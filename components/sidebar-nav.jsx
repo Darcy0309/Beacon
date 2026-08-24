@@ -19,7 +19,7 @@ export default function SidebarNav({ onNavigate }) {
   return (
     <div className="flex h-full flex-col">
       <div className="px-5 py-5">
-        <BeaconWordmark className="h-9 w-auto text-white" />
+        <BeaconWordmark className="h-9 w-auto text-sidebar-foreground" />
         <div className="mt-1.5 text-[0.6rem] font-medium uppercase tracking-[0.14em] text-sidebar-foreground/55">Signature Marketing</div>
       </div>
 
@@ -73,10 +73,10 @@ export default function SidebarNav({ onNavigate }) {
           value={role}
           onChange={(e) => setRole(e.target.value)}
           aria-label="Switch role"
-          className="mb-3 w-full rounded-md border border-sidebar-border bg-sidebar-accent/60 px-2.5 py-1.5 text-sm text-white outline-none focus:ring-2 focus:ring-sidebar-ring"
+          className="mb-3 w-full rounded-md border border-sidebar-border bg-sidebar-accent/60 px-2.5 py-1.5 text-sm text-sidebar-foreground outline-none focus:ring-2 focus:ring-sidebar-ring"
         >
           {Object.entries(ROLES).map(([key, r]) => (
-            <option key={key} value={key} className="bg-slate-800 text-white">
+            <option key={key} value={key}>
               {r.label}
             </option>
           ))}
@@ -85,7 +85,7 @@ export default function SidebarNav({ onNavigate }) {
         <div className="flex items-center gap-3">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500 text-xs font-semibold text-white">SF</div>
           <div className="min-w-0 flex-1 text-sm leading-tight">
-            <div className="font-medium text-white">Sean F.</div>
+            <div className="font-medium text-sidebar-foreground">Sean F.</div>
             <div className="truncate text-xs text-sidebar-foreground/60">{ROLES[role]?.label}</div>
           </div>
           <Link
@@ -93,7 +93,7 @@ export default function SidebarNav({ onNavigate }) {
             onClick={onNavigate}
             title="Sign out"
             aria-label="Sign out"
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-white"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <LogOut className="size-4" />
           </Link>
