@@ -194,11 +194,5 @@ table tbody tr:hover {
   100% { transform: scale(2.6); opacity: 0; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.001ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-    scroll-behavior: auto !important;
-  }
-}
+/* Note: reduced-motion suppression intentionally omitted so the ambient
+   backgrounds and page transitions always play (this is a design demo). */

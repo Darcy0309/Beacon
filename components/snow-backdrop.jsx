@@ -9,7 +9,6 @@ export default function SnowBackdrop() {
     const canvas = ref.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let w = 0;
     let h = 0;
@@ -57,8 +56,7 @@ export default function SnowBackdrop() {
 
     resize();
     seed();
-    if (reduce) render(false);
-    else loop();
+    loop();
 
     const onResize = () => {
       resize();
