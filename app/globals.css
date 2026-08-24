@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(0.985 0.002 250);
+  --foreground: oklch(0.21 0.02 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 260);
+  --primary: oklch(0.52 0.17 262);
+  --primary-foreground: oklch(0.985 0.01 250);
+  --secondary: oklch(0.968 0.004 260);
+  --secondary-foreground: oklch(0.28 0.02 260);
+  --muted: oklch(0.968 0.004 260);
+  --muted-foreground: oklch(0.552 0.02 258);
+  --accent: oklch(0.966 0.006 260);
+  --accent-foreground: oklch(0.28 0.02 260);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0.005 260);
+  --input: oklch(0.922 0.005 260);
+  --ring: oklch(0.52 0.17 262);
+  --sidebar: oklch(0.23 0.03 262);
+  --sidebar-foreground: oklch(0.87 0.02 258);
+  --sidebar-primary: oklch(0.55 0.17 262);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.30 0.03 262);
+  --sidebar-accent-foreground: oklch(0.97 0 0);
+  --sidebar-border: oklch(0.33 0.03 262);
+  --sidebar-ring: oklch(0.55 0.17 262);
+}
+
+.dark {
+    --background: oklch(0.17 0.012 262);
+    --foreground: oklch(0.93 0.01 258);
+    --card: oklch(0.205 0.014 262);
+    --card-foreground: oklch(0.93 0.01 258);
+    --popover: oklch(0.205 0.014 262);
+    --popover-foreground: oklch(0.93 0.01 258);
+    --primary: oklch(0.62 0.16 260);
+    --primary-foreground: oklch(0.17 0.012 262);
+    --secondary: oklch(0.27 0.015 262);
+    --secondary-foreground: oklch(0.93 0.01 258);
+    --muted: oklch(0.27 0.015 262);
+    --muted-foreground: oklch(0.705 0.015 258);
+    --accent: oklch(0.29 0.015 262);
+    --accent-foreground: oklch(0.96 0 0);
+    --destructive: oklch(0.62 0.2 25);
+    --destructive-foreground: oklch(0.985 0 0);
+    --border: oklch(0.32 0.02 262);
+    --input: oklch(0.34 0.02 262);
+    --ring: oklch(0.62 0.16 260);
+    --sidebar: oklch(0.15 0.01 262);
+    --sidebar-foreground: oklch(0.87 0.02 258);
+    --sidebar-primary: oklch(0.62 0.16 260);
+    --sidebar-primary-foreground: oklch(0.17 0.012 262);
+    --sidebar-accent: oklch(0.26 0.02 262);
+    --sidebar-accent-foreground: oklch(0.96 0 0);
+    --sidebar-border: oklch(1 0 0 / 8%);
+    --sidebar-ring: oklch(0.62 0.16 260);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@keyframes beacon-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 40%, transparent); }
+  70%  { box-shadow: 0 0 0 7px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.animate-beacon-pulse { animation: beacon-pulse 2.4s ease-out infinite; }
+
+@keyframes pop-in {
+  0%   { opacity: 0; transform: translateY(6px) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-pop-in { animation: pop-in 0.28s ease-out both; }
+
+/* Cards that contain a table stay put on hover — only the column reacts */
+.bg-card:has(table):hover {
+  transform: none !important;
+  box-shadow: var(--tw-shadow, 0 1px 3px 0 rgb(0 0 0 / 0.08)) !important;
+}
+
+/* Hovered row highlight — flush, no overflow */
+table tbody tr {
+  transition: background-color 0.16s ease;
+}
+table tbody tr:hover {
+  background-color: color-mix(in oklch, var(--primary) 6%, transparent);
+}
+
+/* Subtle theme-matching scrollbars so scroll areas blend into the background */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-foreground);
+  background-clip: content-box;
+}
+
+/* Page transition on navigation */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+.animate-page-in {
+  animation: page-in 0.32s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
