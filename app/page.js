@@ -7,10 +7,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { recentLeads, appointments } from "@/lib/data";
 
 const stats = [
-  { label: "Active Leads", value: "342", delta: "+12.4%", up: true, note: "vs last month", icon: Target, tint: "bg-sky-500/10 text-sky-600" },
-  { label: "Appointments / wk", value: "28", delta: "+6", up: true, note: "vs last week", icon: CalendarCheck, tint: "bg-emerald-500/10 text-emerald-600" },
-  { label: "Active Clients", value: "17", delta: "+2", up: true, note: "new this quarter", icon: Users, tint: "bg-violet-500/10 text-violet-600" },
-  { label: "Conversion Rate", value: "23.6%", delta: "-1.1%", up: false, note: "vs last month", icon: Percent, tint: "bg-amber-500/10 text-amber-600" },
+  { label: "Active Leads", value: "342", delta: "+12.4%", up: true, note: "vs last month", icon: Target, tint: "bg-sky-500/10 text-sky-600", wm: "text-sky-500", rgb: "14 165 233" },
+  { label: "Appointments / wk", value: "28", delta: "+6", up: true, note: "vs last week", icon: CalendarCheck, tint: "bg-emerald-500/10 text-emerald-600", wm: "text-emerald-500", rgb: "16 185 129" },
+  { label: "Active Clients", value: "17", delta: "+2", up: true, note: "new this quarter", icon: Users, tint: "bg-violet-500/10 text-violet-600", wm: "text-violet-500", rgb: "139 92 246" },
+  { label: "Conversion Rate", value: "23.6%", delta: "-1.1%", up: false, note: "vs last month", icon: Percent, tint: "bg-amber-500/10 text-amber-600", wm: "text-amber-500", rgb: "245 158 11" },
 ];
 
 export default function Dashboard() {
@@ -24,8 +24,12 @@ export default function Dashboard() {
             const Icon = s.icon;
             const Trend = s.up ? TrendingUp : TrendingDown;
             return (
-              <Card key={s.label}>
-                <CardContent className="p-5">
+              <Card key={s.label} className="relative overflow-hidden">
+                <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(150px 120px at 100% 0%, rgb(${s.rgb} / 0.16), transparent)` }} />
+                <div aria-hidden className={`pointer-events-none absolute -bottom-7 -right-4 opacity-[0.08] ${s.wm}`}>
+                  <Icon className="size-28" />
+                </div>
+                <CardContent className="relative p-5">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">{s.label}</span>
                     <span className={`flex size-8 items-center justify-center rounded-lg ${s.tint}`}>

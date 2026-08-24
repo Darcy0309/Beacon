@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Radar, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+import BeaconLogo from "@/components/logo";
 import { navGroups } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -11,8 +12,8 @@ export default function SidebarNav({ onNavigate }) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-sky-400 text-white shadow-md shadow-primary/30">
-          <Radar className="size-5" />
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-sky-400 shadow-md shadow-primary/30">
+          <BeaconLogo className="size-5 text-white" />
         </div>
         <div className="leading-tight">
           <div className="font-semibold text-white">Beacon</div>
