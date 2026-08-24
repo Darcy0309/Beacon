@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut } from "lucide-react";
-import BeaconLogo from "@/components/logo";
+import BeaconWordmark from "@/components/logo-wordmark";
 import { navGroups } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -11,14 +11,9 @@ export default function SidebarNav({ onNavigate }) {
   const path = usePathname();
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-sky-400 shadow-md shadow-primary/30">
-          <BeaconLogo className="size-5 text-white" />
-        </div>
-        <div className="leading-tight">
-          <div className="font-semibold text-white">Beacon</div>
-          <div className="text-[0.62rem] font-medium uppercase tracking-[0.14em] text-sidebar-foreground/55">Signature Mktg</div>
-        </div>
+      <div className="px-5 py-5">
+        <BeaconWordmark className="h-7 w-auto text-white" />
+        <div className="mt-1.5 text-[0.6rem] font-medium uppercase tracking-[0.14em] text-sidebar-foreground/55">Signature Marketing</div>
       </div>
 
       <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">

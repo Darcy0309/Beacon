@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import BeaconBackdrop from "@/components/beacon-backdrop";
 import SnowBackdrop from "@/components/snow-backdrop";
-import BeaconLogo from "@/components/logo";
+import BeaconWordmark from "@/components/logo-wordmark";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,14 +34,9 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0"><SnowBackdrop /></div>
 
       <div className="relative w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/15 backdrop-blur">
-            <BeaconLogo className="size-8 text-white" />
-          </div>
-          <div>
-            <div className="text-2xl font-semibold tracking-tight text-white">Beacon</div>
-            <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
-          </div>
+        <div className="mb-7 flex flex-col items-center gap-2 text-center">
+          <BeaconWordmark className="h-11 w-auto text-white" />
+          <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
         </div>
 
         <form onSubmit={signIn} className="space-y-4 rounded-2xl border border-white/12 bg-white/8 p-6 shadow-2xl backdrop-blur-xl">

@@ -2,6 +2,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Safelist: color classes stored in lib/data.js and applied via template strings.
+   They build fine locally, but this guarantees they are never dropped in any
+   production build environment (e.g. Vercel) regardless of source scanning. */
+@source inline("bg-primary bg-emerald-500 bg-sky-500 bg-rose-500 bg-violet-500 bg-amber-500 text-sky-500 text-sky-600 text-emerald-500 text-emerald-600 text-violet-500 text-violet-600 text-amber-500 text-amber-600 bg-sky-500/10 bg-emerald-500/10 bg-violet-500/10 bg-amber-500/10");
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
