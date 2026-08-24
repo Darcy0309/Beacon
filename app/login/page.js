@@ -8,14 +8,19 @@ import { Button } from "@/components/ui/button";
 import BeaconBackdrop from "@/components/beacon-backdrop";
 import SnowBackdrop from "@/components/snow-backdrop";
 import BeaconWordmark from "@/components/logo-wordmark";
+import { useRole } from "@/components/role-provider";
+import { ROLES } from "@/lib/nav";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { setRole } = useRole();
   const [username, setUsername] = useState("seanf");
+  const [selectedRole, setSelectedRole] = useState("admin");
 
   function signIn(e) {
     e.preventDefault();
-    toast.success("Signed in — welcome back, Sean");
+    setRole(selectedRole);
+    toast.success(`Signed in as ${ROLES[selectedRole].label}`);
     router.push("/");
   }
 
@@ -27,7 +32,6 @@ export default function LoginPage() {
       className="relative grid min-h-svh place-items-center overflow-hidden p-4"
       style={{ background: "radial-gradient(120% 90% at 50% -10%, #223258 0%, #0e1830 55%, #080d19 100%)" }}
     >
-      {/* stylish glows + motifs */}
       <div className="pointer-events-none absolute -left-24 top-1/3 size-96 rounded-full blur-3xl" style={{ background: "rgb(245 177 32 / 0.12)" }} />
       <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full blur-3xl" style={{ background: "rgb(43 87 201 / 0.20)" }} />
       <BeaconBackdrop />
@@ -35,7 +39,7 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-2 text-center">
-          <BeaconWordmark className="h-11 w-auto text-white" />
+          <BeaconWordmark className="h-14 w-auto text-white" />
           <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
         </div>
 
@@ -48,6 +52,27 @@ export default function LoginPage() {
             <label htmlFor="password" className="text-sm font-medium text-white/80">Password</label>
             <input id="password" type="password" defaultValue="password" autoComplete="current-password" className={field} />
           </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-white/80">Sign in as</label>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(ROLES).map(([key, r]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setSelectedRole(key)}
+                  className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
+                    selectedRole === key
+                      ? "border-white/40 bg-white/15 text-white"
+                      : "border-white/12 bg-white/5 text-white/70 hover:bg-white/10"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <Button type="submit" className="w-full">Sign in</Button>
           <button
             type="button"
@@ -62,7 +87,7 @@ export default function LoginPage() {
           <Lock className="size-3" /> Access is restricted to approved IP addresses.
         </p>
         <p className="mt-1 text-center text-[0.7rem] text-white/35">
-          Design preview · you’ll be routed to your workspace by role after sign-in.
+          Design preview · your workspace is tailored to your role after sign-in.
         </p>
       </div>
     </div>

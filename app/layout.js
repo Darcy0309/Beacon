@@ -3,6 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import AppShell from "@/components/app-shell";
 import Backdrop from "@/components/backdrop";
+import { RoleProvider } from "@/components/role-provider";
 
 export const metadata = {
   title: "Beacon CRM — Design Preview",
@@ -15,8 +16,10 @@ export default function RootLayout({ children }) {
       <body className="antialiased">
         <Backdrop />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AppShell>{children}</AppShell>
-          <Toaster />
+          <RoleProvider>
+            <AppShell>{children}</AppShell>
+            <Toaster />
+          </RoleProvider>
         </ThemeProvider>
       </body>
     </html>
