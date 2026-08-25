@@ -16,7 +16,7 @@ export default function AlertsPage() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {alertRules.map((r) => (
-                  <div key={r.name} className="flex items-center justify-between gap-4 px-5 py-4">
+                  <div key={r.name} data-list-row className="flex items-center justify-between gap-4 px-5 py-4">
                     <div className="min-w-0">
                       <div className="font-medium">{r.name}</div>
                       <div className="text-sm text-muted-foreground">{r.desc}</div>
@@ -32,7 +32,7 @@ export default function AlertsPage() {
             <CardHeader><CardTitle>Recent alerts</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {recentAlerts.map((a, i) => (
-                <div key={i} className="flex items-start gap-3">
+                <div key={i} data-list-row className="-mx-2 flex items-start gap-3 rounded-lg px-2 py-1.5">
                   <span className={`mt-1.5 size-2 shrink-0 rounded-full ${dot[a.tone] || dot.new}`} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">{a.text}</div>

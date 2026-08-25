@@ -41,7 +41,7 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {reps.map((r) => (
-              <div key={r.name}>
+              <div key={r.name} data-list-row className="-mx-2 rounded-lg px-2 py-1.5">
                 <div className="mb-1.5 flex items-center justify-between text-sm">
                   <span className="font-medium">{r.name}</span>
                   <span className="tabular-nums text-muted-foreground">{r.appts}</span>

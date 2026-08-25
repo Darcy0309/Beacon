@@ -90,7 +90,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-3">
               {appointments.today.map((a) => (
-                <div key={a.time} className="flex items-center gap-3">
+                <div key={a.time} data-list-row className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-1">
                   <span className={`h-9 w-1 rounded-full ${a.bar}`} />
                   <div className="w-14 shrink-0 text-sm font-semibold tabular-nums">
                     {a.time}

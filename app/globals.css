@@ -129,17 +129,21 @@
 .animate-pop-in { animation: pop-in 0.28s ease-out both; }
 
 /* Cards that contain a table stay put on hover — only the column reacts */
-[data-card]:has(table):hover {
+[data-card]:has(table):hover,
+[data-card]:has([data-list-row]):hover {
   transform: none !important;
+  scale: 1 !important;
   box-shadow: var(--tw-shadow, 0 1px 3px 0 rgb(0 0 0 / 0.08)) !important;
 }
 
-/* Hovered row highlight — flush, no overflow */
-table tbody tr {
+/* Hovered row highlight — flush, no overflow (tables and list rows) */
+table tbody tr,
+[data-list-row] {
   transition: background-color 0.16s ease;
 }
-table tbody tr:hover {
-  background-color: color-mix(in oklch, var(--primary) 6%, transparent);
+table tbody tr:hover,
+[data-list-row]:hover {
+  background-color: color-mix(in oklch, var(--primary) 8%, transparent);
 }
 
 /* Subtle theme-matching scrollbars so scroll areas blend into the background */

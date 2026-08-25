@@ -19,7 +19,7 @@ export default function MobileNav() {
       </SheetTrigger>
       <SheetContent side="left" className="p-0">
         <SheetTitle className="sr-only">Navigation</SheetTitle>
-        <SidebarNav onNavigate={() => setOpen(false)} />
+        <SidebarNav onNavigate={() => setOpen(false)} forceExpanded />
       </SheetContent>
     </Sheet>
   );

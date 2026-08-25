@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import AppShell from "@/components/app-shell";
 import Backdrop from "@/components/backdrop";
 import { RoleProvider } from "@/components/role-provider";
+import { SidebarProvider } from "@/components/sidebar-provider";
 
 export const metadata = {
   title: "Beacon CRM — Design Preview",
@@ -17,8 +18,10 @@ export default function RootLayout({ children }) {
         <Backdrop />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <RoleProvider>
-            <AppShell>{children}</AppShell>
-            <Toaster />
+            <SidebarProvider>
+              <AppShell>{children}</AppShell>
+              <Toaster />
+            </SidebarProvider>
           </RoleProvider>
         </ThemeProvider>
       </body>

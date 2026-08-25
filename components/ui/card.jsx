@@ -5,7 +5,7 @@ function Card({ className, ...props }) {
     <div
       data-card
       className={cn(
-        "rounded-xl border bg-card/70 text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 supports-[backdrop-filter]:bg-card/62 hover:-translate-y-0.5 hover:shadow-md",
+        "relative rounded-xl border bg-card/70 text-card-foreground shadow-sm backdrop-blur-sm transition-all duration-200 supports-[backdrop-filter]:bg-card/62 hover:z-10 hover:scale-[1.005] hover:shadow-md",
         className
       )}
       {...props}
