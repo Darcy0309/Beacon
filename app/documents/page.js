@@ -1,23 +1,26 @@
-import { Upload, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import Topbar from "@/components/topbar";
 import ToneBadge from "@/components/tone-badge";
 import RowActions from "@/components/row-actions";
-import ToastButton from "@/components/toast-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { documents } from "@/lib/data";
+import { getDocuments } from "@/lib/queries";
+import { deleteDocument } from "@/lib/actions";
+import { fileSize, longDate, fullName } from "@/lib/display";
+import { DOC_TONE } from "@/lib/constants";
 
-const typeTone = { PDF: "rose", DOCX: "sky", CSV: "emerald", PNG: "violet" };
+export const dynamic = "force-dynamic";
 
-export default function DocumentsPage() {
+export default async function DocumentsPage() {
+  const documents = await getDocuments();
+
   return (
     <>
-      <Topbar title="Documents" sub="Lead sheets, contracts, and assets" />
+      <Topbar title="Documents" sub={`${documents.length} lead sheets, contracts, and assets`} />
       <div className="flex-1 p-4 sm:p-6">
         <Card>
           <CardHeader>
             <CardTitle>All documents</CardTitle>
-            <ToastButton size="sm" message="Upload dialog opened"><Upload /> Upload</ToastButton>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -26,8 +29,10 @@ export default function DocumentsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Client</TableHead>
+                  <TableHead>Project</TableHead>
                   <TableHead>Size</TableHead>
-                  <TableHead>Uploaded</TableHead>
+                  <TableHead>Uploaded by</TableHead>
+                  <TableHead>Date</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -40,13 +45,36 @@ export default function DocumentsPage() {
                         <span className="font-medium">{d.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell><ToneBadge tone={typeTone[d.type]}>{d.type}</ToneBadge></TableCell>
-                    <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">{d.size}</TableCell>
-                    <TableCell className="text-muted-foreground">{d.date}</TableCell>
-                    <TableCell className="text-right"><RowActions name={d.name} /></TableCell>
+                    <TableCell>
+                      {d.file_type ? (
+                        <ToneBadge tone={DOC_TONE[d.file_type] ?? "slate"}>{d.file_type}</ToneBadge>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className={d.company ? "" : "text-muted-foreground"}>
+                      {d.company?.name ?? "—"}
+                    </TableCell>
+                    <TableCell className={d.project ? "" : "text-muted-foreground"}>
+                      {d.project?.name ?? "—"}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {fileSize(d.size_bytes)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{fullName(d.uploader)}</TableCell>
+                    <TableCell className="text-muted-foreground">{longDate(d.created_at)}</TableCell>
+                    <TableCell className="text-right">
+                      <RowActions name={d.name} id={d.id} onDelete={deleteDocument} />
+                    </TableCell>
                   </TableRow>
                 ))}
+                {documents.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      No documents yet.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>

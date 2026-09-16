@@ -1,29 +1,23 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext } from "react";
 
 const RoleContext = createContext(null);
 
-export function RoleProvider({ children }) {
-  const [role, setRoleState] = useState("admin");
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("beacon-role");
-      if (stored) setRoleState(stored);
-    } catch {}
-  }, []);
-
-  const setRole = (r) => {
-    setRoleState(r);
-    try {
-      localStorage.setItem("beacon-role", r);
-    } catch {}
+/**
+ * Carries the signed-in user's real role and profile down to client components
+ * so the navigation can hide what the user has no access to. This is a
+ * convenience only — Row Level Security in Postgres is what actually enforces
+ * access.
+ */
+export function RoleProvider({ user, children }) {
+  const value = {
+    user: user ?? null,
+    role: user?.role ?? "client",
   };
-
-  return <RoleContext.Provider value={{ role, setRole }}>{children}</RoleContext.Provider>;
+  return <RoleContext.Provider value={value}>{children}</RoleContext.Provider>;
 }
 
 export function useRole() {
-  return useContext(RoleContext) ?? { role: "admin", setRole: () => {} };
+  return useContext(RoleContext) ?? { user: null, role: "client" };
 }
