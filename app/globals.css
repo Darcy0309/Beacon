@@ -208,43 +208,46 @@
   pointer-events: none;
 }
 
-/* The moving segment: a short glowing streak that rides just inside the
-   border and follows the rounded corners at constant speed. */
+/* The moving streak. A chain of pills follows the same rounded path with a
+   small lag between them, so it flexes through corners; sizes peak in the
+   middle of the chain and fall away to both ends for the taper. */
+.edge-trace {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  display: none;
+}
 @supports (offset-path: inset(0 round 1px)) {
-  [data-accent-edge]::after {
-    content: "";
+  .edge-trace { display: block; }
+
+  .edge-trace > i {
     position: absolute;
     top: 0;
     left: 0;
-    width: 110px;
-    height: 2px;
+    /* --s: 1 in the middle of the streak, 0 at its ends */
+    width: calc(6px + 10px * var(--s));
+    height: calc(1px + 2.6px * var(--s));
     border-radius: 9999px;
-    background: linear-gradient(
-      90deg,
-      transparent,
-      color-mix(in srgb, var(--edge, var(--primary)) 70%, white) 50%,
-      transparent
-    );
-    box-shadow: 0 0 10px 1px color-mix(in srgb, var(--edge, var(--primary)) 55%, transparent);
+    background: color-mix(in srgb, var(--edge, var(--primary)) calc(55% + 45% * var(--s)), white);
+    opacity: calc(0.12 + 0.88 * var(--s));
+    box-shadow: 0 0 calc(3px + 7px * var(--s)) color-mix(in srgb, var(--edge, var(--primary)) 65%, transparent);
     /* one pixel inside the border, with matching corner radii */
     offset-path: inset(1px round calc(var(--radius) + 3px));
     offset-rotate: auto;
     offset-distance: 0%;
-    animation: trace-edge 7s linear infinite;
-    animation-delay: var(--trace-delay, 0s);
-    pointer-events: none;
+    animation: trace-edge 8s linear infinite;
+    /* each pill trails the one before it slightly */
+    animation-delay: calc(var(--trace-delay, 0s) - var(--i) * 0.045s);
     will-change: offset-distance;
   }
 
-  /* Stagger siblings in a grid so the four tiles are not in lockstep. */
-  :where(.grid) > [data-accent-edge]:nth-child(2)::after { --trace-delay: -1.75s; }
-  :where(.grid) > [data-accent-edge]:nth-child(3)::after { --trace-delay: -3.5s; }
-  :where(.grid) > [data-accent-edge]:nth-child(4)::after { --trace-delay: -5.25s; }
-  :where(.grid) > [data-accent-edge]:nth-child(5)::after { --trace-delay: -0.9s; }
-  :where(.grid) > [data-accent-edge]:nth-child(6)::after { --trace-delay: -2.6s; }
-
-  /* A brief hover slows the lap so the eye can follow it. */
-  [data-accent-edge]:hover::after { animation-duration: 12s; }
+  /* Stagger siblings in a grid so the tiles are not in lockstep. */
+  :where(.grid) > [data-accent-edge]:nth-child(2) { --trace-delay: -2s; }
+  :where(.grid) > [data-accent-edge]:nth-child(3) { --trace-delay: -4s; }
+  :where(.grid) > [data-accent-edge]:nth-child(4) { --trace-delay: -6s; }
+  :where(.grid) > [data-accent-edge]:nth-child(5) { --trace-delay: -1s; }
+  :where(.grid) > [data-accent-edge]:nth-child(6) { --trace-delay: -3s; }
 }
 
 @keyframes trace-edge {

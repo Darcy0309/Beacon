@@ -1,4 +1,5 @@
 import Sparkline from "@/components/sparkline";
+import EdgeTrace from "@/components/edge-trace";
 import { cn } from "@/lib/utils";
 
 /**
@@ -66,6 +67,8 @@ export default function StatTile({
           className="block h-16 w-full"
         />
       ) : null}
+
+      <EdgeTrace />
     </div>
   );
 }

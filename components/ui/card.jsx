@@ -1,10 +1,11 @@
 import { cn } from "@/lib/utils";
+import EdgeTrace from "@/components/edge-trace";
 
 /**
  * Panel surface: hairline border, flat dark ground, optional bright accent edge
  * along the top (pass `accent` as any CSS colour, e.g. "var(--neon-amber)").
  */
-function Card({ className, accent, style, ...props }) {
+function Card({ className, accent, style, children, ...props }) {
   return (
     <div
       data-card
@@ -16,7 +17,10 @@ function Card({ className, accent, style, ...props }) {
       )}
       style={accent ? { ...style, "--edge": accent } : style}
       {...props}
-    />
+    >
+      {children}
+      {accent ? <EdgeTrace /> : null}
+    </div>
   );
 }
 
