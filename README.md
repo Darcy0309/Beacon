@@ -112,14 +112,46 @@ Four roles, enforced in the database rather than the UI:
 Every table has RLS enabled. The navigation hides what a role cannot use, but
 the policies are what actually deny access — `npm run smoke` proves it.
 
-## Deploying
+## Deploying to Vercel
 
-The app runs against any Supabase project, not just the local stack:
+The app needs a **hosted** Supabase project — the local Docker stack is not
+reachable from Vercel. Without one, every route shows a setup screen at
+`/setup` explaining what is missing (rather than a 500).
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. `supabase link --project-ref <ref>` then `supabase db push` to apply the migrations.
-3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in your host
-   (e.g. Vercel) and deploy.
+1. **Create the Supabase project** at [supabase.com/dashboard](https://supabase.com/dashboard).
+   Under *Settings → API* copy the **Project URL** and the **anon / publishable** key.
 
-Create real users through Supabase Auth, then add a matching row in `users` with
-the correct `role` and `auth_id`.
+2. **Push the schema and seed data** from this repo:
+
+   ```bash
+   npx supabase login
+   npx supabase link --project-ref <your-project-ref>
+   npm run db:push          # runs the migrations, then supabase/seed.sql
+   ```
+
+   This creates the tables, RLS policies, lookup values and the demo accounts
+   (`admin@beacon.test` etc., password `Beacon!2026`).
+
+3. **Set the environment variables** in Vercel → *Project → Settings →
+   Environment Variables*, for Production (and Preview if you use it):
+
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon or publishable key>
+   ```
+
+   These are inlined at **build** time, so saving them is not enough —
+   **trigger a new deployment** afterwards (Deployments → ⋯ → Redeploy).
+
+4. **Add your production users.** Create them under *Authentication → Users*
+   in Supabase, then insert a matching row in `public.users` with the right
+   `role` and `auth_id`, or invite them from the app's Users screen once you
+   are signed in as an admin.
+
+### Why it 500'd before
+
+`proxy.js` runs on every request and used to create the Supabase client
+unconditionally. With the variables unset it threw before any page rendered,
+so even `/login` returned 500. It now checks configuration first and sends
+visitors to `/setup`; it also detects a `127.0.0.1` URL on a hosted deployment,
+which is what happens when `.env.local` values are pasted into Vercel.

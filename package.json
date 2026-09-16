@@ -12,7 +12,9 @@
     "db:studio": "echo 'Supabase Studio: http://127.0.0.1:54323'",
     "smoke": "node scripts/smoke-test.mjs",
     "e2e": "node scripts/e2e-check.mjs",
-    "test": "node scripts/csv-test.mjs && node scripts/smoke-test.mjs"
+    "test": "node scripts/csv-test.mjs && node scripts/smoke-test.mjs",
+    "db:link": "supabase link",
+    "db:push": "supabase db push --include-seed"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",

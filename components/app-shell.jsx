@@ -7,7 +7,7 @@ export default function AppShell({ children }) {
   const path = usePathname();
 
   // Login is a standalone full-screen screen — no sidebar.
-  if (path === "/login") return children;
+  if (path === "/login" || path === "/setup") return children;
 
   return (
     <div className="flex min-h-svh">

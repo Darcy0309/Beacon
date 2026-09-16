@@ -7,6 +7,7 @@ import Backdrop from "@/components/backdrop";
 import { RoleProvider } from "@/components/role-provider";
 import { SidebarProvider } from "@/components/sidebar-provider";
 import { getCurrentUser } from "@/lib/queries";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,10 +24,12 @@ export const metadata = {
 export default async function RootLayout({ children }) {
   // Null on the login page and for signed-out visitors.
   let user = null;
-  try {
-    user = await getCurrentUser();
-  } catch {
-    user = null;
+  if (isSupabaseConfigured) {
+    try {
+      user = await getCurrentUser();
+    } catch {
+      user = null;
+    }
   }
 
   return (
