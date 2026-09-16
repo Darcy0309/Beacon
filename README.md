@@ -121,13 +121,18 @@ reachable from Vercel. Without one, every route shows a setup screen at
 1. **Create the Supabase project** at [supabase.com/dashboard](https://supabase.com/dashboard).
    Under *Settings → API* copy the **Project URL** and the **anon / publishable** key.
 
-2. **Push the schema and seed data** from this repo:
+2. **Push the schema and seed data.** Either paste `supabase/deploy.sql`
+   (migrations + seed in one file) into the dashboard's **SQL Editor** and run
+   it — no CLI or credentials needed — or use the CLI:
 
    ```bash
    npx supabase login
    npx supabase link --project-ref <your-project-ref>
    npm run db:push          # runs the migrations, then supabase/seed.sql
    ```
+
+   Regenerate `deploy.sql` after changing a migration:
+   `cat supabase/migrations/*.sql supabase/seed.sql > supabase/deploy.sql`
 
    This creates the tables, RLS policies, lookup values and the demo accounts
    (`admin@beacon.test` etc., password `Beacon!2026`).
