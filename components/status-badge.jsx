@@ -2,28 +2,38 @@ import { cn } from "@/lib/utils";
 import { STATUS } from "@/lib/data";
 
 const ring = {
-  appt: "bg-emerald-500/10 text-emerald-600 ring-emerald-500/20",
-  survey: "bg-violet-500/10 text-violet-600 ring-violet-500/20",
-  hot: "bg-rose-500/10 text-rose-600 ring-rose-500/20",
-  xdate: "bg-sky-500/10 text-sky-600 ring-sky-500/20",
-  profile: "bg-amber-500/10 text-amber-600 ring-amber-500/20",
-  new: "bg-slate-500/10 text-slate-500 ring-slate-500/20",
+  appt: "border-emerald-400/40 bg-emerald-400/8 text-emerald-400",
+  survey: "border-violet-400/40 bg-violet-400/8 text-violet-400",
+  hot: "border-rose-400/40 bg-rose-400/8 text-rose-400",
+  xdate: "border-cyan-400/40 bg-cyan-400/8 text-cyan-400",
+  profile: "border-amber-400/45 bg-amber-400/8 text-amber-400",
+  new: "border-slate-400/30 bg-slate-400/8 text-slate-400",
 };
 const dot = {
-  appt: "bg-emerald-500",
-  survey: "bg-violet-500",
-  hot: "bg-rose-500",
-  xdate: "bg-sky-500",
-  profile: "bg-amber-500",
+  appt: "bg-emerald-400",
+  survey: "bg-violet-400",
+  hot: "bg-rose-400",
+  xdate: "bg-cyan-400",
+  profile: "bg-amber-400",
   new: "bg-slate-400",
 };
 
+/** Accepts a status code ("hot") or a lead_statuses row ({ code, name }). */
 export default function StatusBadge({ status }) {
-  const s = STATUS[status] || STATUS.new;
+  const code = typeof status === "string" ? status : status?.code;
+  const label =
+    (typeof status === "object" && status?.name) || STATUS[code]?.label || STATUS.new.label;
+  const key = code in ring ? code : "new";
+
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset", ring[status] || ring.new)}>
-      <span className={cn("size-1.5 rounded-full", dot[status] || dot.new)} />
-      {s.label}
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[0.66rem] font-semibold uppercase tracking-[0.1em]",
+        ring[key]
+      )}
+    >
+      <span className={cn("size-1.5 rounded-full", dot[key])} />
+      {label}
     </span>
   );
 }

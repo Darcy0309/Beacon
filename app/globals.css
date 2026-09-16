@@ -2,10 +2,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Safelist: color classes stored in lib/data.js and applied via template strings.
-   They build fine locally, but this guarantees they are never dropped in any
-   production build environment (e.g. Vercel) regardless of source scanning. */
-@source inline("bg-primary bg-emerald-500 bg-sky-500 bg-rose-500 bg-violet-500 bg-amber-500 text-sky-500 text-sky-600 text-emerald-500 text-emerald-600 text-violet-500 text-violet-600 text-amber-500 text-amber-600 bg-sky-500/10 bg-emerald-500/10 bg-violet-500/10 bg-amber-500/10");
+/* Safelist: colour classes applied via template strings from data. */
+@source inline("bg-primary bg-emerald-500 bg-sky-500 bg-rose-500 bg-violet-500 bg-amber-500 bg-cyan-500 bg-fuchsia-500 text-sky-500 text-sky-400 text-emerald-500 text-emerald-400 text-violet-500 text-violet-400 text-amber-500 text-amber-400 text-cyan-400 text-fuchsia-400 text-rose-400 bg-sky-500/10 bg-emerald-500/10 bg-violet-500/10 bg-amber-500/10 bg-rose-500/10 bg-cyan-500/10 bg-fuchsia-500/10");
 
 @theme inline {
   --color-background: var(--background);
@@ -39,68 +37,102 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
+/* ---------------------------------------------------------------------------
+   Command-centre palette. Dark is the primary surface; light is a coherent
+   counterpart on the same cyan/amber hues so the theme toggle still reads as
+   deliberate.
+   --------------------------------------------------------------------------- */
+
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.985 0.002 250);
-  --foreground: oklch(0.21 0.02 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.21 0.02 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.21 0.02 260);
-  --primary: oklch(0.52 0.17 262);
-  --primary-foreground: oklch(0.985 0.01 250);
-  --secondary: oklch(0.968 0.004 260);
-  --secondary-foreground: oklch(0.28 0.02 260);
-  --muted: oklch(0.968 0.004 260);
-  --muted-foreground: oklch(0.552 0.02 258);
-  --accent: oklch(0.966 0.006 260);
-  --accent-foreground: oklch(0.28 0.02 260);
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0.005 260);
-  --input: oklch(0.922 0.005 260);
-  --ring: oklch(0.52 0.17 262);
-  --sidebar: oklch(0.985 0.003 250);
-  --sidebar-foreground: oklch(0.32 0.02 262);
-  --sidebar-primary: oklch(0.55 0.17 262);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.95 0.006 258);
-  --sidebar-accent-foreground: oklch(0.30 0.02 262);
-  --sidebar-border: oklch(0.91 0.005 258);
-  --sidebar-ring: oklch(0.55 0.17 262);
+  --radius: 0.5rem;
+
+  --background: hsl(210 40% 97%);
+  --foreground: hsl(222 40% 12%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 40% 12%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 40% 12%);
+  --primary: hsl(191 91% 33%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(210 35% 93%);
+  --secondary-foreground: hsl(222 40% 18%);
+  --muted: hsl(210 35% 94%);
+  --muted-foreground: hsl(215 18% 42%);
+  --accent: hsl(38 92% 45%);
+  --accent-foreground: hsl(222 40% 10%);
+  --destructive: hsl(0 72% 47%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(205 25% 86%);
+  --input: hsl(205 25% 86%);
+  --ring: hsl(191 91% 33%);
+
+  --sidebar: hsl(210 40% 99%);
+  --sidebar-foreground: hsl(222 35% 22%);
+  --sidebar-primary: hsl(191 91% 33%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(205 35% 93%);
+  --sidebar-accent-foreground: hsl(222 40% 16%);
+  --sidebar-border: hsl(205 25% 88%);
+  --sidebar-ring: hsl(191 91% 33%);
+
+  --panel-border: hsl(205 25% 86%);
+  --grid-line: hsl(205 30% 90%);
+
+  /* Per-card accent hues used by stat tiles and chips. */
+  --neon-cyan: hsl(190 90% 42%);
+  --neon-blue: hsl(217 85% 55%);
+  --neon-emerald: hsl(160 72% 36%);
+  --neon-amber: hsl(38 92% 47%);
+  --neon-violet: hsl(263 70% 56%);
+  --neon-magenta: hsl(295 72% 50%);
+  --neon-rose: hsl(350 75% 50%);
 }
 
 .dark {
-    --background: oklch(0.17 0.012 262);
-    --foreground: oklch(0.93 0.01 258);
-    --card: oklch(0.205 0.014 262);
-    --card-foreground: oklch(0.93 0.01 258);
-    --popover: oklch(0.205 0.014 262);
-    --popover-foreground: oklch(0.93 0.01 258);
-    --primary: oklch(0.62 0.16 260);
-    --primary-foreground: oklch(0.17 0.012 262);
-    --secondary: oklch(0.27 0.015 262);
-    --secondary-foreground: oklch(0.93 0.01 258);
-    --muted: oklch(0.27 0.015 262);
-    --muted-foreground: oklch(0.705 0.015 258);
-    --accent: oklch(0.29 0.015 262);
-    --accent-foreground: oklch(0.96 0 0);
-    --destructive: oklch(0.62 0.2 25);
-    --destructive-foreground: oklch(0.985 0 0);
-    --border: oklch(0.32 0.02 262);
-    --input: oklch(0.34 0.02 262);
-    --ring: oklch(0.62 0.16 260);
-    --sidebar: oklch(0.15 0.01 262);
-    --sidebar-foreground: oklch(0.87 0.02 258);
-    --sidebar-primary: oklch(0.62 0.16 260);
-    --sidebar-primary-foreground: oklch(0.17 0.012 262);
-    --sidebar-accent: oklch(0.26 0.02 262);
-    --sidebar-accent-foreground: oklch(0.96 0 0);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.62 0.16 260);
+  /* Values taken from the reference command-centre theme. */
+  --background: hsl(222 40% 5%);
+  --foreground: hsl(210 40% 98%);
+  --card: hsl(222 40% 7%);
+  --card-foreground: hsl(210 40% 98%);
+  --popover: hsl(222 40% 7%);
+  --popover-foreground: hsl(210 40% 98%);
+  --primary: hsl(190 90% 50%);
+  --primary-foreground: hsl(222 40% 5%);
+  --secondary: hsl(220 30% 12%);
+  --secondary-foreground: hsl(210 40% 98%);
+  --muted: hsl(220 30% 12%);
+  --muted-foreground: hsl(215 20% 65%);
+  --accent: hsl(43 96% 56%);
+  --accent-foreground: hsl(222 40% 5%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(210 40% 98%);
+  --border: hsl(200 40% 12%);
+  --input: hsl(200 40% 15%);
+  --ring: hsl(190 90% 50%);
+
+  --sidebar: hsl(222 40% 4%);
+  --sidebar-foreground: hsl(210 40% 98%);
+  --sidebar-primary: hsl(190 90% 50%);
+  --sidebar-primary-foreground: hsl(222 40% 5%);
+  --sidebar-accent: hsl(220 30% 12%);
+  --sidebar-accent-foreground: hsl(210 40% 98%);
+  --sidebar-border: hsl(200 40% 12%);
+  --sidebar-ring: hsl(190 90% 50%);
+
+  --panel-border: hsl(200 40% 15%);
+  --grid-line: hsl(200 40% 10%);
+
+  --neon-cyan: hsl(190 90% 50%);
+  --neon-blue: hsl(217 91% 60%);
+  --neon-emerald: hsl(160 84% 45%);
+  --neon-amber: hsl(43 96% 56%);
+  --neon-violet: hsl(263 85% 65%);
+  --neon-magenta: hsl(295 85% 62%);
+  --neon-rose: hsl(350 85% 62%);
 }
 
 @layer base {
@@ -115,8 +147,75 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Signature type treatment: tiny, bold, wide-tracked uppercase labels.
+   --------------------------------------------------------------------------- */
+.eyebrow {
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted-foreground);
+}
+.eyebrow-accent {
+  color: var(--primary);
+}
+.stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: color-mix(in srgb, var(--foreground) 78%, transparent);
+}
+
+/* Big figures read as data, not prose. */
+.stat-value {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Panels. A hairline border plus a bright top edge in the panel's accent hue.
+   --------------------------------------------------------------------------- */
+[data-panel] {
+  position: relative;
+  border: 1px solid var(--panel-border);
+  background-color: var(--card);
+  border-radius: var(--radius-xl);
+}
+[data-accent-edge]::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: 1px;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--edge, var(--primary)) 35%,
+    var(--edge, var(--primary)) 65%,
+    transparent
+  );
+  opacity: 0.9;
+}
+
+/* Faint technical grid, used behind the shell and the sidebar. */
+.grid-veil {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+}
+
 @keyframes beacon-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--primary) 40%, transparent); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent); }
   70%  { box-shadow: 0 0 0 7px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
@@ -128,25 +227,24 @@
 }
 .animate-pop-in { animation: pop-in 0.28s ease-out both; }
 
-/* Cards that contain a table stay put on hover — only the column reacts */
+/* Cards that contain a table stay put on hover — only the row reacts. */
 [data-card]:has(table):hover,
 [data-card]:has([data-list-row]):hover {
   transform: none !important;
   scale: 1 !important;
-  box-shadow: var(--tw-shadow, 0 1px 3px 0 rgb(0 0 0 / 0.08)) !important;
 }
 
-/* Hovered row highlight — flush, no overflow (tables and list rows) */
+/* Hovered row highlight — flush, no overflow (tables and list rows). */
 table tbody tr,
 [data-list-row] {
   transition: background-color 0.16s ease;
 }
 table tbody tr:hover,
 [data-list-row]:hover {
-  background-color: color-mix(in oklch, var(--primary) 8%, transparent);
+  background-color: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
-/* Subtle theme-matching scrollbars so scroll areas blend into the background */
+/* Subtle theme-matching scrollbars so scroll areas blend into the background. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
@@ -178,7 +276,7 @@ table tbody tr:hover,
   animation: page-in 0.32s ease-out both;
 }
 
-/* Beacon / radar pulse rings (login + dashboard backdrop) */
+/* Beacon / radar pulse rings (login backdrop) */
 .beacon-ring {
   position: absolute;
   left: 50%;
@@ -188,7 +286,7 @@ table tbody tr:hover,
   margin-left: -17vmin;
   margin-top: -17vmin;
   border-radius: 9999px;
-  border: 1px solid color-mix(in oklch, var(--primary) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent);
   opacity: 0;
   animation: beacon-radar 7s ease-out infinite;
 }
@@ -197,6 +295,3 @@ table tbody tr:hover,
   12%  { opacity: 0.45; }
   100% { transform: scale(2.6); opacity: 0; }
 }
-
-/* Note: reduced-motion suppression intentionally omitted so the ambient
-   backgrounds and page transitions always play (this is a design demo). */

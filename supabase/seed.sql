@@ -489,3 +489,30 @@ insert into public.app_settings (key, value) values
   ('security',     '{"ip_lockdown":true,"session_timeout_min":60,"password_min_length":10}'::jsonb),
   ('mail',         '{"provider":"smtp","from":"alerts@signaturemktg.net","host":"smtp.office365.com","port":587}'::jsonb),
   ('branding',     '{"primary":"#2b57c9","accent":"#38bdf8","logo":"/logo.svg"}'::jsonb);
+
+-- ---------------------------------------------------------------------------
+-- X-dates for the generated leads. Renewal dates are the core of this product,
+-- so every lead carries one rather than only the hand-written records.
+-- ---------------------------------------------------------------------------
+insert into public.insurance_details (
+  lead_id, agency_name, ultimate_xdate, pkg_xdate, pkg_carrier,
+  wc_xdate, wc_carrier, auto_xdate, auto_carrier, covered_employees, autos
+)
+select
+  l.id,
+  a.name,
+  d.ult,
+  d.ult,
+  a.name,
+  d.ult + 45,
+  a.name,
+  d.ult,
+  a.name,
+  l.covered_employees,
+  l.autos
+from public.leads l
+join public.agencies a on a.id = l.agency_id
+cross join lateral (
+  select (current_date + (((l.id * 17) % 300)::int) - 30)::date as ult
+) d
+where not exists (select 1 from public.insurance_details i where i.lead_id = l.id);

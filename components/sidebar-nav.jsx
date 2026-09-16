@@ -57,7 +57,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
               </button>
             )}
           </div>
-          <div className="mt-1.5 text-[0.6rem] font-medium uppercase tracking-[0.14em] text-sidebar-foreground/55">
+          <div className="mt-2 text-[0.6rem] font-bold uppercase leading-[1.5] tracking-[0.2em] text-primary">
             Signature Marketing
           </div>
         </div>
@@ -69,7 +69,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
             {collapsed ? (
               <div className="mx-auto mb-1 h-px w-6 bg-sidebar-border" />
             ) : (
-              <div className="px-2 pb-1 text-[0.62rem] font-semibold uppercase tracking-[0.13em] text-sidebar-foreground/45">
+              <div className="px-2 pb-1.5 pt-1 text-[0.6rem] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/40">
                 {group.label}
               </div>
             )}
@@ -84,20 +84,20 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                     onClick={onNavigate}
                     title={collapsed ? item.label : undefined}
                     className={cn(
-                      "flex items-center rounded-lg text-sm font-medium transition-colors",
-                      collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2",
+                      "relative flex items-center rounded-lg text-sm font-medium transition-all duration-150",
+                      collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",
                       active
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                        : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        ? "border border-primary/45 bg-primary/10 text-foreground shadow-[0_0_20px_-6px_var(--primary)]"
+                        : "border border-transparent text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                     )}
                   >
-                    <Icon className="size-4 shrink-0" />
+                    <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "")} />
                     {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
                     {!collapsed && item.badge ? (
                       <span
                         className={cn(
                           "rounded-full px-2 py-0.5 text-[0.65rem] font-semibold tabular-nums",
-                          active ? "bg-white/20 text-white" : "bg-sidebar-accent text-sidebar-foreground"
+                          active ? "bg-primary/20 text-primary" : "bg-sidebar-accent text-sidebar-foreground/70"
                         )}
                       >
                         {item.badge}
@@ -113,7 +113,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
 
       <div className={cn("border-t border-sidebar-border", collapsed ? "flex flex-col items-center gap-2 p-2" : "p-3")}>
         <div className={cn("flex items-center gap-3", collapsed && "flex-col gap-2")}>
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-violet-500 text-xs font-semibold text-white">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-blue)] text-xs font-bold text-[var(--background)]">
             {initials}
           </div>
           {!collapsed && (

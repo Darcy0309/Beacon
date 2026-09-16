@@ -57,7 +57,7 @@ const check = (label, cond, detail = "") => {
 // Pages every signed-in staff user should get, with a string proving the page
 // rendered real seeded data rather than an empty shell.
 const PAGES = [
-  ["/", "Dashboard", ["Active Leads", "Recent leads"]],
+  ["/", "Dashboard", ["Active Leads", "Recent Leads", "Command Center"]],
   ["/leads", "Leads", ["All leads", "Garry Insurance"]],
   ["/appointments", "Appointments", ["This week"]],
   ["/calendar", "Calendar", ["Mon", "Sun"]],
@@ -70,7 +70,7 @@ const PAGES = [
   ["/bulletin", "Bulletin", ["announcement"]],
   ["/documents", "Documents", ["All documents"]],
   ["/imports", "Imports", ["Recent imports", "az-commercial-q3.csv"]],
-  ["/reports", "Reports", ["Performance", "Leads delivered"]],
+  ["/reports", "Reports", ["Leads Delivered", "Appointments Set", "Leads by Status"]],
   ["/alerts", "Alerts", ["Alert rules", "X-date"]],
   ["/users", "Users", ["Users", "beacon.test"]],
   ["/settings", "Settings", ["IP Lockdown", "Branding", "Email (SMTP)"]],

@@ -13,7 +13,10 @@ export default function AppSidebar() {
         collapsed ? "md:w-16" : "md:w-60"
       )}
     >
-      <SidebarNav />
+      <div aria-hidden className="grid-veil pointer-events-none absolute inset-0 opacity-[0.5]" />
+      <div className="relative h-full">
+        <SidebarNav />
+      </div>
     </aside>
   );
 }
