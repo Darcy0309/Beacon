@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/actions";
 
-const EMPTY = { ok: false, data: null, error: null };
+const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
 // The seeded accounts, so the workspace can be opened as any role.
 const ACCOUNTS = {
@@ -29,6 +29,7 @@ export default function LoginForm({ next = "/" }) {
   return (
     <form
       action={formAction}
+      noValidate
       className="space-y-4 rounded-2xl border border-white/12 bg-white/8 p-6 shadow-2xl backdrop-blur-xl"
     >
       <input type="hidden" name="next" value={next} />
@@ -44,8 +45,10 @@ export default function LoginForm({ next = "/" }) {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@company.com"
           autoComplete="username"
-          className={field}
+          aria-invalid={state?.fieldErrors?.email ? true : undefined}
+          className={`${field} ${state?.fieldErrors?.email ? "border-rose-400/60" : ""}`}
         />
+        {state?.fieldErrors?.email ? <p role="alert" className="text-xs text-rose-300">{state.fieldErrors.email}</p> : null}
       </div>
       <div className="space-y-1.5">
         <label htmlFor="password" className="text-sm font-medium text-white/80">Password</label>
@@ -57,8 +60,10 @@ export default function LoginForm({ next = "/" }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
-          className={field}
+          aria-invalid={state?.fieldErrors?.password ? true : undefined}
+          className={`${field} ${state?.fieldErrors?.password ? "border-rose-400/60" : ""}`}
         />
+        {state?.fieldErrors?.password ? <p role="alert" className="text-xs text-rose-300">{state.fieldErrors.password}</p> : null}
       </div>
 
       <div className="space-y-1.5">
@@ -85,8 +90,8 @@ export default function LoginForm({ next = "/" }) {
         </div>
       </div>
 
-      {state?.error ? (
-        <p className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+      {state?.error && !state?.fieldErrors ? (
+        <p role="alert" className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
           {state.error}
         </p>
       ) : null}

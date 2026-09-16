@@ -9,7 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { importLeadsCsv } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 
-const EMPTY = { ok: false, data: null, error: null };
+const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
+const MAX_BYTES = 5 * 1024 * 1024;
 
 export default function CsvImport() {
   const [state, formAction, pending] = useActionState(importLeadsCsv, EMPTY);
@@ -27,19 +28,29 @@ export default function CsvImport() {
       setFileName("");
       router.refresh();
     } else if (state?.error) {
+      // Import failures are about the file as a whole, so a toast is the right place.
       toast.error(state.error);
     }
   }, [state, router]);
+
+  function accept(file) {
+    if (!file) return false;
+    if (!/\.csv$/i.test(file.name)) {
+      toast.error("Only .csv files can be imported.");
+      return false;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.error("That file is larger than 5 MB.");
+      return false;
+    }
+    return true;
+  }
 
   function onDrop(e) {
     e.preventDefault();
     setDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (!file) return;
-    if (!/\.csv$/i.test(file.name)) {
-      toast.error("Only CSV files are supported.");
-      return;
-    }
+    if (!accept(file)) return;
     // Hand the dropped file to the real input so it submits with the form.
     const dt = new DataTransfer();
     dt.items.add(file);
@@ -71,9 +82,11 @@ export default function CsvImport() {
                 {fileName || "Drag & drop a CSV file"}
               </div>
               <div className="text-sm text-muted-foreground">
-                {fileName
-                  ? "Ready to import · columns like Company, Contact, Phone, City, State"
-                  : "or browse to upload · leads, clients, or X-date lists"}
+                {state?.fieldErrors?.file
+                  ? <span className="text-destructive">{state.fieldErrors.file}</span>
+                  : fileName
+                    ? "Ready to import · columns like Company, Contact, Phone, City, State"
+                    : "or browse to upload · .csv up to 5 MB"}
               </div>
             </div>
             <input
@@ -82,7 +95,11 @@ export default function CsvImport() {
               name="file"
               accept=".csv,text/csv"
               className="hidden"
-              onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f && !accept(f)) { e.target.value = ""; setFileName(""); return; }
+                setFileName(f?.name ?? "");
+              }}
             />
             {fileName ? (
               <Button size="sm" type="submit" disabled={pending}>
