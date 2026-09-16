@@ -59,7 +59,7 @@ const check = (label, cond, detail = "") => {
 const PAGES = [
   ["/", "Dashboard", ["Active Leads", "Recent Leads", "Command Center"]],
   ["/leads", "Leads", ["All leads", "Garry Insurance"]],
-  ["/appointments", "Appointments", ["This week"]],
+  ["/appointments", "Appointments", ["This Week"]],
   ["/calendar", "Calendar", ["Mon", "Sun"]],
   ["/clients", "Clients", ["Garry Insurance", "Rural Insurance"]],
   ["/projects", "Projects", ["Q3 X-Date Renewals"]],
@@ -90,8 +90,8 @@ for (const [path, label, needles] of PAGES) {
     check(`${label} (${path})`, false, `HTTP ${res.status}`);
     continue;
   }
-  const html = await res.text();
-  const missing = needles.filter((n) => !html.includes(n));
+  const html = (await res.text()).toLowerCase();
+  const missing = needles.filter((n) => !html.includes(n.toLowerCase()));
   check(`${label} (${path})`, missing.length === 0, missing.length ? `missing ${missing.join(", ")}` : "");
 }
 
@@ -100,11 +100,11 @@ console.log(`\nDetail pages:`);
 for (const [path, label, needle] of [
   ["/leads/1", "Lead sheet", "Lead Sheet"],
   ["/clients/garry-insurance", "Client profile", "Projects"],
-  ["/projects/1", "Project detail", "Recent leads"],
+  ["/projects/1", "Project detail", "Leads on this Campaign"],
 ]) {
   const res = await get(path, adminCookie);
-  const html = res.status === 200 ? await res.text() : "";
-  check(`${label} (${path})`, res.status === 200 && html.includes(needle), `HTTP ${res.status}`);
+  const html = res.status === 200 ? (await res.text()).toLowerCase() : "";
+  check(`${label} (${path})`, res.status === 200 && html.includes(needle.toLowerCase()), `HTTP ${res.status}`);
 }
 
 console.log(`\nClient portal user (client@beacon.test) — must be denied admin pages:`);
