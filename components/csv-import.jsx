@@ -3,17 +3,15 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UploadCloud, FileSpreadsheet } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/field";
 import { importLeadsCsv } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null };
 
-export default function CsvImport({ projects = [] }) {
+export default function CsvImport() {
   const [state, formAction, pending] = useActionState(importLeadsCsv, EMPTY);
   const [fileName, setFileName] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -54,7 +52,7 @@ export default function CsvImport({ projects = [] }) {
   return (
     <Card>
       <CardContent className="p-5">
-        <form ref={formRef} action={formAction} className="space-y-4">
+        <form ref={formRef} action={formAction}>
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -62,31 +60,22 @@ export default function CsvImport({ projects = [] }) {
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
-            onClick={() => inputRef.current?.click()}
             className={cn(
-              "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed py-10 text-center transition-colors",
-              dragging ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+              "flex flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed py-10 text-center transition-colors",
+              dragging ? "border-primary bg-primary/5" : "border-border"
             )}
           >
-            {fileName ? (
-              <>
-                <FileSpreadsheet className="size-8 text-primary" />
-                <div>
-                  <div className="font-medium">{fileName}</div>
-                  <div className="text-sm text-muted-foreground">Ready to import · click to choose another</div>
-                </div>
-              </>
-            ) : (
-              <>
-                <UploadCloud className="size-8 text-muted-foreground" />
-                <div>
-                  <div className="font-medium">Drag &amp; drop a CSV file</div>
-                  <div className="text-sm text-muted-foreground">
-                    or click to browse · columns like Company, Contact, Phone, City, State
-                  </div>
-                </div>
-              </>
-            )}
+            <UploadCloud className="size-8 text-muted-foreground" />
+            <div>
+              <div className="font-medium">
+                {fileName || "Drag & drop a CSV file"}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {fileName
+                  ? "Ready to import · columns like Company, Contact, Phone, City, State"
+                  : "or browse to upload · leads, clients, or X-date lists"}
+              </div>
+            </div>
             <input
               ref={inputRef}
               type="file"
@@ -95,19 +84,15 @@ export default function CsvImport({ projects = [] }) {
               className="hidden"
               onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
             />
-          </div>
-
-          <div className="flex flex-wrap items-end justify-end gap-2">
-            <Select name="project_id" defaultValue="" className="h-9 w-auto max-w-[16rem]">
-              <option value="">No project</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </Select>
-            <Input name="list_source" placeholder="List source" className="h-9 w-40" />
-            <Button type="submit" size="sm" disabled={pending || !fileName}>
-              {pending ? "Importing…" : "Import leads"}
-            </Button>
+            {fileName ? (
+              <Button size="sm" type="submit" disabled={pending}>
+                {pending ? "Importing…" : "Import leads"}
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" type="button" onClick={() => inputRef.current?.click()}>
+                Browse files
+              </Button>
+            )}
           </div>
         </form>
       </CardContent>

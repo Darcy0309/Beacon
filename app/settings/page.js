@@ -9,7 +9,7 @@ export default async function SettingsPage() {
 
   return (
     <>
-      <Topbar title="Settings" sub="Organization, branding, email, and access control" />
+      <Topbar title="Settings" sub="Branding, security, and email" />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <SettingsForm settings={settings} ipWhitelist={ipWhitelist} />
       </div>

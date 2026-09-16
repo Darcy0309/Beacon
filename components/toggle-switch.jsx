@@ -7,17 +7,10 @@ import { cn } from "@/lib/utils";
 /**
  * Switch that persists through a server action.
  *
- * Pass `action` (a server action taking FormData with `id` + `field`) and `id`
+ * Pass `action` (a server action taking FormData with `id` + `field`) plus `id`
  * to make it write to the database; without one it behaves as a local toggle.
  */
-export default function ToggleSwitch({
-  defaultChecked = false,
-  name,
-  id,
-  action,
-  field = "enabled",
-  disabled = false,
-}) {
+export default function ToggleSwitch({ defaultChecked = false, name, id, action, field = "enabled" }) {
   const [on, setOn] = useState(defaultChecked);
   const [pending, startTransition] = useTransition();
 
@@ -50,7 +43,7 @@ export default function ToggleSwitch({
       role="switch"
       aria-checked={on}
       aria-label={name}
-      disabled={disabled || pending}
+      disabled={pending}
       onClick={handleClick}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60",

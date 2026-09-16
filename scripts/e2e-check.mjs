@@ -73,7 +73,7 @@ const PAGES = [
   ["/reports", "Reports", ["Performance", "Leads delivered"]],
   ["/alerts", "Alerts", ["Alert rules", "X-date"]],
   ["/users", "Users", ["Users", "beacon.test"]],
-  ["/settings", "Settings", ["IP Lockdown", "Organization"]],
+  ["/settings", "Settings", ["IP Lockdown", "Branding", "Email (SMTP)"]],
 ];
 
 console.log(`\nSigned out — protected routes must redirect:`);
@@ -99,8 +99,8 @@ for (const [path, label, needles] of PAGES) {
 console.log(`\nDetail pages:`);
 for (const [path, label, needle] of [
   ["/leads/1", "Lead sheet", "Lead Sheet"],
-  ["/clients/1", "Client profile", "Projects"],
-  ["/projects/1", "Project detail", "Leads on this project"],
+  ["/clients/garry-insurance", "Client profile", "Projects"],
+  ["/projects/1", "Project detail", "Recent leads"],
 ]) {
   const res = await get(path, adminCookie);
   const html = res.status === 200 ? await res.text() : "";

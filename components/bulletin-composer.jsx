@@ -6,12 +6,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Select } from "@/components/ui/field";
 import { postBulletin } from "@/lib/actions";
 
 const EMPTY = { ok: false, data: null, error: null };
 
-export default function BulletinComposer({ projects = [] }) {
+export default function BulletinComposer() {
   const [state, formAction, pending] = useActionState(postBulletin, EMPTY);
   const formRef = useRef(null);
   const router = useRouter();
@@ -28,7 +27,7 @@ export default function BulletinComposer({ projects = [] }) {
 
   return (
     <Card>
-      <CardContent className="p-5">
+      <CardContent className="space-y-3 p-5">
         <form ref={formRef} action={formAction} className="space-y-3">
           <Textarea
             name="message"
@@ -36,17 +35,7 @@ export default function BulletinComposer({ projects = [] }) {
             maxLength={100}
             placeholder="Share an announcement with the team…"
           />
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Select name="message_type" defaultValue="IN" className="h-9 w-auto">
-              <option value="IN">Info</option>
-              <option value="AL">Alert</option>
-            </Select>
-            <Select name="project_id" defaultValue="" className="h-9 w-auto max-w-[14rem]">
-              <option value="">All projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </Select>
+          <div className="flex justify-end">
             <Button size="sm" type="submit" disabled={pending}>
               {pending ? "Posting…" : "Post announcement"}
             </Button>
