@@ -188,8 +188,8 @@
   background-color: var(--card);
   border-radius: var(--radius-xl);
 }
-/* A faint rail stays on the top edge so the tile keeps its accent while the
-   bright segment is elsewhere on its lap. */
+/* The accent rail along the top edge. Dimmed only when the animated streak
+   is present, so it keeps the tile's hue while the streak is on another edge. */
 [data-accent-edge]::before {
   content: "";
   position: absolute;
@@ -204,8 +204,11 @@
     var(--edge, var(--primary)) 65%,
     transparent
   );
-  opacity: 0.35;
+  opacity: 0.9;
   pointer-events: none;
+}
+[data-accent-edge]:has(.edge-trace)::before {
+  opacity: 0.35;
 }
 
 /* The moving streak. A chain of pills follows the same rounded path with a

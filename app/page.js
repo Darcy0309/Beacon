@@ -76,7 +76,7 @@ export default async function Dashboard() {
       />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         {/* headline banner */}
-        <Card accent="var(--neon-cyan)">
+        <Card accent="var(--neon-cyan)" trace>
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0"
@@ -127,7 +127,7 @@ export default async function Dashboard() {
         {/* metric tiles */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((t, i) => (
-            <StatTile key={t.label} {...t} className="animate-pop-in"
+            <StatTile key={t.label} {...t} trace className="animate-pop-in"
               style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>

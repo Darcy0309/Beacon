@@ -4,8 +4,9 @@ import EdgeTrace from "@/components/edge-trace";
 /**
  * Panel surface: hairline border, flat dark ground, optional bright accent edge
  * along the top (pass `accent` as any CSS colour, e.g. "var(--neon-amber)").
+ * Add `trace` to animate a streak around the border (dashboard only).
  */
-function Card({ className, accent, style, children, ...props }) {
+function Card({ className, accent, trace = false, style, children, ...props }) {
   return (
     <div
       data-card
@@ -19,7 +20,7 @@ function Card({ className, accent, style, children, ...props }) {
       {...props}
     >
       {children}
-      {accent ? <EdgeTrace /> : null}
+      {accent && trace ? <EdgeTrace /> : null}
     </div>
   );
 }

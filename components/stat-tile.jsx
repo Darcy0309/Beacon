@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 /**
  * Metric tile: accent edge, icon chip, wide-tracked label, large figure, and a
  * sparkline bleeding to the bottom edge in the tile's accent hue.
+ * Pass `trace` to add the animated streak that laps the border.
  */
 export default function StatTile({
   label,
@@ -14,6 +15,7 @@ export default function StatTile({
   accent = "var(--neon-cyan)",
   series,
   bars = false,
+  trace = false,
   className,
   style,
 }) {
@@ -68,7 +70,7 @@ export default function StatTile({
         />
       ) : null}
 
-      <EdgeTrace />
+      {trace ? <EdgeTrace /> : null}
     </div>
   );
 }
