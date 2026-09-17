@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, PanelLeft, PanelLeftClose } from "lucide-react";
+import { LogOut, PanelLeftClose } from "lucide-react";
 import BeaconWordmark from "@/components/logo-wordmark";
 import BeaconMark from "@/components/logo-mark";
 import { navGroups, ROLES } from "@/lib/nav";
@@ -31,15 +31,16 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
     <div className="flex h-full flex-col">
       {/* brand + collapse control */}
       {collapsed ? (
-        <div className="flex flex-col items-center gap-3 px-2 py-5">
-          <BeaconMark className="size-9" />
+        <div className="flex flex-col items-center px-2 py-5">
+          {/* The logo itself is the expand control when the rail is collapsed. */}
           <button
+            type="button"
             onClick={toggle}
             aria-label="Expand sidebar"
             title="Expand sidebar"
-            className="flex size-8 items-center justify-center rounded-md text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-95"
+            className="group rounded-xl outline-none transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary/60 active:scale-95"
           >
-            <PanelLeft className="size-4" />
+            <BeaconMark className="size-9 transition-[filter] duration-150 group-hover:drop-shadow-[0_0_10px_var(--primary)]" />
           </button>
         </div>
       ) : (
