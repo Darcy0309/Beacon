@@ -8,7 +8,8 @@ import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
 import { getUsers, getLookups } from "@/lib/queries";
 import { setUserIpLock, deleteUser } from "@/lib/actions";
 
@@ -52,20 +53,21 @@ export default async function UsersPage() {
             icon={Users}
             action={<UserForm options={options} trigger={<Button size="sm"><UserPlus /> Invite user</Button>} />}
           />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>IP Lock</TableHead>
-                <TableHead>Last login</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id}>
+          <FilterTable
+            columns={["User", "Role", "IP Lock", "Last login", "Status", { label: "Action", className: "text-right" }]}
+            filters={[
+              { key: "role", label: "Role" },
+              { key: "status", label: "Status" },
+              { key: "iplock", label: "IP Lock" },
+            ]}
+            placeholder="Search users…"
+            empty="No users yet."
+            rows={users.map((u) => ({
+              id: u.id,
+              search: `${u.name} ${u.email} ${u.role} ${u.status}`,
+              facets: { role: u.role, status: u.status, iplock: u.iplock ? "Locked" : "Open" },
+              node: (
+                <TableRow>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <span className="flex size-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: u.color }}>{u.initials}</span>
@@ -81,9 +83,9 @@ export default async function UsersPage() {
                   <TableCell><ToneBadge tone={statusTone[u.status] ?? "slate"}>{u.status}</ToneBadge></TableCell>
                   <TableCell className="text-right"><RowActions name={u.name} id={u.id} onDelete={deleteUser} /></TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              ),
+            }))}
+          />
         </Card>
       </div>
     </>

@@ -9,7 +9,9 @@ import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import MetricBar from "@/components/metric-bar";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
+import { STATUS } from "@/lib/data";
 import {
   getRecentLeads, getAppointments, getDashboardStats, getCurrentUser, getReps,
 } from "@/lib/queries";
@@ -203,41 +205,42 @@ export default async function Dashboard() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <SectionHeader label="Recent Leads" icon={ListChecks} href="/leads" action="Open leads" />
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Company</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>X-Date</TableHead>
-                  <TableHead>Assigned</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentLeads.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white"
-                          style={{ background: l.color }}>
-                          {l.initials}
-                        </span>
-                        <div>
-                          <Link href={`/leads/${l.id}`} className="font-medium transition-colors hover:text-primary">
-                            {l.co}
-                          </Link>
-                          <div className="text-xs text-muted-foreground">{l.city}</div>
+            <FilterTable
+              columns={["Company", "Contact", "Status", "X-Date", "Assigned"]}
+              filters={[{ key: "status", label: "Status" }]}
+              placeholder="Search recent leads…"
+              empty="No leads yet."
+              rows={recentLeads.map((l) => {
+                const status = STATUS[l.status]?.label ?? STATUS.new.label;
+                return {
+                  id: l.id,
+                  search: `${l.co} ${l.city} ${l.contact} ${status} ${l.rep}`,
+                  facets: { status },
+                  node: (
+                    <TableRow>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white"
+                            style={{ background: l.color }}>
+                            {l.initials}
+                          </span>
+                          <div>
+                            <Link href={`/leads/${l.id}`} className="font-medium transition-colors hover:text-primary">
+                              {l.co}
+                            </Link>
+                            <div className="text-xs text-muted-foreground">{l.city}</div>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>{l.contact}</TableCell>
-                    <TableCell><StatusBadge status={l.status} /></TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
-                    <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      </TableCell>
+                      <TableCell>{l.contact}</TableCell>
+                      <TableCell><StatusBadge status={l.status} /></TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
+                      <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
+                    </TableRow>
+                  ),
+                };
+              })}
+            />
           </Card>
 
           <Card>

@@ -4,7 +4,8 @@ import ToneBadge from "@/components/tone-badge";
 import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
 import { getQaCalls } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -43,19 +44,21 @@ export default async function QaPage() {
 
         <Card>
           <SectionHeader label="Recent Scored Calls" icon={ClipboardCheck} />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Rep</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead className="w-56">Score</TableHead>
-                <TableHead>Result</TableHead>
-                <TableHead>Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {calls.map((q) => (
-                <TableRow key={q.id}>
+          <FilterTable
+            columns={["Rep", "Client", { label: "Score", className: "w-56" }, "Result", "Date"]}
+            filters={[
+              { key: "result", label: "Result" },
+              { key: "rep", label: "Rep", kind: "select" },
+              { key: "client", label: "Client", kind: "select" },
+            ]}
+            placeholder="Search scored calls…"
+            empty="No scored calls yet."
+            rows={calls.map((q) => ({
+              id: q.id,
+              search: `${q.rep} ${q.client} ${q.result} ${q.score}`,
+              facets: { result: q.result, rep: q.rep, client: q.client },
+              node: (
+                <TableRow>
                   <TableCell className="font-medium">{q.rep}</TableCell>
                   <TableCell>{q.client}</TableCell>
                   <TableCell>
@@ -69,12 +72,9 @@ export default async function QaPage() {
                   <TableCell><ToneBadge tone={resultTone[q.result] ?? "slate"}>{q.result}</ToneBadge></TableCell>
                   <TableCell className="text-muted-foreground">{q.date}</TableCell>
                 </TableRow>
-              ))}
-              {calls.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No scored calls yet.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              ),
+            }))}
+          />
         </Card>
       </div>
     </>

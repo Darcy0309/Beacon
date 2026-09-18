@@ -8,8 +8,9 @@ import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import ProjectForm from "@/components/project-form";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { clientSlug } from "@/lib/data";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
+import { clientSlug, STATUS } from "@/lib/data";
 import { getProject, getLeadsByProject, getLookups } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -79,31 +80,32 @@ export default async function ProjectDetail({ params }) {
 
         <Card>
           <SectionHeader label="Leads on this Campaign" icon={ListChecks} href="/leads" action="All leads" />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Company</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>X-Date</TableHead>
-                <TableHead>Assigned</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentLeads.map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="font-medium"><Link href={`/leads/${l.id}`} className="transition-colors hover:text-primary">{l.co}</Link></TableCell>
-                  <TableCell>{l.contact}</TableCell>
-                  <TableCell><StatusBadge status={l.status} /></TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
-                  <TableCell>{l.rep}</TableCell>
-                </TableRow>
-              ))}
-              {recentLeads.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="py-10 text-center text-muted-foreground">No leads on this project yet.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <FilterTable
+            columns={["Company", "Contact", "Status", "X-Date", "Assigned"]}
+            filters={[
+              { key: "status", label: "Status" },
+              { key: "rep", label: "Assigned", kind: "select" },
+            ]}
+            placeholder="Search leads…"
+            empty="No leads on this project yet."
+            rows={recentLeads.map((l) => {
+              const status = STATUS[l.status]?.label ?? STATUS.new.label;
+              return {
+                id: l.id,
+                search: `${l.co} ${l.contact} ${status} ${l.rep}`,
+                facets: { status, rep: l.rep },
+                node: (
+                  <TableRow>
+                    <TableCell className="font-medium"><Link href={`/leads/${l.id}`} className="transition-colors hover:text-primary">{l.co}</Link></TableCell>
+                    <TableCell>{l.contact}</TableCell>
+                    <TableCell><StatusBadge status={l.status} /></TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
+                    <TableCell>{l.rep}</TableCell>
+                  </TableRow>
+                ),
+              };
+            })}
+          />
         </Card>
       </div>
     </>

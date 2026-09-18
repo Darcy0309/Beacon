@@ -5,7 +5,8 @@ import CsvImport from "@/components/csv-import";
 import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
 import { getImports } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -44,21 +45,20 @@ export default async function ImportsPage() {
 
         <Card>
           <SectionHeader label="Recent Imports" icon={Upload} />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>File</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Rows</TableHead>
-                <TableHead>Imported</TableHead>
-                <TableHead>Skipped</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>When</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentImports.map((r) => (
-                <TableRow key={r.id}>
+          <FilterTable
+            columns={["File", "Project", "Rows", "Imported", "Skipped", "Status", "When"]}
+            filters={[
+              { key: "status", label: "Status" },
+              { key: "project", label: "Project", kind: "select" },
+            ]}
+            placeholder="Search imports…"
+            empty="No imports yet — upload a CSV above."
+            rows={recentImports.map((r) => ({
+              id: r.id,
+              search: `${r.file} ${r.project} ${r.status}`,
+              facets: { status: r.status, project: r.project },
+              node: (
+                <TableRow>
                   <TableCell className="font-medium">{r.file}</TableCell>
                   <TableCell className="text-muted-foreground">{r.project}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{r.rows.toLocaleString()}</TableCell>
@@ -67,12 +67,9 @@ export default async function ImportsPage() {
                   <TableCell><ToneBadge tone={statusTone[r.status] ?? "slate"}>{r.status}</ToneBadge></TableCell>
                   <TableCell className="text-muted-foreground">{r.date}</TableCell>
                 </TableRow>
-              ))}
-              {recentImports.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No imports yet — upload a CSV above.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              ),
+            }))}
+          />
         </Card>
       </div>
     </>

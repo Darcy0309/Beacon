@@ -5,7 +5,8 @@ import RowActions from "@/components/row-actions";
 import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
 import { getDocuments } from "@/lib/queries";
 import { deleteDocument } from "@/lib/actions";
 
@@ -42,20 +43,20 @@ export default async function DocumentsPage() {
 
         <Card>
           <SectionHeader label="All Documents" icon={Files} />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Size</TableHead>
-                <TableHead>Uploaded</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {documents.map((d) => (
-                <TableRow key={d.id}>
+          <FilterTable
+            columns={["Name", "Type", "Client", "Size", "Uploaded", { label: "Action", className: "text-right" }]}
+            filters={[
+              { key: "type", label: "Type" },
+              { key: "client", label: "Client", kind: "select" },
+            ]}
+            placeholder="Search documents…"
+            empty="No documents yet."
+            rows={documents.map((d) => ({
+              id: d.id,
+              search: `${d.name} ${d.type} ${d.client}`,
+              facets: { type: d.type, client: d.client },
+              node: (
+                <TableRow>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <FileText className="size-4 shrink-0 text-primary" />
@@ -68,12 +69,9 @@ export default async function DocumentsPage() {
                   <TableCell className="text-muted-foreground">{d.date}</TableCell>
                   <TableCell className="text-right"><RowActions name={d.name} id={d.id} onDelete={deleteDocument} /></TableCell>
                 </TableRow>
-              ))}
-              {documents.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="py-10 text-center text-muted-foreground">No documents yet.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              ),
+            }))}
+          />
         </Card>
       </div>
     </>

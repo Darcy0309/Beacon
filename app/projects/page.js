@@ -7,7 +7,8 @@ import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableCell, TableRow } from "@/components/ui/table";
+import FilterTable from "@/components/filter-table";
 import { getProjects, getLookups } from "@/lib/queries";
 import { deleteProject } from "@/lib/actions";
 
@@ -50,21 +51,22 @@ export default async function ProjectsPage() {
             icon={FolderKanban}
             action={<ProjectForm options={options} trigger={<Button size="sm"><Plus /> New project</Button>} />}
           />
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Project</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Leads</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Manager</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.map((p) => (
-                <TableRow key={p.id}>
+          <FilterTable
+            columns={["Project", "Client", "Type", "Leads", "Status", "Manager", { label: "Action", className: "text-right" }]}
+            filters={[
+              { key: "status", label: "Status" },
+              { key: "type", label: "Type" },
+              { key: "client", label: "Client", kind: "select" },
+              { key: "manager", label: "Manager", kind: "select" },
+            ]}
+            placeholder="Search projects…"
+            empty="No projects yet."
+            rows={projects.map((p) => ({
+              id: p.id,
+              search: `${p.name} ${p.client} ${p.type} ${p.status} ${p.manager}`,
+              facets: { status: p.status, type: p.type, client: p.client, manager: p.manager },
+              node: (
+                <TableRow>
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white" style={{ background: p.color }}>
@@ -82,12 +84,9 @@ export default async function ProjectsPage() {
                     <RowActions name={p.name} href={`/projects/${p.id}`} id={p.id} onDelete={deleteProject} />
                   </TableCell>
                 </TableRow>
-              ))}
-              {projects.length === 0 && (
-                <TableRow><TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No projects yet.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              ),
+            }))}
+          />
         </Card>
       </div>
     </>
