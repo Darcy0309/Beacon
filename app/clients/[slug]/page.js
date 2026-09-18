@@ -24,10 +24,10 @@ function Field({ label, children }) {
 
 export default async function ClientProfile({ params }) {
   const { slug } = await params;
-  const c = await getClientBySlug(slug);
+  const [c, projects] = await Promise.all([getClientBySlug(slug), getProjects()]);
   if (!c) notFound();
 
-  const clientProjects = (await getProjects()).filter((p) => p.client === c.name);
+  const clientProjects = projects.filter((p) => p.client === c.name);
   const delivery = `leads-${slug}@signaturemktg.net`;
   const activeProjects = clientProjects.filter((p) => p.status === "Active").length;
 

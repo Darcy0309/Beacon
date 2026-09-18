@@ -46,11 +46,11 @@ const APPT_TONE = { Scheduled: "cyan", Confirmed: "emerald", Held: "violet", Res
 
 export default async function LeadSheet({ params }) {
   const { id } = await params;
-  const lead = await getLead(id);
+  // All three only need the route id, so they run together.
+  const [lead, activity, options] = await Promise.all([getLead(id), getLeadActivity(id), getLookups()]);
   if (!lead) notFound();
 
   const r = lead.raw;
-  const [activity, options] = await Promise.all([getLeadActivity(lead.id), getLookups()]);
   const ins = r.insurance;
   const xdates = ins ? XDATE_ROWS.filter(([, k]) => ins[k]) : [];
 

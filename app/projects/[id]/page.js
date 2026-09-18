@@ -20,10 +20,10 @@ const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Complet
 
 export default async function ProjectDetail({ params }) {
   const { id } = await params;
-  const p = await getProject(id);
+  // All three only need the route id, so they run together.
+  const [p, recentLeads, options] = await Promise.all([getProject(id), getLeadsByProject(id, { limit: 25 }), getLookups()]);
   if (!p) notFound();
 
-  const [recentLeads, options] = await Promise.all([getLeadsByProject(p.id, { limit: 25 }), getLookups()]);
   const delivered = recentLeads.filter((l) => l.status !== "new").length;
   const appts = recentLeads.filter((l) => l.status === "appt" || l.status === "survey").length;
 

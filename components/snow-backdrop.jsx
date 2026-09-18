@@ -56,16 +56,29 @@ export default function SnowBackdrop() {
 
     resize();
     seed();
-    loop();
+
+    // A still frame is enough when the user prefers reduced motion, and the
+    // animation stops while the tab is hidden so it never burns CPU unseen.
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const start = () => {
+      cancelAnimationFrame(raf);
+      if (reduced) render(false);
+      else if (!document.hidden) loop();
+    };
+    const onVisibility = () => (document.hidden ? cancelAnimationFrame(raf) : start());
+    start();
 
     const onResize = () => {
       resize();
       seed();
+      if (reduced) render(false);
     };
     window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

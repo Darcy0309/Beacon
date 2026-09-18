@@ -101,7 +101,7 @@ export default async function AppointmentsPage() {
             action={
               <AppointmentForm
                 options={options}
-                leads={leads}
+                leads={leads.map(({ id, co, city }) => ({ id, co, city }))}
                 trigger={<Button size="sm"><CalendarClock /> New appointment</Button>}
               />
             }

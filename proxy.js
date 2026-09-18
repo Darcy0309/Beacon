@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
-import { SUPABASE_URL, SUPABASE_ANON_KEY, supabaseConfigProblem } from "@/lib/supabase/config";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_ID_HEADER, supabaseConfigProblem } from "@/lib/supabase/config";
+import { supabaseFetch } from "@/lib/supabase/fetch";
 
 const PUBLIC_PATHS = ["/login", "/auth", "/setup"];
 
@@ -18,19 +19,18 @@ export async function proxy(request) {
     return NextResponse.redirect(url);
   }
 
-  let response = NextResponse.next({ request });
-
+  let refreshed = [];
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { fetch: supabaseFetch },
     cookies: {
       getAll() {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
+        // Update the request so the app sees the fresh token, and remember
+        // the cookies for the response built below.
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
-        cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
-        );
+        refreshed = cookiesToSet;
       },
     },
   });
@@ -63,6 +63,14 @@ export async function proxy(request) {
     return NextResponse.redirect(url);
   }
 
+  // Snapshot the headers after getUser() so a refreshed session cookie is
+  // included, then stamp the verified user id on.
+  const headers = new Headers(request.headers);
+  if (user) headers.set(AUTH_ID_HEADER, user.id);
+  else headers.delete(AUTH_ID_HEADER);
+
+  const response = NextResponse.next({ request: { headers } });
+  refreshed.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
   return response;
 }
 
