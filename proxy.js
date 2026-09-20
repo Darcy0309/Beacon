@@ -39,15 +39,28 @@ export async function proxy(request) {
   // unreachable, treat the visitor as signed out rather than crashing — the
   // login page will surface the real error on submit.
   let user = null;
+  let unreachable = false;
   try {
-    ({
-      data: { user },
-    } = await supabase.auth.getUser());
+    const { data, error } = await supabase.auth.getUser();
+    user = data?.user ?? null;
+    // auth-js reports a failed network call as an error rather than throwing.
+    unreachable = error?.name === "AuthRetryableFetchError";
   } catch (err) {
+    unreachable = true;
     console.error("[proxy] Supabase unreachable:", err?.message ?? err);
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  // A visitor with a session cookie whose check could not reach Supabase is
+  // not signed out — let the request through so the page reports the outage
+  // itself. Row Level Security still guards every query.
+  if (!user && unreachable && !isPublic && request.cookies.getAll().some((c) => c.name.includes("auth-token"))) {
+    console.error("[proxy] session check failed, passing request through");
+    const headers = new Headers(request.headers);
+    headers.delete(AUTH_ID_HEADER);
+    return NextResponse.next({ request: { headers } });
+  }
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

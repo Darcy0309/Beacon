@@ -7,15 +7,19 @@ import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { getDocuments } from "@/lib/queries";
+import { listDocuments } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteDocument } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
 const typeTone = { PDF: "rose", DOCX: "cyan", CSV: "emerald", PNG: "violet" };
 
-export default async function DocumentsPage() {
-  const documents = await getDocuments();
+export default async function DocumentsPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["type", "client"]);
+  const { rows, total, stats: documents, types, clients: clientNames } = await listDocuments(params);
+
+  // Tiles describe the whole library; the table shows one page of it.
   const byType = {};
   for (const d of documents) byType[d.type] = (byType[d.type] || 0) + 1;
   const clients = new Set(documents.map((d) => d.client).filter((c) => c !== "—")).size;
@@ -46,15 +50,16 @@ export default async function DocumentsPage() {
           <FilterTable
             columns={["Name", "Type", "Client", "Size", "Uploaded", { label: "Action", className: "text-right" }]}
             filters={[
-              { key: "type", label: "Type" },
-              { key: "client", label: "Client", kind: "select" },
+              { key: "type", label: "Type", options: types.map((t) => ({ value: t, label: t })) },
+              { key: "client", label: "Client", kind: "select", options: clientNames.map((c) => ({ value: c, label: c })) },
             ]}
             placeholder="Search documents…"
             empty="No documents yet."
-            rows={documents.map((d) => ({
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={rows.map((d) => ({
               id: d.id,
-              search: `${d.name} ${d.type} ${d.client}`,
-              facets: { type: d.type, client: d.client },
               node: (
                 <TableRow>
                   <TableCell>

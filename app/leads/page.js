@@ -1,40 +1,79 @@
+import { Plus, ListChecks } from "lucide-react";
 import Topbar from "@/components/topbar";
-import LeadsView from "@/components/leads-view";
-import { getLeads, getLeadCounts, getLookups } from "@/lib/queries";
+import StatusBadge from "@/components/status-badge";
+import RowActions from "@/components/row-actions";
+import LeadForm from "@/components/lead-form";
+import SectionHeader from "@/components/section-header";
+import FilterTable from "@/components/filter-table";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { TableCell, TableRow } from "@/components/ui/table";
+import { listLeads, getLeadCounts, getLookups } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
+import { deleteLead } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
-const LIMIT = 500;
+// Chip labels for the status facet, shorter than the full status names.
+const CHIP_LABEL = { appt: "Phone appt", survey: "Survey", hot: "Hot leads", xdate: "X-date", profile: "Profile", new: "New" };
 
-export default async function LeadsPage() {
-  const [leads, options] = await Promise.all([getLeads({ limit: LIMIT }), getLookups()]);
+export default async function LeadsPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["status"]);
+  const [{ rows, total }, summary, options] = await Promise.all([listLeads(params), getLeadCounts(), getLookups()]);
 
-  // The rows on hand answer the totals unless the list hit the cap, in which
-  // case ask the database for the true count.
-  let total = leads.length;
-  let counts = {};
-  if (leads.length >= LIMIT) {
-    ({ total, counts } = await getLeadCounts());
-  } else {
-    for (const l of leads) counts[l.status] = (counts[l.status] || 0) + 1;
-  }
-
-  const clientCount = new Set(
-    leads.map((l) => l.raw.project?.company?.id).filter(Boolean)
-  ).size;
-
-  // The table only renders the summary fields; keep the full record out of
-  // the payload sent to the browser.
-  const rows = leads.map(({ raw, ...l }) => l);
+  const statusOptions = options.statuses.map((s) => ({
+    value: s.code,
+    label: CHIP_LABEL[s.code] ?? s.name,
+    count: summary.counts[s.code] ?? 0,
+  }));
 
   return (
     <>
       <Topbar
         title="Leads"
-        sub={`${total} active leads across ${clientCount} client${clientCount === 1 ? "" : "s"}`}
+        sub={`${summary.total} active leads across ${summary.clients} client${summary.clients === 1 ? "" : "s"}`}
       />
       <div className="flex-1 p-4 sm:p-6">
-        <LeadsView leads={rows} options={options} counts={counts} total={total} />
+        <Card>
+          <SectionHeader
+            label="All leads"
+            icon={ListChecks}
+            action={<LeadForm options={options} trigger={<Button size="sm"><Plus /> New lead</Button>} />}
+          />
+          <FilterTable
+            columns={["Company", "Contact", "Phone", "Status", "X-Date", "Assigned", { label: "Action", className: "text-right" }]}
+            filters={[{ key: "status", label: "Status", kind: "chips", options: statusOptions }]}
+            placeholder="Search leads…"
+            empty="No leads yet."
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={rows.map((l) => ({
+              id: l.id,
+              node: (
+                <TableRow>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-8 items-center justify-center rounded-lg text-xs font-semibold text-white" style={{ background: l.color }}>{l.initials}</span>
+                      <div>
+                        <div className="font-medium">{l.co}</div>
+                        <div className="text-xs text-muted-foreground">{l.city}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{l.contact}</TableCell>
+                  <TableCell className="tabular-nums text-muted-foreground">{l.phone}</TableCell>
+                  <TableCell><StatusBadge status={l.status} /></TableCell>
+                  <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
+                  <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
+                  <TableCell className="text-right">
+                    <RowActions name={l.co} href={`/leads/${l.id}`} id={l.id} onDelete={deleteLead} />
+                  </TableCell>
+                </TableRow>
+              ),
+            }))}
+          />
+        </Card>
       </div>
     </>
   );

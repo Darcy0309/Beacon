@@ -1,7 +1,9 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Search, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,11 +26,22 @@ import { cn } from "@/lib/utils";
  *     }))}
  *   />
  *
- * Facet options and their counts are derived from the rows. A facet with up
- * to CHIP_LIMIT distinct values renders as a chip row, larger ones fall back
- * to a select; set `kind: "chips" | "select"` on a filter to force one.
+ * Two modes:
+ *
+ * - Client (default): every row is on hand. Search and facets filter here,
+ *   and facet options with counts are derived from the rows.
+ * - Server: pass `paging` (from pageInfo), the current `query` and
+ *   `selected` facets. The rows are one page, already filtered by the
+ *   database; the search box and chips write ?q=, ?<facet>= and ?page= to
+ *   the URL and the server re-renders. Each filter supplies its own
+ *   `options` ([{ value, label, count? }]) because the page cannot know
+ *   what the other pages hold.
+ *
+ * A facet with up to CHIP_LIMIT options renders as a chip row, larger ones
+ * fall back to a select; set `kind: "chips" | "select"` to force one.
  */
 const CHIP_LIMIT = 6;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export default function FilterTable({
   columns,
@@ -37,49 +50,115 @@ export default function FilterTable({
   placeholder = "Search…",
   empty = "Nothing here yet.",
   className,
+  query = "",
+  selected,
+  paging,
 }) {
-  const [query, setQuery] = useState("");
-  const [picked, setPicked] = useState({});
+  const server = Boolean(paging);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
-  // Distinct values per facet, most common first. Counted over every row so
-  // the chips hold still while the user narrows the table.
+  const [q, setQ] = useState(query);
+  const [picked, setPicked] = useState(selected ?? {});
+
+  // Server mode keeps the URL as the source of truth. When it changes from
+  // outside (back button, a link) adopt it; when it changes because of what
+  // the user just typed, leave the input alone so keystrokes are not undone
+  // by a response that is already stale.
+  const pushed = useRef(JSON.stringify({ q: query, picked: selected ?? {} }));
+  useEffect(() => {
+    if (!server) return;
+    const incoming = JSON.stringify({ q: query, picked: selected ?? {} });
+    if (incoming !== pushed.current) {
+      pushed.current = incoming;
+      setQ(query);
+      setPicked(selected ?? {});
+    }
+  }, [server, query, selected]);
+
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const navigate = (nextQ, nextPicked) => {
+    pushed.current = JSON.stringify({ q: nextQ, picked: nextPicked });
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    if (nextQ) params.set("q", nextQ);
+    else params.delete("q");
+    for (const f of filters) {
+      if (nextPicked[f.key]) params.set(f.key, nextPicked[f.key]);
+      else params.delete(f.key);
+    }
+    const qs = params.toString();
+    startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
+  };
+
+  const onQuery = (value) => {
+    setQ(value);
+    if (!server) return;
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => navigate(value.trim(), picked), SEARCH_DEBOUNCE_MS);
+  };
+  const onPick = (key, value) => {
+    const next = { ...picked, [key]: value };
+    setPicked(next);
+    if (!server) return;
+    clearTimeout(timer.current);
+    navigate(q.trim(), next);
+  };
+  const reset = () => {
+    setQ("");
+    setPicked({});
+    if (!server) return;
+    clearTimeout(timer.current);
+    navigate("", {});
+  };
+
+  // Facet options: supplied by the page in server mode; otherwise the
+  // distinct values across the rows, most common first, counted over every
+  // row so the chips hold still while the user narrows the table.
   const groups = useMemo(
     () =>
       filters.map((f) => {
-        const counts = new Map();
-        for (const r of rows) {
-          const v = r.facets?.[f.key];
-          if (v == null || v === "") continue;
-          counts.set(String(v), (counts.get(String(v)) || 0) + 1);
+        let options = f.options;
+        if (!options) {
+          const counts = new Map();
+          for (const r of rows) {
+            const v = r.facets?.[f.key];
+            if (v == null || v === "") continue;
+            counts.set(String(v), (counts.get(String(v)) || 0) + 1);
+          }
+          options = [...counts.entries()]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([value, count]) => ({ value, label: value, count }));
         }
-        const options = [...counts.entries()]
-          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-          .map(([value, count]) => ({ value, count }));
         const kind = f.kind ?? (options.length > CHIP_LIMIT ? "select" : "chips");
         return { ...f, options, kind };
       }),
     [filters, rows]
   );
 
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  const shown = rows.filter((r) => {
-    for (const f of filters) {
-      const want = picked[f.key];
-      if (want && String(r.facets?.[f.key] ?? "") !== want) return false;
-    }
-    if (terms.length === 0) return true;
-    const hay = String(r.search ?? "").toLowerCase();
-    return terms.every((t) => hay.includes(t));
-  });
+  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = server
+    ? rows
+    : rows.filter((r) => {
+        for (const f of filters) {
+          const want = picked[f.key];
+          if (want && String(r.facets?.[f.key] ?? "") !== want) return false;
+        }
+        if (terms.length === 0) return true;
+        const hay = String(r.search ?? "").toLowerCase();
+        return terms.every((t) => hay.includes(t));
+      });
 
   const active = terms.length > 0 || Object.values(picked).some(Boolean);
-  const pick = (key, value) => setPicked((p) => ({ ...p, [key]: value }));
-  const reset = () => {
-    setQuery("");
-    setPicked({});
-  };
-
   const heads = columns.map((c) => (typeof c === "string" ? { label: c } : c));
+
+  let summary;
+  if (server) summary = paging.total ? `${paging.from}–${paging.to} of ${paging.total}` : "0 results";
+  else summary = active ? `${shown.length} of ${rows.length}` : `${rows.length} total`;
 
   return (
     <div className={className}>
@@ -87,20 +166,23 @@ export default function FilterTable({
         <div className="relative w-full sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            value={q}
+            onChange={(e) => onQuery(e.target.value)}
             placeholder={placeholder}
             aria-label={placeholder}
-            className="h-8 pl-8"
+            className="h-8 pl-8 pr-8"
           />
+          {isPending ? (
+            <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-primary" aria-label="Loading" />
+          ) : null}
         </div>
 
         {groups.map((g) => (
-          <FacetGroup key={g.key} group={g} value={picked[g.key] ?? ""} onChange={(v) => pick(g.key, v)} />
+          <FacetGroup key={g.key} group={g} value={picked[g.key] ?? ""} onChange={(v) => onPick(g.key, v)} />
         ))}
 
         <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="tabular-nums">{active ? `${shown.length} of ${rows.length}` : `${rows.length} total`}</span>
+          <span className="tabular-nums" aria-live="polite">{summary}</span>
           {active ? (
             <button
               type="button"
@@ -113,7 +195,7 @@ export default function FilterTable({
         </div>
       </div>
 
-      <Table>
+      <Table className={cn("transition-opacity", isPending && "opacity-60")}>
         <TableHeader>
           <TableRow>
             {heads.map((h, i) => (
@@ -128,12 +210,14 @@ export default function FilterTable({
           {shown.length === 0 && (
             <TableRow>
               <TableCell colSpan={heads.length} className="py-10 text-center text-muted-foreground">
-                {rows.length === 0 ? empty : "Nothing matches your filters."}
+                {active ? "Nothing matches your filters." : empty}
               </TableCell>
             </TableRow>
           )}
         </TableBody>
       </Table>
+
+      {server && paging.pages > 1 ? <Pager paging={paging} searchParams={searchParams} pathname={pathname} /> : null}
     </div>
   );
 }
@@ -154,7 +238,7 @@ function FacetGroup({ group, value, onChange }) {
           <option value="">All</option>
           {group.options.map((o) => (
             <option key={o.value} value={o.value}>
-              {o.value} ({o.count})
+              {o.label}{o.count != null ? ` (${o.count})` : ""}
             </option>
           ))}
         </Select>
@@ -168,8 +252,8 @@ function FacetGroup({ group, value, onChange }) {
       <Chip active={value === ""} onClick={() => onChange("")}>All</Chip>
       {group.options.map((o) => (
         <Chip key={o.value} active={value === o.value} onClick={() => onChange(value === o.value ? "" : o.value)}>
-          {o.value}
-          <span className="ml-1.5 tabular-nums opacity-60">{o.count}</span>
+          {o.label}
+          {o.count != null ? <span className="ml-1.5 tabular-nums opacity-60">{o.count}</span> : null}
         </Chip>
       ))}
     </div>
@@ -192,5 +276,59 @@ function Chip({ active, onClick, children }) {
     >
       {children}
     </button>
+  );
+}
+
+/** Which page numbers to show: the ends, and a window around the current page. */
+function pageNumbers(page, pages) {
+  const out = [];
+  let last = 0;
+  for (let n = 1; n <= pages; n++) {
+    if (n === 1 || n === pages || Math.abs(n - page) <= 1) {
+      if (n - last > 1) out.push("…");
+      out.push(n);
+      last = n;
+    }
+  }
+  return out;
+}
+
+const pageButton =
+  "flex h-7 min-w-7 items-center justify-center rounded-md border px-1.5 text-xs font-semibold tabular-nums transition-colors";
+
+function Pager({ paging, searchParams, pathname }) {
+  const href = (n) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (n > 1) params.set("page", String(n));
+    else params.delete("page");
+    const qs = params.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+  const link = (n, label, children, disabled) =>
+    disabled ? (
+      <span aria-disabled className={cn(pageButton, "border-[var(--panel-border)] text-muted-foreground/40")}>{children}</span>
+    ) : (
+      <Link href={href(n)} scroll={false} aria-label={label} className={cn(pageButton, "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40 hover:text-primary")}>
+        {children}
+      </Link>
+    );
+
+  return (
+    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--panel-border)] px-5 py-3">
+      <span className="text-xs text-muted-foreground">Page {paging.page} of {paging.pages}</span>
+      <div className="flex items-center gap-1">
+        {link(paging.page - 1, "Previous page", <ChevronLeft className="size-3.5" />, paging.page <= 1)}
+        {pageNumbers(paging.page, paging.pages).map((n, i) =>
+          n === "…" ? (
+            <span key={`gap-${i}`} className="px-1 text-xs text-muted-foreground">…</span>
+          ) : n === paging.page ? (
+            <span key={n} aria-current="page" className={cn(pageButton, "border-primary bg-primary/10 text-primary")}>{n}</span>
+          ) : (
+            <Fragment key={n}>{link(n, `Page ${n}`, n, false)}</Fragment>
+          )
+        )}
+        {link(paging.page + 1, "Next page", <ChevronRight className="size-3.5" />, paging.page >= paging.pages)}
+      </div>
+    </nav>
   );
 }

@@ -7,14 +7,18 @@ import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { getImports } from "@/lib/queries";
+import { listImports, IMPORT_STATUS_OPTIONS } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
 
 const statusTone = { Complete: "emerald", Processing: "cyan", Failed: "rose" };
 
-export default async function ImportsPage() {
-  const recentImports = await getImports();
+export default async function ImportsPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["status", "project"]);
+  const { rows: pageRows, total, stats: recentImports, projects } = await listImports(params);
+
+  // Tiles total every batch; the table shows one page of them.
   const rows = recentImports.reduce((s, r) => s + r.rows, 0);
   const imported = recentImports.reduce((s, r) => s + r.imported, 0);
   const errors = recentImports.reduce((s, r) => s + r.errors, 0);
@@ -48,15 +52,16 @@ export default async function ImportsPage() {
           <FilterTable
             columns={["File", "Project", "Rows", "Imported", "Skipped", "Status", "When"]}
             filters={[
-              { key: "status", label: "Status" },
-              { key: "project", label: "Project", kind: "select" },
+              { key: "status", label: "Status", options: IMPORT_STATUS_OPTIONS },
+              { key: "project", label: "Project", kind: "select", options: projects.map((p) => ({ value: p, label: p })) },
             ]}
             placeholder="Search imports…"
             empty="No imports yet — upload a CSV above."
-            rows={recentImports.map((r) => ({
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={pageRows.map((r) => ({
               id: r.id,
-              search: `${r.file} ${r.project} ${r.status}`,
-              facets: { status: r.status, project: r.project },
               node: (
                 <TableRow>
                   <TableCell className="font-medium">{r.file}</TableCell>

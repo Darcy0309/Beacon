@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { getUsers, getLookups } from "@/lib/queries";
+import { listUsers, getUserStats, getLookups, USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
 import { setUserIpLock, deleteUser } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
@@ -18,23 +19,26 @@ export const dynamic = "force-dynamic";
 const roleTone = { admin: "amber", manager: "cyan", agent: "emerald", client: "violet" };
 const statusTone = { Active: "emerald", Invited: "amber", Disabled: "slate" };
 
-export default async function UsersPage() {
-  const [users, options] = await Promise.all([getUsers(), getLookups()]);
-  const active = users.filter((u) => u.status === "Active").length;
-  const invited = users.filter((u) => u.status === "Invited").length;
-  const locked = users.filter((u) => u.iplock).length;
+export default async function UsersPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["role", "status", "iplock"]);
+  const [{ rows, total }, users, options] = await Promise.all([listUsers(params), getUserStats(), getLookups()]);
+
+  // Tiles describe every account; the table shows one page of them.
+  const active = users.filter((u) => u.status === "active").length;
+  const invited = users.filter((u) => u.status === "invited").length;
+  const locked = users.filter((u) => u.ip_locked).length;
   const byRole = {};
-  for (const u of users) byRole[u.roleTone] = (byRole[u.roleTone] || 0) + 1;
+  for (const u of users) byRole[u.role] = (byRole[u.role] || 0) + 1;
 
   const tiles = [
     { label: "Accounts", value: String(users.length), note: `${byRole.admin ?? 0} admin · ${byRole.manager ?? 0} managers`,
       icon: Users, accent: "var(--neon-cyan)", series: Object.values(byRole), bars: true },
     { label: "Active", value: String(active), note: "can sign in",
-      icon: ShieldCheck, accent: "var(--neon-emerald)", series: users.map((u) => (u.status === "Active" ? 1 : 0)), bars: true },
+      icon: ShieldCheck, accent: "var(--neon-emerald)", series: users.map((u) => (u.status === "active" ? 1 : 0)), bars: true },
     { label: "Pending Invites", value: String(invited), note: "awaiting first sign-in",
-      icon: Mail, accent: "var(--neon-amber)", series: users.map((u) => (u.status === "Invited" ? 1 : 0)), bars: true },
+      icon: Mail, accent: "var(--neon-amber)", series: users.map((u) => (u.status === "invited" ? 1 : 0)), bars: true },
     { label: "IP Locked", value: String(locked), note: "restricted to approved addresses",
-      icon: Lock, accent: "var(--neon-violet)", series: users.map((u) => (u.iplock ? 1 : 0)), bars: true },
+      icon: Lock, accent: "var(--neon-violet)", series: users.map((u) => (u.ip_locked ? 1 : 0)), bars: true },
   ];
 
   return (
@@ -56,16 +60,17 @@ export default async function UsersPage() {
           <FilterTable
             columns={["User", "Role", "IP Lock", "Last login", "Status", { label: "Action", className: "text-right" }]}
             filters={[
-              { key: "role", label: "Role" },
-              { key: "status", label: "Status" },
-              { key: "iplock", label: "IP Lock" },
+              { key: "role", label: "Role", options: USER_ROLE_OPTIONS },
+              { key: "status", label: "Status", options: USER_STATUS_OPTIONS },
+              { key: "iplock", label: "IP Lock", options: [{ value: "true", label: "Locked" }, { value: "false", label: "Open" }] },
             ]}
             placeholder="Search users…"
             empty="No users yet."
-            rows={users.map((u) => ({
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={rows.map((u) => ({
               id: u.id,
-              search: `${u.name} ${u.email} ${u.role} ${u.status}`,
-              facets: { role: u.role, status: u.status, iplock: u.iplock ? "Locked" : "Open" },
               node: (
                 <TableRow>
                   <TableCell>

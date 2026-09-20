@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { getProjects, getLookups } from "@/lib/queries";
+import { listProjects, getProjectStats, getLookups } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
@@ -17,8 +18,11 @@ export const dynamic = "force-dynamic";
 const typeTone = { DBDV: "cyan", APPT: "violet" };
 const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Completed: "sky" };
 
-export default async function ProjectsPage() {
-  const [projects, options] = await Promise.all([getProjects(), getLookups()]);
+export default async function ProjectsPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["status", "type", "client"]);
+  const [{ rows, total }, projects, options] = await Promise.all([listProjects(params), getProjectStats(), getLookups()]);
+
+  // Tiles describe every project; the table shows one page of them.
   const active = projects.filter((p) => p.status === "Active").length;
   const totalLeads = projects.reduce((s, p) => s + p.leads, 0);
   const contract = projects.reduce((s, p) => s + Number(p.amount ?? 0), 0);
@@ -54,17 +58,17 @@ export default async function ProjectsPage() {
           <FilterTable
             columns={["Project", "Client", "Type", "Leads", "Status", "Manager", { label: "Action", className: "text-right" }]}
             filters={[
-              { key: "status", label: "Status" },
-              { key: "type", label: "Type" },
-              { key: "client", label: "Client", kind: "select" },
-              { key: "manager", label: "Manager", kind: "select" },
+              { key: "status", label: "Status", options: options.projectStatuses.map((s) => ({ value: s.name, label: s.name })) },
+              { key: "type", label: "Type", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
+              { key: "client", label: "Client", kind: "select", options: options.companies.map((c) => ({ value: c.name, label: c.name })) },
             ]}
             placeholder="Search projects…"
             empty="No projects yet."
-            rows={projects.map((p) => ({
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={rows.map((p) => ({
               id: p.id,
-              search: `${p.name} ${p.client} ${p.type} ${p.status} ${p.manager}`,
-              facets: { status: p.status, type: p.type, client: p.client, manager: p.manager },
               node: (
                 <TableRow>
                   <TableCell>

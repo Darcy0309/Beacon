@@ -6,15 +6,19 @@ import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { getQaCalls } from "@/lib/queries";
+import { listQaCalls, QA_RESULT_OPTIONS } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
 
 const resultTone = { Passed: "emerald", Review: "amber", Failed: "rose" };
 const scoreColor = (s) => (s >= 85 ? "var(--neon-emerald)" : s >= 70 ? "var(--neon-amber)" : "var(--neon-rose)");
 
-export default async function QaPage() {
-  const calls = await getQaCalls({ limit: 40 });
+export default async function QaPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["result", "rep"]);
+  const { rows, total, stats: calls, reps } = await listQaCalls(params);
+
+  // Tiles score every reviewed call; the table shows one page of them.
   const avg = calls.length ? Math.round(calls.reduce((s, c) => s + c.score, 0) / calls.length) : 0;
   const passed = calls.filter((c) => c.result === "Passed").length;
   const review = calls.filter((c) => c.result === "Review").length;
@@ -47,16 +51,16 @@ export default async function QaPage() {
           <FilterTable
             columns={["Rep", "Client", { label: "Score", className: "w-56" }, "Result", "Date"]}
             filters={[
-              { key: "result", label: "Result" },
-              { key: "rep", label: "Rep", kind: "select" },
-              { key: "client", label: "Client", kind: "select" },
+              { key: "result", label: "Result", options: QA_RESULT_OPTIONS },
+              { key: "rep", label: "Rep", kind: "select", options: reps },
             ]}
-            placeholder="Search scored calls…"
+            placeholder="Search by client…"
             empty="No scored calls yet."
-            rows={calls.map((q) => ({
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={rows.map((q) => ({
               id: q.id,
-              search: `${q.rep} ${q.client} ${q.result} ${q.score}`,
-              facets: { result: q.result, rep: q.rep, client: q.client },
               node: (
                 <TableRow>
                   <TableCell className="font-medium">{q.rep}</TableCell>

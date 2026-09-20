@@ -7,18 +7,21 @@ import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { getInsuranceCompanies } from "@/lib/queries";
+import { listInsuranceCompanies } from "@/lib/queries";
+import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteAgency } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
 const statusTone = { Preferred: "amber", Active: "emerald" };
 
-export default async function InsuranceCompaniesPage() {
-  const carriers = await getInsuranceCompanies();
+export default async function InsuranceCompaniesPage({ searchParams }) {
+  const params = readListParams(await searchParams, ["lines"]);
+  const { rows, total, stats: carriers, associations } = await listInsuranceCompanies(params);
+
+  // Tiles describe every carrier; the table shows one page of them.
   const totalXdates = carriers.reduce((s, c) => s + c.xdates, 0);
   const preferred = carriers.filter((c) => c.status === "Preferred").length;
-  const states = new Set();
   const maxStates = Math.max(0, ...carriers.map((c) => c.states));
 
   const tiles = [
@@ -47,15 +50,15 @@ export default async function InsuranceCompaniesPage() {
           <FilterTable
             columns={["Carrier", "Association", "States", "Active X-dates", "Status", { label: "Action", className: "text-right" }]}
             filters={[
-              { key: "status", label: "Status" },
-              { key: "lines", label: "Association", kind: "select" },
+              { key: "lines", label: "Association", options: associations.map((a) => ({ value: a, label: a })) },
             ]}
             placeholder="Search carriers…"
             empty="No carriers on file."
-            rows={carriers.map((c) => ({
+            query={params.q}
+            selected={params.filters}
+            paging={pageInfo(total, params.page, params.perPage)}
+            rows={rows.map((c) => ({
               id: c.id,
-              search: `${c.name} ${c.lines} ${c.status}`,
-              facets: { status: c.status, lines: c.lines },
               node: (
                 <TableRow>
                   <TableCell>
