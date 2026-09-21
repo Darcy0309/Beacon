@@ -9,7 +9,7 @@ export default function AppSidebar() {
   return (
     <aside
       className={cn(
-        "sticky top-0 hidden h-svh shrink-0 overflow-hidden border-r border-sidebar-border bg-sidebar/90 text-sidebar-foreground transition-[width] duration-300 ease-in-out md:block",
+        "sticky top-0 hidden h-svh shrink-0 overflow-hidden border-r border-sidebar-border bg-sidebar/80 text-sidebar-foreground transition-[width] duration-300 ease-in-out md:block",
         collapsed ? "md:w-16" : "md:w-60"
       )}
     >

@@ -187,7 +187,7 @@
   border: 1px solid var(--panel-border);
   /* Slightly see-through, so the snow falling behind the page shows faintly
      through every panel. */
-  background-color: color-mix(in srgb, var(--card) 90%, transparent);
+  background-color: color-mix(in srgb, var(--card) 80%, transparent);
   border-radius: var(--radius-xl);
 }
 /* The accent rail along the top edge. Dimmed only when the animated streak

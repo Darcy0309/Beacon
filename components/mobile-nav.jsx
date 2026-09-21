@@ -11,7 +11,7 @@ export default function MobileNav() {
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <button
-          className="flex size-9 items-center justify-center rounded-md border bg-card/90 text-muted-foreground transition-all duration-150 hover:bg-accent active:scale-95 md:hidden"
+          className="flex size-9 items-center justify-center rounded-md border bg-card/80 text-muted-foreground transition-all duration-150 hover:bg-accent active:scale-95 md:hidden"
           aria-label="Open menu"
         >
           <Menu className="size-4" />
