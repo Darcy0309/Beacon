@@ -185,7 +185,9 @@
 [data-panel] {
   position: relative;
   border: 1px solid var(--panel-border);
-  background-color: var(--card);
+  /* Nearly see-through, so the snow falling behind the page shows through
+     every panel; the hairline border and accent edge carry the outline. */
+  background-color: color-mix(in srgb, var(--card) 10%, transparent);
   border-radius: var(--radius-xl);
 }
 /* The accent rail along the top edge. Dimmed only when the animated streak

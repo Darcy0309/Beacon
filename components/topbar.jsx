@@ -5,7 +5,7 @@ import ThemeToggle from "@/components/theme-toggle";
 
 export default function Topbar({ title, sub }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--panel-border)] bg-background/85 px-4 py-3 backdrop-blur sm:px-6">
+    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--panel-border)] bg-background/10 px-4 py-3 backdrop-blur-sm sm:px-6">
       <MobileNav />
       <div className="min-w-0">
         <h1 className="truncate text-sm font-bold uppercase tracking-[0.16em]">{title}</h1>
@@ -26,7 +26,7 @@ export default function Topbar({ title, sub }) {
         </span>
         <ThemeToggle />
         <button
-          className="relative flex size-9 items-center justify-center rounded-md border border-[var(--panel-border)] bg-card text-muted-foreground transition-all duration-150 hover:border-primary/40 hover:text-primary active:scale-95"
+          className="relative flex size-9 items-center justify-center rounded-md border border-[var(--panel-border)] bg-card/10 text-muted-foreground transition-all duration-150 hover:border-primary/40 hover:text-primary active:scale-95"
           aria-label="Notifications"
         >
           <Bell className="size-4" />
