@@ -1,4 +1,4 @@
-# Beacon CRM
+# Lighthouse CRM
 
 Lead-generation and appointment-setting CRM for Signature Marketing — a working
 rebuild of the legacy DCMPower / BeaconApp (VB.NET + ASP.NET Web Forms + SQL

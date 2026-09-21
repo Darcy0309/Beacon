@@ -21,7 +21,7 @@ export default function Topbar({ title, sub }) {
           />
         </div>
         <span className="hidden items-center gap-1.5 rounded-full border border-emerald-400/40 bg-emerald-400/8 px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-emerald-400 sm:inline-flex">
-          <span className="size-1.5 rounded-full bg-emerald-400 animate-beacon-pulse" />
+          <span className="size-1.5 rounded-full bg-emerald-400 animate-lighthouse-pulse" />
           Live
         </span>
         <ThemeToggle />

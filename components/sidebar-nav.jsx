@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, PanelLeftClose } from "lucide-react";
-import BeaconWordmark from "@/components/logo-wordmark";
-import BeaconMark from "@/components/logo-mark";
+import LighthouseWordmark from "@/components/logo-wordmark";
+import LighthouseMark from "@/components/logo-mark";
 import { navGroups, ROLES } from "@/lib/nav";
 import { useRole } from "@/components/role-provider";
 import { signOut } from "@/lib/actions";
@@ -40,13 +40,13 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
             title="Expand sidebar"
             className="group rounded-xl outline-none transition-transform duration-150 hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary/60 active:scale-95"
           >
-            <BeaconMark className="size-9 transition-[filter] duration-150 group-hover:drop-shadow-[0_0_10px_var(--primary)]" />
+            <LighthouseMark className="size-9 transition-[filter] duration-150 group-hover:drop-shadow-[0_0_10px_var(--primary)]" />
           </button>
         </div>
       ) : (
         <div className="px-4 py-5">
           <div className="flex items-center justify-between gap-2">
-            <BeaconWordmark className="h-9 w-auto text-sidebar-foreground" />
+            <LighthouseWordmark className="h-9 w-auto text-sidebar-foreground" />
             {!forceExpanded && (
               <button
                 onClick={toggle}

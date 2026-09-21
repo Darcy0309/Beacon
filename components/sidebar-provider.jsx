@@ -9,7 +9,7 @@ export function SidebarProvider({ children }) {
 
   useEffect(() => {
     try {
-      setCollapsed(localStorage.getItem("beacon-sidebar") === "1");
+      setCollapsed(localStorage.getItem("lighthouse-sidebar") === "1");
     } catch {}
   }, []);
 
@@ -17,7 +17,7 @@ export function SidebarProvider({ children }) {
     setCollapsed((c) => {
       const v = !c;
       try {
-        localStorage.setItem("beacon-sidebar", v ? "1" : "0");
+        localStorage.setItem("lighthouse-sidebar", v ? "1" : "0");
       } catch {}
       return v;
     });

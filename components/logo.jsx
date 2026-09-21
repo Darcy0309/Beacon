@@ -1,4 +1,4 @@
-export default function BeaconLogo({ className }) {
+export default function LighthouseLogo({ className }) {
   // Rising-arrow "growth" mark — arrow in currentColor, gold accent ray.
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">

@@ -29,7 +29,7 @@ export default function GlobalError({ error, reset }) {
           }}
         >
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fbbf24" }}>
-            Beacon could not start
+            Lighthouse could not start
           </div>
           <p style={{ marginTop: 10, fontSize: 14, color: "rgba(230,237,247,0.75)", lineHeight: 1.5 }}>
             {error?.message || "An unexpected error occurred while loading the application."}

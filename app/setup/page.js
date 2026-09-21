@@ -1,5 +1,5 @@
 import { Database, KeyRound, TerminalSquare, AlertTriangle } from "lucide-react";
-import BeaconWordmark from "@/components/logo-wordmark";
+import LighthouseWordmark from "@/components/logo-wordmark";
 import { SUPABASE_URL } from "@/lib/supabase/config";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon or publishable key>`}
     >
       <div className="relative w-full max-w-2xl">
         <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <BeaconWordmark className="h-12 w-auto text-white" />
+          <LighthouseWordmark className="h-12 w-auto text-white" />
           <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
         </div>
 

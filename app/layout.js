@@ -17,7 +17,7 @@ const inter = Inter({
 });
 
 export const metadata = {
-  title: "Beacon — Lead Management Platform",
+  title: "Lighthouse — Lead Management Platform",
   description: "Lead generation and appointment-setting CRM for Signature Marketing.",
 };
 

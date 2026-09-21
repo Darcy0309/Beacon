@@ -66,7 +66,7 @@ export default function SettingsForm({ settings, ipWhitelist }) {
               <Input name="org_name" required maxLength={80} defaultValue={dv("org_name", org.name ?? "")} aria-invalid={inv("org_name")} />
             </Field>
             <Field label="Product name" error={fe("product_name")}>
-              <Input name="product_name" maxLength={40} defaultValue={dv("product_name", branding.product ?? "Beacon")} aria-invalid={inv("product_name")} />
+              <Input name="product_name" maxLength={40} defaultValue={dv("product_name", branding.product ?? "Lighthouse")} aria-invalid={inv("product_name")} />
             </Field>
             <Field label="Logo URL" error={fe("logo")} hint="https://… or a path like /logo.svg">
               <Input name="logo" type="url" maxLength={200} placeholder="/logo.svg" defaultValue={dv("logo", branding.logo ?? "")} aria-invalid={inv("logo")} />

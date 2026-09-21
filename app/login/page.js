@@ -1,7 +1,7 @@
 import { Lock } from "lucide-react";
-import BeaconBackdrop from "@/components/beacon-backdrop";
+import LighthouseBackdrop from "@/components/lighthouse-backdrop";
 import SnowBackdrop from "@/components/snow-backdrop";
-import BeaconWordmark from "@/components/logo-wordmark";
+import LighthouseWordmark from "@/components/logo-wordmark";
 import LoginForm from "@/components/login-form";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +17,12 @@ export default async function LoginPage({ searchParams }) {
     >
       <div className="pointer-events-none absolute -left-24 top-1/3 size-96 rounded-full blur-3xl" style={{ background: "rgb(245 177 32 / 0.12)" }} />
       <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full blur-3xl" style={{ background: "rgb(43 87 201 / 0.20)" }} />
-      <BeaconBackdrop />
+      <LighthouseBackdrop />
       <div className="pointer-events-none absolute inset-0"><SnowBackdrop /></div>
 
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-2 text-center">
-          <BeaconWordmark className="h-14 w-auto text-white" />
+          <LighthouseWordmark className="h-14 w-auto text-white" />
           <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
         </div>
 

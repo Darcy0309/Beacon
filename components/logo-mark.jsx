@@ -48,10 +48,10 @@ export function SphereGlyph({ id = "sphere" }) {
 }
 
 /** Icon-only mark, for the collapsed sidebar rail. */
-export default function BeaconMark({ className }) {
+export default function LighthouseMark({ className }) {
   return (
-    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="Beacon">
-      <SphereGlyph id="beacon-mark" />
+    <svg viewBox="0 0 100 100" className={className} role="img" aria-label="Lighthouse">
+      <SphereGlyph id="lighthouse-mark" />
     </svg>
   );
 }

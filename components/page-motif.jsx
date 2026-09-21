@@ -121,7 +121,7 @@ const MOTIFS = {
       <path d="M115 40 L115 58 M115 142 L115 160 M55 100 L73 100 M157 100 L175 100 M72 57 L85 70 M145 130 L158 143 M158 57 L145 70 M85 130 L72 143" />
     </>
   ),
-  default: ( // beacon signal
+  default: ( // lighthouse signal
     <>
       <circle cx="110" cy="150" r="6" fill="currentColor" stroke="none" />
       <path d="M80 132 a42 42 0 0 1 60 0" />

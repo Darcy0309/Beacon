@@ -266,12 +266,12 @@
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
 }
 
-@keyframes beacon-pulse {
+@keyframes lighthouse-pulse {
   0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 40%, transparent); }
   70%  { box-shadow: 0 0 0 7px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
-.animate-beacon-pulse { animation: beacon-pulse 2.4s ease-out infinite; }
+.animate-lighthouse-pulse { animation: lighthouse-pulse 2.4s ease-out infinite; }
 
 @keyframes pop-in {
   0%   { opacity: 0; transform: translateY(6px) scale(0.985); }
@@ -328,8 +328,8 @@ table tbody tr:hover,
   animation: page-in 0.32s ease-out both;
 }
 
-/* Beacon / radar pulse rings (login backdrop) */
-.beacon-ring {
+/* Lighthouse / radar pulse rings (login backdrop) */
+.lighthouse-ring {
   position: absolute;
   left: 50%;
   top: 50%;
@@ -340,9 +340,9 @@ table tbody tr:hover,
   border-radius: 9999px;
   border: 1px solid color-mix(in srgb, var(--primary) 26%, transparent);
   opacity: 0;
-  animation: beacon-radar 7s ease-out infinite;
+  animation: lighthouse-radar 7s ease-out infinite;
 }
-@keyframes beacon-radar {
+@keyframes lighthouse-radar {
   0%   { transform: scale(0.25); opacity: 0; }
   12%  { opacity: 0.45; }
   100% { transform: scale(2.6); opacity: 0; }

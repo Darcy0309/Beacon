@@ -90,7 +90,7 @@ export default async function Dashboard() {
           <div className="grid-veil pointer-events-none absolute inset-0 opacity-40" />
           <div className="relative flex flex-wrap items-end justify-between gap-6 p-6">
             <div className="max-w-xl">
-              <span className="eyebrow eyebrow-accent">Signature Marketing · Beacon Platform</span>
+              <span className="eyebrow eyebrow-accent">Signature Marketing · Lighthouse Platform</span>
               <h2 className="mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
                 Qualified leads and set appointments,
                 <br className="hidden sm:block" /> routed to the agencies that bought them.

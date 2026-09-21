@@ -1,4 +1,4 @@
-export default function BeaconBackdrop() {
+export default function LighthouseBackdrop() {
   return (
     <div className="absolute inset-0 overflow-hidden">
       <div
@@ -11,7 +11,7 @@ export default function BeaconBackdrop() {
         }}
       />
       {[0, 1, 2, 3, 4].map((i) => (
-        <span key={i} className="beacon-ring" style={{ animationDelay: `${i * 1.4}s` }} />
+        <span key={i} className="lighthouse-ring" style={{ animationDelay: `${i * 1.4}s` }} />
       ))}
     </div>
   );
