@@ -5,7 +5,7 @@ import SectionHeader from "@/components/section-header";
 import AppointmentForm from "@/components/appointment-form";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getWeekAppointments, getLookups, getLeads } from "@/lib/queries";
+import { getWeekAppointments, getLookups, getLeadOptions } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +55,7 @@ export default async function AppointmentsPage() {
   const [{ rows, groups }, options, leads] = await Promise.all([
     getWeekAppointments(),
     getLookups(),
-    getLeads({ limit: 300 }),
+    getLeadOptions(),
   ]);
 
   const today = new Date().toISOString().slice(0, 10);
@@ -101,7 +101,7 @@ export default async function AppointmentsPage() {
             action={
               <AppointmentForm
                 options={options}
-                leads={leads.map(({ id, co, city }) => ({ id, co, city }))}
+                leads={leads}
                 trigger={<Button size="sm"><CalendarClock /> New appointment</Button>}
               />
             }
