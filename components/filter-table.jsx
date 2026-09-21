@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
 
 /**
  * A data table with a search box and facet filters across the top.
@@ -91,6 +92,16 @@ export default function FilterTable({
       if (nextPicked[f.key]) params.set(f.key, nextPicked[f.key]);
       else params.delete(f.key);
     }
+    const qs = params.toString();
+    startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
+  };
+
+  // Rows per page lives in ?per=; changing it starts again from page 1.
+  const setPerPage = (per) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    if (Number(per) === PAGE_SIZE) params.delete("per");
+    else params.set("per", String(per));
     const qs = params.toString();
     startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
   };
@@ -217,7 +228,9 @@ export default function FilterTable({
         </TableBody>
       </Table>
 
-      {server && paging.pages > 1 ? <Pager paging={paging} searchParams={searchParams} pathname={pathname} /> : null}
+      {server && (paging.pages > 1 || paging.total > PAGE_SIZES[0]) ? (
+        <Pager paging={paging} searchParams={searchParams} pathname={pathname} onPerPage={setPerPage} />
+      ) : null}
     </div>
   );
 }
@@ -296,7 +309,7 @@ function pageNumbers(page, pages) {
 const pageButton =
   "flex h-7 min-w-7 items-center justify-center rounded-md border px-1.5 text-xs font-semibold tabular-nums transition-colors";
 
-function Pager({ paging, searchParams, pathname }) {
+function Pager({ paging, searchParams, pathname, onPerPage }) {
   const href = (n) => {
     const params = new URLSearchParams(searchParams.toString());
     if (n > 1) params.set("page", String(n));
@@ -314,8 +327,23 @@ function Pager({ paging, searchParams, pathname }) {
     );
 
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--panel-border)] px-5 py-3">
-      <span className="text-xs text-muted-foreground">Page {paging.page} of {paging.pages}</span>
+    <nav aria-label="Pagination" className="flex flex-wrap items-center justify-between gap-x-5 gap-y-3 border-t border-[var(--panel-border)] px-5 py-3">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <label className="flex items-center gap-2">
+          <span className="eyebrow">Rows per page</span>
+          <Select
+            value={String(paging.perPage)}
+            onChange={(e) => onPerPage(Number(e.target.value))}
+            aria-label="Rows per page"
+            className="h-8 w-auto min-w-20 text-xs"
+          >
+            {PAGE_SIZES.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </Select>
+        </label>
+        <span className="text-xs text-muted-foreground">Page {paging.page} of {paging.pages}</span>
+      </div>
       <div className="flex items-center gap-1">
         {link(paging.page - 1, "Previous page", <ChevronLeft className="size-3.5" />, paging.page <= 1)}
         {pageNumbers(paging.page, paging.pages).map((n, i) =>

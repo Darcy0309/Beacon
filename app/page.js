@@ -13,7 +13,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
 import { STATUS } from "@/lib/data";
 import {
-  getRecentLeads, getAppointments, getDashboardStats, getCurrentUser, getReps,
+  getRecentLeads, getAppointments, getDashboardStats, getCurrentUser,
 } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -40,13 +40,14 @@ const BAR_COLORS = [
 ];
 
 export default async function Dashboard() {
-  const [recentLeads, appointments, s, me, reps] = await Promise.all([
+  const [recentLeads, appointments, s, me] = await Promise.all([
     getRecentLeads(6),
     getAppointments(),
     getDashboardStats(),
     getCurrentUser(),
-    getReps(),
   ]);
+  // Appointments per rep ride along with the dashboard stats.
+  const reps = s.reps;
 
   const c = chart(s.weeks);
   const hour = new Date().getHours();
