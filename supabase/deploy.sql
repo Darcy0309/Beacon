@@ -1019,6 +1019,99 @@ $$;
 
 grant execute on function public.global_search(text, int) to authenticated;
 
+-- ===== supabase/migrations/20260922100000_security_and_activity.sql =====
+-- ---------------------------------------------------------------------------
+-- Lighthouse CRM — retire IP lockdown, add activity logging
+--
+-- The legacy app pinned each user to an IP address, which broke whenever
+-- somebody worked from a different desk and did nothing against a stolen
+-- password. It is replaced by two-factor authentication (TOTP), which
+-- Supabase Auth stores in the auth schema — so there is nothing to add here
+-- beyond a way for administrators to see who has it switched on.
+--
+-- The activity log answers "how much is this account actually using the
+-- system": every sign-in, and the record changes that matter.
+-- ---------------------------------------------------------------------------
+
+-- --- IP lockdown, removed -------------------------------------------------
+drop policy if exists ip_whitelist_read on public.ip_whitelist;
+drop policy if exists ip_whitelist_write on public.ip_whitelist;
+drop table if exists public.ip_whitelist;
+alter table public.users drop column if exists ip_locked;
+
+-- --- Two-factor status ----------------------------------------------------
+-- auth.mfa_factors is not exposed through the API, so this reads it on the
+-- caller's behalf: administrators and managers see every account's status,
+-- everyone else sees only their own.
+create or replace function public.mfa_status()
+returns table (user_id bigint, enabled boolean)
+language sql stable security definer set search_path = public, auth as $$
+  select u.id,
+         exists (select 1 from auth.mfa_factors f
+                  where f.user_id = u.auth_id and f.status = 'verified')
+    from public.users u
+   where public.is_manager() or u.auth_id = auth.uid();
+$$;
+
+grant execute on function public.mfa_status() to authenticated;
+
+-- --- Activity log ---------------------------------------------------------
+create table if not exists public.activity_log (
+  id         bigint generated always as identity primary key,
+  user_id    bigint references public.users(id) on delete set null,
+  action     text not null,                 -- sign_in, sign_out, lead.create, …
+  entity     text,                          -- lead, project, user, …
+  entity_id  bigint,
+  detail     text,                          -- a short human-readable summary
+  created_at timestamptz not null default now()
+);
+
+create index if not exists activity_log_user_created_idx on public.activity_log (user_id, created_at desc);
+create index if not exists activity_log_created_idx on public.activity_log (created_at desc);
+
+alter table public.activity_log enable row level security;
+
+-- Anyone may record their own activity; nobody may rewrite history.
+create policy activity_log_insert_self on public.activity_log
+  for insert to authenticated
+  with check (user_id = public.app_user_id());
+
+-- Staff leaders see everything, everyone else sees only their own trail.
+create policy activity_log_read on public.activity_log
+  for select to authenticated
+  using (public.is_manager() or user_id = public.app_user_id());
+
+grant select, insert on public.activity_log to authenticated;
+
+/**
+ * Per-user activity roll-up for the administration screen: sign-ins this
+ * calendar month, sign-ins in the last 30 days, total recorded actions and
+ * when the account was last seen.
+ */
+create or replace function public.activity_summary()
+returns jsonb
+language sql stable security invoker set search_path = public as $$
+  select coalesce(jsonb_agg(x order by x->>'last_active' desc nulls last), '[]'::jsonb)
+    from (
+      select jsonb_build_object(
+               'user_id',        u.id,
+               'first_name',     u.first_name,
+               'last_name',      u.last_name,
+               'email',          u.email,
+               'role',           u.role,
+               'logins_month',   count(*) filter (where a.action = 'sign_in' and a.created_at >= date_trunc('month', now())),
+               'logins_30d',     count(*) filter (where a.action = 'sign_in' and a.created_at >= now() - interval '30 days'),
+               'actions_30d',    count(*) filter (where a.action <> 'sign_in' and a.created_at >= now() - interval '30 days'),
+               'last_active',    max(a.created_at)
+             ) as x
+        from public.users u
+        left join public.activity_log a on a.user_id = u.id
+       group by u.id, u.first_name, u.last_name, u.email, u.role
+    ) t;
+$$;
+
+grant execute on function public.activity_summary() to authenticated;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- Beacon CRM — seed data
@@ -1147,26 +1240,26 @@ values
 -- Application users, linked to the auth accounts above
 -- ---------------------------------------------------------------------------
 insert into public.users
-  (auth_id, company_id, user_type_id, role, first_name, last_name, email, username, phone, city, state, status, ip_locked, last_login)
+  (auth_id, company_id, user_type_id, role, first_name, last_name, email, username, phone, city, state, status, last_login)
 values
   ((select id from auth.users where email='admin@beacon.test'),  null,
-   (select id from public.user_types where code='ADMIN'),  'admin',   'Darcy',  'Johnston',  'admin@beacon.test',  'darcy',  '(480) 555-0111', 'Scottsdale', 'AZ', 'active', true,  now() - interval '2 hours'),
+   (select id from public.user_types where code='ADMIN'),  'admin',   'Darcy',  'Johnston',  'admin@beacon.test',  'darcy',  '(480) 555-0111', 'Scottsdale', 'AZ', 'active', now() - interval '2 hours'),
 
   ((select id from auth.users where email='sean@beacon.test'),   null,
-   (select id from public.user_types where code='AE'),     'manager', 'Sean',   'Fitzgerald','sean@beacon.test',   'seanf',  '(480) 555-0122', 'Phoenix',    'AZ', 'active', false, now() - interval '1 day'),
+   (select id from public.user_types where code='AE'),     'manager', 'Sean',   'Fitzgerald','sean@beacon.test',   'seanf',  '(480) 555-0122', 'Phoenix',    'AZ', 'active', now() - interval '1 day'),
 
   ((select id from auth.users where email='mike@beacon.test'),   null,
-   (select id from public.user_types where code='AE'),     'manager', 'Mike',   'Preston',   'mike@beacon.test',   'mikep',  '(319) 555-0133', 'Cedar Rapids','IA','active', false, now() - interval '3 hours'),
+   (select id from public.user_types where code='AE'),     'manager', 'Mike',   'Preston',   'mike@beacon.test',   'mikep',  '(319) 555-0133', 'Cedar Rapids','IA','active', now() - interval '3 hours'),
 
   ((select id from auth.users where email='rachel@beacon.test'), null,
-   (select id from public.user_types where code='AE'),     'manager', 'Rachel', 'Colestock', 'rachel@beacon.test', 'rcole',  '(520) 555-0144', 'Tucson',     'AZ', 'active', false, now() - interval '5 days'),
+   (select id from public.user_types where code='AE'),     'manager', 'Rachel', 'Colestock', 'rachel@beacon.test', 'rcole',  '(520) 555-0144', 'Tucson',     'AZ', 'active', now() - interval '5 days'),
 
   ((select id from auth.users where email='agent@beacon.test'),  null,
-   (select id from public.user_types where code='AGENT'),  'agent',   'Tyler',  'Nguyen',    'agent@beacon.test',  'tylern', '(602) 555-0155', 'Phoenix',    'AZ', 'active', false, now() - interval '20 minutes'),
+   (select id from public.user_types where code='AGENT'),  'agent',   'Tyler',  'Nguyen',    'agent@beacon.test',  'tylern', '(602) 555-0155', 'Phoenix',    'AZ', 'active', now() - interval '20 minutes'),
 
   ((select id from auth.users where email='client@beacon.test'),
    (select id from public.companies where name='Garry Insurance'),
-   (select id from public.user_types where code='CLIENT'), 'client',  'Jeff',   'Garry',     'client@beacon.test', 'jgarry', '(602) 555-0148', 'Phoenix',    'AZ', 'active', false, now() - interval '4 days');
+   (select id from public.user_types where code='CLIENT'), 'client',  'Jeff',   'Garry',     'client@beacon.test', 'jgarry', '(602) 555-0148', 'Phoenix',    'AZ', 'active', now() - interval '4 days');
 
 -- A couple of non-login staff records so the directory looks real.
 insert into public.users (user_type_id, role, first_name, last_name, email, username, status)
@@ -1499,16 +1592,11 @@ from (values
 join public.alert_rules r on r.name = v.rule;
 
 -- ---------------------------------------------------------------------------
--- IP whitelist + settings
+-- Settings
 -- ---------------------------------------------------------------------------
-insert into public.ip_whitelist (ip_address, label) values
-  ('45.61.157.16',  'Production office'),
-  ('72.14.201.88',  'Scottsdale office'),
-  ('10.0.0.0/8',    'Internal VPN');
-
 insert into public.app_settings (key, value) values
   ('organization', '{"name":"Signature Marketing","email":"info@signaturemktg.net","phone":"(480) 555-0100","timezone":"MST"}'::jsonb),
-  ('security',     '{"ip_lockdown":true,"session_timeout_min":60,"password_min_length":10}'::jsonb),
+  ('security',     '{"session_timeout_min":60,"password_min_length":10}'::jsonb),
   ('mail',         '{"provider":"smtp","from":"alerts@signaturemktg.net","host":"smtp.office365.com","port":587}'::jsonb),
   ('branding',     '{"primary":"#2b57c9","accent":"#38bdf8","logo":"/logo.svg"}'::jsonb);
 

@@ -125,26 +125,26 @@ values
 -- Application users, linked to the auth accounts above
 -- ---------------------------------------------------------------------------
 insert into public.users
-  (auth_id, company_id, user_type_id, role, first_name, last_name, email, username, phone, city, state, status, ip_locked, last_login)
+  (auth_id, company_id, user_type_id, role, first_name, last_name, email, username, phone, city, state, status, last_login)
 values
   ((select id from auth.users where email='admin@beacon.test'),  null,
-   (select id from public.user_types where code='ADMIN'),  'admin',   'Darcy',  'Johnston',  'admin@beacon.test',  'darcy',  '(480) 555-0111', 'Scottsdale', 'AZ', 'active', true,  now() - interval '2 hours'),
+   (select id from public.user_types where code='ADMIN'),  'admin',   'Darcy',  'Johnston',  'admin@beacon.test',  'darcy',  '(480) 555-0111', 'Scottsdale', 'AZ', 'active', now() - interval '2 hours'),
 
   ((select id from auth.users where email='sean@beacon.test'),   null,
-   (select id from public.user_types where code='AE'),     'manager', 'Sean',   'Fitzgerald','sean@beacon.test',   'seanf',  '(480) 555-0122', 'Phoenix',    'AZ', 'active', false, now() - interval '1 day'),
+   (select id from public.user_types where code='AE'),     'manager', 'Sean',   'Fitzgerald','sean@beacon.test',   'seanf',  '(480) 555-0122', 'Phoenix',    'AZ', 'active', now() - interval '1 day'),
 
   ((select id from auth.users where email='mike@beacon.test'),   null,
-   (select id from public.user_types where code='AE'),     'manager', 'Mike',   'Preston',   'mike@beacon.test',   'mikep',  '(319) 555-0133', 'Cedar Rapids','IA','active', false, now() - interval '3 hours'),
+   (select id from public.user_types where code='AE'),     'manager', 'Mike',   'Preston',   'mike@beacon.test',   'mikep',  '(319) 555-0133', 'Cedar Rapids','IA','active', now() - interval '3 hours'),
 
   ((select id from auth.users where email='rachel@beacon.test'), null,
-   (select id from public.user_types where code='AE'),     'manager', 'Rachel', 'Colestock', 'rachel@beacon.test', 'rcole',  '(520) 555-0144', 'Tucson',     'AZ', 'active', false, now() - interval '5 days'),
+   (select id from public.user_types where code='AE'),     'manager', 'Rachel', 'Colestock', 'rachel@beacon.test', 'rcole',  '(520) 555-0144', 'Tucson',     'AZ', 'active', now() - interval '5 days'),
 
   ((select id from auth.users where email='agent@beacon.test'),  null,
-   (select id from public.user_types where code='AGENT'),  'agent',   'Tyler',  'Nguyen',    'agent@beacon.test',  'tylern', '(602) 555-0155', 'Phoenix',    'AZ', 'active', false, now() - interval '20 minutes'),
+   (select id from public.user_types where code='AGENT'),  'agent',   'Tyler',  'Nguyen',    'agent@beacon.test',  'tylern', '(602) 555-0155', 'Phoenix',    'AZ', 'active', now() - interval '20 minutes'),
 
   ((select id from auth.users where email='client@beacon.test'),
    (select id from public.companies where name='Garry Insurance'),
-   (select id from public.user_types where code='CLIENT'), 'client',  'Jeff',   'Garry',     'client@beacon.test', 'jgarry', '(602) 555-0148', 'Phoenix',    'AZ', 'active', false, now() - interval '4 days');
+   (select id from public.user_types where code='CLIENT'), 'client',  'Jeff',   'Garry',     'client@beacon.test', 'jgarry', '(602) 555-0148', 'Phoenix',    'AZ', 'active', now() - interval '4 days');
 
 -- A couple of non-login staff records so the directory looks real.
 insert into public.users (user_type_id, role, first_name, last_name, email, username, status)
@@ -477,16 +477,11 @@ from (values
 join public.alert_rules r on r.name = v.rule;
 
 -- ---------------------------------------------------------------------------
--- IP whitelist + settings
+-- Settings
 -- ---------------------------------------------------------------------------
-insert into public.ip_whitelist (ip_address, label) values
-  ('45.61.157.16',  'Production office'),
-  ('72.14.201.88',  'Scottsdale office'),
-  ('10.0.0.0/8',    'Internal VPN');
-
 insert into public.app_settings (key, value) values
   ('organization', '{"name":"Signature Marketing","email":"info@signaturemktg.net","phone":"(480) 555-0100","timezone":"MST"}'::jsonb),
-  ('security',     '{"ip_lockdown":true,"session_timeout_min":60,"password_min_length":10}'::jsonb),
+  ('security',     '{"session_timeout_min":60,"password_min_length":10}'::jsonb),
   ('mail',         '{"provider":"smtp","from":"alerts@signaturemktg.net","host":"smtp.office365.com","port":587}'::jsonb),
   ('branding',     '{"primary":"#2b57c9","accent":"#38bdf8","logo":"/logo.svg"}'::jsonb);
 

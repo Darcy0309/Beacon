@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the shared form validation. */
-import { rules, validate, schemas, cross, validateIpList } from "../lib/validate.js";
+import { rules, validate, schemas, cross } from "../lib/validate.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -64,11 +64,6 @@ passes("hostname: smtp.office365.com", rules.hostname, "smtp.office365.com");
 fails("hostname: has space", rules.hostname, "smtp office");
 fails("hostname: no tld", rules.hostname, "localhost");
 
-passes("ipOrCidr: 45.61.157.16", rules.ipOrCidr, "45.61.157.16");
-passes("ipOrCidr: 10.0.0.0/8", rules.ipOrCidr, "10.0.0.0/8");
-fails("ipOrCidr: octet 256", rules.ipOrCidr, "256.1.1.1");
-fails("ipOrCidr: prefix 33", rules.ipOrCidr, "10.0.0.0/33");
-fails("ipOrCidr: not an ip", rules.ipOrCidr, "office");
 
 passes("username: darcy_j", rules.username, "darcy_j");
 fails("username: too short", rules.username, "ab");
@@ -107,13 +102,6 @@ fails("username: spaces", rules.username, "darcy j");
   check("bulletin: 2-char message too short", Boolean(r.errors.message));
   const r2 = validate({ message: "x".repeat(101) }, schemas.bulletin);
   check("bulletin: 101 chars too long", Boolean(r2.errors.message));
-}
-{
-  const ok = validateIpList("45.61.157.16\n10.0.0.0/8\n");
-  check("ip list: valid list passes", ok.ok && ok.list.length === 2);
-  const bad = validateIpList("45.61.157.16\nnot-an-ip\n45.61.157.16");
-  check("ip list: reports the bad line", bad.error?.includes("line 2"));
-  check("ip list: reports duplicates", bad.error?.includes("duplicate"));
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll validation tests passed.\n");

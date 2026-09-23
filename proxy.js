@@ -5,6 +5,26 @@ import { supabaseFetch } from "@/lib/supabase/fetch";
 
 const PUBLIC_PATHS = ["/login", "/auth", "/setup"];
 
+/**
+ * True when the session has cleared two-factor. The assurance level is a
+ * claim inside the access token, so this reads the cookie rather than
+ * calling Supabase again.
+ */
+async function atFullAssurance(supabase) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(Buffer.from(token.split(".")[1], "base64").toString("utf8"));
+    return payload?.aal === "aal2";
+  } catch {
+    // An unreadable token is not proof of anything; fail closed.
+    return false;
+  }
+}
+
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -69,7 +89,20 @@ export async function proxy(request) {
     return NextResponse.redirect(url);
   }
 
-  if (user && (pathname === "/login" || pathname === "/setup")) {
+  // With an authenticator enrolled, a password alone only reaches aal1. Send
+  // those half-finished sessions back to the login page for the code, rather
+  // than letting them browse. The factors came back with getUser(), and the
+  // level is a claim inside the token it just validated, so this costs
+  // nothing extra.
+  const needsCode = user && (user.factors ?? []).some((f) => f.status === "verified") && !(await atFullAssurance(supabase));
+  if (needsCode && !isPublic) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  if (user && !needsCode && (pathname === "/login" || pathname === "/setup")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

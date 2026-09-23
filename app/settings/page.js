@@ -5,13 +5,13 @@ import { getSettings } from "@/lib/queries";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const { settings, ipWhitelist } = await getSettings();
+  const { settings } = await getSettings();
 
   return (
     <>
       <Topbar title="Settings" sub="Branding, security, and email" />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        <SettingsForm settings={settings} ipWhitelist={ipWhitelist} />
+        <SettingsForm settings={settings} />
       </div>
     </>
   );

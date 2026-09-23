@@ -2,29 +2,21 @@
 
 import { useActionState, useState } from "react";
 import { toast } from "sonner";
+import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { signIn } from "@/lib/actions";
+import { signIn, verifyTwoFactor } from "@/lib/actions";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
-
-// The seeded accounts, so the workspace can be opened as any role.
-const ACCOUNTS = {
-  admin: { label: "Administrator", email: "admin@beacon.test" },
-  manager: { label: "Account Manager", email: "sean@beacon.test" },
-  agent: { label: "Agent", email: "agent@beacon.test" },
-  client: { label: "Client", email: "client@beacon.test" },
-};
-
-const PASSWORD = "Beacon!2026";
 
 const field =
   "h-9 w-full rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-white/30 focus:ring-2 focus:ring-white/20";
 
 export default function LoginForm({ next = "/" }) {
+  // The password step reports `mfa` when the account has an authenticator,
+  // which swaps this form for the code step.
   const [state, formAction, pending] = useActionState(signIn, EMPTY);
-  const [selectedRole, setSelectedRole] = useState("admin");
-  const [email, setEmail] = useState(ACCOUNTS.admin.email);
-  const [password, setPassword] = useState(PASSWORD);
+
+  if (state?.mfa) return <TwoFactorStep next={next} />;
 
   return (
     <form
@@ -41,8 +33,8 @@ export default function LoginForm({ next = "/" }) {
           name="email"
           type="email"
           required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          autoFocus
+          defaultValue={state?.values?.email ?? ""}
           placeholder="you@company.com"
           autoComplete="username"
           aria-invalid={state?.fieldErrors?.email ? true : undefined}
@@ -50,6 +42,7 @@ export default function LoginForm({ next = "/" }) {
         />
         {state?.fieldErrors?.email ? <p role="alert" className="text-xs text-rose-300">{state.fieldErrors.email}</p> : null}
       </div>
+
       <div className="space-y-1.5">
         <label htmlFor="password" className="text-sm font-medium text-white/80">Password</label>
         <input
@@ -57,37 +50,11 @@ export default function LoginForm({ next = "/" }) {
           name="password"
           type="password"
           required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
           aria-invalid={state?.fieldErrors?.password ? true : undefined}
           className={`${field} ${state?.fieldErrors?.password ? "border-rose-400/60" : ""}`}
         />
         {state?.fieldErrors?.password ? <p role="alert" className="text-xs text-rose-300">{state.fieldErrors.password}</p> : null}
-      </div>
-
-      <div className="space-y-1.5">
-        <label className="text-sm font-medium text-white/80">Sign in as</label>
-        <div className="grid grid-cols-2 gap-2">
-          {Object.entries(ACCOUNTS).map(([key, r]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                setSelectedRole(key);
-                setEmail(r.email);
-                setPassword(PASSWORD);
-              }}
-              className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
-                selectedRole === key
-                  ? "border-white/40 bg-white/15 text-white"
-                  : "border-white/12 bg-white/5 text-white/70 hover:bg-white/10"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {state?.error && !state?.fieldErrors ? (
@@ -106,6 +73,63 @@ export default function LoginForm({ next = "/" }) {
       >
         Forgot your password?
       </button>
+    </form>
+  );
+}
+
+/** Second step: the six-digit code from the user's authenticator app. */
+function TwoFactorStep({ next }) {
+  const [state, formAction, pending] = useActionState(verifyTwoFactor, EMPTY);
+  const [code, setCode] = useState("");
+
+  return (
+    <form
+      action={formAction}
+      noValidate
+      className="space-y-4 rounded-2xl border border-white/12 bg-white/8 p-6 shadow-2xl backdrop-blur-xl"
+    >
+      <input type="hidden" name="next" value={next} />
+
+      <div className="flex items-center gap-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white">
+          <ShieldCheck className="size-4" />
+        </span>
+        <div>
+          <div className="text-sm font-semibold text-white">Two-factor required</div>
+          <div className="text-xs text-white/60">Enter the code from your authenticator app.</div>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <label htmlFor="code" className="text-sm font-medium text-white/80">Six-digit code</label>
+        <input
+          id="code"
+          name="code"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          required
+          autoFocus
+          value={code}
+          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="000000"
+          aria-invalid={state?.fieldErrors?.code ? true : undefined}
+          className={`${field} text-center font-mono text-base tracking-[0.4em] ${state?.fieldErrors?.code ? "border-rose-400/60" : ""}`}
+        />
+      </div>
+
+      {state?.error ? (
+        <p role="alert" className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+          {state.error}
+        </p>
+      ) : null}
+
+      <Button type="submit" className="w-full" disabled={pending || code.length < 6}>
+        {pending ? "Checking…" : "Verify and continue"}
+      </Button>
+      <p className="text-center text-xs text-white/50">
+        Lost your authenticator? Ask an administrator to reset it.
+      </p>
     </form>
   );
 }

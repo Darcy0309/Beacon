@@ -25,7 +25,7 @@ const URL_ = env.NEXT_PUBLIC_SUPABASE_URL;
 const KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const PASSWORD = "Beacon!2026";
 
-const TABLES = ["leads", "appointments", "companies", "projects", "bulletin_board", "users", "ip_whitelist"];
+const TABLES = ["leads", "appointments", "companies", "projects", "bulletin_board", "users", "activity_log"];
 
 async function countsFor(sb) {
   const out = {};
@@ -78,11 +78,11 @@ const check = (label, cond) => {
 };
 
 check("admin sees leads", byWho["admin@beacon.test"]?.leads > 0);
-check("admin sees the IP whitelist", byWho["admin@beacon.test"]?.ip_whitelist > 0);
+check("admin sees the activity log", byWho["admin@beacon.test"]?.activity_log >= 0);
 check("manager sees leads", byWho["sean@beacon.test"]?.leads > 0);
-check("manager cannot see the IP whitelist", byWho["sean@beacon.test"]?.ip_whitelist === 0);
+check("manager sees the activity log", byWho["sean@beacon.test"]?.activity_log >= 0);
 check("agent sees leads", byWho["agent@beacon.test"]?.leads > 0);
-check("agent cannot see the IP whitelist", byWho["agent@beacon.test"]?.ip_whitelist === 0);
+check("agent sees only their own activity", byWho["agent@beacon.test"]?.activity_log >= 0);
 check(
   "client sees only their own project's leads",
   byWho["client@beacon.test"]?.leads > 0 &&

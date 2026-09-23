@@ -1,14 +1,14 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import SectionHeader from "@/components/section-header";
-import { Palette, Mail, Lock } from "lucide-react";
+import { Palette, Mail, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { saveSettings } from "@/lib/actions";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -30,17 +30,13 @@ function Field({ label, children, error, hint, required }) {
   );
 }
 
-export default function SettingsForm({ settings, ipWhitelist }) {
+export default function SettingsForm({ settings }) {
   const [state, formAction, pending] = useActionState(saveSettings, EMPTY);
   const router = useRouter();
 
   const org = settings.organization ?? {};
   const mail = settings.mail ?? {};
   const branding = settings.branding ?? {};
-
-  const [ips, setIps] = useState(
-    ipWhitelist.map((r) => r.ip_address).join("\n")
-  );
 
   useEffect(() => {
     if (state?.ok) {
@@ -91,17 +87,19 @@ export default function SettingsForm({ settings, ipWhitelist }) {
       </div>
 
       <Card>
-        <SectionHeader label="IP Lockdown" icon={Lock} />
-        <div className="space-y-4 p-5">
-          <Field label="Allowed IP addresses (one per line)" error={fe("ip_whitelist")} hint="IPv4 addresses or CIDR ranges, e.g. 203.0.113.0/24">
-            <Textarea
-              name="ip_whitelist"
-              value={ips}
-              onChange={(e) => setIps(e.target.value)}
-              className="min-h-28 font-mono text-xs"
-              aria-invalid={inv("ip_whitelist")}
-            />
-          </Field>
+        <SectionHeader label="Sign-in Security" icon={ShieldCheck} />
+        <div className="space-y-3 p-5 text-sm text-muted-foreground">
+          <p>
+            Accounts are protected by a password plus an optional authenticator app.
+            IP lockdown was retired: it broke whenever somebody worked from a different
+            desk, and did nothing against a stolen password.
+          </p>
+          <p>
+            Each person turns two-factor on for themselves under{" "}
+            <Link href="/security" className="font-medium text-primary hover:underline">My Security</Link>.
+            Who has it on is shown on the{" "}
+            <Link href="/users" className="font-medium text-primary hover:underline">Users &amp; Access</Link> page.
+          </p>
         </div>
       </Card>
 

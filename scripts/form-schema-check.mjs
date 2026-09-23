@@ -17,8 +17,8 @@ const FORMS = {
   "components/bulletin-composer.jsx":{ schema: "bulletin",    extra: [] },
   "components/call-logger.jsx":      { schema: "call",        extra: [] },
   "components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
-  "components/settings-form.jsx":    { schema: "settings",    extra: ["ip_whitelist"] },
-  "components/login-form.jsx":       { schema: "login",       extra: ["next"] },
+  "components/settings-form.jsx":    { schema: "settings",    extra: [] },
+  "components/login-form.jsx":       { schema: "login",       extra: ["next", "code"] },  // `code` belongs to the two-factor step
 };
 
 let failures = 0;
