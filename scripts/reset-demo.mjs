@@ -79,22 +79,49 @@ const CLIENTS = [
       },
     ],
   },
+  // Stand-ins until the client names his other two accounts. Named to his own
+  // convention so the demo reads as a working book of business; the leads
+  // underneath are all marked SAMPLE.
   {
-    name: "Client Two — awaiting name",
-    city: null,
-    state: null,
+    name: "Heartland Insurance Group-MidwestPros",
+    city: "Cedar Rapids",
+    state: "IA",
     projects: [
-      { name: "Client2-Project-A_2026", type: "DBDV", description: "Awaiting the client's list", state: null, list: null },
-      { name: "Client2-Project-B_2026", type: "APPT", description: "Awaiting the client's list", state: null, list: null },
+      {
+        name: "HeartlandIns-MidwestPros_DaleWinters_2026",
+        type: "DBDV",
+        description: "Linn & Polk county trades — X-date development",
+        state: "IA",
+        list: null,
+      },
+      {
+        name: "HeartlandIns-MidwestPros_Appointments_2026",
+        type: "APPT",
+        description: "Appointment setting from the developed X-dates",
+        state: "IA",
+        list: null,
+      },
     ],
   },
   {
-    name: "Client Three — awaiting name",
-    city: null,
-    state: null,
+    name: "Summit Risk Partners-MountainWest",
+    city: "Denver",
+    state: "CO",
     projects: [
-      { name: "Client3-Project-A_2026", type: "DBDV", description: "Awaiting the client's list", state: null, list: null },
-      { name: "Client3-Project-B_2026", type: "APPT", description: "Awaiting the client's list", state: null, list: null },
+      {
+        name: "SummitRisk-MtnWestCO_ReneeAldridge_2026",
+        type: "DBDV",
+        description: "Front Range contractors — X-date development",
+        state: "CO",
+        list: null,
+      },
+      {
+        name: "SummitRisk-MtnWestCO_Appointments_2026",
+        type: "APPT",
+        description: "Appointment setting from the developed X-dates",
+        state: "CO",
+        list: null,
+      },
     ],
   },
 ];
