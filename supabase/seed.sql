@@ -30,7 +30,10 @@ insert into public.lead_statuses (code, name) values
   ('hot',     'X-date hot lead'),
   ('xdate',   'X-date lead'),
   ('profile', 'X-date profile'),
-  ('new',     'New');
+  ('new',     'New'),
+  ('not_interested',  'Not interested'),
+  ('disconnected',    'Disconnected number'),
+  ('out_of_business', 'Out of business');
 
 insert into public.appointment_statuses (name) values
   ('Scheduled'), ('Confirmed'), ('Held'), ('Rescheduled'), ('Cancelled'), ('No Show');

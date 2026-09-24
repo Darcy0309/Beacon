@@ -8,6 +8,9 @@ const ring = {
   xdate: "border-cyan-400/40 bg-cyan-400/8 text-cyan-400",
   profile: "border-amber-400/45 bg-amber-400/8 text-amber-400",
   new: "border-slate-400/30 bg-slate-400/8 text-slate-400",
+  not_interested: "border-zinc-400/30 bg-zinc-400/8 text-zinc-400",
+  disconnected: "border-stone-400/30 bg-stone-400/8 text-stone-400",
+  out_of_business: "border-neutral-400/30 bg-neutral-400/8 text-neutral-400",
 };
 const dot = {
   appt: "bg-emerald-400",
@@ -16,6 +19,9 @@ const dot = {
   xdate: "bg-cyan-400",
   profile: "bg-amber-400",
   new: "bg-slate-400",
+  not_interested: "bg-zinc-400",
+  disconnected: "bg-stone-400",
+  out_of_business: "bg-neutral-400",
 };
 
 /** Accepts a status code ("hot") or a lead_statuses row ({ code, name }). */

@@ -1112,6 +1112,50 @@ $$;
 
 grant execute on function public.activity_summary() to authenticated;
 
+-- ===== supabase/migrations/20260924100000_lead_sheet_fields.sql =====
+-- ---------------------------------------------------------------------------
+-- Lighthouse CRM — the last three lead-sheet fields
+--
+-- The client's own lead sheet and their export both carry a fax number, the
+-- decision maker's title and a professionals count. Everything else on that
+-- sheet already had a column here; these three did not.
+-- ---------------------------------------------------------------------------
+
+alter table public.leads add column if not exists fax           text;
+alter table public.leads add column if not exists dm_title      text;
+alter table public.leads add column if not exists professionals text;
+
+-- ---------------------------------------------------------------------------
+-- The dispositions their call sheets actually use. Without these, every
+-- "Not Interested", "Disconnected" and "Out of Business" record imports as
+-- "New", which overstates the live pipeline by a wide margin.
+-- ---------------------------------------------------------------------------
+insert into public.lead_statuses (code, name) values
+  ('not_interested', 'Not interested'),
+  ('disconnected',   'Disconnected number'),
+  ('out_of_business','Out of business')
+on conflict (code) do nothing;
+
+-- ===== supabase/migrations/20260924110000_activity_log_grants.sql =====
+-- ---------------------------------------------------------------------------
+-- Lighthouse CRM — activity_log grants
+--
+-- The table was created with only select and insert granted to authenticated,
+-- which left it unreadable to the service role and undeletable by anyone. That
+-- blocks maintenance work (rebuilding the demo data, trimming old entries)
+-- without changing who can read what: the Row Level Security policies on the
+-- table still decide that for ordinary users.
+-- ---------------------------------------------------------------------------
+
+grant all on public.activity_log to service_role;
+grant delete on public.activity_log to authenticated;
+
+-- Administrators may clear the trail; everyone else still only reads their own.
+drop policy if exists activity_log_admin_delete on public.activity_log;
+create policy activity_log_admin_delete on public.activity_log
+  for delete to authenticated
+  using (public.is_admin());
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- Beacon CRM — seed data
@@ -1145,7 +1189,10 @@ insert into public.lead_statuses (code, name) values
   ('hot',     'X-date hot lead'),
   ('xdate',   'X-date lead'),
   ('profile', 'X-date profile'),
-  ('new',     'New');
+  ('new',     'New'),
+  ('not_interested',  'Not interested'),
+  ('disconnected',    'Disconnected number'),
+  ('out_of_business', 'Out of business');
 
 insert into public.appointment_statuses (name) values
   ('Scheduled'), ('Confirmed'), ('Held'), ('Rescheduled'), ('Cancelled'), ('No Show');
