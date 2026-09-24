@@ -1,12 +1,13 @@
 import {
-  Download, Target, CalendarCheck, Star, CheckCheck, BarChart3, Map, PieChart, Radio,
+  Download, Target, CalendarCheck, Star, CheckCheck, BarChart3, Map, PieChart, Radio, UserCheck,
 } from "lucide-react";
 import Topbar from "@/components/topbar";
 import StatTile from "@/components/stat-tile";
 import SectionHeader from "@/components/section-header";
 import MetricBar from "@/components/metric-bar";
 import { Card } from "@/components/ui/card";
-import { getReps, getReports } from "@/lib/queries";
+import { reportsView } from "@/lib/role-views";
+import { getReps, getReports, getCurrentUser, getMyWorkload } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +25,30 @@ const STATUS_COLORS = {
   New: "var(--neon-blue)",
 };
 
+const SUBTITLE = {
+  admin: "Performance across projects and reps",
+  manager: "Performance across your accounts",
+  agent: "Your performance alongside the team",
+  client: "Delivery and appointment performance",
+};
+
 export default async function ReportsPage() {
-  const [reps, r] = await Promise.all([getReps(), getReports()]);
+  // Cached per request — the layout has usually resolved this already.
+  const me = await getCurrentUser();
+  const role = me?.role ?? "client";
+  const view = reportsView(role);
+
+  const [reps, r, mine] = await Promise.all([
+    view.reps ? getReps() : null,
+    getReports(),
+    view.myPerformance ? getMyWorkload() : null,
+  ]);
 
   const maxMonth = Math.max(1, ...r.months.map((m) => Math.max(m.leads, m.appts)));
   const maxState = Math.max(1, ...r.byState.map(([, n]) => n));
+  const repRows = reps ?? [];
+  // An agent's own bar is highlighted rather than singled out into its own chart.
+  const myShare = (n, total) => (total ? Math.round((n / total) * 100) : 0);
 
   const tiles = [
     { label: "Leads Delivered", value: r.leads.toLocaleString(), note: `${r.projects} campaigns`,
@@ -43,7 +63,7 @@ export default async function ReportsPage() {
 
   return (
     <>
-      <Topbar title="Reports" sub="Performance across projects and reps" />
+      <Topbar title="Reports" sub={SUBTITLE[role] ?? SUBTITLE.client} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((t, i) => (
@@ -51,6 +71,35 @@ export default async function ReportsPage() {
               style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
+
+        {view.myPerformance ? (
+          <Card accent="var(--neon-violet)">
+            <SectionHeader label="My Performance" icon={UserCheck} />
+            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-3">
+              <div>
+                <div className="stat-label">Appointments I set</div>
+                <div className="stat-value mt-2" style={{ color: "var(--neon-emerald)" }}>{mine.appts}</div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {myShare(mine.appts, r.appts)}% of the {r.appts.toLocaleString()} set overall
+                </p>
+              </div>
+              <div>
+                <div className="stat-label">Leads assigned to me</div>
+                <div className="stat-value mt-2" style={{ color: "var(--neon-cyan)" }}>{mine.leads}</div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {myShare(mine.leads, r.leads)}% of the {r.leads.toLocaleString()} on the book
+                </p>
+              </div>
+              <div>
+                <div className="stat-label">My conversion</div>
+                <div className="stat-value mt-2" style={{ color: "var(--neon-amber)" }}>
+                  {mine.leads ? Math.round((mine.appts / mine.leads) * 100) : 0}%
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">appointments per lead worked</p>
+              </div>
+            </div>
+          </Card>
+        ) : null}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
@@ -111,55 +160,63 @@ export default async function ReportsPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card>
-            <SectionHeader
-              label="Appointments by Rep"
-              icon={Radio}
-              action={
-                <button className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75">
-                  <Download className="size-3" /> Export CSV
-                </button>
-              }
-            />
-            <div className="space-y-2.5 p-4">
-              {reps.map((rep, i) => (
-                <MetricBar key={rep.name} label={rep.name} value={rep.appts}
-                  max={reps[0]?.appts || 1} color={BAR_COLORS[i % BAR_COLORS.length]} />
-              ))}
-              {reps.length === 0 && <p className="text-sm text-muted-foreground">No appointments yet.</p>}
-            </div>
-          </Card>
+          {/* Rep-by-rep productivity is internal; clients never see it. */}
+          {view.reps ? (
+            <Card>
+              <SectionHeader
+                label="Appointments by Rep"
+                icon={Radio}
+                action={
+                  <button className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75">
+                    <Download className="size-3" /> Export CSV
+                  </button>
+                }
+              />
+              <div className="space-y-2.5 p-4">
+                {repRows.map((rep, i) => (
+                  <MetricBar key={rep.name} label={rep.name === me?.short ? `${rep.name} (me)` : rep.name}
+                    value={rep.appts} max={repRows[0]?.appts || 1}
+                    color={rep.name === me?.short ? "var(--neon-violet)" : BAR_COLORS[i % BAR_COLORS.length]} />
+                ))}
+                {repRows.length === 0 && <p className="text-sm text-muted-foreground">No appointments yet.</p>}
+              </div>
+            </Card>
+          ) : null}
 
-          <Card>
-            <SectionHeader label="Top States" icon={Map} />
-            <div className="space-y-2.5 p-4">
-              {r.byState.map(([state, count], i) => (
-                <MetricBar key={state} label={state} value={count} max={maxState}
-                  color={BAR_COLORS[i % BAR_COLORS.length]} />
-              ))}
-              {r.byState.length === 0 && <p className="text-sm text-muted-foreground">No location data.</p>}
-            </div>
-          </Card>
+          {view.states ? (
+            <Card>
+              <SectionHeader label="Top States" icon={Map} />
+              <div className="space-y-2.5 p-4">
+                {r.byState.map(([state, count], i) => (
+                  <MetricBar key={state} label={state} value={count} max={maxState}
+                    color={BAR_COLORS[i % BAR_COLORS.length]} />
+                ))}
+                {r.byState.length === 0 && <p className="text-sm text-muted-foreground">No location data.</p>}
+              </div>
+            </Card>
+          ) : null}
 
-          <Card>
-            <SectionHeader label="Appointment Outcomes" icon={CheckCheck} />
-            <div className="divide-y divide-[var(--panel-border)]">
-              {Object.entries(r.apptByStatus).map(([name, count]) => (
-                <div key={name} data-list-row className="flex items-center justify-between px-5 py-3 text-sm">
-                  <span>{name}</span>
-                  <span className="flex items-baseline gap-2 tabular-nums">
-                    <span className="font-semibold">{count}</span>
-                    <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">
-                      {Math.round((count / Math.max(1, r.appts)) * 100)}%
+          {view.outcomes ? (
+            <Card>
+              <SectionHeader label="Appointment Outcomes" icon={CheckCheck} />
+              <div className="divide-y divide-[var(--panel-border)]">
+                {Object.entries(r.apptByStatus).map(([name, count]) => (
+                  <div key={name} data-list-row className="flex items-center justify-between px-5 py-3 text-sm">
+                    <span>{name}</span>
+                    <span className="flex items-baseline gap-2 tabular-nums">
+                      <span className="font-semibold">{count}</span>
+                      <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">
+                        {Math.round((count / Math.max(1, r.appts)) * 100)}%
+                      </span>
                     </span>
-                  </span>
-                </div>
-              ))}
-              {Object.keys(r.apptByStatus).length === 0 && (
-                <p className="p-5 text-sm text-muted-foreground">No appointments yet.</p>
-              )}
-            </div>
-          </Card>
+                  </div>
+                ))}
+                {Object.keys(r.apptByStatus).length === 0 && (
+                  <p className="p-5 text-sm text-muted-foreground">No appointments yet.</p>
+                )}
+              </div>
+            </Card>
+          ) : null}
         </div>
       </div>
     </>
