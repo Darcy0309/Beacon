@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-  Search, Loader2, CornerDownLeft, Target, Users, FolderKanban, UserCog, FileText, Building2,
+  Search, Loader2, CornerDownLeft, Target, Users, FolderKanban, UserCog, FileText, Building2, X,
 } from "lucide-react";
 import { navGroups } from "@/lib/nav";
 import { useRole } from "@/components/role-provider";
@@ -139,7 +139,7 @@ export default function GlobalSearch() {
   const term = q.trim();
   let status = null;
   if (error) status = error;
-  else if (term.length < MIN_CHARS) status = "Search leads, clients, projects, users, documents and carriers.";
+  else if (term.length < MIN_CHARS) status = "idle";
   else if (flat.length === 0) status = loading ? "Searching…" : `No matches for “${term}”.`;
 
   return (
@@ -181,31 +181,63 @@ export default function GlobalSearch() {
               Search leads, clients, projects, users, documents and carriers, or jump to a page.
             </DialogPrimitive.Description>
 
-            <div className="flex items-center gap-3 border-b border-[var(--panel-border)] px-4">
-              <Search className="size-4 shrink-0 text-muted-foreground" />
-              <input
-                ref={inputRef}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onKeyDown={onKeyDown}
-                placeholder="Search everything…"
-                aria-label="Search everything"
-                role="combobox"
-                aria-expanded={flat.length > 0}
-                aria-controls="global-search-results"
-                aria-activedescendant={flat[active] ? `gs-${flat[active].key}` : undefined}
-                autoComplete="off"
-                spellCheck={false}
-                className="h-12 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-              />
-              {loading ? <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-label="Searching" /> : null}
-              <kbd className="hidden shrink-0 rounded border border-[var(--panel-border)] bg-muted/50 px-1.5 py-0.5 font-sans text-[0.62rem] font-semibold text-muted-foreground sm:inline-block">
-                Esc
-              </kbd>
+            {/* A real field, outlined and lit, so it reads as the place to type
+                rather than as the dialog's heading. */}
+            <div className="border-b border-[var(--panel-border)] p-3">
+              <label className="flex h-12 items-center gap-3 rounded-lg border-2 border-primary/45 bg-background px-3.5 ring-4 ring-primary/10 transition-[border-color,box-shadow] focus-within:border-primary focus-within:ring-primary/20">
+                <Search className="size-5 shrink-0 text-primary" />
+                <input
+                  ref={inputRef}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={onKeyDown}
+                  placeholder="Search a company, contact, phone or email…"
+                  aria-label="Search everything"
+                  role="combobox"
+                  aria-expanded={flat.length > 0}
+                  aria-controls="global-search-results"
+                  aria-activedescendant={flat[active] ? `gs-${flat[active].key}` : undefined}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="h-full w-full min-w-0 bg-transparent text-base font-medium outline-none placeholder:font-normal placeholder:text-muted-foreground"
+                />
+                {loading ? <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-label="Searching" /> : null}
+                {q ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQ("");
+                      inputRef.current?.focus();
+                    }}
+                    aria-label="Clear search"
+                    className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                ) : null}
+                <kbd className="hidden shrink-0 rounded border border-[var(--panel-border)] bg-muted/50 px-1.5 py-0.5 font-sans text-[0.62rem] font-semibold text-muted-foreground sm:inline-block">
+                  Esc
+                </kbd>
+              </label>
             </div>
 
             <div id="global-search-results" ref={listRef} role="listbox" className="max-h-[60vh] overflow-y-auto p-2">
-              {status ? (
+              {status === "idle" ? (
+                // Before anything is typed: say what can be found, not just that it can.
+                <div className="px-3 py-6 text-center">
+                  <p className="text-sm text-muted-foreground">Type at least two letters to search across</p>
+                  <div className="mt-3 flex flex-wrap justify-center gap-2">
+                    {[
+                      ["Leads", Target], ["Clients", Users], ["Projects", FolderKanban],
+                      ["Users", UserCog], ["Documents", FileText], ["Carriers", Building2],
+                    ].map(([label, Icon]) => (
+                      <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--panel-border)] bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+                        <Icon className="size-3.5 text-primary" /> {label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : status ? (
                 <p className="px-3 py-8 text-center text-sm text-muted-foreground" aria-live="polite">{status}</p>
               ) : (
                 flat.map((item, i) => {
