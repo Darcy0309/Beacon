@@ -13,10 +13,14 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
   const x = (i) => (i * W) / Math.max(1, data.length - 1);
   const y = (v) => H - 4 - ((v - min) / span) * (H - 10);
 
-  // Stable id so two sparklines on a page never share a gradient.
-  const id = `spark-${Math.abs(
-    data.reduce((a, v, i) => a + v * (i + 7), data.length)
-  ).toString(36)}-${Math.round(H)}`;
+  // Stable id so two sparklines on a page never share a gradient. The colour
+  // has to be part of it: tiles often plot the same series in different hues,
+  // and SVG resolves url(#id) to whichever gradient was defined first — so a
+  // green tile would otherwise paint itself with an amber tile's fill.
+  const seed = `${color}|${data.join(",")}|${H}`;
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  const id = `spark-${hash.toString(36)}`;
 
   if (bars) {
     const bw = W / (data.length * 1.6);

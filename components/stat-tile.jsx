@@ -52,7 +52,14 @@ export default function StatTile({
               <Icon className="size-4" />
             </span>
           ) : null}
-          <span className="stat-label pt-0.5">{label}</span>
+          {/* Tinted toward the tile's accent so the heading belongs to the
+              tile rather than reading as navy inside a green or amber one. */}
+          <span
+            className="stat-label pt-0.5"
+            style={{ color: `color-mix(in srgb, ${accent} 68%, var(--foreground))` }}
+          >
+            {label}
+          </span>
         </div>
 
         <div className="mt-3 stat-value" style={{ color: accent }}>
