@@ -198,7 +198,10 @@ function AppointmentDialog({ a, onClose }) {
                 <a href={tel}><Phone /> Call now</a>
               </Button>
             ) : (
-              <Button disabled title="No phone number on this lead"><Phone /> Call now</Button>
+              // Keep pointer events so the cursor and the reason still show.
+              <Button disabled className="disabled:pointer-events-auto" title="No phone number on this lead">
+                <Phone /> Call now
+              </Button>
             )}
             <Button asChild variant="outline">
               <Link href={a.leadId ? `/leads/${a.leadId}` : "/appointments"} onClick={onClose}>
