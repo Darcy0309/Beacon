@@ -144,56 +144,61 @@ function TimeGrid({ view, title, days, byDate, rows, today }) {
         }
       />
 
-      {/* Day headings, aligned to the columns below. */}
-      <div className="flex border-b border-[var(--panel-border)]">
-        <div className="w-14 shrink-0" />
-        <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
-          {days.map((d) => (
-            <Link
-              key={d.date}
-              href={d.href}
-              scroll={false}
-              className={cn(
-                "flex items-baseline justify-center gap-1.5 border-l border-[var(--panel-border)] py-2 transition-colors hover:bg-primary/5",
-                d.isToday && "bg-primary/10"
-              )}
-            >
-              <span className={cn("eyebrow", d.isToday && "text-primary")}>{d.dow}</span>
-              <span className={cn("text-sm font-bold tabular-nums", d.isToday ? "text-primary" : "text-foreground/80")}>
-                {d.dayNum}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {untimed.length > 0 && (
-        <div className="flex border-b border-[var(--panel-border)]">
-          <div className="flex w-14 shrink-0 items-center justify-end pr-2">
-            <span className="eyebrow">No time</span>
+      <div className="max-h-[70svh] overflow-y-auto">
+        {/* The headings live inside the scroller: a scrollbar narrows whatever
+            shares its box, so a header outside it would drift a little further
+            from the columns with every day across the week. */}
+        <div className="sticky top-0 z-20 bg-card">
+          <div className="flex border-b border-[var(--panel-border)]">
+            <div className="w-14 shrink-0" />
+            <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
+              {days.map((d) => (
+                <Link
+                  key={d.date}
+                  href={d.href}
+                  scroll={false}
+                  className={cn(
+                    "flex items-baseline justify-center gap-1.5 border-l border-[var(--panel-border)] py-2 transition-colors hover:bg-primary/5",
+                    d.isToday && "bg-primary/10"
+                  )}
+                >
+                  <span className={cn("eyebrow", d.isToday && "text-primary")}>{d.dow}</span>
+                  <span className={cn("text-sm font-bold tabular-nums", d.isToday ? "text-primary" : "text-foreground/80")}>
+                    {d.dayNum}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
-            {days.map((d) => (
-              <div key={d.date} className="space-y-1 border-l border-[var(--panel-border)] p-1">
-                {untimed.filter((a) => a.date === d.date).map((a) => (
-                  <Block key={a.id} a={a} compact />
+
+          {untimed.length > 0 && (
+            <div className="flex border-b border-[var(--panel-border)]">
+              <div className="flex w-14 shrink-0 items-center justify-end pr-2">
+                <span className="eyebrow">No time</span>
+              </div>
+              <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
+                {days.map((d) => (
+                  <div key={d.date} className="space-y-1 border-l border-[var(--panel-border)] p-1">
+                    {untimed.filter((a) => a.date === d.date).map((a) => (
+                      <Block key={a.id} a={a} compact />
+                    ))}
+                  </div>
                 ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
-      )}
 
-      <div className="max-h-[70svh] overflow-y-auto">
-        <div className="flex">
+        {/* The top padding gives the first hour label room to sit on its line
+            like the rest, instead of being nudged down to avoid clipping. */}
+        <div className="flex pt-2">
           {/* Hour gutter */}
           <div className="w-14 shrink-0" style={{ height }}>
-            {hours.map((h, i) => (
+            {hours.map((h) => (
               <div key={h} className="relative" style={{ height: HOUR_PX }}>
-                {/* Labels sit on the hour line, except the first, which would clip. */}
+                {/* Every label sits on its own hour line, the first included. */}
                 <span
-                  className="absolute right-2 text-[0.62rem] font-semibold tabular-nums text-muted-foreground"
-                  style={{ top: i === 0 ? 2 : -8 }}
+                  className="absolute -top-2 right-2 text-[0.62rem] font-semibold tabular-nums text-muted-foreground"
                 >
                   {fmtHour(h)}
                 </span>
