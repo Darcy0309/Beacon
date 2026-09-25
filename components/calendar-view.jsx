@@ -1,11 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import {
+  CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight,
+  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock,
+} from "lucide-react";
 import SectionHeader from "@/components/section-header";
+import StatusBadge from "@/components/status-badge";
+import ToneBadge from "@/components/tone-badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+
+/** Lets any appointment in any of the three views open the shared dialog. */
+const OpenAppointment = createContext(() => {});
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -64,8 +76,10 @@ function layoutDay(events) {
  */
 export default function CalendarView(props) {
   const { view, title, prev, next, todayHref, viewHrefs } = props;
+  const [selected, setSelected] = useState(null);
 
   return (
+    <OpenAppointment.Provider value={setSelected}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-lg border border-[var(--panel-border)] p-1">
@@ -102,6 +116,99 @@ export default function CalendarView(props) {
 
       {view === "month" ? <MonthView {...props} /> : <TimeGrid {...props} />}
     </div>
+    <AppointmentDialog a={selected} onClose={() => setSelected(null)} />
+    </OpenAppointment.Provider>
+  );
+}
+
+/** Digits only, with the US country code, so a softphone can dial it. */
+function telHref(phone) {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (digits.length === 10) return `tel:+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `tel:+${digits}`;
+  return digits ? `tel:${digits}` : null;
+}
+
+const APPT_TONE = {
+  Scheduled: "cyan", Confirmed: "emerald", Held: "violet",
+  Rescheduled: "amber", Cancelled: "rose", "No Show": "slate",
+};
+
+/** One row of the detail list, hidden when there is nothing to show. */
+function Detail({ icon: Icon, label, children, href, wide = false }) {
+  if (!children || children === "—") return null;
+  return (
+    <div className={cn("flex items-start gap-3", wide && "sm:col-span-2")}>
+      <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--panel-border)] text-muted-foreground">
+        <Icon className="size-3.5" />
+      </span>
+      <span className="min-w-0">
+        <span className="eyebrow block">{label}</span>
+        <span className="block truncate text-sm">
+          {href ? (
+            <a href={href} className="transition-colors hover:text-primary">{children}</a>
+          ) : (
+            children
+          )}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * What the appointment is, who to call, and the two things worth doing from
+ * here: ring the contact, or open the full lead sheet.
+ */
+function AppointmentDialog({ a, onClose }) {
+  const tel = a ? telHref(a.phone) : null;
+
+  return (
+    <Dialog open={Boolean(a)} onOpenChange={(open) => (open ? null : onClose())}>
+      {a ? (
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{a.co}</DialogTitle>
+            <DialogDescription>
+              {a.longDate} · {a.time} {a.ampm} · {a.duration} min
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <ToneBadge tone={APPT_TONE[a.status] ?? "slate"}>{a.status}</ToneBadge>
+            {a.leadStatus ? <StatusBadge status={a.statusCode} /> : null}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Detail icon={User} label="Contact">
+              {[a.contact, a.contactTitle].filter(Boolean).join(" · ") || null}
+            </Detail>
+            <Detail icon={Phone} label="Phone" href={tel}>{a.phone}</Detail>
+            <Detail icon={Mail} label="Email" href={a.email ? `mailto:${a.email}` : null}>{a.email}</Detail>
+            <Detail icon={MapPin} label="Location">{a.location}</Detail>
+            <Detail icon={Clock} label="Rep">{a.rep}</Detail>
+            <Detail icon={FolderKanban} label="Campaign" wide>
+              {[a.client, a.project].filter(Boolean).join(" · ") || null}
+            </Detail>
+          </div>
+
+          <DialogFooter>
+            {tel ? (
+              <Button asChild>
+                <a href={tel}><Phone /> Call now</a>
+              </Button>
+            ) : (
+              <Button disabled title="No phone number on this lead"><Phone /> Call now</Button>
+            )}
+            <Button asChild variant="outline">
+              <Link href={a.leadId ? `/leads/${a.leadId}` : "/appointments"} onClick={onClose}>
+                View detail <ArrowUpRight />
+              </Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      ) : null}
+    </Dialog>
   );
 }
 
@@ -262,14 +369,16 @@ function TimeGrid({ view, title, days, byDate, rows, today }) {
   );
 }
 
-/** One appointment on the time grid. */
+/** One appointment on the time grid. Opens the detail dialog. */
 function Block({ a, dense = false, compact = false }) {
+  const open = useContext(OpenAppointment);
   return (
-    <Link
-      href={a.leadId ? `/leads/${a.leadId}` : "/appointments"}
+    <button
+      type="button"
+      onClick={() => open(a)}
       title={`${a.time} ${a.ampm} · ${a.co} · ${a.detail}`}
       className={cn(
-        "flex h-full min-w-0 gap-1.5 overflow-hidden rounded-md border border-[var(--panel-border)] bg-card/90 px-1.5 py-1 transition-colors hover:border-primary/50 hover:bg-card",
+        "flex h-full w-full min-w-0 gap-1.5 overflow-hidden rounded-md border border-[var(--panel-border)] bg-card/90 px-1.5 py-1 text-left transition-colors hover:border-primary/50 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         compact && "h-auto"
       )}
     >
@@ -300,7 +409,7 @@ function Block({ a, dense = false, compact = false }) {
           {a.repI}
         </span>
       ) : null}
-    </Link>
+    </button>
   );
 }
 
@@ -447,9 +556,10 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
 }
 
 function ApptRow({ a }) {
+  const open = useContext(OpenAppointment);
   return (
-    <Link href={a.leadId ? `/leads/${a.leadId}` : "/appointments"} data-list-row
-      className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2">
+    <button type="button" onClick={() => open(a)} data-list-row
+      className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2 text-left">
       <span className={cn("h-9 w-[3px] shrink-0 rounded-full", a.bar)} />
       <div className="w-14 shrink-0 text-sm font-bold tabular-nums">
         {a.time}
@@ -463,6 +573,6 @@ function ApptRow({ a }) {
         style={{ background: a.repC }} title={a.rep}>
         {a.repI}
       </span>
-    </Link>
+    </button>
   );
 }
