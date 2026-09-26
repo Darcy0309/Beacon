@@ -31,21 +31,26 @@ function Appt({ a }) {
         <div className="truncate font-medium">{a.co}</div>
         <div className="truncate text-xs text-muted-foreground">{a.detail}</div>
       </div>
-      <span
-        className="hidden shrink-0 rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em] sm:inline-flex"
-        style={{
-          borderColor: `color-mix(in srgb, ${tone} 45%, transparent)`,
-          background: `color-mix(in srgb, ${tone} 8%, transparent)`,
-          color: tone,
-        }}
-      >
-        {a.status}
-      </span>
-      <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex">
-        <span className="flex size-7 items-center justify-center rounded-md text-[0.6rem] font-bold text-white" style={{ background: a.repC }}>
+      {/* Fixed-width columns: "Held" and "Confirmed" are different lengths, as
+          are rep names, and without a set width each row pushed the pill and
+          the avatar to a different place. */}
+      <div className="hidden w-32 shrink-0 justify-center sm:flex">
+        <span
+          className="inline-flex rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em]"
+          style={{
+            borderColor: `color-mix(in srgb, ${tone} 45%, transparent)`,
+            background: `color-mix(in srgb, ${tone} 8%, transparent)`,
+            color: tone,
+          }}
+        >
+          {a.status}
+        </span>
+      </div>
+      <div className="hidden w-44 shrink-0 items-center gap-2 text-sm text-muted-foreground md:flex">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-[0.6rem] font-bold text-white" style={{ background: a.repC }}>
           {a.repI}
         </span>
-        {a.rep}
+        <span className="truncate" title={a.rep}>{a.rep}</span>
       </div>
     </div>
   );
