@@ -1,7 +1,7 @@
-import { Bell } from "lucide-react";
 import MobileNav from "@/components/mobile-nav";
 import ThemeToggle from "@/components/theme-toggle";
 import GlobalSearch from "@/components/global-search";
+import NotificationBell from "@/components/notification-bell";
 
 export default function Topbar({ title, sub }) {
   return (
@@ -18,13 +18,7 @@ export default function Topbar({ title, sub }) {
           Live
         </span>
         <ThemeToggle />
-        <button
-          className="relative flex size-9 items-center justify-center rounded-md border border-[var(--panel-border)] bg-card/80 text-muted-foreground transition-all duration-150 hover:border-primary/40 hover:text-primary active:scale-95"
-          aria-label="Notifications"
-        >
-          <Bell className="size-4" />
-          <span className="absolute right-2 top-2 size-1.5 rounded-full bg-accent" />
-        </button>
+        <NotificationBell />
       </div>
     </header>
   );

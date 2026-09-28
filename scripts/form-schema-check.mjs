@@ -15,6 +15,8 @@ const FORMS = {
   "components/appointment-form.jsx": { schema: "appointment", extra: ["id"] },
   "components/user-form.jsx":        { schema: "user",        extra: ["id"] },
   "components/bulletin-composer.jsx":{ schema: "bulletin",    extra: [] },
+  // Recipients are multi-value, checked in sendNotification rather than the schema.
+  "components/notification-composer.jsx": { schema: "notification", extra: ["roles", "user_ids"] },
   "components/call-logger.jsx":      { schema: "call",        extra: [] },
   "components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
   "components/settings-form.jsx":    { schema: "settings",    extra: [] },
