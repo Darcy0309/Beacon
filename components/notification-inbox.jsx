@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, BellOff, CheckCheck, ExternalLink } from "lucide-react";
-import { KIND_ICONS } from "@/components/notification-bell";
+import { Bell, BellOff, CheckCheck, ArrowUpRight, ChevronRight } from "lucide-react";
+import { KIND_ICONS, linkLabel } from "@/lib/notification-kinds";
 import { markNotificationRead, markAllNotificationsRead } from "@/lib/actions";
 import { cn } from "@/lib/utils";
 
-/** The inbox on /notifications. Opening an item marks it read and follows its link. */
+/**
+ * The inbox on /notifications. Opening an item shows it in full, with the
+ * conversation when a person sent it; the small link beside it jumps straight
+ * to what it points at.
+ */
 export default function NotificationInbox({ rows, unread, empty }) {
   const router = useRouter();
   const [readIds, setReadIds] = useState(() => new Set());
@@ -27,9 +32,10 @@ export default function NotificationInbox({ rows, unread, empty }) {
     });
   };
 
+  // The detail page marks it read on the server; just show it read here.
   const open = (n) => {
-    markOne(n);
-    if (n.link) router.push(n.link);
+    if (!isRead(n)) setReadIds((s) => new Set(s).add(n.id));
+    router.push(`/notifications/${n.id}`);
   };
 
   const markAll = () => {
@@ -74,23 +80,37 @@ export default function NotificationInbox({ rows, unread, empty }) {
                 )}>
                   <Icon className="size-4" />
                 </span>
-                <button type="button" onClick={() => open(n)} className="min-w-0 flex-1 cursor-pointer text-left">
-                  <span className={cn("block text-sm", read ? "text-foreground/85" : "font-semibold")}>{n.title}</span>
-                  {n.body ? <span className="mt-0.5 block whitespace-pre-line text-sm text-muted-foreground">{n.body}</span> : null}
-                  <span className="mt-1 flex items-center gap-2 text-[0.7rem] text-muted-foreground">
+                <button type="button" onClick={() => open(n)} className="group min-w-0 flex-1 cursor-pointer text-left">
+                  <span className={cn("flex items-center gap-1 text-sm", read ? "text-foreground/85" : "font-semibold")}>
+                    <span className="truncate">{n.title}</span>
+                    <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </span>
+                  {n.body ? <span className="mt-0.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{n.body}</span> : null}
+                  <span className="mt-1 block text-[0.7rem] text-muted-foreground">
                     {n.when}
-                    {n.link ? <span className="flex items-center gap-1 text-primary"><ExternalLink className="size-3" /> Open</span> : null}
+                    {n.kind === "message" ? " · Open to reply" : ""}
                   </span>
                 </button>
-                {read ? null : (
-                  <button
-                    type="button"
-                    onClick={() => markOne(n)}
-                    className="shrink-0 cursor-pointer rounded-md border border-[var(--panel-border)] px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-                  >
-                    Mark read
-                  </button>
-                )}
+                <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+                  {n.link ? (
+                    <Link
+                      href={n.link}
+                      onClick={() => markOne(n)}
+                      className="flex items-center gap-1 rounded-md border border-[var(--panel-border)] px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-primary transition-colors hover:border-primary/40"
+                    >
+                      {linkLabel(n.link)} <ArrowUpRight className="size-3" />
+                    </Link>
+                  ) : null}
+                  {read ? null : (
+                    <button
+                      type="button"
+                      onClick={() => markOne(n)}
+                      className="cursor-pointer rounded-md border border-[var(--panel-border)] px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                    >
+                      Mark read
+                    </button>
+                  )}
+                </div>
               </li>
             );
           })}

@@ -18,6 +18,7 @@ const FORMS = {
   "components/password-form.jsx":    { schema: "password",    extra: [] },
   // Recipients are multi-value, checked in sendNotification rather than the schema.
   "components/notification-composer.jsx": { schema: "notification", extra: ["roles", "user_ids"] },
+  "components/notification-thread.jsx": { schema: "reply",   extra: ["id"] },
   "components/call-logger.jsx":      { schema: "call",        extra: [] },
   "components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
   "components/settings-form.jsx":    { schema: "settings",    extra: [] },

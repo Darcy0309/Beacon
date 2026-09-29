@@ -4,30 +4,20 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  Bell, BellOff, CheckCheck, MessageSquare, CalendarCheck, Target, Star, Upload, Megaphone,
-} from "lucide-react";
+import { Bell, BellOff, CheckCheck } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import { useRole } from "@/components/role-provider";
 import { markNotificationRead, markAllNotificationsRead } from "@/lib/actions";
+import { KIND_ICONS } from "@/lib/notification-kinds";
+import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/lib/active-chat";
 import { cn } from "@/lib/utils";
-
-export const KIND_ICONS = {
-  message: MessageSquare,
-  appointment: CalendarCheck,
-  lead: Target,
-  feedback: Star,
-  import: Upload,
-  bulletin: Megaphone,
-  system: Bell,
-};
 
 const SHOWN = 8;
 const POLL_MS = 60_000;
-const COLUMNS = "id, kind, title, body, link, read_at, created_at";
+const COLUMNS = "id, kind, sender_id, title, body, link, read_at, created_at";
 
 function ago(iso) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -72,6 +62,8 @@ export default function NotificationBell() {
     if (!count.error) setUnread(count.count ?? 0);
   }, [me, supabase]);
 
+  // Every notification opens on its own page: the full text, who sent it,
+  // where it points, and the conversation with the sender.
   const openItem = useCallback(
     async (n) => {
       setOpen(false);
@@ -80,7 +72,7 @@ export default function NotificationBell() {
         setUnread((u) => Math.max(0, u - 1));
         markNotificationRead(formOf(n.id));
       }
-      if (n.link) router.push(n.link);
+      router.push(`/notifications/${n.id}`);
     },
     [router]
   );
@@ -103,6 +95,8 @@ export default function NotificationBell() {
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${me}` },
           ({ new: n }) => {
             setItems((xs) => [n, ...xs.filter((x) => x.id !== n.id)].slice(0, SHOWN));
+            // Already reading the conversation it belongs to: it is read there, no pop-up.
+            if (n.kind === "message" && isActiveChat(n.sender_id)) return;
             setUnread((u) => u + 1);
             toast(n.title, {
               description: n.body || undefined,
@@ -110,7 +104,7 @@ export default function NotificationBell() {
                 const Icon = KIND_ICONS[n.kind] ?? Bell;
                 return <Icon className="size-4 text-primary" />;
               })(),
-              action: n.link ? { label: "Open", onClick: () => openItem(n) } : undefined,
+              action: { label: n.kind === "message" ? "Reply" : "View", onClick: () => openItem(n) },
               duration: 8000,
             });
           }
@@ -120,10 +114,12 @@ export default function NotificationBell() {
 
     const onFocus = () => load();
     window.addEventListener("focus", onFocus);
+    window.addEventListener(NOTIFICATIONS_CHANGED, onFocus);
     const timer = setInterval(load, POLL_MS);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, onFocus);
       clearInterval(timer);
       if (channel) supabase.removeChannel(channel);
     };
