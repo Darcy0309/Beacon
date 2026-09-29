@@ -3,12 +3,22 @@ import LighthouseBackdrop from "@/components/lighthouse-backdrop";
 import SnowBackdrop from "@/components/snow-backdrop";
 import LighthouseWordmark from "@/components/logo-wordmark";
 import LoginForm from "@/components/login-form";
+import EmailLinkHandoff from "@/components/email-link-handoff";
+import { safeInternalPath } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
+const NOTICES = {
+  link: "That sign-in link has expired or was already used. Ask an administrator for a new invitation.",
+  disabled: "This account has been disabled. Contact an administrator.",
+};
+
 export default async function LoginPage({ searchParams }) {
   const params = await searchParams;
-  const next = typeof params?.next === "string" && params.next.startsWith("/") ? params.next : "/";
+  // Only a path inside the app — never somewhere a link could send people after they sign in.
+  const next = safeInternalPath(params?.next, "/");
+  // Own keys only: "?error=constructor" must not find Object.prototype.constructor.
+  const notice = Object.hasOwn(NOTICES, params?.error ?? "") ? NOTICES[params.error] : null;
 
   return (
     <div
@@ -26,10 +36,17 @@ export default async function LoginPage({ searchParams }) {
           <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
         </div>
 
+        <EmailLinkHandoff />
+        {notice ? (
+          <p role="alert" className="mb-4 rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-center text-sm text-amber-200">
+            {notice}
+          </p>
+        ) : null}
+
         <LoginForm next={next} />
 
         <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs text-white/50">
-          <Lock className="size-3" /> Access is restricted to approved IP addresses.
+          <Lock className="size-3" /> Protected by two-factor authentication.
         </p>
         <p className="mt-1 text-center text-[0.7rem] text-white/35">
           Your workspace is tailored to your role after sign-in.

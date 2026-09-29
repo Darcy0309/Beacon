@@ -8,16 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { saveUser } from "@/lib/actions";
 import { ROLES } from "@/lib/nav";
+import { useDialogOpen } from "@/components/row-edit-context";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
 export default function UserForm({ user, options, trigger }) {
   const isEdit = Boolean(user?.id);
-  const [open, setOpen] = useState(false);
+  // Inside a row's action menu the menu owns the open state and there is no trigger.
+  const [open, setOpen, inRowMenu, onCloseAutoFocus] = useDialogOpen();
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveUser, EMPTY);
 
@@ -26,13 +28,13 @@ export default function UserForm({ user, options, trigger }) {
 
   useEffect(() => {
     if (state?.ok) {
-      toast.success(isEdit ? "User updated" : "User invited");
+      toast.success(isEdit ? "User updated" : `Invitation sent to ${state.data?.email ?? "them"}`);
       setOpen(false);
       router.refresh();
     } else if (state?.error && !state?.fieldErrors) {
       toast.error(state.error);
     }
-  }, [state, isEdit, router]);
+  }, [state, isEdit, router, setOpen]);
 
   const { companies = [] } = options ?? {};
   const record = user
@@ -42,14 +44,21 @@ export default function UserForm({ user, options, trigger }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm">{isEdit ? <Pencil /> : <UserPlus />} {isEdit ? "Edit" : "Invite user"}</Button>
-        )}
-      </DialogTrigger>
-      <DialogContent>
+      {inRowMenu ? null : (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button size="sm">{isEdit ? <Pencil /> : <UserPlus />} {isEdit ? "Edit" : "Invite user"}</Button>
+          )}
+        </DialogTrigger>
+      )}
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit user" : "Invite user"}</DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Changing the role or client account takes effect on their next request. Disabled accounts cannot sign in or read anything."
+              : "They receive an email with a link to set their password. The account is active once they have."}
+          </DialogDescription>
         </DialogHeader>
 
         <form action={formAction} noValidate className="flex flex-col gap-4">
@@ -72,12 +81,19 @@ export default function UserForm({ user, options, trigger }) {
                 {Object.entries(ROLES).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
               </Select>
             </Field>
-            <Field label="Status" error={fe("status")}>
-              <Select name="status" defaultValue={dv("status", "invited")} aria-invalid={invalid("status")}>
-                <option value="active">Active</option>
-                <option value="invited">Invited</option>
-                <option value="disabled">Disabled</option>
-              </Select>
+            <Field label="Status" error={fe("status")} hint={isEdit ? "Disabled: signed out and locked out until re-enabled." : "New accounts start as Invited."}>
+              {isEdit ? (
+                <Select name="status" defaultValue={dv("status", "invited")} aria-invalid={invalid("status")}>
+                  <option value="active">Active</option>
+                  <option value="invited">Invited</option>
+                  <option value="disabled">Disabled</option>
+                </Select>
+              ) : (
+                <>
+                  <input type="hidden" name="status" value="invited" />
+                  <Input value="Invited — until they set a password" disabled />
+                </>
+              )}
             </Field>
 
             <Field label="Username" error={fe("username")} hint="3–25 letters, numbers, . _ -">
@@ -103,7 +119,7 @@ export default function UserForm({ user, options, trigger }) {
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={pending}>{pending ? "Saving…" : isEdit ? "Save changes" : "Invite"}</Button>
+            <Button type="submit" disabled={pending}>{pending ? (isEdit ? "Saving…" : "Sending…") : isEdit ? "Save changes" : "Send invitation"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

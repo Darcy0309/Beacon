@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { createLead, updateLead } from "@/lib/actions";
 import { fullName } from "@/lib/display";
+import { useDialogOpen } from "@/components/row-edit-context";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -22,7 +23,8 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  */
 export default function LeadForm({ lead, options, trigger }) {
   const isEdit = Boolean(lead?.id);
-  const [open, setOpen] = useState(false);
+  // Inside a row's action menu the menu owns the open state and there is no trigger.
+  const [open, setOpen, inRowMenu, onCloseAutoFocus] = useDialogOpen();
   const router = useRouter();
 
   const [state, formAction, pending] = useActionState(isEdit ? updateLead : createLead, EMPTY);
@@ -36,7 +38,7 @@ export default function LeadForm({ lead, options, trigger }) {
       // Field errors are shown inline; only surface non-field failures as a toast.
       toast.error(state.error);
     }
-  }, [state, isEdit, router]);
+  }, [state, isEdit, router, setOpen]);
 
   const { statuses = [], projects = [], managers = [], agencies = [] } = options ?? {};
 
@@ -56,14 +58,16 @@ export default function LeadForm({ lead, options, trigger }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm">
-            {isEdit ? <Pencil /> : <Plus />} {isEdit ? "Edit" : "New lead"}
-          </Button>
-        )}
-      </DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      {inRowMenu ? null : (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button size="sm">
+              {isEdit ? <Pencil /> : <Plus />} {isEdit ? "Edit" : "New lead"}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
+      <DialogContent className="max-w-2xl" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${lead.company_name}` : "New lead"}</DialogTitle>
         </DialogHeader>

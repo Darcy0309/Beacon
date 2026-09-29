@@ -11,9 +11,12 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
 import { listUsers, getUserStats, getLookups, USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from "@/lib/queries";
 import { readListParams, pageInfo } from "@/lib/paging";
-import { deleteUser } from "@/lib/actions";
+import { deleteUser, resetUserTwoFactor, resendInvitation } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
+
+/** Not signed up yet: invited but never set a password, or listed without a sign-in at all. */
+const awaitingInvite = (u) => u.status === "invited" || (!u.auth_id && u.status !== "disabled");
 
 const roleTone = { admin: "amber", manager: "cyan", agent: "emerald", client: "violet" };
 const statusTone = { Active: "emerald", Invited: "amber", Disabled: "slate" };
@@ -87,7 +90,17 @@ export default async function UsersPage({ searchParams }) {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{u.last}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[u.status] ?? "slate"}>{u.status}</ToneBadge></TableCell>
-                  <TableCell className="text-right"><RowActions name={u.name} id={u.id} onDelete={deleteUser} /></TableCell>
+                  <TableCell className="text-right">
+                    <RowActions
+                      name={u.name}
+                      id={u.id}
+                      edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} />}
+                      onResetTwoFactor={u.mfa ? resetUserTwoFactor : undefined}
+                      onResendInvite={awaitingInvite(u.raw) ? resendInvitation : undefined}
+                      onDelete={deleteUser}
+                      warning="Their sign-in and inbox are removed. Leads, appointments and other work they touched stay, but no longer name them. To keep them on record, set them to Disabled instead."
+                    />
+                  </TableCell>
                 </TableRow>
               ),
             }))}

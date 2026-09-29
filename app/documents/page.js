@@ -7,7 +7,7 @@ import SectionHeader from "@/components/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/filter-table";
-import { listDocuments } from "@/lib/queries";
+import { listDocuments, getCurrentUser } from "@/lib/queries";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteDocument } from "@/lib/actions";
 
@@ -17,7 +17,12 @@ const typeTone = { PDF: "rose", DOCX: "cyan", CSV: "emerald", PNG: "violet" };
 
 export default async function DocumentsPage({ searchParams }) {
   const params = readListParams(await searchParams, ["type", "client"]);
-  const { rows, total, stats: documents, types, clients: clientNames } = await listDocuments(params);
+  const [{ rows, total, stats: documents, types, clients: clientNames }, me] = await Promise.all([
+    listDocuments(params),
+    getCurrentUser(),
+  ]);
+  // Clients can read their documents but not remove them (documents_write is staff only).
+  const canDelete = ["admin", "manager", "agent"].includes(me?.role);
 
   // Tiles describe the whole library; the table shows one page of it.
   const byType = {};
@@ -72,7 +77,7 @@ export default async function DocumentsPage({ searchParams }) {
                   <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{d.size}</TableCell>
                   <TableCell className="text-muted-foreground">{d.date}</TableCell>
-                  <TableCell className="text-right"><RowActions name={d.name} id={d.id} onDelete={deleteDocument} /></TableCell>
+                  <TableCell className="text-right"><RowActions name={d.name} id={d.id} onDelete={canDelete ? deleteDocument : undefined} /></TableCell>
                 </TableRow>
               ),
             }))}

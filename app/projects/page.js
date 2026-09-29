@@ -85,7 +85,23 @@ export default async function ProjectsPage({ searchParams }) {
                   <TableCell><ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge></TableCell>
                   <TableCell>{p.manager}</TableCell>
                   <TableCell className="text-right">
-                    <RowActions name={p.name} href={`/projects/${p.id}`} id={p.id} onDelete={deleteProject} />
+                    <RowActions
+                      name={p.name}
+                      href={`/projects/${p.id}`}
+                      id={p.id}
+                      edit={
+                        <ProjectForm
+                          project={{
+                            ...p.raw,
+                            company: p.raw.company?.[0] ?? p.raw.company,
+                            type: p.raw.type?.[0] ?? p.raw.type,
+                            status: p.raw.status?.[0] ?? p.raw.status,
+                          }}
+                          options={options}
+                        />
+                      }
+                      onDelete={deleteProject}
+                    />
                   </TableCell>
                 </TableRow>
               ),

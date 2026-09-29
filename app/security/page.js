@@ -1,27 +1,37 @@
-import { ShieldCheck, History } from "lucide-react";
+import { ShieldCheck, History, KeyRound } from "lucide-react";
 import Topbar from "@/components/topbar";
 import SectionHeader from "@/components/section-header";
 import TwoFactorSetup from "@/components/two-factor-setup";
+import PasswordForm from "@/components/password-form";
 import ToneBadge from "@/components/tone-badge";
 import { Card } from "@/components/ui/card";
 import { getMyTwoFactor, getCurrentUser, listActivity } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-/** Everyone's own security settings: two-factor, and their recent activity. */
-export default async function SecurityPage() {
+/** Everyone's own security settings: password, two-factor, and their recent activity. */
+export default async function SecurityPage({ searchParams }) {
+  const params = await searchParams;
   const [me, twoFactor, { rows }] = await Promise.all([
     getCurrentUser(),
     getMyTwoFactor(),
     listActivity({ page: 1, perPage: 10, q: "", filters: {} }),
   ]);
 
+  // A fresh invitation lands here to set a password; so does an invited
+  // account that wandered elsewhere before doing so.
+  const welcome = params?.welcome === "1" || me?.status === "invited";
   const mine = rows.filter((r) => r.who === me?.name).slice(0, 8);
 
   return (
     <>
       <Topbar title="My Security" sub={me?.email ?? "Your sign-in settings"} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
+        <Card accent={welcome ? "var(--neon-cyan)" : undefined}>
+          <SectionHeader label={welcome ? "Set your password" : "Password"} icon={KeyRound} />
+          <PasswordForm welcome={welcome} isClient={me?.role === "client"} />
+        </Card>
+
         <Card accent="var(--neon-emerald)">
           <SectionHeader label="Two-Factor Authentication" icon={ShieldCheck} />
           <TwoFactorSetup enabled={twoFactor.enabled} factors={twoFactor.factors} />

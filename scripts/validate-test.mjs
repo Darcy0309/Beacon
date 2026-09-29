@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the shared form validation. */
-import { rules, validate, schemas, cross } from "../lib/validate.js";
+import { rules, validate, schemas, cross, safeInternalPath } from "../lib/validate.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -102,6 +102,47 @@ fails("username: spaces", rules.username, "darcy j");
   check("bulletin: 2-char message too short", Boolean(r.errors.message));
   const r2 = validate({ message: "x".repeat(101) }, schemas.bulletin);
   check("bulletin: 101 chars too long", Boolean(r2.errors.message));
+}
+
+// --- where people are sent after signing in ----------------------------------
+// Each of these must stay inside the app; a browser leaves the site for all
+// the rejected ones.
+for (const [v, want] of [
+  ["/", "/"],
+  ["/leads/12", "/leads/12"],
+  ["/explore?sic=1711&months=7", "/explore?sic=1711&months=7"],
+  ["//evil.example/login", "/"],
+  ["/\\evil.example", "/"],
+  ["https://evil.example", "/"],
+  ["javascript:alert(1)", "/"],
+  ["/\t/evil.example", "/"],
+  ["/ok path", "/"],
+  ["", "/"],
+  [null, "/"],
+  [undefined, "/"],
+]) {
+  check(`safeInternalPath(${JSON.stringify(v)}) → ${want}`, safeInternalPath(v) === want, `got ${safeInternalPath(v)}`);
+}
+check("safeInternalPath falls back to the given default", safeInternalPath("//x", "/security") === "/security");
+
+// --- passwords ------------------------------------------------------------------
+{
+  const ok = validate({ password: "Harbour-Light-2026", confirm: "Harbour-Light-2026" }, schemas.password, cross.password);
+  check("password: 18 chars, matching → ok", ok.ok, JSON.stringify(ok.errors));
+  const short = validate({ password: "short1", confirm: "short1" }, schemas.password, cross.password);
+  check("password: under 10 chars rejected", Boolean(short.errors.password));
+  const mismatch = validate({ password: "Harbour-Light-2026", confirm: "Harbour-Light-2025" }, schemas.password, cross.password);
+  check("password: mismatch reported on confirm", Boolean(mismatch.errors.confirm) && !mismatch.errors.password);
+  const long = validate({ password: "x".repeat(73), confirm: "x".repeat(73) }, schemas.password, cross.password);
+  check("password: over 72 chars rejected (bcrypt limit)", Boolean(long.errors.password));
+}
+
+// --- notification links -----------------------------------------------------------
+{
+  const link = (v) => validate({ title: "t", link: v }, schemas.notification).errors.link;
+  check("notification link /leads/1 ok", !link("/leads/1"));
+  check("notification link //evil rejected", Boolean(link("//evil.example")));
+  check("notification link https:// rejected", Boolean(link("https://evil.example")));
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll validation tests passed.\n");

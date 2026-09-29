@@ -67,7 +67,14 @@ export default async function LeadsPage({ searchParams }) {
                   <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                   <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
                   <TableCell className="text-right">
-                    <RowActions name={l.co} href={`/leads/${l.id}`} id={l.id} onDelete={deleteLead} />
+                    <RowActions
+                      name={l.co}
+                      href={`/leads/${l.id}`}
+                      id={l.id}
+                      edit={<LeadForm lead={l.raw} options={options} />}
+                      onDelete={deleteLead}
+                      warning="This cannot be undone. Its call history and insurance details are deleted with it. Appointments, documents and feedback stay, no longer linked to this lead."
+                    />
                   </TableCell>
                 </TableRow>
               ),

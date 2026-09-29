@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
@@ -12,12 +12,14 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { saveProject } from "@/lib/actions";
+import { useDialogOpen } from "@/components/row-edit-context";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
 export default function ProjectForm({ project, options, trigger }) {
   const isEdit = Boolean(project?.id);
-  const [open, setOpen] = useState(false);
+  // Inside a row's action menu the menu owns the open state and there is no trigger.
+  const [open, setOpen, inRowMenu, onCloseAutoFocus] = useDialogOpen();
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveProject, EMPTY);
 
@@ -29,7 +31,7 @@ export default function ProjectForm({ project, options, trigger }) {
     } else if (state?.error && !state?.fieldErrors) {
       toast.error(state.error);
     }
-  }, [state, isEdit, router]);
+  }, [state, isEdit, router, setOpen]);
 
   const { companies = [], projectTypes = [], projectStatuses = [] } = options ?? {};
   const record = project
@@ -47,12 +49,14 @@ export default function ProjectForm({ project, options, trigger }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button size="sm">{isEdit ? <Pencil /> : <Plus />} {isEdit ? "Edit" : "New project"}</Button>
-        )}
-      </DialogTrigger>
-      <DialogContent>
+      {inRowMenu ? null : (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button size="sm">{isEdit ? <Pencil /> : <Plus />} {isEdit ? "Edit" : "New project"}</Button>
+          )}
+        </DialogTrigger>
+      )}
+      <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${project.name}` : "New project"}</DialogTitle>
         </DialogHeader>
