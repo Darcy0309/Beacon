@@ -11,7 +11,7 @@ const projectSelect = ({ company = false, type = false, status = false } = {}) =
   type:project_types${inner(type)}(id, code, description),
   status:project_statuses${inner(status)}(id, name),
   assignments:project_assignments(ae:users!project_assignments_ae_user_id_fkey(id, first_name, last_name, email)),
-  leads(count)
+  leads!leads_project_id_fkey(count)
 `;
 
 const PROJECT_SELECT = projectSelect();
@@ -69,7 +69,7 @@ export async function getProjectStats() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("amount_paid, type:project_types(code), status:project_statuses(name), leads(count)");
+    .select("amount_paid, type:project_types(code), status:project_statuses(name), leads!leads_project_id_fkey(count)");
   if (error) throw error;
   return (data ?? []).map((p) => ({
     type: one(p.type)?.code ?? "—",

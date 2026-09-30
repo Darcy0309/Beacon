@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
@@ -33,7 +33,7 @@ export default function ProjectForm({ project, options, trigger }) {
     }
   }, [state, isEdit, router, setOpen]);
 
-  const { companies = [], projectTypes = [], projectStatuses = [] } = options ?? {};
+  const { companies = [], projectTypes = [], projectStatuses = [], projects = [] } = options ?? {};
   const record = project
     ? {
         ...project,
@@ -46,6 +46,11 @@ export default function ProjectForm({ project, options, trigger }) {
       }
     : null;
   const { fe, invalid, dv } = formHelpers(state, record);
+  // A DBDev project promotes its leads to one of the same client's Appt projects.
+  const [companyId, setCompanyId] = useState(String(dv("company_id") ?? ""));
+  const [typeId, setTypeId] = useState(String(dv("project_type_id") ?? ""));
+  const isDbdev = projectTypes.find((t) => String(t.id) === typeId)?.code === "DBDV";
+  const apptProjects = projects.filter((p) => p.type === "APPT" && String(p.company_id ?? "") === companyId && p.id !== project?.id);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -70,17 +75,33 @@ export default function ProjectForm({ project, options, trigger }) {
             </Field>
 
             <Field label="Client" error={fe("company_id")}>
-              <Select name="company_id" defaultValue={dv("company_id")} aria-invalid={invalid("company_id")}>
+              <Select name="company_id" defaultValue={dv("company_id")} onChange={(e) => setCompanyId(e.target.value)} aria-invalid={invalid("company_id")}>
                 <option value="">—</option>
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
             <Field label="Type" error={fe("project_type_id")}>
-              <Select name="project_type_id" defaultValue={dv("project_type_id")} aria-invalid={invalid("project_type_id")}>
+              <Select name="project_type_id" defaultValue={dv("project_type_id")} onChange={(e) => setTypeId(e.target.value)} aria-invalid={invalid("project_type_id")}>
                 <option value="">—</option>
                 {projectTypes.map((t) => <option key={t.id} value={t.id}>{t.description}</option>)}
               </Select>
             </Field>
+
+            {isDbdev ? (
+              <Field
+                label="Promotes leads to"
+                className="sm:col-span-2"
+                error={fe("appt_project_id")}
+                hint={apptProjects.length ? "The appointment project a Lead result moves names to" : "This client has no appointment project yet"}
+              >
+                <Select name="appt_project_id" defaultValue={dv("appt_project_id")} aria-invalid={invalid("appt_project_id")}>
+                  <option value="">—</option>
+                  {apptProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </Select>
+              </Field>
+            ) : (
+              <input type="hidden" name="appt_project_id" value="" />
+            )}
 
             <Field label="Status" error={fe("status_id")}>
               <Select name="status_id" defaultValue={dv("status_id")} aria-invalid={invalid("status_id")}>

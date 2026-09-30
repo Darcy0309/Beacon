@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
-  Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell,
+  Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
 } from "lucide-react";
 
 export const ROLES = {
@@ -13,12 +13,22 @@ export const ROLES = {
 
 const ALL = ["admin", "manager", "agent", "client"];
 
+const STAFF = ["admin", "manager", "agent"];
+
+// Pages open to more roles than the section they sit in. A lead sheet is
+// where every call is worked, so anyone with a call list can open one; the
+// full Leads list stays with administrators and agents.
+const DETAIL_ROLES = [[/^\/leads\/\d+$/, STAFF]];
+
 /**
  * Which roles may open a path. Detail pages inherit from their section, so
- * /leads/12 follows /leads. Paths not listed here (the dashboard, the login
- * screen) are open to anyone signed in.
+ * /projects/12 follows /projects, unless DETAIL_ROLES says otherwise. Paths
+ * not listed here (the dashboard, the login screen) are open to anyone
+ * signed in.
  */
 export function rolesForPath(pathname) {
+  const detail = DETAIL_ROLES.find(([re]) => re.test(pathname));
+  if (detail) return detail[1];
   const item = navGroups
     .flatMap((g) => g.items)
     .filter((i) => i.href !== "/")
@@ -32,6 +42,8 @@ export const navGroups = [
     label: "Workspace",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ALL },
+      // The account manager's day: their projects, then each one's call list.
+      { href: "/work", label: "My Projects", icon: PhoneCall, roles: STAFF },
       { href: "/leads", label: "Leads", icon: Target, roles: ["admin", "agent"] },
       { href: "/appointments", label: "Appointments", icon: CalendarDays, roles: ALL },
       { href: "/calendar", label: "Calendar", icon: CalendarRange, roles: ALL },

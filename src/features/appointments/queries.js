@@ -18,11 +18,11 @@ const BAR = {
 const APPT_SELECT = `
   id, appt_date, appt_time, duration_min, rep_name,
   status:appointment_statuses(id, name),
-  user:users(id, first_name, last_name),
+  user:users!appointments_user_id_fkey(id, first_name, last_name),
   lead:leads(
     id, company_name, contact_name, contact_title, phone, email, city, state,
     status:lead_statuses(code, name),
-    project:projects(id, name, company:companies(id, name))
+    project:projects!leads_project_id_fkey(id, name, company:companies(id, name))
   )
 `;
 

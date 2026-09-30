@@ -11,16 +11,10 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { createAppointment, updateAppointment } from "@/features/appointments/actions";
-import { DURATIONS } from "@/lib/validate";
+import { DURATIONS, APPOINTMENT_TIMES } from "@/lib/validate";
 import { fullName } from "@/lib/format";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
-
-const TIMES = [
-  "8:00 AM","8:30 AM","9:00 AM","9:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM",
-  "12:00 PM","12:30 PM","1:00 PM","1:30 PM","2:00 PM","2:30 PM","3:00 PM","3:30 PM",
-  "4:00 PM","4:30 PM","5:00 PM","5:30 PM",
-];
 
 export default function AppointmentForm({ appointment, options, leads = [], defaultLeadId, trigger }) {
   const isEdit = Boolean(appointment?.id);
@@ -87,7 +81,7 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
             </Field>
             <Field label="Time" required error={fe("appt_time")}>
               <Select name="appt_time" required defaultValue={dv("appt_time")} aria-invalid={invalid("appt_time")}>
-                {TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {APPOINTMENT_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
             </Field>
 

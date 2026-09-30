@@ -150,11 +150,13 @@ export function formValues(formData, fields) {
 export const ROLES = ["admin", "manager", "agent", "client"];
 export const USER_STATUSES = ["active", "invited", "disabled"];
 export const DURATIONS = ["15", "30", "45", "60", "90"];
-export const CALL_RESULTS = [
-  "Appointment set", "Callback requested", "X-date captured", "Left voicemail",
-  "Gatekeeper", "Not interested", "Wrong number", "Do not call",
-];
 
+/** Appointment start times offered in the forms, every half hour of the working day. */
+export const APPOINTMENT_TIMES = [
+  "8:00 AM", "8:30 AM", "9:00 AM", "9:30 AM", "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+  "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
+  "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM",
+];
 const { required, max, email, phone, date, time12, int, num, id, oneOf, stateCode, zip, urlOrPath, hostname, username } = rules;
 
 /**
@@ -208,6 +210,7 @@ export const schemas = {
     company_id: [id],
     project_type_id: [id],
     status_id: [id],
+    appt_project_id: [id],
     description: [max(500)],
     client_name: [max(120)],
     amount_paid: [num({ min: 0, max: 100000000 })],
@@ -242,15 +245,23 @@ export const schemas = {
     project_id: [id],
   },
 
-  call: {
+  // A call result recorded from the lead sheet. What each result needs (an
+  // appointment date, a corrected renewal date) is checked by
+  // record_call_result() in the database, which knows what the result does.
+  callResult: {
     lead_id: [required("Missing lead"), id],
+    result_id: [required("Choose a call result"), id],
     project_id: [id],
-    call_result: [required("Choose a call result"), oneOf(CALL_RESULTS)],
     notes: [max(1000)],
+    appt_date: [date],
+    appt_time: [time12],
+    duration_min: [oneOf(DURATIONS, "Choose a duration")],
+    rep_name: [max(80)],
+    corrected_xdate: [date],
   },
 
   csvImport: {
-    project_id: [id],
+    project_id: [required("Choose the project these names go into"), id],
     list_source: [max(80)],
   },
 

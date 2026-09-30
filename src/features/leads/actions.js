@@ -3,7 +3,7 @@
 /** Creating, editing and working leads. */
 
 import { revalidatePath } from "next/cache";
-import { NOT_DELETED, check, currentAppUser, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
+import { NOT_DELETED, check, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
@@ -105,33 +105,3 @@ export async function setLeadStatus(formData) {
   return ok({ id });
 }
 
-/** Log a call against a lead (the legacy tblCallRecord behaviour). */
-export async function logCall(prevState, formData) {
-  const { values, failed } = check(formData, schemas.call);
-  if (failed) return failed;
-
-  const supabase = await createClient();
-  const me = await currentAppUser(supabase);
-  const leadId = Number(values.lead_id);
-
-  const { error } = await supabase.from("call_records").insert({
-    lead_id: leadId,
-    project_id: n(formData, "project_id"),
-    user_id: me?.id ?? null,
-    call_result: s(formData, "call_result"),
-    notes: s(formData, "notes"),
-  });
-  if (error) return fail(error);
-
-  await supabase
-    .from("leads")
-    .update({
-      date_last_worked: new Date().toISOString(),
-      call_result_dbdv: s(formData, "call_result"),
-    })
-    .eq("id", leadId);
-
-  revalidatePath(`/leads/${leadId}`);
-  revalidatePath("/qa");
-  return ok();
-}

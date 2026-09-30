@@ -18,6 +18,8 @@ export async function saveProject(prevState, formData) {
     company_id: n(formData, "company_id"),
     project_type_id: n(formData, "project_type_id"),
     status_id: n(formData, "status_id"),
+    // Which appointment project a DBDev project's leads are promoted to.
+    appt_project_id: n(formData, "appt_project_id"),
     description: s(formData, "description"),
     client_name: s(formData, "client_name"),
     start_date: s(formData, "start_date"),

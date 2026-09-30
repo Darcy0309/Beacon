@@ -19,7 +19,7 @@ const FORMS = {
   // Recipients are multi-value, checked in sendNotification rather than the schema.
   "src/features/notifications/components/notification-composer.jsx": { schema: "notification", extra: ["roles", "user_ids"] },
   "src/features/notifications/components/notification-thread.jsx": { schema: "reply",   extra: ["id"] },
-  "src/features/leads/components/call-logger.jsx":      { schema: "call",        extra: [] },
+  "src/features/work/components/call-result-panel.jsx": { schema: "callResult", extra: [] },
   "src/features/imports/components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
   "src/features/settings/components/settings-form.jsx":    { schema: "settings",    extra: [] },
   "src/features/auth/components/login-form.jsx":       { schema: "login",       extra: ["next", "code"] },  // `code` belongs to the two-factor step

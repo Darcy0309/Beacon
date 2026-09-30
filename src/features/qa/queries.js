@@ -53,3 +53,37 @@ export async function listQaCalls(params) {
     reps: (reps ?? []).map((u) => ({ value: String(u.id), label: shortName(u) })),
   };
 }
+
+/**
+ * Appointments set from a call and waiting for QA, oldest first. The client
+ * is told about an appointment only once it passes here.
+ */
+export async function getQaQueue() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("appointments")
+    .select(`id, appt_date, appt_time, rep_name, appt_create_date, set_stage,
+      setter:users!appointments_user_id_fkey(id, first_name, last_name, email),
+      project:projects!appointments_project_id_fkey(name),
+      lead:leads(id, company_name, contact_name, phone),
+      call:call_records!appointments_call_record_id_fkey(call_result, notes)`)
+    .eq("qa_status", "pending")
+    .order("appt_create_date")
+    .order("id");
+  if (error) throw error;
+  return (data ?? []).map((a) => ({
+    id: a.id,
+    leadId: one(a.lead)?.id,
+    company: one(a.lead)?.company_name ?? "—",
+    contact: one(a.lead)?.contact_name ?? "—",
+    phone: one(a.lead)?.phone ?? "—",
+    project: one(a.project)?.name ?? "—",
+    setterId: one(a.setter)?.id ?? null,
+    setBy: shortName(one(a.setter)),
+    result: one(a.call)?.call_result ?? "Appointment",
+    notes: one(a.call)?.notes ?? null,
+    when: `${shortDate(a.appt_date)}${a.appt_time ? ` · ${a.appt_time}` : ""}`,
+    with: a.rep_name,
+    set: shortDate(a.appt_create_date),
+  }));
+}

@@ -12,7 +12,7 @@ const CONTAINER = `supabase_db_${projectId}`;
 
 /** Run one statement; returns psql's unaligned output (one row per line). */
 export function sql(query) {
-  return execFileSync("docker", ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-tA", "-c", query], {
+  return execFileSync("docker", ["exec", "-i", CONTAINER, "psql", "-U", "postgres", "-d", "postgres", "-qtA", "-c", query], {
     encoding: "utf8",
   }).trim();
 }

@@ -46,9 +46,27 @@ export async function importLeadsCsv(prevState, formData) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
 
-  // The sheet's call results decide the status; "New" covers anything else.
-  const { data: statusRows } = await supabase.from("lead_statuses").select("id, code");
+  const { data: project } = await supabase
+    .from("projects")
+    .select("id, appt_project_id, type:project_types(code)")
+    .eq("id", projectId)
+    .maybeSingle();
+  if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
+  const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
+
+  // The sheet's call-result columns place each name in the lifecycle. Old
+  // and new result names both work (call_results.aliases holds the old ones).
+  const [{ data: statusRows }, { data: resultRows }] = await Promise.all([
+    supabase.from("lead_statuses").select("id, code"),
+    supabase.from("call_results").select("id, project_type, name, aliases, viable, effect, status_code"),
+  ]);
   const statusId = Object.fromEntries((statusRows ?? []).map((r) => [r.code, r.id]));
+  const resultFor = (type, text) => {
+    const t = String(text ?? "").trim().toLowerCase();
+    if (!t) return null;
+    return (resultRows ?? []).find((r) => r.project_type === type && (r.name.toLowerCase() === t || (r.aliases ?? []).includes(t))) ?? null;
+  };
+  const byName = (type, name) => (resultRows ?? []).find((r) => r.project_type === type && r.name === name);
 
   const { data: apptStatus } = await supabase
     .from("appointment_statuses")
@@ -68,16 +86,35 @@ export async function importLeadsCsv(prevState, formData) {
   // that could half-finish.
   for (let i = 0; i < parsed.length; i += 250) {
     const chunk = parsed.slice(i, i + 250);
-    const payload = chunk.map(({ lead, status }) => ({
-      ...lead,
-      project_id: projectId,
-      status_id: statusId[status] ?? statusId.new ?? null,
-      list_source: lead.list_source || listSource,
-      lead_date: now,
-      import_date: now,
-    }));
+    const payload = chunk.map(({ lead, status }) => {
+      let target = projectId;
+      let stageType = projectType;
+      let result = resultFor(projectType, projectType === "DBDV" ? lead.call_result_dbdv : lead.call_result_appt);
+      let source = null;
+      // A name the old system had already made a lead or an appointment
+      // starts on the linked appointment project, like a promotion.
+      if (projectType === "DBDV" && ["promote", "appointment"].includes(result?.effect) && project.appt_project_id) {
+        target = project.appt_project_id;
+        stageType = "APPT";
+        source = projectId;
+        result = resultFor("APPT", lead.call_result_appt)
+          ?? byName("APPT", result.effect === "appointment" ? result.name : "Lead-No Contact");
+      }
+      result ??= byName(stageType, stageType === "DBDV" ? "Viable-No Contact" : "Lead-No Contact");
+      return {
+        ...lead,
+        project_id: target,
+        ...(source ? { source_project_id: source, promoted_at: now } : {}),
+        result_id: result?.id ?? null,
+        resolved_at: result && !result.viable ? now : null,
+        status_id: statusId[result?.status_code] ?? statusId[status] ?? statusId.new ?? null,
+        list_source: lead.list_source || listSource,
+        lead_date: now,
+        import_date: now,
+      };
+    });
 
-    const { data: inserted, error } = await supabase.from("leads").insert(payload).select("id");
+    const { data: inserted, error } = await supabase.from("leads").insert(payload).select("id, project_id, stage");
     if (error || !inserted) {
       console.error("[import] lead chunk failed:", error?.message);
       errors += chunk.length;
@@ -95,6 +132,9 @@ export async function importLeadsCsv(prevState, formData) {
       if (source.appointment) {
         appointmentRows.push({
           lead_id: row.id,
+          project_id: row.project_id,
+          set_project_id: row.project_id,
+          set_stage: row.stage,
           appt_date: source.appointment.appt_date,
           appt_time: source.appointment.appt_time ?? null,
           status_id: apptStatus?.id ?? null,
@@ -119,6 +159,14 @@ export async function importLeadsCsv(prevState, formData) {
 
   if (imported === 0) return fail("No rows could be imported from that file.");
 
+  // Share the new names out across each project's account managers.
+  let assigned = 0;
+  for (const id of new Set([projectId, project.appt_project_id].filter(Boolean))) {
+    const { data: split, error: splitError } = await supabase.rpc("distribute_project_names", { p_project_id: id });
+    if (splitError) console.error("[import] distribution failed:", splitError.message);
+    else if (id === projectId) assigned = split?.reps ?? 0;
+  }
+
   const { error: batchError } = await supabase.from("import_batches").insert({
     file_name: file.name,
     source: listSource,
@@ -137,6 +185,7 @@ export async function importLeadsCsv(prevState, formData) {
   });
   revalidatePath("/imports");
   revalidatePath("/leads");
+  revalidatePath("/work", "layout");
   revalidatePath("/");
-  return ok({ imported, errors, details, appointments, total: rows.length - 1 });
+  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 });
 }

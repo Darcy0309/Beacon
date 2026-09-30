@@ -39,9 +39,32 @@ tests/
 scripts/                  Operational tools (bundling deploy.sql, demo data, screenshots)
 ```
 
-The 19 features are activity, alerts, appointments, auth, bulletin, clients,
+The 20 features are activity, alerts, appointments, auth, bulletin, clients,
 dashboard, documents, explore, feedback, imports, insurance, leads,
-notifications, projects, qa, search, settings, users.
+notifications, projects, qa, search, settings, users, and work (the account
+manager's projects, call lists and the call result panel).
+
+## The lead lifecycle
+
+The client's sheet of call results is the spec, stored as data in
+`call_results` (one row per result and project type, with what it does). A
+list is imported into a database-development (DBDev) project and shared
+evenly across its account managers. Each call is one `record_call_result()`
+in the database, which in a single transaction:
+
+- writes the call, and bumps the name's call weight;
+- keeps the name on the rep's list or resolves it;
+- promotes a Lead to the linked appointment (Appt) project, handing it to the
+  appointment manager with the fewest names and recording who developed it;
+- sets an appointment on the calendar, staged for QA (the client hears only
+  when QA passes), as a confirmation follow-up for whoever set it;
+- pays the rep at the project's rate, and charges back an invalid lead or
+  appointment against whoever was paid for it.
+
+`call_list()` gives a rep their names least-called first ("Not Shopping"
+last), which cycles by itself; `distribute_project_names()` re-splits a
+project when reps come and go. `tests/integration/lifecycle.test.mjs` checks
+every result against the sheet.
 
 ## Rules the layers follow
 
@@ -78,8 +101,10 @@ signs out.
 ## Adding a feature
 
 1. Schema changes go in a new file in `supabase/migrations/` (never edit a
-   shipped one), with its Row Level Security in the same file. Then run
-   `npm run db:reset` locally and `npm run db:bundle`.
+   shipped one), with its Row Level Security in the same file. A new table
+   also needs the two account-wide restrictive policies, `mfa_required` and
+   `active_account_required` (see the lifecycle migration for the loop that
+   adds them). Then run `npm run db:reset` locally and `npm run db:bundle`.
 2. Create `src/features/<name>/` with `queries.js` and/or `actions.js`, starting
    from the helpers in `src/lib/server/`.
 3. Add the page under `src/app/(workspace)/<route>/page.js` and, if it belongs in

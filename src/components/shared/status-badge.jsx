@@ -11,6 +11,10 @@ const ring = {
   not_interested: "border-zinc-400/30 bg-zinc-400/8 text-zinc-400",
   disconnected: "border-stone-400/30 bg-stone-400/8 text-stone-400",
   out_of_business: "border-neutral-400/30 bg-neutral-400/8 text-neutral-400",
+  not_qualified: "border-zinc-400/30 bg-zinc-400/8 text-zinc-400",
+  do_not_call: "border-rose-400/30 bg-rose-400/8 text-rose-300",
+  removed: "border-neutral-400/30 bg-neutral-400/8 text-neutral-400",
+  invalid: "border-rose-400/40 bg-rose-400/8 text-rose-400",
 };
 const dot = {
   appt: "bg-emerald-400",
@@ -22,6 +26,10 @@ const dot = {
   not_interested: "bg-zinc-400",
   disconnected: "bg-stone-400",
   out_of_business: "bg-neutral-400",
+  not_qualified: "bg-zinc-400",
+  do_not_call: "bg-rose-300",
+  removed: "bg-neutral-400",
+  invalid: "bg-rose-400",
 };
 
 /** Accepts a status code ("hot") or a lead_statuses row ({ code, name }). */

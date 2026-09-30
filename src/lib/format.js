@@ -100,3 +100,11 @@ export function timeRank(v) {
 /** "Garry Insurance" -> "garry-insurance", the client's address in /clients/[slug]. */
 export const clientSlug = (name) =>
   String(name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+/** 2027-03-15 -> "Mar 15, 2027" (renewals, where the year matters) */
+export const mediumDate = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
+};

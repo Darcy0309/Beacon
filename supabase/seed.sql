@@ -33,10 +33,17 @@ insert into public.lead_statuses (code, name) values
   ('new',     'New'),
   ('not_interested',  'Not interested'),
   ('disconnected',    'Disconnected number'),
-  ('out_of_business', 'Out of business');
+  ('out_of_business', 'Out of business'),
+  ('not_qualified',   'Not qualified'),
+  ('do_not_call',     'Do not call'),
+  ('removed',         'Removed'),
+  ('invalid',         'Invalid lead')
+-- Later migrations add statuses too; on a fresh install they run first.
+on conflict (code) do nothing;
 
 insert into public.appointment_statuses (name) values
-  ('Scheduled'), ('Confirmed'), ('Held'), ('Rescheduled'), ('Cancelled'), ('No Show');
+  ('Scheduled'), ('Confirmed'), ('Held'), ('Rescheduled'), ('Cancelled'), ('No Show'), ('Invalid')
+on conflict (name) do nothing;
 
 insert into public.project_types (code, description) values
   ('DBDV', 'Database Development'),
@@ -65,7 +72,9 @@ insert into public.sic_codes (code, description) values
   ('8011', 'Offices & Clinics of Doctors of Medicine'),
   ('2411', 'Logging'),
   ('3441', 'Fabricated Structural Metal'),
-  ('7349', 'Building Cleaning & Maintenance Services');
+  ('7349', 'Building Cleaning & Maintenance Services')
+-- The Lead Explorer migration adds codes too; on a fresh install it runs first.
+on conflict (code) do nothing;
 
 -- ---------------------------------------------------------------------------
 -- Auth users (Supabase GoTrue) — local demo accounts.
@@ -514,3 +523,8 @@ cross join lateral (
   select (current_date + (((l.id * 17) % 300)::int) - 30)::date as ult
 ) d
 where not exists (select 1 from public.insurance_details i where i.lead_id = l.id);
+
+-- The seed's projects and names join the lead lifecycle: DBDev projects are
+-- paired with their client's Appt project, and each name gets its call result
+-- (see supabase/migrations/20260930120000_lead_lifecycle.sql).
+select public.lifecycle_backfill();

@@ -10,9 +10,13 @@ const leadSelect = ({ status = false } = {}) => `
   address, city, state, zip, county, sic_code, description, list_source,
   employees, covered_employees, autos, sales_volume, years_in_business,
   estimated_annual_premium, notes_dcm, notes_client, lead_date, import_date,
-  date_last_worked, created_at,
+  date_last_worked, created_at, decision_maker, dm_title, fax,
+  stage, call_weight, original_xdate, promoted_at,
   status:lead_statuses${inner(status)}(id, code, name),
-  project:projects(id, name, company:companies(id, name)),
+  result:call_results(id, name, viable, callable, project_type),
+  project:projects!leads_project_id_fkey(id, name, type:project_types(code), company:companies(id, name)),
+  source:projects!leads_source_project_id_fkey(id, name),
+  developer:users!leads_dbdv_user_id_fkey(id, first_name, last_name, email),
   agency:agencies(id, name),
   assigned:users!leads_assigned_user_id_fkey(id, first_name, last_name, email),
   insurance:insurance_details(*)
@@ -56,7 +60,14 @@ function toLeadView(row) {
     xdate: shortDate(effectiveXdate(insurance)),
     rep: shortName(assigned),
     // Full record, for the lead sheet and the edit form.
-    raw: { ...row, status, project, agency: one(row.agency), assigned, insurance },
+    raw: {
+      ...row, status, project, agency: one(row.agency), assigned, insurance,
+      result: one(row.result),
+      projectType: one(project?.type)?.code ?? null,
+      source: one(row.source),
+      developer: one(row.developer),
+      renewal: effectiveXdate(insurance),
+    },
   };
 }
 
@@ -142,12 +153,12 @@ export async function getLeadActivity(leadId) {
   const [appts, calls] = await Promise.all([
     supabase
       .from("appointments")
-      .select("id, appt_date, appt_time, duration_min, rep_name, status:appointment_statuses(name)")
+      .select("id, appt_date, appt_time, duration_min, rep_name, qa_status, confirmed_at, invalid_at, status:appointment_statuses(name), setter:users!appointments_user_id_fkey(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("appt_date", { ascending: false }),
     supabase
       .from("call_records")
-      .select("id, call_date, call_result, notes, user:users(first_name, last_name)")
+      .select("id, call_date, call_result, notes, stage, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("call_date", { ascending: false })
       .limit(20),
@@ -161,6 +172,8 @@ export async function getLeadActivity(leadId) {
       duration: a.duration_min ?? 30,
       rep: a.rep_name ?? "—",
       status: one(a.status)?.name ?? "—",
+      qa: a.qa_status,
+      setBy: fullName(one(a.setter)) || null,
     })),
     calls: (calls.data ?? []).map((c) => ({
       id: c.id,
@@ -168,6 +181,7 @@ export async function getLeadActivity(leadId) {
       notes: c.notes,
       when: timeAgo(c.call_date),
       by: fullName(one(c.user)) || "—",
+      stage: c.stage === "dbdev" ? "DBDev" : c.stage === "appt" ? "Appt" : null,
     })),
   };
 }

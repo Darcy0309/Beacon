@@ -12,4 +12,8 @@ export const STATUS = {
   not_interested:  { cls: "p-new", label: "Not interested" },
   disconnected:    { cls: "p-new", label: "Disconnected number" },
   out_of_business: { cls: "p-new", label: "Out of business" },
+  not_qualified:   { cls: "p-new", label: "Not qualified" },
+  do_not_call:     { cls: "p-new", label: "Do not call" },
+  removed:         { cls: "p-new", label: "Removed" },
+  invalid:         { cls: "p-new", label: "Invalid lead" },
 };

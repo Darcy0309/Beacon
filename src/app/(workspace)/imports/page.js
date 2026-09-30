@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
 import { listImports, IMPORT_STATUS_OPTIONS } from "@/features/imports/queries";
+import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ const statusTone = { Complete: "emerald", Processing: "cyan", Failed: "rose" };
 
 export default async function ImportsPage({ searchParams }) {
   const params = readListParams(await searchParams, ["status", "project"]);
-  const { rows: pageRows, total, stats: recentImports, projects } = await listImports(params);
+  const [{ rows: pageRows, total, stats: recentImports, projects }, lookups] = await Promise.all([listImports(params), getLookups()]);
 
   // Tiles total every batch; the table shows one page of them.
   const rows = recentImports.reduce((s, r) => s + r.rows, 0);
@@ -45,7 +46,7 @@ export default async function ImportsPage({ searchParams }) {
           ))}
         </div>
 
-        <CsvImport />
+        <CsvImport projects={lookups.projects} />
 
         <Card>
           <SectionHeader label="Recent Imports" icon={Upload} />

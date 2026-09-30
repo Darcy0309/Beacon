@@ -6,13 +6,20 @@ import { toast } from "sonner";
 import { UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Field, Select } from "@/components/ui/field";
 import { importLeadsCsv } from "@/features/imports/actions";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const MAX_BYTES = 5 * 1024 * 1024;
 
-export default function CsvImport() {
+/**
+ * Import a lead list into a project. The names land on that project's call
+ * lists, shared evenly across its account managers; each row's call-result
+ * columns (old or new names) decide where in the lifecycle it starts.
+ */
+export default function CsvImport({ projects = [] }) {
   const [state, formAction, pending] = useActionState(importLeadsCsv, EMPTY);
   const [fileName, setFileName] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -22,12 +29,12 @@ export default function CsvImport() {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total } = state.data ?? {};
-      toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}`);
+      const { imported, errors, total, assigned } = state.data ?? {};
+      toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}${assigned ? ` · shared across ${assigned} account managers` : ""}`);
       formRef.current?.reset();
       setFileName("");
       router.refresh();
-    } else if (state?.error) {
+    } else if (state?.error && !state?.fieldErrors?.project_id) {
       // Import failures are about the file as a whole, so a toast is the right place.
       toast.error(state.error);
     }
@@ -63,7 +70,22 @@ export default function CsvImport() {
   return (
     <Card>
       <CardContent className="p-5">
-        <form ref={formRef} action={formAction}>
+        <form ref={formRef} action={formAction} noValidate className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field label="Project" required error={state?.fieldErrors?.project_id}>
+              <Select name="project_id" required defaultValue={state?.values?.project_id ?? ""} aria-invalid={state?.fieldErrors?.project_id ? true : undefined}>
+                <option value="" disabled>Choose the project these names go into…</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}{p.type ? ` (${p.type === "DBDV" ? "DBDev" : "Appt"})` : ""}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="List source" hint="Where the list came from, e.g. InfoUSA Sept">
+              <Input name="list_source" maxLength={80} defaultValue={state?.values?.list_source ?? ""} />
+            </Field>
+          </div>
           <div
             onDragOver={(e) => {
               e.preventDefault();

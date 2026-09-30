@@ -15,11 +15,16 @@ export async function createAppointment(prevState, formData) {
   const me = await currentAppUser(supabase);
   const leadId = Number(values.lead_id);
   const apptDate = values.appt_date;
+  // An appointment belongs to the project its lead is on, like one set from a call.
+  const { data: lead } = await supabase.from("leads").select("project_id, stage").eq("id", leadId).maybeSingle();
 
   const { data, error } = await supabase
     .from("appointments")
     .insert({
       lead_id: leadId,
+      project_id: lead?.project_id ?? null,
+      set_project_id: lead?.project_id ?? null,
+      set_stage: lead?.stage ?? null,
       user_id: n(formData, "user_id") ?? me?.id ?? null,
       rep_name: s(formData, "rep_name"),
       appt_date: apptDate,

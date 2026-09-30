@@ -1,4 +1,4 @@
-import { ClipboardCheck, Gauge, CheckCheck, AlertTriangle } from "lucide-react";
+import { ClipboardCheck, Gauge, CheckCheck, AlertTriangle, CalendarCheck } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatTile from "@/components/shared/stat-tile";
@@ -6,7 +6,9 @@ import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
-import { listQaCalls, QA_RESULT_OPTIONS } from "@/features/qa/queries";
+import { listQaCalls, getQaQueue, QA_RESULT_OPTIONS } from "@/features/qa/queries";
+import QaQueue from "@/features/qa/components/qa-queue";
+import { getCurrentUser } from "@/lib/server/session";
 import { readListParams, pageInfo } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +18,7 @@ const scoreColor = (s) => (s >= 85 ? "var(--neon-emerald)" : s >= 70 ? "var(--ne
 
 export default async function QaPage({ searchParams }) {
   const params = readListParams(await searchParams, ["result", "rep"]);
-  const { rows, total, stats: calls, reps } = await listQaCalls(params);
+  const [{ rows, total, stats: calls, reps }, queue, me] = await Promise.all([listQaCalls(params), getQaQueue(), getCurrentUser()]);
 
   // Tiles score every reviewed call; the table shows one page of them.
   const avg = calls.length ? Math.round(calls.reduce((s, c) => s + c.score, 0) / calls.length) : 0;
@@ -45,6 +47,15 @@ export default async function QaPage({ searchParams }) {
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
+
+        <Card>
+          <SectionHeader
+            label="Appointments Waiting for QA"
+            icon={CalendarCheck}
+            action={queue.length ? <span className="text-[0.66rem] font-semibold text-amber-300">{queue.length} waiting</span> : null}
+          />
+          <QaQueue items={queue} me={me ? { id: me.id, role: me.role } : null} />
+        </Card>
 
         <Card>
           <SectionHeader label="Recent Scored Calls" icon={ClipboardCheck} />
