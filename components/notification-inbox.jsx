@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Bell, BellOff, CheckCheck, ArrowUpRight, ChevronRight } from "lucide-react";
 import { KIND_ICONS, linkLabel } from "@/lib/notification-kinds";
 import { markNotificationRead, markAllNotificationsRead } from "@/lib/actions";
+import { announceNotificationsChanged } from "@/lib/active-chat";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +29,7 @@ export default function NotificationInbox({ rows, unread, empty }) {
     f.set("id", String(n.id));
     startTransition(async () => {
       await markNotificationRead(f);
+      announceNotificationsChanged();
       router.refresh();
     });
   };
@@ -42,6 +44,7 @@ export default function NotificationInbox({ rows, unread, empty }) {
     setAllRead(true);
     startTransition(async () => {
       await markAllNotificationsRead();
+      announceNotificationsChanged();
       router.refresh();
     });
   };
