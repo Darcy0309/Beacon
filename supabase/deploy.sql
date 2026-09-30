@@ -1,5 +1,5 @@
--- Beacon CRM — full database setup for a hosted Supabase project.
--- Generated from supabase/migrations/* + supabase/seed.sql. Run once in the SQL Editor.
+-- Lighthouse CRM — full database setup for a hosted Supabase project.
+-- Generated from supabase/migrations/* + supabase/seed.sql by `npm run db:bundle`. Run once in the SQL Editor.
 -- Safe to re-run? No — creates tables; drop them first if repeating.
 
 -- ===== supabase/migrations/20260916120000_init.sql =====

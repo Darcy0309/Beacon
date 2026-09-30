@@ -28,12 +28,13 @@ npm run db:start     # starts Postgres + Auth + Studio in Docker, applies
 npm run dev          # http://localhost:3000
 ```
 
-`npm run db:start` prints the local API URL and keys. They are already written to
-`.env.local`; if the values differ, update:
+`npm run db:start` prints the local API URL and keys. Put them in `.env.local`
+(see `.env.example`):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable key>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+SUPABASE_SERVICE_ROLE_KEY=<service role key>   # server only: user administration
 ```
 
 ### Demo accounts
@@ -53,30 +54,36 @@ All use the password `Beacon!2026`:
 |---|---|
 | `npm run dev` | Development server |
 | `npm run build` | Production build |
+| `npm test` | Unit tests (no database needed) |
+| `npm run test:integration` | Row Level Security, role by role, against the local stack |
+| `npm run test:e2e` | The running app in headless Chrome: pages, forms, security, notifications |
+| `npm run test:all` | Everything above |
 | `npm run db:start` / `db:stop` | Start / stop the local Supabase stack |
 | `npm run db:reset` | Drop, re-run migrations, re-seed |
-| `npm run smoke` | Sign in as each role and assert RLS exposes the right rows |
+| `npm run db:bundle` | Rebuild `supabase/deploy.sql` from the migrations and seed |
 | `npm run db:studio` | Print the Supabase Studio URL (http://127.0.0.1:54323) |
+
+The integration and end-to-end tests only ever run against the local stack:
+they refuse any Supabase or app URL that is not localhost.
 
 ## Project layout
 
 ```
-app/                 route per module (leads, appointments, clients, …)
-components/          UI and record forms
-  ui/                shadcn primitives
-lib/
-  queries.js         server-side reads   (all data fetching)
-  actions.js         server actions      (all writes)
-  supabase/          browser + server clients
-  display.js         formatting helpers
-  constants.js       status → colour maps
-proxy.js             session refresh + route protection (Next 16 renamed
-                     middleware.js → proxy.js)
-supabase/
-  migrations/        schema + RLS policies
-  seed.sql           lookups, demo accounts, sample records
-scripts/smoke-test.mjs
+src/
+  app/(auth)/          sign-in, setup, email links (no sidebar)
+  app/(workspace)/     every signed-in page
+  app/api/             route handlers
+  features/<feature>/  actions.js (writes) · queries.js (reads) · components/
+  components/          ui/ · layout/ · brand/ · shared/
+  lib/                 server/ kernel · supabase/ clients · format · validate · nav
+  proxy.js             session refresh + route protection (Next 16's middleware)
+supabase/              migrations/ · seed.sql · deploy.sql (generated)
+tests/                 unit/ · integration/ · e2e/ · support/
+scripts/               deploy.sql bundler, demo data, screenshots
+docs/                  architecture.md, build plan
 ```
+
+See **[docs/architecture.md](docs/architecture.md)** for what goes where and why.
 
 ## Data model
 
@@ -110,7 +117,9 @@ Four roles, enforced in the database rather than the UI:
 - **client** — read-only, and only rows belonging to their own company
 
 Every table has RLS enabled. The navigation hides what a role cannot use, but
-the policies are what actually deny access — `npm run smoke` proves it.
+the policies are what actually deny access — `npm run test:integration` proves
+it. A disabled account, and a session that has not yet entered its two-factor
+code, see nothing at all.
 
 ## Deploying to Vercel
 
@@ -131,8 +140,8 @@ reachable from Vercel. Without one, every route shows a setup screen at
    npm run db:push          # runs the migrations, then supabase/seed.sql
    ```
 
-   Regenerate `deploy.sql` after changing a migration:
-   `cat supabase/migrations/*.sql supabase/seed.sql > supabase/deploy.sql`
+   Regenerate `deploy.sql` after changing a migration: `npm run db:bundle`.
+   A project that is already set up only needs the migrations it has not run.
 
    This creates the tables, RLS policies, lookup values and the demo accounts
    (`admin@beacon.test` etc., password `Beacon!2026`).
@@ -143,19 +152,22 @@ reachable from Vercel. Without one, every route shows a setup screen at
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon or publishable key>
+   SUPABASE_SERVICE_ROLE_KEY=<service role key>    # server only, never NEXT_PUBLIC_
    ```
 
    These are inlined at **build** time, so saving them is not enough —
    **trigger a new deployment** afterwards (Deployments → ⋯ → Redeploy).
 
-4. **Add your production users.** Create them under *Authentication → Users*
-   in Supabase, then insert a matching row in `public.users` with the right
-   `role` and `auth_id`, or invite them from the app's Users screen once you
-   are signed in as an admin.
+4. **Configure Supabase Auth**: turn off public sign-ups; set the Site URL and
+   add `https://<your-domain>/auth/callback` to the Redirect URLs; and set up
+   custom SMTP, or invitation emails only reach your Supabase team members.
+
+5. **Add your production users** from the app's *Users & Access* screen,
+   signed in as an admin. Each person gets an email to set their password.
 
 ### Why it 500'd before
 
-`proxy.js` runs on every request and used to create the Supabase client
+`src/proxy.js` runs on every request and used to create the Supabase client
 unconditionally. With the variables unset it threw before any page rendered,
 so even `/login` returned 500. It now checks configuration first and sends
 visitors to `/setup`; it also detects a `127.0.0.1` URL on a hosted deployment,
