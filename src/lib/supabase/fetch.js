@@ -40,6 +40,11 @@ const isConnectionError = (err) => {
   );
 };
 
+// The gateway in front of Supabase answering instead of the database (bad
+// gateway, unavailable, timeout, and Cloudflare's 52x). A read that gets one
+// is safe to ask again; it is a passing hiccup, not an answer.
+const GATEWAY_ERRORS = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
+
 export async function supabaseFetch(url, init = {}) {
   const method = String(init.method ?? "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") {
@@ -47,11 +52,15 @@ export async function supabaseFetch(url, init = {}) {
   }
 
   let lastError;
-  for (const budget of READ_BUDGETS_MS) {
+  for (const [attempt, budget] of READ_BUDGETS_MS.entries()) {
     const timeout = AbortSignal.timeout(budget);
     const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
     try {
-      return await undiciFetch(url, { ...init, signal, dispatcher: agent() });
+      const res = await undiciFetch(url, { ...init, signal, dispatcher: agent() });
+      if (!GATEWAY_ERRORS.has(res.status) || attempt === READ_BUDGETS_MS.length - 1) return res;
+      // Free the socket before asking again.
+      await res.body?.cancel().catch(() => {});
+      lastError = new Error(`Supabase gateway answered ${res.status}`);
     } catch (err) {
       lastError = err;
       // The caller's own abort, or a real answer from the server, ends it.

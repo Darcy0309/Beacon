@@ -7,13 +7,22 @@ import { Card, CardContent } from "@/components/ui/card";
 
 // Most failures here are a slow first call to the database, which succeeds on
 // a second try. Rather than leave the reader looking at an error and expecting
-// them to navigate away and back, the screen reloads itself once. Module
+// them to navigate away and back, the screen loads itself again once. Module
 // scope, so a boundary that remounts does not start the cycle again.
 let lastAutoRetry = 0;
 const RETRY_COOLDOWN_MS = 15_000;
+// A retry still waiting this long gives way to the Try again button.
+const RETRY_PATIENCE_MS = 20_000;
 
-export default function RouteError({ error, reset }) {
+/**
+ * retry() asks the server for the page again; reset() only re-renders what
+ * the browser already has, which for a page that failed on the server is the
+ * same failure. Using reset() here is why a failed page stayed broken until
+ * the reader went to another tab and came back.
+ */
+export default function RouteError({ error, retry, reset }) {
   const [retrying, setRetrying] = useState(false);
+  const again = retry ?? reset;
 
   useEffect(() => {
     console.error(error);
@@ -24,9 +33,13 @@ export default function RouteError({ error, reset }) {
     if (now - lastAutoRetry < RETRY_COOLDOWN_MS) return;
     lastAutoRetry = now;
     setRetrying(true);
-    const timer = setTimeout(reset, 400);
-    return () => clearTimeout(timer);
-  }, [reset]);
+    const start = setTimeout(again, 400);
+    const giveUp = setTimeout(() => setRetrying(false), RETRY_PATIENCE_MS);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(giveUp);
+    };
+  }, [again]);
 
   if (retrying) {
     return (
@@ -55,7 +68,7 @@ export default function RouteError({ error, reset }) {
               Reference: {error.digest}
             </p>
           ) : null}
-          <Button onClick={reset} className="mt-5">
+          <Button onClick={() => { setRetrying(true); again(); }} className="mt-5">
             <RotateCcw /> Try again
           </Button>
         </CardContent>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 

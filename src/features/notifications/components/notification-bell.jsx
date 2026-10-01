@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { toast } from "sonner";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";

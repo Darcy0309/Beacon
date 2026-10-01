@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { useRouter } from "next/navigation";
 import { MoreHorizontal, Eye, Pencil, Trash2, KeyRound, Loader2, MailPlus } from "lucide-react";
 import { toast } from "sonner";

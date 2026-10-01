@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { Building2, Target, CalendarCheck, UserCog } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";

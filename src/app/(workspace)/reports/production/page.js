@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import {
   Banknote, CalendarCheck, CheckCheck, Download, ListChecks, PhoneCall, Target, Undo2, Users,
 } from "lucide-react";

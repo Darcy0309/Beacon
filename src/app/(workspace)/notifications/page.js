@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { Bell, Send, MailCheck, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";

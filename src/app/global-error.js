@@ -2,7 +2,9 @@
 
 // Catches failures in the root layout itself, which app/error.js cannot.
 // Kept dependency-free so it renders even when the rest of the app cannot.
-export default function GlobalError({ error, reset }) {
+// retry() loads the page from the server again; reset() would only re-render
+// the failure the browser already has.
+export default function GlobalError({ error, retry, reset }) {
   return (
     <html lang="en">
       <body
@@ -40,7 +42,7 @@ export default function GlobalError({ error, reset }) {
             </p>
           ) : null}
           <button
-            onClick={() => reset()}
+            onClick={() => (retry ?? reset)()}
             style={{
               marginTop: 18,
               padding: "0.6rem 1.1rem",

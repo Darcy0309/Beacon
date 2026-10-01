@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, FolderKanban, Target, CalendarCheck, UserCog } from "lucide-react";
 import Topbar from "@/components/layout/topbar";

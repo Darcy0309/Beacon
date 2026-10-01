@@ -1,5 +1,5 @@
 import { isValidElement } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, CalendarPlus, ShieldCheck, Phone, PhoneCall, CalendarClock, Building2, UserRound,

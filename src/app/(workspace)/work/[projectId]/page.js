@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ListChecks, PhoneCall, CalendarCheck, PartyPopper, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";

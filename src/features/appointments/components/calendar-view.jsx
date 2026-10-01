@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight,
   Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock,

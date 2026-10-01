@@ -100,6 +100,16 @@ async function openPage(browser, port, browserContextId, { width = 1440, height 
       await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
       return true;
     },
+    /** A real mouse click on the middle of `selector`: move there, press, release. */
+    mouseClick: async (selector) => {
+      const at = await ev(`(() => { const el = document.querySelector(${js(selector)}); if (!el) return null; el.scrollIntoView({ block: 'nearest' });
+        const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
+      if (!at) return false;
+      await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
+      await cdp.send("Input.dispatchMouseEvent", { type: "mousePressed", x: at.x, y: at.y, button: "left", clickCount: 1 });
+      await cdp.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: at.x, y: at.y, button: "left", clickCount: 1 });
+      return true;
+    },
     /** Press a Radix trigger (they open on pointerdown, not click). */
     pointer: (selector) =>
       ev(`(() => { const b = document.querySelector(${js(selector)}); if (!b) return false; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return true; })()`),

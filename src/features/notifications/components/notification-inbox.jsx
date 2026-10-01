@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { useRouter } from "next/navigation";
 import { Bell, BellOff, CheckCheck, ArrowUpRight, ChevronRight } from "lucide-react";
 import { KIND_ICONS, linkLabel } from "@/features/notifications/kinds";

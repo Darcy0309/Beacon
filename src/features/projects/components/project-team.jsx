@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { toast } from "sonner";
 import { Loader2, Shuffle, UserMinus, UserPlus, Users } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";

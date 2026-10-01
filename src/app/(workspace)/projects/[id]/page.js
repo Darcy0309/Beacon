@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight } from "lucide-react";
 import Topbar from "@/components/layout/topbar";

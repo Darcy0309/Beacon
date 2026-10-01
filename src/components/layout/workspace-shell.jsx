@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/intent-link";
 import { usePathname, useRouter } from "next/navigation";
 import { ShieldOff, UserX, LogOut } from "lucide-react";
 import AppSidebar from "@/components/layout/app-sidebar";

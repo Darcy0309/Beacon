@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useLinkStatus } from "next/link";
+import Link from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose } from "lucide-react";
 import LighthouseWordmark from "@/components/brand/logo-wordmark";
@@ -10,6 +11,16 @@ import { useRole } from "@/components/layout/role-provider";
 import { signOut } from "@/features/auth/actions";
 import { useSidebar } from "@/components/layout/sidebar-provider";
 import { cn } from "@/lib/utils";
+
+/**
+ * A thin sweep along the bottom of a sidebar item while the page it opens is
+ * on its way, so a click on a slow page shows it registered. Always rendered,
+ * so nothing shifts; it only fades in. Must sit inside the Link.
+ */
+function LoadingHint() {
+  const { pending } = useLinkStatus();
+  return <span aria-hidden className={cn("nav-loading", pending && "is-pending")} />;
+}
 
 /**
  * The sign-out door with its arrow drawn separately (Lucide's LogOut, split),
@@ -125,6 +136,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                         {item.badge}
                       </span>
                     ) : null}
+                    <LoadingHint />
                   </Link>
                 );
               })}
