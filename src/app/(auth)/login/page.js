@@ -32,7 +32,7 @@ export default async function LoginPage({ searchParams }) {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-2 text-center">
-          <LighthouseWordmark className="h-14 w-auto text-white" />
+          <LighthouseWordmark className="h-16 w-auto" tone="dark" />
           <div className="text-sm text-white/55">Signature Marketing · Lead Management</div>
         </div>
 

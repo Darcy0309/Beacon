@@ -46,7 +46,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
       ) : (
         <div className="px-4 py-5">
           <div className="flex items-center justify-between gap-2">
-            <LighthouseWordmark className="h-9 w-auto text-sidebar-foreground" />
+            <LighthouseWordmark className="h-11 w-auto" />
             {!forceExpanded && (
               <button
                 onClick={toggle}

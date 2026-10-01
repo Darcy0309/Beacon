@@ -79,6 +79,12 @@
   --sidebar-border: hsl(205 25% 88%);
   --sidebar-ring: hsl(191 91% 33%);
 
+  /* The logo: silver turning to navy (components/brand/logo-wordmark.jsx). */
+  --logo-silver: #8e939f;
+  --logo-navy: #33307a;
+  --logo-edge: rgb(20 22 45 / 0.45);
+  --logo-glow: #bcdcff;
+
   --panel-border: hsl(205 25% 86%);
   --grid-line: hsl(205 30% 90%);
 
@@ -133,6 +139,18 @@
   --neon-violet: hsl(263 85% 65%);
   --neon-magenta: hsl(295 85% 62%);
   --neon-rose: hsl(350 85% 62%);
+  --logo-silver: #dfe2ea;
+  --logo-navy: #6f6ae0;
+  --logo-edge: rgb(0 0 0 / 0.55);
+  --logo-glow: #d4e9ff;
+}
+
+/* Pages that are dark whatever the theme (sign-in, setup) use the dark logo. */
+.logo-on-dark {
+  --logo-silver: #dfe2ea;
+  --logo-navy: #6f6ae0;
+  --logo-edge: rgb(0 0 0 / 0.55);
+  --logo-glow: #d4e9ff;
 }
 
 @layer base {

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="5 5 54 54">
+  <defs>
+    <linearGradient id="l" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#6aa6dd"/><stop offset="1" stop-color="#4f8bc6"/></linearGradient>
+    <linearGradient id="d" x1="0" y1="0" x2="0.8" y2="1"><stop offset="0" stop-color="#4878b3"/><stop offset="1" stop-color="#3a669f"/></linearGradient>
+    <linearGradient id="p" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="#85309a"/><stop offset="1" stop-color="#722688"/></linearGradient>
+    <linearGradient id="c" x1="0" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#78298c"/><stop offset="1" stop-color="#611e74"/></linearGradient>
+  </defs>
+  <g>
+    <path d="M 33.32 6.03 A 26 26 0 0 0 6.83 38.51 C 15.20 40.96 28.12 43.71 33.45 57.27 C 30.95 52.59 29.25 43.71 29.34 35.63 C 29.42 25.94 31.52 11.41 33.32 6.03 Z" fill="url(#l)"/>
+    <path d="M 8.63 43.40 A 26 26 0 0 0 33.09 57.98 L 33.45 57.27 C 29.34 47.42 18.84 42.90 8.63 43.40 Z" fill="url(#d)"/>
+    <path d="M 34.58 21.10 C 41.85 21.91 51.54 25.14 57.64 27.71 A 26 26 0 0 1 35.30 57.79 C 36.36 50.17 36.20 38.06 35.71 32.40 C 35.39 27.56 34.75 23.52 34.58 21.10 Z" fill="url(#p)"/>
+    <path d="M 35.07 20.45 C 36.20 15.45 39.43 10.60 44.05 8.96 A 26 26 0 0 1 56.51 23.32 C 49.93 22.88 40.24 21.50 35.07 20.45 Z" fill="url(#c)"/>
+  </g>
+</svg>

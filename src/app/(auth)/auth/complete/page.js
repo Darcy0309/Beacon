@@ -11,7 +11,7 @@ export default async function AuthCompletePage({ searchParams }) {
   return (
     <div className="grid min-h-svh place-items-center p-4">
       <div className="flex flex-col items-center gap-6 text-center">
-        <LighthouseWordmark className="h-12 w-auto" />
+        <LighthouseWordmark className="h-14 w-auto" />
         <AuthComplete next={next} />
       </div>
     </div>
