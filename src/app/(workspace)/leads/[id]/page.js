@@ -302,7 +302,7 @@ export default async function LeadSheet({ params, searchParams }) {
               />
             ) : staff ? (
               <Card className="p-5 text-sm text-muted-foreground">
-                Results on this name are recorded by {lead.rep === "Unassigned" ? "the reps on its project" : lead.rep}.
+                Results on this name are recorded by {lead.rep === "Unassigned" ? "the reps on its project." : /\.$/.test(lead.rep) ? lead.rep : `${lead.rep}.`}
               </Card>
             ) : null}
           </div>
