@@ -4,7 +4,7 @@
  *
  *   npm run test:e2e
  */
-import { check, finish, until } from "../support/assert.mjs";
+import { check, finish, sleep, until } from "../support/assert.mjs";
 import { signIn } from "../support/auth.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
@@ -27,9 +27,12 @@ const a = await agent.newPage();
 const b = await agent.newPage(); // a second tab, same person
 const bell = (tab) => tab.ev(`document.querySelector('button[aria-label^="Notifications"]')?.getAttribute('aria-label') ?? 'no bell'`);
 const bellIs = (tab, label, timeout) => until(async () => (await bell(tab)) === label, { timeout });
+const BELL = 'button[aria-label^="Notifications"]';
+const PANEL = "[data-notification-panel]";
+const panelOpen = (tab) => tab.ev(`!!document.querySelector('${PANEL}')`);
 const openBell = async (tab) => {
-  await tab.pointer('button[aria-label^="Notifications"]');
-  await until(() => tab.ev(`!!document.querySelector('[role=menu]')`), { timeout: 2000 });
+  await tab.click(BELL);
+  await until(() => panelOpen(tab), { timeout: 2000 });
 };
 
 try {
@@ -42,9 +45,10 @@ try {
   await message("Read test one");
   check("pop-up appears", await until(async () => /Read test one/.test(await a.toasts())));
   check("count shows 1", await bellIs(a, "Notifications, 1 unread"), await bell(a));
+  check("the badge shakes as it appears", await a.ev(`!!document.querySelector('${BELL} .animate-badge-shake')`));
   check("the other tab counts it too", await bellIs(b, "Notifications, 1 unread"), await bell(b));
   await openBell(a);
-  await a.ev(`[...document.querySelectorAll('[role=menu] button')].find((x) => x.innerText.includes('Read test one'))?.click()`);
+  await a.ev(`[...document.querySelectorAll('${PANEL} button')].find((x) => x.innerText.includes('Read test one'))?.click()`);
   check("opening it closes its pop-up at once", await until(async () => !/Read test one/.test(await a.toasts()), { timeout: 2000 }), await a.toasts());
   check("count clears in this tab", await bellIs(a, "Notifications"), await bell(a));
   check("…and in the other tab, without switching to it", await bellIs(b, "Notifications"), await bell(b));
@@ -75,7 +79,7 @@ try {
   await a.go("/notifications", 3000);
   check("inbox lists 2 unread", /Unread\s*2/i.test(await a.text()));
   await openBell(a);
-  await a.click("[role=menu] button", "Mark all read");
+  await a.click(`${PANEL} button`, "Mark all read");
   check("the bell's Mark all read updates the open inbox", await until(async () => /all caught up/i.test(await a.text())));
 
   // 5. Reading in one tab takes the other tab's pop-up away (checked with B in front).
@@ -88,6 +92,28 @@ try {
   await b.front();
   check("reading it in tab A removes tab B's pop-up", await until(async () => !/Read test eight/.test(await b.toasts()), { timeout: 4000 }), await b.toasts());
   check("…and tab B's count", await bellIs(b, "Notifications"), await bell(b));
+
+  // 6. The panel opens while the mouse rests on the bell and closes when it
+  //    leaves; one opened by click stays open; Escape closes it.
+  await a.front();
+  await a.go("/leads", 2500);
+  const away = { x: 600, y: 600 };
+  await a.hover(away);
+  check("panel shut to begin with", !(await panelOpen(a)));
+  await a.hover(BELL);
+  check("resting the mouse on the bell opens the panel", await until(() => panelOpen(a), { timeout: 1500 }));
+  check("…and the bell reports it open", (await a.ev(`document.querySelector('${BELL}').getAttribute('aria-expanded')`)) === "true");
+  await a.hover(`${PANEL} a[href="/notifications"]`);
+  await sleep(600);
+  check("moving down into the panel keeps it open", await panelOpen(a));
+  await a.hover(away);
+  check("moving away closes it", await until(async () => !(await panelOpen(a)), { timeout: 1500 }));
+  await openBell(a);
+  await a.hover(away);
+  await sleep(700);
+  check("opened by a click, it stays when the mouse leaves", await panelOpen(a));
+  await a.key("Escape");
+  check("Escape closes it", await until(async () => !(await panelOpen(a)), { timeout: 1500 }));
 } finally {
   clear();
   browser.close();

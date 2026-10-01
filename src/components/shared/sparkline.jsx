@@ -1,6 +1,7 @@
 /**
  * Small line + gradient-area chart used inside stat tiles.
  * `values` is a plain number array; the line is drawn in `color`.
+ * It rises from the baseline when it appears; bars rise one after another.
  */
 export default function Sparkline({ values = [], color = "var(--primary)", className, bars = false }) {
   const data = values.length ? values : [0, 0];
@@ -38,6 +39,8 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
               rx="1.5"
               fill={color}
               opacity={0.55 + (0.45 * i) / Math.max(1, data.length - 1)}
+              className="animate-rise"
+              style={{ animationDelay: `${150 + i * 45}ms` }}
             />
           );
         })}
@@ -57,16 +60,18 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
           <stop offset="1" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
-      <path d={area} fill={`url(#${id})`} />
-      <path
-        d={line}
-        fill="none"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        vectorEffect="non-scaling-stroke"
-      />
+      <g className="animate-rise" style={{ animationDelay: "150ms" }}>
+        <path d={area} fill={`url(#${id})`} />
+        <path
+          d={line}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </g>
     </svg>
   );
 }

@@ -120,7 +120,7 @@ signs out.
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, validation rules, form ↔ schema contract |
 | `npm run test:integration` | local stack | Row Level Security for every role, reads and writes |
-| `npm run test:e2e` | local stack + app | Every page per role, forms, security, notifications, in headless Chrome |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

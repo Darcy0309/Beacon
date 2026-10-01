@@ -91,6 +91,15 @@ async function openPage(browser, port, browserContextId, { width = 1440, height 
         const proto = el.tagName === 'SELECT' ? HTMLSelectElement : el.tagName === 'TEXTAREA' ? HTMLTextAreaElement : HTMLInputElement;
         Object.getOwnPropertyDescriptor(proto.prototype, 'value').set.call(el, ${js(value)});
         el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); el.focus(); return true; })()`),
+    /** Move the real mouse onto the middle of `selector`, or to a point { x, y }. */
+    hover: async (target) => {
+      const at = typeof target === "string"
+        ? await ev(`(() => { const r = document.querySelector(${js(target)})?.getBoundingClientRect(); return r ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null; })()`)
+        : target;
+      if (!at) return false;
+      await cdp.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
+      return true;
+    },
     /** Press a Radix trigger (they open on pointerdown, not click). */
     pointer: (selector) =>
       ev(`(() => { const b = document.querySelector(${js(selector)}); if (!b) return false; b.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' })); return true; })()`),

@@ -1,13 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { createClient } from "@/lib/supabase/client";
 import { useRole } from "@/components/layout/role-provider";
 import { markNotificationRead, markAllNotificationsRead } from "@/features/notifications/actions";
@@ -18,6 +15,15 @@ import { cn } from "@/lib/utils";
 const SHOWN = 8;
 const POLL_MS = 60_000;
 const COLUMNS = "id, kind, sender_id, title, body, link, read_at, created_at";
+// Hover intent: a pointer passing over the bell does not open it, and the
+// panel stays while the pointer crosses from the bell into it.
+const HOVER_OPEN_MS = 120;
+const HOVER_CLOSE_MS = 300;
+
+// Every page draws its own top bar, so the bell mounts afresh on each
+// navigation. The count it last showed lives here, outside the component,
+// so the badge shakes when the count goes up, not on every page change.
+let lastCount = 0;
 
 function ago(iso) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -47,19 +53,34 @@ const formOf = (id) => {
  * Reading a notification anywhere — here, the inbox, its own page, another
  * tab — clears it from the count and takes down its pop-up: the database
  * change arrives over Realtime, and same-tab readers also announce it.
+ *
+ * The panel opens on click, or when a mouse rests on the bell; one opened
+ * by hovering closes when the pointer leaves, one opened by click stays
+ * until clicked again, Escape, a click elsewhere, or a page change.
  */
 export default function NotificationBell() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useRole();
   const me = user?.id ?? null;
   const supabase = useMemo(() => createClient(), []);
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
-  const [open, setOpen] = useState(false);
+  // null when shut; "hover" or "click" for how it was opened.
+  const [openedBy, setOpenedBy] = useState(null);
+  const open = openedBy !== null;
+  const [shake, setShake] = useState(0);
   const popups = useRef(new Set()); // notification ids with a pop-up on screen
   const known = useRef(new Set()); // ids already counted, so a late live event is not counted twice
   const announced = useRef(new Set()); // ids that have had their pop-up
   const reloadTimer = useRef(null);
+  const loaded = useRef(false);
+  const rootRef = useRef(null);
+  const buttonRef = useRef(null);
+  const hoverTimer = useRef(null);
+  const panelId = useId();
+
+  const setOpen = useCallback((value) => setOpenedBy(value ? "click" : null), []);
 
   const dismissPopup = useCallback((id) => {
     toast.dismiss(toastId(id));
@@ -80,10 +101,19 @@ export default function NotificationBell() {
       for (const x of list.data ?? []) if (x.read_at) dismissPopup(x.id);
     }
     if (!count.error) {
+      loaded.current = true;
       setUnread(count.count ?? 0);
       if (!count.count) [...popups.current].forEach(dismissPopup);
     }
   }, [me, supabase, dismissPopup]);
+
+  // Shake the badge when the count goes up: when it first appears, and for
+  // each new arrival. Not before the first load, whose 0 is only a placeholder.
+  useEffect(() => {
+    if (!loaded.current) return;
+    if (unread > lastCount) setShake((n) => n + 1);
+    lastCount = unread;
+  }, [unread]);
 
   // "Mark all read" changes many rows at once; count again once they settle.
   const reloadSoon = useCallback(() => {
@@ -104,7 +134,7 @@ export default function NotificationBell() {
       }
       router.push(`/notifications/${n.id}`);
     },
-    [router, dismissPopup]
+    [router, dismissPopup, setOpen]
   );
 
   // First load, the live subscription, and the fallbacks.
@@ -189,82 +219,155 @@ export default function NotificationBell() {
     router.refresh(); // the inbox page, if it is open, shows them read too
   };
 
+  // Fresh items every time the panel opens.
+  useEffect(() => {
+    if (open) load();
+  }, [open, load]);
+
+  // A new page closes it.
+  useEffect(() => {
+    setOpenedBy(null);
+  }, [pathname]);
+
+  // Escape, or a press anywhere outside the bell and its panel, closes it.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      setOpenedBy(null);
+      if (rootRef.current?.contains(document.activeElement)) buttonRef.current?.focus();
+    };
+    const onDown = (e) => {
+      if (!rootRef.current?.contains(e.target)) setOpenedBy(null);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onDown);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onDown);
+    };
+  }, [open]);
+
+  useEffect(() => () => clearTimeout(hoverTimer.current), []);
+
+  // Hover only for a mouse: on touch the first tap is the click.
+  const onPointerEnter = (e) => {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(hoverTimer.current);
+    if (!open) hoverTimer.current = setTimeout(() => setOpenedBy((o) => o ?? "hover"), HOVER_OPEN_MS);
+  };
+  const onPointerLeave = (e) => {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(hoverTimer.current);
+    if (openedBy === "hover") {
+      hoverTimer.current = setTimeout(() => setOpenedBy((o) => (o === "hover" ? null : o)), HOVER_CLOSE_MS);
+    }
+  };
+  // A click on a panel that hovering opened keeps it open; otherwise it toggles.
+  const onButtonClick = () => {
+    clearTimeout(hoverTimer.current);
+    setOpenedBy((o) => (o === "hover" ? "click" : o ? null : "click"));
+  };
+
   return (
-    <DropdownMenu open={open} onOpenChange={(o) => { setOpen(o); if (o) load(); }}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
-          className="relative flex size-9 cursor-pointer items-center justify-center rounded-md border border-[var(--panel-border)] bg-card/80 text-muted-foreground transition-all duration-150 hover:border-primary/40 hover:text-primary active:scale-95"
-        >
-          <Bell className="size-4" />
-          {unread > 0 ? (
-            <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[0.6rem] font-bold tabular-nums text-accent-foreground shadow">
-              {unread > 99 ? "99+" : unread}
-            </span>
-          ) : null}
-        </button>
-      </DropdownMenuTrigger>
+    <div ref={rootRef} className="relative" onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={onButtonClick}
+        aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        className={cn(
+          "relative flex size-9 cursor-pointer items-center justify-center rounded-md border border-[var(--panel-border)] bg-card/80 text-muted-foreground transition-all duration-150 hover:border-primary/40 hover:text-primary active:scale-95",
+          open && "border-primary/40 text-primary"
+        )}
+      >
+        <Bell key={`bell-${shake}`} className={cn("size-4", shake > 0 && "animate-bell-ring")} />
+        {unread > 0 ? (
+          <span
+            key={`badge-${shake}`}
+            className={cn(
+              "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[0.6rem] font-bold tabular-nums text-accent-foreground shadow",
+              shake > 0 && "animate-badge-shake"
+            )}
+          >
+            {unread > 99 ? "99+" : unread}
+          </span>
+        ) : null}
+      </button>
 
-      <DropdownMenuContent align="end" className="w-[22rem] p-0">
-        <div className="flex items-center justify-between border-b border-[var(--panel-border)] px-4 py-2.5">
-          <span className="eyebrow">Notifications{unread ? ` · ${unread} new` : ""}</span>
-          {unread > 0 ? (
-            <button
-              type="button"
-              onClick={markAll}
-              className="flex cursor-pointer items-center gap-1 text-[0.66rem] font-bold uppercase tracking-[0.1em] text-primary transition-opacity hover:opacity-75"
-            >
-              <CheckCheck className="size-3.5" /> Mark all read
-            </button>
-          ) : null}
-        </div>
-
-        <div className="max-h-[26rem] overflow-y-auto p-1.5">
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
-              <BellOff className="size-5" />
-              You&apos;re all caught up.
-            </div>
-          ) : (
-            items.map((n) => {
-              const Icon = KIND_ICONS[n.kind] ?? Bell;
-              return (
+      {open ? (
+        // The top padding bridges the gap to the bell, so the pointer never leaves.
+        <div className="absolute right-0 top-full z-50 pt-1.5">
+          <div
+            id={panelId}
+            role="dialog"
+            aria-label="Notifications"
+            data-notification-panel=""
+            className="animate-popover-in w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-lg"
+          >
+            <div className="flex items-center justify-between border-b border-[var(--panel-border)] px-4 py-2.5">
+              <span className="eyebrow">Notifications{unread ? ` · ${unread} new` : ""}</span>
+              {unread > 0 ? (
                 <button
-                  key={n.id}
                   type="button"
-                  onClick={() => openItem(n)}
-                  className={cn(
-                    "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60",
-                    !n.read_at && "bg-primary/5"
-                  )}
+                  onClick={markAll}
+                  className="flex cursor-pointer items-center gap-1 text-[0.66rem] font-bold uppercase tracking-[0.1em] text-primary transition-opacity hover:opacity-75"
                 >
-                  <span className={cn(
-                    "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border",
-                    n.read_at ? "border-[var(--panel-border)] text-muted-foreground" : "border-primary/40 text-primary"
-                  )}>
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className={cn("block truncate text-sm", n.read_at ? "text-foreground/80" : "font-semibold")}>{n.title}</span>
-                    {n.body ? <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span> : null}
-                    <span className="mt-0.5 block text-[0.66rem] text-muted-foreground">{ago(n.created_at)}</span>
-                  </span>
-                  {!n.read_at ? <span className="mt-2 size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" /> : null}
+                  <CheckCheck className="size-3.5" /> Mark all read
                 </button>
-              );
-            })
-          )}
-        </div>
+              ) : null}
+            </div>
 
-        <Link
-          href="/notifications"
-          onClick={() => setOpen(false)}
-          className="block border-t border-[var(--panel-border)] px-4 py-2.5 text-center text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary"
-        >
-          View all notifications
-        </Link>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            <div className="max-h-[26rem] overflow-y-auto p-1.5">
+              {items.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 px-4 py-10 text-center text-sm text-muted-foreground">
+                  <BellOff className="size-5" />
+                  You&apos;re all caught up.
+                </div>
+              ) : (
+                items.map((n) => {
+                  const Icon = KIND_ICONS[n.kind] ?? Bell;
+                  return (
+                    <button
+                      key={n.id}
+                      type="button"
+                      onClick={() => openItem(n)}
+                      className={cn(
+                        "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60",
+                        !n.read_at && "bg-primary/5"
+                      )}
+                    >
+                      <span className={cn(
+                        "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border",
+                        n.read_at ? "border-[var(--panel-border)] text-muted-foreground" : "border-primary/40 text-primary"
+                      )}>
+                        <Icon className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className={cn("block truncate text-sm", n.read_at ? "text-foreground/80" : "font-semibold")}>{n.title}</span>
+                        {n.body ? <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span> : null}
+                        <span className="mt-0.5 block text-[0.66rem] text-muted-foreground">{ago(n.created_at)}</span>
+                      </span>
+                      {!n.read_at ? <span className="mt-2 size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" /> : null}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="block border-t border-[var(--panel-border)] px-4 py-2.5 text-center text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary"
+            >
+              View all notifications
+            </Link>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

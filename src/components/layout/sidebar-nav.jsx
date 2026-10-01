@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOut, PanelLeftClose } from "lucide-react";
+import { PanelLeftClose } from "lucide-react";
 import LighthouseWordmark from "@/components/brand/logo-wordmark";
 import LighthouseMark from "@/components/brand/logo-mark";
 import { navGroups, ROLES } from "@/lib/nav";
@@ -10,6 +10,27 @@ import { useRole } from "@/components/layout/role-provider";
 import { signOut } from "@/features/auth/actions";
 import { useSidebar } from "@/components/layout/sidebar-provider";
 import { cn } from "@/lib/utils";
+
+/**
+ * The sign-out door with its arrow drawn separately (Lucide's LogOut, split),
+ * so on hover the arrow can stream out of the door: two copies half a beat
+ * apart, each sliding right and fading (globals.css, .signout-button).
+ */
+function SignOutIcon() {
+  const arrow = (
+    <>
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </>
+  );
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4 overflow-visible" aria-hidden>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <g className="signout-arrow">{arrow}</g>
+      <g className="signout-arrow signout-arrow-trail">{arrow}</g>
+    </svg>
+  );
+}
 
 export default function SidebarNav({ onNavigate, forceExpanded = false }) {
   const path = usePathname();
@@ -64,7 +85,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
         </div>
       )}
 
-      <nav className={cn("flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-4", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("scrollbar-on-hover flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-4", collapsed ? "px-2" : "px-3")}>
         {groups.map((group) => (
           <div key={group.label}>
             {collapsed ? (
@@ -128,9 +149,9 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
               type="submit"
               title="Sign out"
               aria-label="Sign out"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              className="signout-button flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
-              <LogOut className="size-4" />
+              <SignOutIcon />
             </button>
           </form>
         </div>

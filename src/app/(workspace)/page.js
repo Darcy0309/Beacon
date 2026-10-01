@@ -14,29 +14,14 @@ import FilterTable from "@/components/shared/filter-table";
 import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
-import { getDashboardStats, getReports } from "@/features/dashboard/queries";
+import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
+import { getDashboardStats, getLeadVolume, getReports } from "@/features/dashboard/queries";
 import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
-
-/* Draws the 8-week lead line on the geometry this layout was built around. */
-function chart(weeks) {
-  const max = Math.max(1, ...weeks.map((w) => w.leads));
-  const x = (i) => 20 + (i * 600) / Math.max(1, weeks.length - 1);
-  const y = (v) => 190 - (v / max) * 153;
-  const pts = weeks.map((w, i) => `${x(i).toFixed(0)},${y(w.leads).toFixed(0)}`);
-  return {
-    line: `M${pts.join(" L")}`,
-    area: `M${pts.join(" L")} L620,190 L20,190 Z`,
-    lastX: Number(x(weeks.length - 1).toFixed(0)),
-    lastY: Number(y(weeks[weeks.length - 1]?.leads ?? 0).toFixed(0)),
-    peak: max,
-    avg: Math.round(weeks.reduce((acc, w) => acc + w.leads, 0) / Math.max(1, weeks.length)),
-  };
-}
 
 const BAR_COLORS = [
   "var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-amber)",
@@ -58,7 +43,7 @@ export default async function Dashboard() {
   const role = me?.role ?? "client";
   const view = dashboardView(role);
 
-  const [recentLeads, appointments, s, report, projects, mine] = await Promise.all([
+  const [recentLeads, appointments, s, report, projects, mine, volume] = await Promise.all([
     getRecentLeads(6),
     getAppointments(),
     getDashboardStats(),
@@ -66,11 +51,11 @@ export default async function Dashboard() {
     view.trend === "months" || view.statusMix ? getReports() : null,
     view.campaigns ? getProjects() : null,
     view.myPerformance ? getMyWorkload() : null,
+    view.trend === "weeks" ? getLeadVolume() : null,
   ]);
 
   // Appointments per rep ride along with the dashboard stats.
   const reps = s.reps;
-  const c = view.trend === "weeks" ? chart(s.weeks) : null;
   const months = report?.months ?? [];
   const maxMonth = Math.max(1, ...months.map((m) => Math.max(m.leads, m.appts)));
 
@@ -201,41 +186,7 @@ export default async function Dashboard() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             {view.trend === "weeks" ? (
-              <>
-                <SectionHeader label="Lead Volume — Last 8 Weeks" icon={Activity} />
-                <div className="p-5">
-                  <div className="mb-3 flex flex-wrap items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-full bg-primary" /> Leads / week
-                    </span>
-                    <span>Peak {c.peak}</span>
-                    <span>Avg {c.avg}</span>
-                  </div>
-                  <svg viewBox="0 0 640 210" preserveAspectRatio="none" className="h-52 w-full" aria-label="New leads per week">
-                    <defs>
-                      <linearGradient id="lg" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stopColor="var(--primary)" stopOpacity="0.3" />
-                        <stop offset="1" stopColor="var(--primary)" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    {[30, 70, 110, 150, 190].map((y) => (
-                      <line key={y} x1="20" y1={y} x2="620" y2={y} stroke="var(--panel-border)" strokeWidth="1" />
-                    ))}
-                    <path d={c.area} fill="url(#lg)" />
-                    <path d={c.line} fill="none" className="stroke-primary" strokeWidth="2.5"
-                      strokeLinejoin="round" strokeLinecap="round" />
-                    <circle cx={c.lastX} cy={c.lastY} r="4.5" className="fill-primary" />
-                    {s.weeks.map((w, i) => (
-                      <text key={w.label}
-                        x={20 + (i * 600) / Math.max(1, s.weeks.length - 1)} y="205"
-                        className="fill-muted-foreground"
-                        style={{ fontSize: "10px", letterSpacing: "0.1em" }}>
-                        {w.label}
-                      </text>
-                    ))}
-                  </svg>
-                </div>
-              </>
+              <LeadVolumeChart days={volume} fallback={s.weeks} />
             ) : (
               <>
                 {/* Monthly totals: quiet weeks in a campaign do not read as a dip. */}
@@ -250,14 +201,14 @@ export default async function Dashboard() {
                     </span>
                   </div>
                   <div className="flex h-52 items-stretch gap-3">
-                    {months.map((m) => (
+                    {months.map((m, i) => (
                       <div key={m.key} className="flex min-h-0 flex-1 flex-col items-center gap-2">
                         <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
-                          <div className="w-1/3 rounded-t transition-all duration-500"
-                            style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)" }}
+                          <div className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
+                            style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)", animationDelay: `${i * 70}ms` }}
                             title={`${m.leads} leads in ${m.label}`} />
-                          <div className="w-1/3 rounded-t transition-all duration-500"
-                            style={{ height: `${(m.appts / maxMonth) * 100}%`, background: "var(--neon-emerald)", boxShadow: "0 0 12px -3px var(--neon-emerald)" }}
+                          <div className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
+                            style={{ height: `${(m.appts / maxMonth) * 100}%`, background: "var(--neon-emerald)", boxShadow: "0 0 12px -3px var(--neon-emerald)", animationDelay: `${i * 70 + 35}ms` }}
                             title={`${m.appts} appointments in ${m.label}`} />
                         </div>
                         <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{m.label}</span>

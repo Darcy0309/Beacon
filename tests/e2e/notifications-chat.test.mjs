@@ -35,9 +35,9 @@ const shot = (page, name) => (SHOTS ? page.screenshot(`${SHOTS}/${name}.png`) : 
 try {
   // The agent opens it from the bell.
   await agent.go("/");
-  await agent.pointer('button[aria-label^="Notifications"]');
+  await agent.click('button[aria-label^="Notifications"]');
   await sleep(1200);
-  const clicked = await agent.ev(`(() => { const b = [...document.querySelectorAll('[role=menu] button')].find((x) => x.innerText.includes('Chat test: team meeting')); if (!b) return false; b.click(); return true; })()`);
+  const clicked = await agent.ev(`(() => { const b = [...document.querySelectorAll('[data-notification-panel] button')].find((x) => x.innerText.includes('Chat test: team meeting')); if (!b) return false; b.click(); return true; })()`);
   check("message is in the agent's bell", clicked);
   check("clicking it opens the notification's page", await until(async () => (await agent.path()) === `/notifications/${msgId}`), await agent.path());
   await sleep(1500);

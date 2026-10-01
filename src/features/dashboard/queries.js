@@ -40,6 +40,22 @@ export async function getDashboardStats() {
   };
 }
 
+/**
+ * New leads per day over the last year, [{ day: "2026-09-29", leads }],
+ * for the Lead Volume chart to group by the period picked. Null when the
+ * database does not have lead_volume_daily() yet, so the chart falls back
+ * to the eight weeks in getDashboardStats() instead of failing the page.
+ */
+export async function getLeadVolume() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("lead_volume_daily", { p_days: 366 });
+  if (error) {
+    console.warn("lead_volume_daily unavailable:", error.message);
+    return null;
+  }
+  return Array.isArray(data) ? data : [];
+}
+
 export async function getReports() {
   const supabase = await createClient();
   const { data: r, error } = await supabase.rpc("report_stats");

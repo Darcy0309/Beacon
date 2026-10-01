@@ -1,10 +1,12 @@
+import CountUp from "@/components/shared/count-up";
 import Sparkline from "@/components/shared/sparkline";
 import EdgeTrace from "@/components/shared/edge-trace";
 import { cn } from "@/lib/utils";
 
 /**
  * Metric tile: accent edge, icon chip, wide-tracked label, large figure, and a
- * sparkline bleeding to the bottom edge in the tile's accent hue.
+ * sparkline bleeding to the bottom edge in the tile's accent hue. The figure
+ * counts up and the sparkline rises from zero as the tile appears.
  * Pass `trace` to add the animated streak that laps the border.
  */
 export default function StatTile({
@@ -63,7 +65,7 @@ export default function StatTile({
         </div>
 
         <div className="mt-3 stat-value" style={{ color: accent }}>
-          {value}
+          <CountUp value={value} />
         </div>
         {note ? <div className="mt-1 text-xs text-muted-foreground">{note}</div> : null}
       </div>

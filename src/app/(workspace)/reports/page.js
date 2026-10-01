@@ -5,6 +5,7 @@ import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
+import CountUp from "@/components/shared/count-up";
 import { Card } from "@/components/ui/card";
 import { reportsView } from "@/features/dashboard/role-views";
 import { getReports } from "@/features/dashboard/queries";
@@ -80,14 +81,14 @@ export default async function ReportsPage() {
             <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-3">
               <div>
                 <div className="stat-label">Appointments I set</div>
-                <div className="stat-value mt-2" style={{ color: "var(--neon-emerald)" }}>{mine.appts}</div>
+                <div className="stat-value mt-2" style={{ color: "var(--neon-emerald)" }}><CountUp value={mine.appts} /></div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {myShare(mine.appts, r.appts)}% of the {r.appts.toLocaleString()} set overall
                 </p>
               </div>
               <div>
                 <div className="stat-label">Leads assigned to me</div>
-                <div className="stat-value mt-2" style={{ color: "var(--neon-cyan)" }}>{mine.leads}</div>
+                <div className="stat-value mt-2" style={{ color: "var(--neon-cyan)" }}><CountUp value={mine.leads} /></div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {myShare(mine.leads, r.leads)}% of the {r.leads.toLocaleString()} on the book
                 </p>
@@ -95,7 +96,7 @@ export default async function ReportsPage() {
               <div>
                 <div className="stat-label">My conversion</div>
                 <div className="stat-value mt-2" style={{ color: "var(--neon-amber)" }}>
-                  {mine.leads ? Math.round((mine.appts / mine.leads) * 100) : 0}%
+                  <CountUp value={`${mine.leads ? Math.round((mine.appts / mine.leads) * 100) : 0}%`} />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">appointments per lead worked</p>
               </div>
@@ -116,24 +117,26 @@ export default async function ReportsPage() {
                 </span>
               </div>
               <div className="flex h-56 items-stretch gap-3">
-                {r.months.map((m) => (
+                {r.months.map((m, i) => (
                   <div key={m.key} className="flex min-h-0 flex-1 flex-col items-center gap-2">
                     <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
                       <div
-                        className="w-1/3 rounded-t transition-all duration-500"
+                        className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
                         style={{
                           height: `${(m.leads / maxMonth) * 100}%`,
                           background: "var(--neon-cyan)",
                           boxShadow: "0 0 12px -3px var(--neon-cyan)",
+                          animationDelay: `${i * 70}ms`,
                         }}
                         title={`${m.leads} leads`}
                       />
                       <div
-                        className="w-1/3 rounded-t transition-all duration-500"
+                        className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
                         style={{
                           height: `${(m.appts / maxMonth) * 100}%`,
                           background: "var(--neon-emerald)",
                           boxShadow: "0 0 12px -3px var(--neon-emerald)",
+                          animationDelay: `${i * 70 + 35}ms`,
                         }}
                         title={`${m.appts} appointments`}
                       />
