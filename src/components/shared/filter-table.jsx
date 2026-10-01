@@ -40,6 +40,7 @@ import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
  *
  * A facet with up to CHIP_LIMIT options renders as a chip row, larger ones
  * fall back to a select; set `kind: "chips" | "select"` to force one.
+ * `searchable={false}` drops the search box, for a list that cannot be searched.
  */
 const CHIP_LIMIT = 6;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -54,6 +55,7 @@ export default function FilterTable({
   query = "",
   selected,
   paging,
+  searchable = true,
 }) {
   const server = Boolean(paging);
   const router = useRouter();
@@ -174,19 +176,21 @@ export default function FilterTable({
   return (
     <div className={className}>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-[var(--panel-border)] px-5 py-3">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => onQuery(e.target.value)}
-            placeholder={placeholder}
-            aria-label={placeholder}
-            className="h-8 pl-8 pr-8"
-          />
-          {isPending ? (
-            <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-primary" aria-label="Loading" />
-          ) : null}
-        </div>
+        {searchable ? (
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={q}
+              onChange={(e) => onQuery(e.target.value)}
+              placeholder={placeholder}
+              aria-label={placeholder}
+              className="h-8 pl-8 pr-8"
+            />
+            {isPending ? (
+              <Loader2 className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-primary" aria-label="Loading" />
+            ) : null}
+          </div>
+        ) : null}
 
         {groups.map((g) => (
           <FacetGroup key={g.key} group={g} value={picked[g.key] ?? ""} onChange={(v) => onPick(g.key, v)} />

@@ -2,6 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
+  CalendarSearch, Banknote,
 } from "lucide-react";
 
 export const ROLES = {
@@ -76,6 +77,10 @@ export const navGroups = [
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
       // Agents get the same page scoped to their own productivity.
       { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "manager", "agent", "client"] },
+      // Renewal months across the book, a client or a project; each number opens its names.
+      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin", "manager"] },
+      // Calls and paid events per day; everyone but an administrator sees only their own.
+      { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       { href: "/alerts", label: "Alert Engine", icon: BellRing, roles: ["admin"] },
     ],
   },

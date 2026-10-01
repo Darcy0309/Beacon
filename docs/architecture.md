@@ -66,6 +66,26 @@ last), which cycles by itself; `distribute_project_names()` re-splits a
 project when reps come and go. `tests/integration/lifecycle.test.mjs` checks
 every result against the sheet.
 
+## The administrator's side
+
+- **Project page** (`/projects/[id]`): totals from `project_overview()` over
+  every name on the project, the reps from `project_reps()` (names left,
+  calls today and this month, last worked), and the leads a page at a time.
+  `set_project_rep()` puts a rep on or takes them off and re-shares the names
+  in the same transaction.
+- **X-dates by month** (`/reports/x-dates`): `xdates_by_month()` counts names
+  by the month their renewal falls in (appointments, off the list, viable
+  left); `xdate_month_leads()` lists the names behind any number.
+- **Production and pay** (`/reports/production`, CSV at
+  `/api/reports/production`): `production_report()` sums calls and
+  `pay_events` per day, rep and project. Only an administrator sees anyone
+  else's rows, and only an administrator sets rates (`set_project_rates()`).
+  A chargeback is marked by `pay_events.is_chargeback`, so one at a $0 rate
+  still counts.
+- **Days** are counted in the business's time zone, `business_tz()`: the
+  `business_timezone` row of `app_settings` (`{"name": "America/Chicago"}`),
+  or America/Phoenix when there is none.
+
 ## Rules the layers follow
 
 **The database is the security boundary.** Every table has Row Level
@@ -119,8 +139,8 @@ signs out.
 | Command | Needs | What |
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, validation rules, form ↔ schema contract |
-| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, forms, security, notifications, in headless Chrome |
+| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay) |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

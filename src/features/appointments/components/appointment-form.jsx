@@ -11,11 +11,16 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { createAppointment, updateAppointment } from "@/features/appointments/actions";
+import LeadPicker from "@/features/leads/components/lead-picker";
 import { DURATIONS, APPOINTMENT_TIMES } from "@/lib/validate";
 import { fullName } from "@/lib/format";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
+/**
+ * New or edit appointment. `defaultLeadId` (with its row in `leads`) fixes
+ * the lead, as on a lead sheet; otherwise the lead is searched for.
+ */
 export default function AppointmentForm({ appointment, options, leads = [], defaultLeadId, trigger }) {
   const isEdit = Boolean(appointment?.id);
   const [open, setOpen] = useState(false);
@@ -64,14 +69,7 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
                     <Input disabled value={lockedLead.company_name ?? lockedLead.co ?? ""} />
                   </>
                 ) : (
-                  <Select name="lead_id" required defaultValue={dv("lead_id")} aria-invalid={invalid("lead_id")}>
-                    <option value="" disabled>Select a lead…</option>
-                    {leads.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.company_name ?? l.co}{(l.city) ? ` — ${l.city}` : ""}
-                      </option>
-                    ))}
-                  </Select>
+                  <LeadPicker name="lead_id" invalid={invalid("lead_id")} />
                 )}
               </Field>
             )}

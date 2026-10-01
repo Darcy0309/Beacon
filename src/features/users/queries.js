@@ -119,6 +119,20 @@ export function shapeReps(list) {
   return rows.map((r, i) => ({ ...r, pct: Math.round((r.appts / max) * 100), color: colors[i % colors.length] }));
 }
 
+/** Active staff who can be put on a project, by name. */
+export async function getAssignableStaff() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, first_name, last_name, email, role")
+    .in("role", ["admin", "manager", "agent"])
+    .eq("status", "active")
+    .order("first_name")
+    .order("last_name");
+  if (error) throw error;
+  return (data ?? []).map((u) => ({ id: u.id, name: fullName(u), role: ROLE_LABEL[u.role] ?? u.role }));
+}
+
 /** Appointments booked per rep — the rep_workload() SQL function, busiest first. */
 export async function getReps() {
   const supabase = await createClient();

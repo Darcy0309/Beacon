@@ -71,6 +71,8 @@ const PAGES = [
   ["/documents", "Documents", ["All documents"]],
   ["/imports", "Imports", imports.length ? ["Recent imports", imports[0].file_name] : ["Recent imports"]],
   ["/reports", "Reports", ["Leads Delivered", "Appointments Set", "Leads by Status"]],
+  ["/reports/x-dates", "X-Dates by Month", ["Renewals by Month", "All months", project.name]],
+  ["/reports/production", "Production & Pay", ["By Rep", "Pay Rates by Project", project.name]],
   ["/alerts", "Alerts", ["Alert rules"]],
   ["/users", "Users", ["Users", "beacon.test"]],
   ["/settings", "Settings", ["Branding", "Email (SMTP)", "Sign-in Security"]],
@@ -99,7 +101,7 @@ section("Detail pages");
 for (const [path, label, needle] of [
   [`/leads/${lead.id}`, "Lead sheet", "Lead Sheet"],
   [`/clients/${slug(company.name)}`, "Client profile", "Projects"],
-  [`/projects/${project.id}`, "Project detail", "Leads on this Campaign"],
+  [`/projects/${project.id}`, "Project detail", "Leads on this Project"],
 ]) {
   const res = await get(path, admin.cookie);
   const html = res.status === 200 ? (await res.text()).toLowerCase() : "";

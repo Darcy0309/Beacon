@@ -1,7 +1,7 @@
 /** Projects: each client's campaigns. */
 
 import "server-only";
-import { colorFor, shortDate, shortName } from "@/lib/format";
+import { colorFor, fullName, shortDate, shortName, timeAgo } from "@/lib/format";
 import { inner, one, paged, runPaged } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -84,4 +84,66 @@ export async function getProject(id) {
   const { data, error } = await supabase.from("projects").select(PROJECT_SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? toProjectView(data) : null;
+}
+
+/** One project's true totals (project_overview()): every lead, appointment and call on it, not a page of them. */
+export async function getProjectOverview(id) {
+  const supabase = await createClient();
+  const { data: o, error } = await supabase.rpc("project_overview", { p_project_id: Number(id) });
+  if (error) throw error;
+  const n = (key) => Number(o?.[key] ?? 0);
+  return {
+    leads: n("leads"),
+    viableLeft: n("viable_left"),
+    unassigned: n("unassigned"),
+    pending: n("pending"),
+    offList: n("off_list"),
+    appointments: n("appointments"),
+    apptsMonth: n("appts_month"),
+    qaPending: n("qa_pending"),
+    callsToday: n("calls_today"),
+    callsMonth: n("calls_month"),
+    lastWorked: o?.last_worked ? timeAgo(o.last_worked) : "Never",
+    // Calls a day for the last two weeks, oldest first.
+    calls14d: (o?.calls_14d ?? []).map(Number),
+  };
+}
+
+/** Who works a project, with what each has left and has done (project_reps()). */
+export async function getProjectTeam(id) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("project_reps", { p_project_id: Number(id) });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.user_id,
+    name: fullName(r),
+    short: shortName(r),
+    role: r.role,
+    active: r.status === "active",
+    namesLeft: Number(r.names_left),
+    leadsHeld: Number(r.leads_held),
+    callsToday: Number(r.calls_today),
+    callsMonth: Number(r.calls_month),
+    apptsMonth: Number(r.appts_month),
+    lastWorked: r.last_worked ? timeAgo(r.last_worked) : "Never",
+  }));
+}
+
+/** Every project's pay rates, for an administrator setting them. */
+export async function getProjectRates() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("projects")
+    .select("id, name, lead_rate, appointment_rate, confirmation_rate, type:project_types(code), company:companies(name)")
+    .order("name");
+  if (error) throw error;
+  return (data ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    client: one(p.company)?.name ?? "—",
+    type: one(p.type)?.code ?? "—",
+    lead: Number(p.lead_rate ?? 0),
+    appointment: Number(p.appointment_rate ?? 0),
+    confirmation: Number(p.confirmation_rate ?? 0),
+  }));
 }

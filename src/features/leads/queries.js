@@ -86,35 +86,42 @@ export async function getRecentLeads(limit = 6) {
   return (await getLeads({ limit })).slice(0, limit);
 }
 
-/** Just enough of each lead to fill a picker: id, company and city. */
-export async function getLeadOptions({ limit = 300 } = {}) {
+/**
+ * Leads matching what someone typed into a lead picker: company, contact,
+ * phone or city, best 20. Searching the database means every lead can be
+ * found, not just the first few hundred.
+ */
+export async function searchLeadOptions(q) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .select("id, company_name, city, state")
-    .order("company_name")
-    .limit(limit);
+  const { data, error } = await paged(
+    supabase.from("leads").select("id, company_name, contact_name, city, state").order("company_name").order("id"),
+    { q, perPage: 20 },
+    { search: ["company_name", "contact_name", "phone", "city"] }
+  );
   if (error) throw error;
-  return (data ?? []).map((l) => ({ id: l.id, co: l.company_name, city: cityState(l) }));
+  return (data ?? []).map((l) => ({ id: l.id, co: l.company_name, contact: l.contact_name, city: cityState(l) }));
 }
 
-/** One page of leads for the leads table, searched and filtered in the database. */
-export async function listLeads(params) {
+/**
+ * One page of leads for a leads table, searched and filtered in the
+ * database. `projectId` narrows it to one project, where it can also be
+ * filtered by rep.
+ */
+export async function listLeads(params, { projectId } = {}) {
   const supabase = await createClient();
   const { rows, total } = await runPaged(
-    (p) =>
-      paged(
-        supabase
-          .from("leads")
-          .select(leadSelect({ status: Boolean(p.filters?.status) }), { count: "exact" })
-          .order("lead_date", { ascending: false, nullsFirst: false })
-          .order("id", { ascending: false }),
-        p,
-        {
-          search: ["company_name", "contact_name", "city", "phone", "email"],
-          columns: { status: "status.code" },
-        }
-      ),
+    (p) => {
+      let query = supabase
+        .from("leads")
+        .select(leadSelect({ status: Boolean(p.filters?.status) }), { count: "exact" })
+        .order("lead_date", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: false });
+      if (projectId) query = query.eq("project_id", Number(projectId));
+      return paged(query, p, {
+        search: ["company_name", "contact_name", "city", "phone", "email"],
+        columns: { status: "status.code", rep: "assigned_user_id" },
+      });
+    },
     params
   );
   return { rows: rows.map(toLeadView), total };
@@ -125,18 +132,6 @@ export async function getLead(id) {
   const { data, error } = await supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? toLeadView(data) : null;
-}
-
-export async function getLeadsByProject(projectId, { limit = 25 } = {}) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("leads")
-    .select(LEAD_SELECT)
-    .eq("project_id", projectId)
-    .order("lead_date", { ascending: false, nullsFirst: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []).map(toLeadView);
 }
 
 /** Totals per status code and the number of clients with leads, for the leads page header and chips. */

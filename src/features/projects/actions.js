@@ -39,3 +39,73 @@ export async function saveProject(prevState, formData) {
 export async function deleteProject(formData) {
   return deleteRow("projects", formData, ["/projects", "/clients"]);
 }
+
+/** "12 names moved" — what a re-share did, for the toast. */
+function sharedOut(result) {
+  if (!result?.reps) return "Nobody is on this project now, so its names wait unassigned.";
+  const moved = Number(result.moved ?? 0);
+  const each = Math.floor(Number(result.names ?? 0) / result.reps);
+  return `${moved ? `${moved} name${moved === 1 ? "" : "s"} moved` : "Already even"} · about ${each} each across ${result.reps} rep${result.reps === 1 ? "" : "s"}`;
+}
+
+/**
+ * Put a rep on a project (on=1) or take them off (on=0). The project's names
+ * still to call are then shared out evenly again, in the same transaction.
+ */
+export async function setProjectRep(formData) {
+  const projectId = idFrom(formData, "project_id");
+  const userId = idFrom(formData, "user_id");
+  const on = formData.get("on") === "1";
+  if (!projectId || !userId) return fail("Choose who to add");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_project_rep", { p_project_id: projectId, p_user_id: userId, p_on: on });
+  if (error) return fail(error);
+
+  await logActivity(supabase, on ? "project.rep_add" : "project.rep_remove", {
+    entity: "project", entityId: projectId, detail: `user ${userId} · ${data?.moved ?? 0} names moved`,
+  });
+  revalidatePath(`/projects/${projectId}`);
+  return ok({ message: sharedOut(data) });
+}
+
+/** Share a project's names still to call evenly across its reps again. */
+export async function redistributeProject(formData) {
+  const projectId = idFrom(formData, "project_id");
+  if (!projectId) return fail("That project no longer exists");
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("distribute_project_names", { p_project_id: projectId });
+  if (error) return fail(error);
+
+  await logActivity(supabase, "project.redistribute", { entity: "project", entityId: projectId, detail: `${data?.moved ?? 0} names moved` });
+  revalidatePath(`/projects/${projectId}`);
+  return ok({ message: sharedOut(data) });
+}
+
+/** An administrator sets one project's pay rates (USD per lead, appointment, confirmation). */
+export async function saveProjectRates(prevState, formData) {
+  const { failed } = check(formData, schemas.projectRates);
+  if (failed) return failed;
+  const projectId = idFrom(formData, "project_id");
+  if (!projectId) return fail("That project no longer exists");
+
+  const supabase = await createClient();
+  // "$12.50" and "1,000" are fine; a blank rate is $0.
+  const rate = (key) => Number(String(formData.get(key) ?? "").replace(/[$,\s]/g, "")) || 0;
+  const { data, error } = await supabase.rpc("set_project_rates", {
+    p_project_id: projectId,
+    p_lead: rate("lead_rate"),
+    p_appointment: rate("appointment_rate"),
+    p_confirmation: rate("confirmation_rate"),
+  });
+  if (error) return fail(error);
+
+  await logActivity(supabase, "project.rates", {
+    entity: "project", entityId: projectId,
+    detail: `lead ${data.lead_rate} · appointment ${data.appointment_rate} · confirmation ${data.confirmation_rate}`,
+  });
+  revalidatePath("/reports/production");
+  revalidatePath(`/projects/${projectId}`);
+  return ok(data);
+}

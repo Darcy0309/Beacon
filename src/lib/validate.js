@@ -218,6 +218,13 @@ export const schemas = {
     end_date: [date],
   },
 
+  /** USD paid per lead, appointment and confirmation on a project. */
+  projectRates: {
+    lead_rate: [num({ min: 0, max: 10000 })],
+    appointment_rate: [num({ min: 0, max: 10000 })],
+    confirmation_rate: [num({ min: 0, max: 10000 })],
+  },
+
   appointment: {
     lead_id: [required("Choose a lead"), id],
     appt_date: [required("Date is required"), date],
