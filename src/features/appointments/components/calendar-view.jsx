@@ -14,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
@@ -119,14 +120,6 @@ export default function CalendarView(props) {
     <AppointmentDialog a={selected} onClose={() => setSelected(null)} />
     </OpenAppointment.Provider>
   );
-}
-
-/** Digits only, with the US country code, so a softphone can dial it. */
-function telHref(phone) {
-  const digits = String(phone ?? "").replace(/\D/g, "");
-  if (digits.length === 10) return `tel:+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `tel:+${digits}`;
-  return digits ? `tel:${digits}` : null;
 }
 
 const APPT_TONE = {

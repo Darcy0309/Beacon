@@ -45,14 +45,15 @@ const formOf = (id) => {
 };
 
 /**
- * The bell in the top bar. Loads the latest notifications straight from
+ * The bell in the top bar. Loads the unread notifications straight from
  * Supabase (Row Level Security keeps it to the user's own inbox), listens on
  * Realtime so new ones arrive — and pop up — without a page load, and falls
  * back to refreshing on focus and every minute if the live connection drops.
  *
  * Reading a notification anywhere — here, the inbox, its own page, another
- * tab — clears it from the count and takes down its pop-up: the database
- * change arrives over Realtime, and same-tab readers also announce it.
+ * tab — takes it off the bell's list and count and takes down its pop-up:
+ * the database change arrives over Realtime, and same-tab readers also
+ * announce it. The inbox (/notifications) keeps the read ones.
  *
  * The panel opens on click, or when a mouse rests on the bell; one opened
  * by hovering closes when the pointer leaves, one opened by click stays
@@ -70,7 +71,7 @@ export default function NotificationBell() {
   const [openedBy, setOpenedBy] = useState(null);
   const open = openedBy !== null;
   const [shake, setShake] = useState(0);
-  const popups = useRef(new Set()); // notification ids with a pop-up on screen
+  const popups = useRef(new Map()); // notification id -> when its pop-up went up
   const known = useRef(new Set()); // ids already counted, so a late live event is not counted twice
   const announced = useRef(new Set()); // ids that have had their pop-up
   const reloadTimer = useRef(null);
@@ -87,23 +88,31 @@ export default function NotificationBell() {
     popups.current.delete(id);
   }, []);
 
+  // The bell lists unread notifications only: once read, one leaves the list
+  // (the inbox keeps them all).
   const load = useCallback(async () => {
     if (!me) return;
+    const started = Date.now();
     const [list, count] = await Promise.all([
-      supabase.from("notifications").select(COLUMNS).eq("user_id", me)
+      supabase.from("notifications").select(COLUMNS).eq("user_id", me).is("read_at", null)
         .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(SHOWN),
       supabase.from("notifications").select("id", { count: "exact", head: true })
         .eq("user_id", me).is("read_at", null),
     ]);
+    // A pop-up whose notification is no longer unread was read somewhere else.
+    // Only pop-ups older than this load: a newer one may simply not be in it yet.
+    const stale = (keep) => {
+      for (const [id, at] of popups.current) if (at < started && !keep.has(id)) dismissPopup(id);
+    };
     if (!list.error) {
       setItems(list.data ?? []);
       for (const x of list.data ?? []) known.current.add(x.id);
-      for (const x of list.data ?? []) if (x.read_at) dismissPopup(x.id);
+      stale(new Set((list.data ?? []).map((x) => x.id)));
     }
     if (!count.error) {
       loaded.current = true;
       setUnread(count.count ?? 0);
-      if (!count.count) [...popups.current].forEach(dismissPopup);
+      if (!count.count) stale(new Set());
     }
   }, [me, supabase, dismissPopup]);
 
@@ -128,7 +137,7 @@ export default function NotificationBell() {
       setOpen(false);
       dismissPopup(n.id);
       if (!n.read_at) {
-        setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
+        setItems((xs) => xs.filter((x) => x.id !== n.id));
         setUnread((u) => Math.max(0, u - 1));
         markNotificationRead(formOf(n.id));
       }
@@ -154,10 +163,10 @@ export default function NotificationBell() {
           "postgres_changes",
           { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${me}` },
           ({ new: n }) => {
-            setItems((xs) => [n, ...xs.filter((x) => x.id !== n.id)].slice(0, SHOWN));
             // Already reading the conversation it belongs to: the conversation marks
-            // it read and tells the bell, so no pop-up and no count in between.
+            // it read and tells the bell, so it is never listed, popped up or counted.
             if (n.kind === "message" && isActiveChat(n.sender_id)) return;
+            setItems((xs) => [n, ...xs.filter((x) => x.id !== n.id)].slice(0, SHOWN));
             // The database has the true count; the live event only makes it show sooner.
             reloadSoon();
             // Count it, unless a load that ran moments before this event already did.
@@ -168,7 +177,7 @@ export default function NotificationBell() {
             // One pop-up per notification, however many times its event arrives.
             if (announced.current.has(n.id)) return;
             announced.current.add(n.id);
-            popups.current.add(n.id);
+            popups.current.set(n.id, Date.now());
             toast(n.title, {
               id: toastId(n.id),
               description: n.body || undefined,
@@ -189,8 +198,8 @@ export default function NotificationBell() {
           ({ new: n }) => {
             if (!n.read_at) return;
             dismissPopup(n.id);
-            setItems((xs) => xs.map((x) => (x.id === n.id ? { ...x, read_at: n.read_at } : x)));
-            reloadSoon();
+            setItems((xs) => xs.filter((x) => x.id !== n.id));
+            reloadSoon(); // the count, and the next unread one to fill the list
           }
         )
         .subscribe();
@@ -212,9 +221,9 @@ export default function NotificationBell() {
   }, [me, supabase, load, reloadSoon, openItem, dismissPopup]);
 
   const markAll = async () => {
-    setItems((xs) => xs.map((x) => ({ ...x, read_at: x.read_at ?? new Date().toISOString() })));
+    setItems([]);
     setUnread(0);
-    [...popups.current].forEach(dismissPopup);
+    [...popups.current.keys()].forEach(dismissPopup);
     await markAllNotificationsRead();
     router.refresh(); // the inbox page, if it is open, shows them read too
   };
@@ -335,23 +344,17 @@ export default function NotificationBell() {
                       key={n.id}
                       type="button"
                       onClick={() => openItem(n)}
-                      className={cn(
-                        "flex w-full cursor-pointer items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted/60",
-                        !n.read_at && "bg-primary/5"
-                      )}
+                      className="flex w-full cursor-pointer items-start gap-3 rounded-lg bg-primary/5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60"
                     >
-                      <span className={cn(
-                        "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border",
-                        n.read_at ? "border-[var(--panel-border)] text-muted-foreground" : "border-primary/40 text-primary"
-                      )}>
+                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-primary/40 text-primary">
                         <Icon className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className={cn("block truncate text-sm", n.read_at ? "text-foreground/80" : "font-semibold")}>{n.title}</span>
+                        <span className="block truncate text-sm font-semibold">{n.title}</span>
                         {n.body ? <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span> : null}
                         <span className="mt-0.5 block text-[0.66rem] text-muted-foreground">{ago(n.created_at)}</span>
                       </span>
-                      {!n.read_at ? <span className="mt-2 size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" /> : null}
+                      <span className="mt-2 size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
                     </button>
                   );
                 })
@@ -363,7 +366,7 @@ export default function NotificationBell() {
               onClick={() => setOpen(false)}
               className="block border-t border-[var(--panel-border)] px-4 py-2.5 text-center text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary"
             >
-              View all notifications
+              {unread > items.length ? `View all · ${unread - items.length} more unread` : "View all notifications"}
             </Link>
           </div>
         </div>

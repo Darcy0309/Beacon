@@ -143,10 +143,29 @@ try {
   check("Mike's list has the promoted lead", t.includes(`${TAG} Bravo Plumbing`) && /\b1\b\s*names left for you/i.test(t));
   await mike.click("a", "Start calling");
   await until(async () => (await mike.path()) === `/leads/${names[1]}`);
-  await sleep(1500);
+  await until(() => mike.ev("document.querySelectorAll('button[aria-pressed]').length > 0"), { timeout: 10000 });
   const apptButtons = await buttons(mike);
   check("appointment-project buttons on his sheet", ["Lead-No Contact", "Lead-Not Shopping", "Lead-Corrected", "Lead-Invalid"].every((b) => apptButtons.includes(b)) && !apptButtons.includes("Viable-Staged"), apptButtons.join(", "));
   check("the sheet shows who developed it", /Developed by\s*Sean Fitzgerald/i.test(await mike.text()));
+  const dial = await mike.ev(`[...document.querySelectorAll('a[href^="tel:"]')].filter((a) => /Call now/i.test(a.textContent)).map((a) => a.getAttribute('href'))`);
+  check("Call now dials the lead's number", dial.length === 1 && dial[0] === "tel:+16145550110", JSON.stringify(dial));
+
+  // At 1280px the panel is at its narrowest. Whatever the result, Save and
+  // Cancel stay whole inside it (a long name once pushed Cancel off the edge).
+  await mike.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await sleep(400);
+  const clipped = [];
+  for (const name of apptButtons) {
+    await pick(mike, name);
+    await sleep(80);
+    const out = await mike.ev(`(() => { const form = document.querySelector('input[name=result_id]').form; const f = form.getBoundingClientRect();
+      return [...form.querySelectorAll('button:not([aria-pressed])')].filter((b) => { const r = b.getBoundingClientRect(); return r.left < f.left - 0.5 || r.right > f.right + 0.5; })
+        .map((b) => b.textContent.trim()); })()`);
+    if (out.length) clipped.push(`${name}: ${out.join(" / ")}`);
+  }
+  check("Save and Cancel fit the panel for every result", apptButtons.length > 0 && clipped.length === 0, clipped.join("; ") || `${apptButtons.length} results tried`);
+  await shot(mike, "am-save-row-1280");
+  await mike.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 950, deviceScaleFactor: 1, mobile: false });
   await pick(mike, "Lead-Corrected");
   await mike.click("button", "Save:");
   check("Lead-Corrected asks for the corrected date", !!(await until(() => mike.ev(`[...document.querySelectorAll('[role=alert]')].some((e) => /corrected renewal date/i.test(e.textContent))`))));

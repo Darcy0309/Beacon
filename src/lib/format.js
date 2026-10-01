@@ -5,6 +5,14 @@
 
 const PALETTE = ["#2b6cb0", "#2c9d78", "#b7791f", "#6d47c9", "#c1362c", "#3f74e6", "#0e7490", "#7c53d6"];
 
+/** A tel: link a softphone can dial: digits only, with the US country code. Null when there is no number. */
+export function telHref(phone) {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (digits.length === 10) return `tel:+1${digits}`;
+  if (digits.length === 11 && digits.startsWith("1")) return `tel:+${digits}`;
+  return digits ? `tel:${digits}` : null;
+}
+
 /** Stable colour for a name, so a record always looks the same. */
 export function colorFor(name = "") {
   let h = 0;

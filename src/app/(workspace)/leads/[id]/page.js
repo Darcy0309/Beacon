@@ -2,7 +2,7 @@ import { isValidElement } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft, ArrowRight, CalendarPlus, ShieldCheck, PhoneCall, CalendarClock, Building2, UserRound,
+  ArrowLeft, ArrowRight, CalendarPlus, ShieldCheck, Phone, PhoneCall, CalendarClock, Building2, UserRound,
   Flag, StickyNote, Repeat,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
@@ -19,7 +19,7 @@ import { getLead, getLeadActivity } from "@/features/leads/queries";
 import { getCallResults, getNextOnList, getOpenAppointment, getWorkProject } from "@/features/work/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
-import { fullName, mediumDate, shortDate } from "@/lib/format";
+import { fullName, mediumDate, shortDate, telHref } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +101,8 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  const tel = telHref(r.phone);
+  const phone = tel ? <a href={tel} className="tabular-nums transition-colors hover:text-primary">{r.phone}</a> : null;
 
   const daysOut = r.renewal ? Math.round((new Date(r.renewal).getTime() - Date.now()) / 86400000) : null;
   const back = listId
@@ -161,7 +163,7 @@ export default async function LeadSheet({ params, searchParams }) {
                   <StatusBadge status={lead.status} />
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2 border-t border-[var(--panel-border)] px-5 py-3">
+              <div className="flex flex-wrap items-center gap-2 border-t border-[var(--panel-border)] px-5 py-3">
                 <LeadForm lead={r} options={options} />
                 <AppointmentForm
                   options={options}
@@ -170,6 +172,17 @@ export default async function LeadSheet({ params, searchParams }) {
                   trigger={<Button size="sm" variant="outline"><CalendarPlus /> Add appointment by hand</Button>}
                 />
                 <PrintButton />
+                {/* One click to dial: a tel: link opens the softphone, or the dialer on a phone. */}
+                {tel ? (
+                  <Button asChild size="sm" className="ml-auto bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] hover:brightness-110">
+                    <a href={tel} title={`Call ${lead.co}`}>
+                      <Phone /> Call now
+                      <span className="font-medium normal-case tracking-normal tabular-nums opacity-85">{r.phone}</span>
+                    </a>
+                  </Button>
+                ) : (
+                  <span className="ml-auto text-xs text-muted-foreground">No phone number on file</span>
+                )}
               </div>
             </Card>
 
@@ -177,7 +190,7 @@ export default async function LeadSheet({ params, searchParams }) {
               <Box label="Business" icon={Building2}>
                 <Field label="Company" wide>{lead.co}</Field>
                 <Field label="Address" wide>{[r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")}</Field>
-                <Field label="Phone"><span className="tabular-nums">{lead.phone}</span></Field>
+                <Field label="Phone">{phone}</Field>
                 <Field label="Website">{r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null}</Field>
                 <Field label="Employees"><span className="tabular-nums">{r.employees}</span></Field>
                 <Field label="Autos"><span className="tabular-nums">{r.autos}</span></Field>
@@ -192,7 +205,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 <Field label="Title">{r.contact_title}</Field>
                 <Field label="Decision maker">{r.decision_maker}</Field>
                 <Field label="DM title">{r.dm_title}</Field>
-                <Field label="Phone"><span className="tabular-nums">{lead.phone}</span></Field>
+                <Field label="Phone">{phone}</Field>
                 <Field label="Fax"><span className="tabular-nums">{r.fax}</span></Field>
                 <Field label="Email" wide><span className="break-all">{r.email}</span></Field>
               </Box>

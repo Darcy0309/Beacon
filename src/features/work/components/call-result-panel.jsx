@@ -164,8 +164,11 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
               <Textarea ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")} />
             </Field>
 
-            <div className="flex gap-2">
-              <Button type="submit" disabled={pending} className="flex-1">
+            {/* Result names run long ("Save: Lead-Not Shopping"). Save sizes to its
+                label and Cancel drops below it when both do not fit; a label too
+                long for the whole column wraps inside the button. */}
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" disabled={pending} className="h-auto min-h-9 min-w-0 shrink grow whitespace-normal py-2 text-left leading-snug">
                 {pending ? <Loader2 className="animate-spin" /> : picked.viable && picked.callable ? <CheckCircle2 /> : <XCircle />}
                 {pending ? "Saving…" : `Save: ${picked.name}`}
               </Button>

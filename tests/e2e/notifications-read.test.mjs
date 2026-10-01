@@ -30,6 +30,7 @@ const bellIs = (tab, label, timeout) => until(async () => (await bell(tab)) === 
 const BELL = 'button[aria-label^="Notifications"]';
 const PANEL = "[data-notification-panel]";
 const panelOpen = (tab) => tab.ev(`!!document.querySelector('${PANEL}')`);
+const panelText = (tab) => tab.ev(`document.querySelector('${PANEL}')?.innerText ?? ''`);
 const openBell = async (tab) => {
   await tab.click(BELL);
   await until(() => panelOpen(tab), { timeout: 2000 });
@@ -52,6 +53,10 @@ try {
   check("opening it closes its pop-up at once", await until(async () => !/Read test one/.test(await a.toasts()), { timeout: 2000 }), await a.toasts());
   check("count clears in this tab", await bellIs(a, "Notifications"), await bell(a));
   check("…and in the other tab, without switching to it", await bellIs(b, "Notifications"), await bell(b));
+  await openBell(a);
+  check("read, it leaves the bell's list", await until(async () => !(await panelText(a)).includes("Read test one"), { timeout: 3000 }), await panelText(a));
+  check("…leaving nothing to read", /all caught up/i.test(await panelText(a)), await panelText(a));
+  await a.key("Escape");
 
   // 2. The inbox's own "Mark read" clears the bell straight away.
   //    (Leave the conversation first: a message arriving in an open conversation is read there.)
@@ -62,6 +67,9 @@ try {
   await a.ev(`(() => { const li = [...document.querySelectorAll('ul li')].find((li) => li.innerText.includes('Read test two')); [...(li?.querySelectorAll('button') ?? [])].find((x) => /mark read/i.test(x.innerText))?.click(); })()`);
   check("Mark read in the inbox clears the bell", await bellIs(a, "Notifications"), await bell(a));
   check("…stored as read", sql(`select read_at is not null from public.notifications where id=${two}`) === "t");
+  await openBell(a);
+  check("…and it is gone from the bell's list, though still in the inbox", !(await panelText(a)).includes("Read test two") && (await a.text()).includes("Read test two"), await panelText(a));
+  await a.key("Escape");
 
   // 3. Three arrive; the inbox's "Mark all read" clears the bell in both tabs.
   await message("Read test three");
