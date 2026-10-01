@@ -128,6 +128,8 @@ try {
   const row = await cells(admin, `tr[data-rep="${SEAN}"]`);
   check("today, on that project: Sean, 2 calls, 1 appointment, $30.00", row[0] === "Sean Fitzgerald" && row[1] === "2" && row[3] === "1" && row[6] === "$30.00", JSON.stringify(row));
   check("the Pay tile agrees", await until(async () => (await tile(admin, "Pay")) === "$30.00"), await tile(admin, "Pay"));
+  const callBars = await admin.ev(`[...document.querySelectorAll('[data-panel]')].find((p) => /^calls$/i.test(p.querySelector('.stat-label')?.textContent.trim()))?.querySelectorAll(':scope > svg rect').length ?? 0`);
+  check("even for one day, the tiles plot the last 14", callBars === 14, `${callBars} bars`);
   const csv = await admin.ev(`fetch('/api/reports/production?period=today&project=${PROJECT}').then((r) => r.text())`);
   check("the CSV export has the same row", /Sean Fitzgerald,"?[^\n]*DBDev"?,2,0,1,0,0,30\.00/.test(csv), csv.split("\n").slice(0, 2).join(" | "));
   await shot(admin, "admin-production");
@@ -137,6 +139,9 @@ try {
   const mt = await manager.text();
   check("an account manager sees only their own production", !(await manager.ev(`!!document.querySelector('tr[data-rep="${SEAN}"]')`)) && /My pay/i.test(mt), mt.slice(0, 120));
   check("…and no rates to set", !/Pay rates by project/i.test(mt));
+  const empty = await manager.ev(`[...document.querySelectorAll('[data-panel]')].filter((p) => p.querySelector(':scope > div > .stat-value'))
+    .map((p) => p.querySelector(':scope > svg')?.dataset.sparkline ?? 'none')`);
+  check("with nothing to plot, every tile shows the same baseline", empty.length === 6 && empty.every((s) => s === "empty"), JSON.stringify(empty));
   const agent = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();
   const agentCsv = await (async () => { await agent.go("/reports/production", 3500); return agent.ev(`fetch('/api/reports/production?period=today&rep=${SEAN}').then((r) => r.text())`); })();
   check("an agent's CSV holds only their own rows", !agentCsv.includes("Sean Fitzgerald"), agentCsv.slice(0, 120));

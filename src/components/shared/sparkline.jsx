@@ -1,16 +1,28 @@
+const W = 220;
+const H = 64;
+
 /**
  * Small line + gradient-area chart used inside stat tiles.
  * `values` is a plain number array; the line is drawn in `color`.
  * It rises from the baseline when it appears; bars rise one after another.
+ *
+ * With nothing to show (fewer than two points, or all zero) every tile, bars
+ * or line, draws the same quiet baseline, so a row of empty tiles matches.
  */
 export default function Sparkline({ values = [], color = "var(--primary)", className, bars = false }) {
-  const data = values.length ? values : [0, 0];
+  if (values.length < 2 || values.every((v) => !Number(v))) {
+    return (
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={className} aria-hidden data-sparkline="empty">
+        {/* Where a line chart puts zero, clear of the tile's border. */}
+        <line x1="0" x2={W} y1={H - 4} y2={H - 4} stroke={color} strokeOpacity="0.35" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+    );
+  }
+
+  const data = values;
   const max = Math.max(...data, 1);
   const min = Math.min(...data, 0);
   const span = max - min || 1;
-
-  const W = 220;
-  const H = 64;
   const x = (i) => (i * W) / Math.max(1, data.length - 1);
   const y = (v) => H - 4 - ((v - min) / span) * (H - 10);
 

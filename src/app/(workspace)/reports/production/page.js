@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import { getProjectRates } from "@/features/projects/queries";
 import { getBusinessTimeZone, getProductionReport } from "@/features/reports/queries";
-import { daysBetween, PERIODS, readPeriod } from "@/features/reports/period";
+import { daysBetween, PERIODS, readPeriod, trendStart } from "@/features/reports/period";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
@@ -45,12 +45,16 @@ export default async function ProductionReport({ searchParams }) {
   const projectId = idParam(sp?.project);
   const userId = admin ? idParam(sp?.rep) : null;
 
-  const [rows, options, staff, rates] = await Promise.all([
-    getProductionReport({ from: range.from, to: range.to, projectId, userId }),
+  // The tiles show a trend of at least two weeks, so one read covers the
+  // range and the days before it that the trend needs.
+  const trendFrom = trendStart(range);
+  const [trendRows, options, staff, rates] = await Promise.all([
+    getProductionReport({ from: trendFrom, to: range.to, projectId, userId }),
     getLookups(),
     admin ? getAssignableStaff() : [],
     admin ? getProjectRates() : [],
   ]);
+  const rows = trendRows.filter((r) => r.day >= range.from && r.day <= range.to);
 
   const totals = rows.reduce(add, {});
   for (const k of COUNTS) totals[k] ??= 0;
@@ -62,9 +66,9 @@ export default async function ProductionReport({ searchParams }) {
     }, {})
   ).sort((a, b) => b.amount - a.amount || b.calls - a.calls || a.rep.localeCompare(b.rep));
 
-  // One point a day, for the tile sparklines.
-  const days = daysBetween(range.from, range.to);
-  const perDay = (key) => days.map((d) => rows.filter((r) => r.day === d).reduce((n, r) => n + r[key], 0));
+  // One point a day, for the tile sparklines: the range, or the last 14 days if it is shorter.
+  const days = daysBetween(trendFrom, range.to);
+  const perDay = (key) => days.map((d) => trendRows.filter((r) => r.day === d).reduce((n, r) => n + r[key], 0));
   const unratedProjects = rates.filter((p) => !p.lead && !p.appointment && !p.confirmation).length;
 
   const tiles = [

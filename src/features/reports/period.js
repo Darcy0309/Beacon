@@ -70,6 +70,12 @@ function fmt(d) {
   return d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
 }
 
+/** The first day of a tile's trend: the range's start, or two weeks before its end if that is earlier. */
+export function trendStart(range, days = 14) {
+  const back = iso(addDays(day(range.to), 1 - days));
+  return back < range.from ? back : range.from;
+}
+
 /** Every day in the range, oldest first (for a per-day series). */
 export function daysBetween(from, to) {
   const out = [];
