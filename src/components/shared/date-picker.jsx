@@ -267,7 +267,7 @@ export default function DatePicker({
             marks={marks === "appointments" ? dayMarks : undefined}
           />
           {quick.length || (value && !required) ? (
-            <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-[var(--panel-border)] pt-3">
+            <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-[var(--panel-border)] pt-2">
               {quick.map(([label, iso]) => {
                 const off = (lo && iso < lo) || (hi && iso > hi);
                 return (
@@ -278,7 +278,7 @@ export default function DatePicker({
                     onClick={() => choose(iso)}
                     title={formatIso(iso, "full")}
                     className={cn(
-                      "cursor-pointer rounded-full border px-2.5 py-1 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-30",
+                      "cursor-pointer rounded-full border px-2 py-0.5 text-[0.7rem] transition-colors disabled:cursor-not-allowed disabled:opacity-30",
                       iso === value ? "border-primary bg-primary/15 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40 hover:text-primary"
                     )}
                   >
@@ -294,8 +294,8 @@ export default function DatePicker({
             </div>
           ) : null}
           {marks === "appointments" ? (
-            <p className="mt-2 flex items-center gap-1.5 text-[0.7rem] text-muted-foreground">
-              <span className="size-1 rounded-full bg-emerald-500" /> appointments already booked
+            <p className="mt-1.5 flex items-center gap-1.5 text-[0.66rem] text-muted-foreground">
+              <span className="size-1 rounded-full bg-emerald-500" /> already booked
               <span className="ml-1 size-1 rounded-full bg-amber-500" /> 4 or more
             </p>
           ) : null}

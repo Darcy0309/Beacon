@@ -160,6 +160,26 @@ try {
   const tomorrowButton = await page.ev(`(() => { const b = document.querySelector('[aria-label="Choose a date range"] button[data-iso="${tomorrow}"]'); return b ? (b.disabled ? 'disabled' : 'enabled') : 'not shown'; })()`);
   check("days after today cannot be chosen", tomorrowButton === "disabled" || (tomorrowButton === "not shown" && tomorrow.slice(8) === "01"), tomorrowButton);
 
+  // The calendar in the appointment dialog, on a desktop window like the
+  // client's (about 1920 x 870 inside the browser) and on a short laptop
+  // screen: never any of it off screen; where it cannot fit, it scrolls.
+  section("Always on screen");
+  for (const [width, height, fitsWhole] of [[1920, 870, true], [1366, 768, true], [1280, 560, false]]) {
+    const p = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width, height });
+    await p.go("/appointments", 4000);
+    await p.click("button", "New appointment");
+    await until(() => p.ev(`!!document.querySelector('${DATE}')`));
+    await p.mouseClick('[role=dialog] button[aria-label^="Change date"]');
+    await until(() => calendarOpen(p));
+    await sleep(400); // past the opening animation
+    const box = await p.ev(`(() => { const c = document.querySelector('[aria-label=Calendar]'); const r = c.getBoundingClientRect();
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), view: innerHeight, scrolls: c.scrollHeight > c.clientHeight + 1 }; })()`);
+    const onScreen = box.top >= 0 && box.bottom <= box.view;
+    check(`${width}x${height}: the calendar is all on screen${fitsWhole ? ", without scrolling" : " (scrolling inside)"}`,
+      onScreen && (fitsWhole ? !box.scrolls : true), JSON.stringify(box));
+    if (width === 1920) await shot(p, "calendar-desktop");
+  }
+
   section("On a phone");
   const phone = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go("/reports/production", 4500);

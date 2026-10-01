@@ -84,8 +84,8 @@ export default function Calendar({
 
   if (view === "months") {
     return (
-      <div className="w-72" role="group" aria-label={`Months of ${year}`}>
-        <div className="mb-2 flex items-center justify-between">
+      <div className="w-[16.25rem]" role="group" aria-label={`Months of ${year}`}>
+        <div className="mb-1 flex items-center justify-between">
           <button type="button" className={navButton} onClick={() => onMonthChange(addYears(month, -1))} aria-label="Previous year"><ChevronLeft className="size-4" /></button>
           <button type="button" onClick={() => setView("years")} className="cursor-pointer rounded-lg px-3 py-1 text-sm font-semibold transition-colors hover:bg-muted">{year}</button>
           <button type="button" className={navButton} onClick={() => onMonthChange(addYears(month, 1))} aria-label="Next year"><ChevronRight className="size-4" /></button>
@@ -102,7 +102,7 @@ export default function Calendar({
                 disabled={disabled}
                 onClick={() => { onMonthChange(clampIso(first, min ? monthStart(min) : null, max)); setView("days"); }}
                 className={cn(
-                  "cursor-pointer rounded-lg py-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30",
+                  "cursor-pointer rounded-lg py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30",
                   current ? "bg-primary text-primary-foreground" : sameMonth(first, today) ? "text-primary ring-1 ring-primary/50 hover:bg-muted" : "hover:bg-muted"
                 )}
               >
@@ -118,8 +118,8 @@ export default function Calendar({
   if (view === "years") {
     const first = year - (year % 12);
     return (
-      <div className="w-72" role="group" aria-label="Years">
-        <div className="mb-2 flex items-center justify-between">
+      <div className="w-[16.25rem]" role="group" aria-label="Years">
+        <div className="mb-1 flex items-center justify-between">
           <button type="button" className={navButton} onClick={() => onMonthChange(addYears(month, -12))} aria-label="Earlier years"><ChevronLeft className="size-4" /></button>
           <span className="text-sm font-semibold">{first} – {first + 11}</span>
           <button type="button" className={navButton} onClick={() => onMonthChange(addYears(month, 12))} aria-label="Later years"><ChevronRight className="size-4" /></button>
@@ -134,7 +134,7 @@ export default function Calendar({
                 disabled={disabled}
                 onClick={() => { onMonthChange(`${y}${monthStart(month).slice(4)}`); setView("months"); }}
                 className={cn(
-                  "cursor-pointer rounded-lg py-2.5 text-sm tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-30",
+                  "cursor-pointer rounded-lg py-2 text-sm tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-30",
                   y === year ? "bg-primary text-primary-foreground" : y === Number(today.slice(0, 4)) ? "text-primary ring-1 ring-primary/50 hover:bg-muted" : "hover:bg-muted"
                 )}
               >
@@ -154,8 +154,8 @@ export default function Calendar({
   return (
     <div ref={gridRef} className="flex flex-col gap-4 sm:flex-row" onKeyDown={onKeyDown}>
       {shown.map((m, mi) => (
-        <div key={m} className="w-[17.5rem]">
-          <div className="mb-2 flex items-center justify-between">
+        <div key={m} className="w-[16.25rem]">
+          <div className="mb-1 flex items-center justify-between">
             {mi === 0 ? (
               <button type="button" className={navButton} onClick={() => onMonthChange(addMonths(month, -1))}
                 disabled={Boolean(min) && monthStart(min) >= monthStart(m)} aria-label="Previous month">
@@ -177,7 +177,7 @@ export default function Calendar({
           <div role="grid" aria-labelledby={`cal-${m}`} className="select-none">
             <div role="row" className="mb-1 grid grid-cols-7">
               {WEEKDAYS.map((d) => (
-                <span key={d} role="columnheader" aria-label={d} className="py-1 text-center text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                <span key={d} role="columnheader" aria-label={d} className="pb-1 text-center text-[0.66rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   {d.slice(0, 2)}
                 </span>
               ))}
@@ -187,7 +187,7 @@ export default function Calendar({
                 {monthGrid(m).slice(w * 7, w * 7 + 7).map((iso) => {
                   const outside = !sameMonth(iso, m);
                   // Side by side, the neighbouring month shows those days itself: leave them blank here.
-                  if (outside && months > 1) return <div key={iso} role="gridcell" aria-hidden className="py-0.5"><span className="block size-9" /></div>;
+                  if (outside && months > 1) return <div key={iso} role="gridcell" aria-hidden className="py-0.5"><span className="block size-8" /></div>;
                   const disabled = !allowed(iso);
                   const isToday = iso === today;
                   const count = Number(marks?.[iso] ?? 0);
@@ -214,7 +214,7 @@ export default function Calendar({
                         onMouseEnter={() => onHover?.(iso)}
                         onFocus={() => setFocusIso(iso)}
                         className={cn(
-                          "relative z-10 flex size-9 cursor-pointer flex-col items-center justify-center rounded-lg text-sm tabular-nums outline-none transition-colors",
+                          "relative z-10 flex size-8 cursor-pointer flex-col items-center justify-center rounded-lg text-[0.8125rem] tabular-nums outline-none transition-colors",
                           "focus-visible:ring-2 focus-visible:ring-primary/60 disabled:cursor-not-allowed disabled:opacity-30",
                           selected
                             ? "bg-primary font-semibold text-primary-foreground shadow-[0_0_14px_-4px_var(--primary)]"
@@ -228,7 +228,7 @@ export default function Calendar({
                       >
                         <span className="leading-none">{Number(iso.slice(8))}</span>
                         {count ? (
-                          <span aria-hidden className="absolute bottom-1 flex gap-0.5" title={markLabel(count)}>
+                          <span aria-hidden className="absolute bottom-[3px] flex gap-0.5" title={markLabel(count)}>
                             {Array.from({ length: Math.min(count, 3) }, (_, i) => (
                               <span key={i} className={cn("size-1 rounded-full", selected ? "bg-primary-foreground" : count >= 4 ? "bg-amber-500" : "bg-emerald-500")} />
                             ))}

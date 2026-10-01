@@ -17,6 +17,8 @@ function PopoverAnchor(props) {
  * Floating panel. Radix keeps it above dialogs (Escape and outside clicks
  * close the panel, not the dialog underneath), flips it above its anchor
  * when there is no room below, and portals it out of cards that clip.
+ * Where neither above nor below has room for all of it, it is held to the
+ * space there is and scrolls inside, so no part of it is ever off screen.
  */
 function PopoverContent({ className, sideOffset = 6, align = "start", ...props }) {
   return (
@@ -26,7 +28,8 @@ function PopoverContent({ className, sideOffset = 6, align = "start", ...props }
         align={align}
         collisionPadding={8}
         className={cn(
-          "animate-popover-in z-50 rounded-xl border bg-popover p-3 text-popover-foreground shadow-xl outline-none",
+          "animate-popover-in z-50 max-h-[var(--radix-popover-content-available-height)] overflow-y-auto overscroll-contain",
+          "rounded-xl border bg-popover p-3 text-popover-foreground shadow-xl outline-none",
           className
         )}
         {...props}
