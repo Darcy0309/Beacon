@@ -86,6 +86,19 @@ every result against the sheet.
   `business_timezone` row of `app_settings` (`{"name": "America/Chicago"}`),
   or America/Phoenix when there is none.
 
+## Dates
+
+Every date field uses `components/shared/date-picker.jsx` (one day) or
+`date-range-picker.jsx` (a span, for reports), built on `calendar.jsx` and the
+pure helpers in `lib/dates.js`. Dates travel as `YYYY-MM-DD` strings and are
+worked out in UTC, so they never move a day with the viewer's time zone. A
+picker submits a hidden input with that string, as a native date input would,
+so forms and their validation are unchanged. People can type dates in words
+("next fri", "Oct 15", "+2w"); `parseTypedDate()` reads them and
+`tests/unit/dates.test.mjs` covers what it accepts. With `marks="appointments"`
+the calendar dots days that already have appointments
+(`appointment_day_counts()`, through `/api/appointments/days`).
+
 ## Rules the layers follow
 
 **The database is the security boundary.** Every table has Row Level
@@ -140,7 +153,7 @@ signs out.
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, validation rules, form ↔ schema contract |
 | `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, forms, security, notifications, in headless Chrome |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

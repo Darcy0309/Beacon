@@ -7,9 +7,9 @@ import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import ParamSelect from "@/components/shared/param-select";
+import DateRangePicker from "@/components/shared/date-range-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import { getProjectRates } from "@/features/projects/queries";
@@ -109,17 +109,12 @@ export default async function ProductionReport({ searchParams }) {
                 {label}
               </Link>
             ))}
-            {/* A plain GET form, so a custom range is a link like the presets. */}
-            <form action="/reports/production" className="flex flex-wrap items-center gap-2">
+            {/* A plain GET form, so a custom range is a link like the presets; the picker submits it on Apply. */}
+            <form action="/reports/production">
               <input type="hidden" name="period" value="custom" />
               {projectId ? <input type="hidden" name="project" value={projectId} /> : null}
               {userId ? <input type="hidden" name="rep" value={userId} /> : null}
-              <label className="sr-only" htmlFor="production-from">From</label>
-              <Input id="production-from" name="from" type="date" defaultValue={range.from} className="h-8 w-auto" />
-              <span className="text-xs text-muted-foreground">to</span>
-              <label className="sr-only" htmlFor="production-to">To</label>
-              <Input id="production-to" name="to" type="date" defaultValue={range.to} className="h-8 w-auto" />
-              <Button type="submit" size="sm" variant={range.period === "custom" ? "default" : "outline"}>Show</Button>
+              <DateRangePicker key={`${range.from}:${range.to}`} defaultFrom={range.from} defaultTo={range.to} max="today" active={range.period === "custom"} />
             </form>
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-[var(--panel-border)] px-5 py-3">

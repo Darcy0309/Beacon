@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { createAppointment, updateAppointment } from "@/features/appointments/actions";
 import LeadPicker from "@/features/leads/components/lead-picker";
+import DatePicker from "@/components/shared/date-picker";
 import { DURATIONS, APPOINTMENT_TIMES } from "@/lib/validate";
 import { fullName } from "@/lib/format";
 
@@ -75,7 +76,8 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
             )}
 
             <Field label="Date" required error={fe("appt_date")}>
-              <Input name="appt_date" type="date" required defaultValue={dv("appt_date")} aria-invalid={invalid("appt_date")} />
+              <DatePicker name="appt_date" required defaultValue={dv("appt_date")} invalid={invalid("appt_date")} aria-label="Appointment date"
+                presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future />
             </Field>
             <Field label="Time" required error={fe("appt_time")}>
               <Select name="appt_time" required defaultValue={dv("appt_time")} aria-invalid={invalid("appt_time")}>

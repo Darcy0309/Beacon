@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { saveProject } from "@/features/projects/actions";
+import DatePicker from "@/components/shared/date-picker";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -114,10 +115,10 @@ export default function ProjectForm({ project, options, trigger }) {
             </Field>
 
             <Field label="Start date" error={fe("start_date")}>
-              <Input name="start_date" type="date" defaultValue={dv("start_date")} aria-invalid={invalid("start_date")} />
+              <DatePicker name="start_date" defaultValue={dv("start_date")} invalid={invalid("start_date")} aria-label="Start date" presets={["today"]} />
             </Field>
             <Field label="End date" error={fe("end_date")}>
-              <Input name="end_date" type="date" defaultValue={dv("end_date")} aria-invalid={invalid("end_date")} />
+              <DatePicker name="end_date" defaultValue={dv("end_date")} invalid={invalid("end_date")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
             </Field>
 
             <Field label="Description" error={fe("description")} className="sm:col-span-2">

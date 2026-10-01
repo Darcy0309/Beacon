@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import SectionHeader from "@/components/shared/section-header";
+import DatePicker from "@/components/shared/date-picker";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { recordCallResult } from "@/features/work/actions";
 import { APPOINTMENT_TIMES, DURATIONS } from "@/lib/validate";
@@ -135,8 +136,10 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
 
             {picked.effect === "appointment" ? (
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Date" required error={fe("appt_date")}>
-                  <Input name="appt_date" type="date" defaultValue={dv("appt_date")} aria-invalid={invalid("appt_date")} />
+                {/* Full width: the panel is narrow, and the date reads in words. Set from a call, so today or later. */}
+                <Field label="Date" required error={fe("appt_date")} className="col-span-2">
+                  <DatePicker name="appt_date" required defaultValue={dv("appt_date")} invalid={invalid("appt_date")} aria-label="Appointment date"
+                    min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future />
                 </Field>
                 <Field label="Time" error={fe("appt_time")}>
                   <Select name="appt_time" defaultValue={dv("appt_time", "10:00 AM")} aria-invalid={invalid("appt_time")}>
@@ -156,7 +159,8 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
 
             {picked.effect === "correct_xdate" ? (
               <Field label="Corrected renewal date" required error={fe("corrected_xdate")}>
-                <Input name="corrected_xdate" type="date" defaultValue={dv("corrected_xdate")} aria-invalid={invalid("corrected_xdate")} />
+                <DatePicker name="corrected_xdate" required defaultValue={dv("corrected_xdate")} invalid={invalid("corrected_xdate")}
+                  aria-label="Corrected renewal date" placeholder="e.g. 11/1 or Nov 1" future />
               </Field>
             ) : null}
 

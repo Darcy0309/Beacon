@@ -56,7 +56,7 @@ All use the password `Beacon!2026`:
 | `npm run build` | Production build |
 | `npm test` | Unit tests (no database needed) |
 | `npm run test:integration` | Row Level Security role by role, the lead lifecycle and the admin reports, against the local stack |
-| `npm run test:e2e` | The running app in headless Chrome: pages, dashboard, call lists, admin side, forms, security, notifications |
+| `npm run test:e2e` | The running app in headless Chrome: pages, dashboard, call lists, admin side, navigation, calendar, forms, security, notifications |
 | `npm run test:all` | Everything above |
 | `npm run db:start` / `db:stop` | Start / stop the local Supabase stack |
 | `npm run db:reset` | Drop, re-run migrations, re-seed |
