@@ -26,7 +26,7 @@ export default function StatTile({
       data-panel
       data-accent-edge=""
       className={cn(
-        "group relative overflow-hidden rounded-xl transition-colors duration-200",
+        "group relative flex flex-col overflow-hidden rounded-xl transition-colors duration-200",
         className
       )}
       style={{ "--edge": accent, ...style }}
@@ -70,12 +70,14 @@ export default function StatTile({
         {note ? <div className="mt-1 text-xs text-muted-foreground">{note}</div> : null}
       </div>
 
+      {/* Pinned to the foot of the tile: tiles in a row stretch to the tallest,
+          and a note that wraps must not push one chart lower than its neighbours. */}
       {series?.length ? (
         <Sparkline
           values={series}
           color={accent}
           bars={bars}
-          className="block h-16 w-full"
+          className="mt-auto block h-16 w-full shrink-0"
         />
       ) : null}
 

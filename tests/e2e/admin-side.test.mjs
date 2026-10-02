@@ -52,8 +52,10 @@ try {
   await admin.go(`/projects/${CAPITAL}`, 5000);
   const total = count("");
   const left = count("and r.viable and r.callable");
-  check("Leads tile: every lead on the project, not the newest 25", num(await tile(admin, "Leads")) === total && total > 25, `${await tile(admin, "Leads")} vs ${total}`);
-  check("Names Left to Call tile matches the database", num(await tile(admin, "Names Left to Call")) === left, `${await tile(admin, "Names Left to Call")} vs ${left}`);
+  // Waited for: the page may still be loading, and the figures count up.
+  const settles = (label, want) => until(async () => num(await tile(admin, label)) === want, { timeout: 8000 });
+  check("Leads tile: every lead on the project, not the newest 25", (await settles("Leads", total)) && total > 25, `${await tile(admin, "Leads")} vs ${total}`);
+  check("Names Left to Call tile matches the database", await settles("Names Left to Call", left), `${await tile(admin, "Names Left to Call")} vs ${left}`);
   const sean = await cells(admin, `tr[data-rep="${SEAN}"]`);
   const seanLeft = count(`and r.viable and r.callable and l.assigned_user_id=${SEAN}`);
   check("Sean is on it, with his names left and leads held", sean[0]?.startsWith("Sean Fitzgerald") && num(sean[1]) === seanLeft && num(sean[2]) === count(`and l.assigned_user_id=${SEAN}`), JSON.stringify(sean));
@@ -145,6 +147,18 @@ try {
   const agent = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();
   const agentCsv = await (async () => { await agent.go("/reports/production", 3500); return agent.ev(`fetch('/api/reports/production?period=today&rep=${SEAN}').then((r) => r.text())`); })();
   check("an agent's CSV holds only their own rows", !agentCsv.includes("Sean Fitzgerald"), agentCsv.slice(0, 120));
+  // Six tiles in one row at 1600px, where some notes wrap to two lines: every
+  // chart still sits on its tile's foot, so the baselines line up.
+  const wide = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1600, height: 900 });
+  await wide.go("/reports/production", 4000);
+  const feet = await wide.ev(`[...document.querySelectorAll('[data-panel]')].filter((p) => p.querySelector(':scope > div > .stat-value')).map((p) => {
+    const tile = p.getBoundingClientRect(); const chart = p.querySelector(':scope > svg').getBoundingClientRect();
+    return { top: Math.round(tile.top), gap: Math.round(tile.bottom - chart.bottom), noteLines: Math.round(p.querySelector('.stat-value + div').getBoundingClientRect().height / 16) };
+  })`);
+  check("six tiles in one row, some notes on two lines", feet.length === 6 && new Set(feet.map((f) => f.top)).size === 1 && feet.some((f) => f.noteLines > 1), JSON.stringify(feet));
+  check("…and every chart sits on its tile's foot, in line with the others", feet.every((f) => f.gap === feet[0].gap && f.gap <= 2), JSON.stringify(feet.map((f) => f.gap)));
+  await shot(wide, "admin-production-wide");
+
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage();
   check("a client cannot export production", (await (async () => { await client.go("/", 3000); return client.ev("fetch('/api/reports/production').then((r) => r.status)"); })()) === 403);
 

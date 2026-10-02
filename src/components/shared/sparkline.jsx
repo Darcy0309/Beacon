@@ -1,5 +1,8 @@
 const W = 220;
 const H = 64;
+// Zero, for every kind of chart (line, bars, empty): a little clear of the
+// tile's border, so a row of tiles shares one baseline.
+const BASE = H - 4;
 
 /**
  * Small line + gradient-area chart used inside stat tiles.
@@ -13,8 +16,7 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
   if (values.length < 2 || values.every((v) => !Number(v))) {
     return (
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={className} aria-hidden data-sparkline="empty">
-        {/* Where a line chart puts zero, clear of the tile's border. */}
-        <line x1="0" x2={W} y1={H - 4} y2={H - 4} stroke={color} strokeOpacity="0.35" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+        <line x1="0" x2={W} y1={BASE} y2={BASE} stroke={color} strokeOpacity="0.35" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
       </svg>
     );
   }
@@ -24,7 +26,7 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
   const min = Math.min(...data, 0);
   const span = max - min || 1;
   const x = (i) => (i * W) / Math.max(1, data.length - 1);
-  const y = (v) => H - 4 - ((v - min) / span) * (H - 10);
+  const y = (v) => BASE - ((v - min) / span) * (H - 10);
 
   // Stable id so two sparklines on a page never share a gradient. The colour
   // has to be part of it: tiles often plot the same series in different hues,
@@ -40,12 +42,13 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
     return (
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={className} aria-hidden>
         {data.map((v, i) => {
+          // Bars stand on the shared baseline; a zero is a 2px mark centred on it.
           const h = Math.max(2, ((v - min) / span) * (H - 8));
           return (
             <rect
               key={i}
               x={(i * W) / data.length + bw * 0.3}
-              y={H - h}
+              y={BASE + 1 - h}
               width={bw}
               height={h}
               rx="1.5"
