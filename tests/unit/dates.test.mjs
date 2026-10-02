@@ -2,7 +2,7 @@
 /** Unit tests for the calendar's date helpers: arithmetic, the month grid, formatting, and reading typed dates. */
 import {
   addDays, addMonths, clampIso, daysBetween, formatIso, formatRange, fromIso, isIsoDate, makeIso,
-  monthEnd, monthGrid, parseTypedDate, relativeDay, todayIso, weekdayOf,
+  monthEnd, monthGrid, parseTypedDate, relativeDay, todayIn, todayIso, weekdayOf,
 } from "../../src/lib/dates.js";
 
 let failures = 0;
@@ -59,6 +59,9 @@ is("relative: in 11 months", relativeDay("2027-09-01", T), "in 11 months");
 is("relative: 2 days ago", relativeDay("2026-09-29", T), "2 days ago");
 is("relative: a year, singular", relativeDay("2025-10-01", T), "12 months ago");
 check("today is the viewer's calendar day", /^\d{4}-\d{2}-\d{2}$/.test(todayIso()));
+is("7 pm in Phoenix is already tomorrow in UTC, still today there", todayIn("America/Phoenix", new Date("2026-10-02T02:00:00Z")), "2026-10-01");
+is("…and in New York, at the same moment", todayIn("America/New_York", new Date("2026-10-02T02:00:00Z")), "2026-10-01");
+is("…but not in London", todayIn("Europe/London", new Date("2026-10-02T02:00:00Z")), "2026-10-02");
 
 // --- reading typed dates -----------------------------------------------------
 const read = (text, opts) => parseTypedDate(text, { today: T, ...opts });

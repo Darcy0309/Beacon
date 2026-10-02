@@ -153,7 +153,7 @@ signs out.
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, validation rules, form ↔ schema contract |
 | `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, forms, security, notifications, in headless Chrome |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, dropdowns in both themes, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

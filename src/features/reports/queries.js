@@ -99,8 +99,4 @@ export async function getProductionReport({ from, to, projectId = null, userId =
 }
 
 /** The business's time zone, which "today" and each day of the production report follow. */
-export async function getBusinessTimeZone() {
-  const supabase = await createClient();
-  const { data } = await supabase.rpc("business_tz");
-  return data || "America/Phoenix";
-}
+export { getBusinessTimeZone } from "@/lib/server/business-day";

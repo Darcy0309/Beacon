@@ -138,13 +138,22 @@ try {
   /** Wait until the report for a range has loaded (its picker shows the range). */
   const showing = (from, to) => until(async () => (await page.url()).includes(`from=${from}&to=${to}`)
     && (await page.ev(`document.readyState === 'complete' && !!document.querySelector('button[aria-label^="Date range, ${formatRange(from, to)}"]')`)), { timeout: 10000 });
+  /**
+   * Open the range picker. A freshly loaded report can show its button a
+   * moment before React is listening to it, so click until it opens.
+   */
+  const rangeOpen = (p) => p.ev("!!document.querySelector('[aria-label=\"Choose a date range\"] [role=grid]')");
+  const openRange = (p = page) => until(async () => {
+    if (await rangeOpen(p)) return true;
+    await p.mouseClick('button[aria-label^="Date range"]');
+    await sleep(150);
+    return rangeOpen(p);
+  }, { timeout: 10000, interval: 400 });
   await page.go("/reports/production", 4000);
-  await page.mouseClick('button[aria-label^="Date range"]');
-  await until(() => page.ev("!!document.querySelector('[aria-label=\"Choose a date range\"] [role=grid]')"));
+  check("the range picker opens", await openRange());
   await page.click('[aria-label="Choose a date range"] button', "Last 7 days");
   check("a quick range applies at once", await showing(addDays(today, -6), today), await page.url());
-  await page.mouseClick('button[aria-label^="Date range"]');
-  await until(() => page.ev("!!document.querySelector('[aria-label=\"Choose a date range\"] [role=grid]')"));
+  await openRange();
   const [first, last] = [addDays(today, -20), addDays(today, -10)];
   await page.click(`[aria-label="Choose a date range"] button[data-iso="${last}"]`);
   await page.click(`[aria-label="Choose a date range"] button[data-iso="${first}"]`);
@@ -155,8 +164,7 @@ try {
   check("Apply shows that range", (await showing(first, last)) && (await page.url()).includes("period=custom"), await page.url());
   // Today's view shows this month, where tomorrow is (unless today is the month's last day).
   await page.go("/reports/production", 4000);
-  await page.mouseClick('button[aria-label^="Date range"]');
-  await until(() => page.ev("!!document.querySelector('[aria-label=\"Choose a date range\"] [role=grid]')"));
+  await openRange();
   const tomorrowButton = await page.ev(`(() => { const b = document.querySelector('[aria-label="Choose a date range"] button[data-iso="${tomorrow}"]'); return b ? (b.disabled ? 'disabled' : 'enabled') : 'not shown'; })()`);
   check("days after today cannot be chosen", tomorrowButton === "disabled" || (tomorrowButton === "not shown" && tomorrow.slice(8) === "01"), tomorrowButton);
 
@@ -183,8 +191,7 @@ try {
   section("On a phone");
   const phone = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go("/reports/production", 4500);
-  await phone.mouseClick('button[aria-label^="Date range"]');
-  await until(() => phone.ev("!!document.querySelector('[aria-label=\"Choose a date range\"] [role=grid]')"));
+  await openRange(phone);
   const box = await phone.ev(`(() => { const r = document.querySelector('[aria-label="Choose a date range"]').getBoundingClientRect(); return { left: r.left, right: r.right, grids: document.querySelectorAll('[aria-label="Choose a date range"] [role=grid]').length }; })()`);
   check("the range picker fits the screen, one month at a time", box.left >= 0 && box.right <= 390 && box.grids === 1, JSON.stringify(box));
   await shot(phone, "calendar-phone");

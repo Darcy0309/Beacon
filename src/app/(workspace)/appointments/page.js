@@ -6,6 +6,8 @@ import AppointmentForm from "@/features/appointments/components/appointment-form
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getWeekAppointments } from "@/features/appointments/queries";
+import { addDays, fromIso } from "@/lib/dates";
+import { getBusinessToday } from "@/lib/server/business-day";
 import { getLookups } from "@/lib/server/lookups";
 
 export const dynamic = "force-dynamic";
@@ -58,9 +60,8 @@ function Appt({ a }) {
 }
 
 export default async function AppointmentsPage() {
-  const [{ rows, groups }, options] = await Promise.all([getWeekAppointments(), getLookups()]);
+  const [{ rows, groups }, options, today] = await Promise.all([getWeekAppointments(), getLookups(), getBusinessToday()]);
 
-  const today = new Date().toISOString().slice(0, 10);
   const todayCount = rows.filter((a) => a.date === today).length;
   const confirmed = rows.filter((a) => a.status === "Confirmed").length;
   const awaiting = rows.filter((a) => a.status === "Scheduled").length;
@@ -79,11 +80,10 @@ export default async function AppointmentsPage() {
       icon: CalendarCheck, accent: "var(--neon-violet)", series: perDay, bars: true },
   ];
 
+  // "Today" and "Tomorrow" where the business is, not on the server's UTC clock.
   const label = (iso) => {
-    const d = new Date(`${iso}T00:00:00`);
-    const t = new Date(); const tm = new Date(); tm.setDate(t.getDate() + 1);
-    const prefix = iso === today ? "Today — " : iso === tm.toISOString().slice(0, 10) ? "Tomorrow — " : "";
-    return prefix + d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+    const prefix = iso === today ? "Today — " : iso === addDays(today, 1) ? "Tomorrow — " : "";
+    return prefix + fromIso(iso).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", timeZone: "UTC" });
   };
 
   return (

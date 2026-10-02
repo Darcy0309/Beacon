@@ -363,6 +363,85 @@ table tbody tr:hover,
   background-clip: content-box;
 }
 
+/* Dropdowns (<select>) in the app's own colours, light and dark, rather
+   than the operating system's: the list that opens is themed like the
+   calendar and the menus. Browsers that can style the open list (Chrome
+   and Edge 135+) get the full treatment; the others still get themed
+   options, and the system's light or dark list to match the theme. */
+option {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+}
+
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    cursor: pointer;
+  }
+  /* The app's chevron (Lucide's chevron-down) in place of the browser's triangle. */
+  select::picker-icon {
+    content: "";
+    flex-shrink: 0;
+    width: 0.875rem;
+    height: 0.875rem;
+    background-color: var(--muted-foreground);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.25' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    transition: rotate 0.15s ease;
+  }
+  select:open::picker-icon {
+    rotate: 180deg;
+  }
+  ::picker(select) {
+    margin-block: 4px;
+    padding: 4px;
+    max-block-size: min(20rem, 60svh);
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) + 2px);
+    background: var(--popover);
+    color: var(--popover-foreground);
+    box-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.45);
+    scrollbar-width: thin;
+  }
+  select:open::picker(select) {
+    animation: popover-in 0.14s ease-out;
+  }
+  select option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    border-radius: calc(var(--radius) - 2px);
+    background: transparent;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+  }
+  select option:hover,
+  select option:focus-visible {
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    outline: none;
+  }
+  select option:checked {
+    color: var(--primary);
+    font-weight: 600;
+  }
+  select option::checkmark {
+    color: var(--primary);
+  }
+  select option:disabled {
+    color: var(--muted-foreground);
+    cursor: not-allowed;
+  }
+}
+
 /* The sidebar's scrollbar shows only while the pointer is over it, or the
    keyboard is in it. Still the same width when hidden, so nothing shifts. */
 .scrollbar-on-hover {

@@ -4,6 +4,8 @@
  * ?from=&to=. Days are calendar days in the business's time zone.
  */
 
+import { todayIn } from "@/lib/dates";
+
 export const PERIODS = [
   ["today", "Today"],
   ["yesterday", "Yesterday"],
@@ -18,12 +20,6 @@ const MAX_DAYS = 366;
 const day = (iso) => new Date(`${iso}T00:00:00Z`);
 const iso = (d) => d.toISOString().slice(0, 10);
 const addDays = (d, n) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n));
-
-/** Today's date (YYYY-MM-DD) in a time zone. */
-export function todayIn(timeZone) {
-  // en-CA formats as YYYY-MM-DD.
-  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-}
 
 /**
  * { period, from, to, label, error } for the report. A custom range that is

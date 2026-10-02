@@ -2,6 +2,8 @@
 
 import "server-only";
 import { cityState, colorFor, initialsOf, isoDay, longDate, shortName, splitTime, timeRank } from "@/lib/format";
+import { addDays } from "@/lib/dates";
+import { getBusinessToday } from "@/lib/server/business-day";
 import { one } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -78,26 +80,22 @@ async function fetchAppointments({ from, to, limit = 400 } = {}) {
     .sort((a, b) => a.date.localeCompare(b.date) || timeRank(a.appt_time) - timeRank(b.appt_time));
 }
 
-/** Today's and tomorrow's appointments — the shape the dashboard renders. */
+/** Today's and tomorrow's appointments, where the business is — the shape the dashboard renders. */
 export async function getAppointments() {
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
+  const today = await getBusinessToday();
+  const tomorrow = addDays(today, 1);
 
-  const rows = await fetchAppointments({ from: isoDay(today), to: isoDay(tomorrow) });
+  const rows = await fetchAppointments({ from: today, to: tomorrow });
   return {
-    today: rows.filter((a) => a.date === isoDay(today)),
-    tomorrow: rows.filter((a) => a.date === isoDay(tomorrow)),
+    today: rows.filter((a) => a.date === today),
+    tomorrow: rows.filter((a) => a.date === tomorrow),
   };
 }
 
-/** Everything scheduled this week, grouped by day, for the appointments page. */
+/** The seven days from the business's today, grouped by day, for the appointments page. */
 export async function getWeekAppointments() {
-  const today = new Date();
-  const end = new Date(today);
-  end.setDate(today.getDate() + 6);
-
-  const rows = await fetchAppointments({ from: isoDay(today), to: isoDay(end) });
+  const today = await getBusinessToday();
+  const rows = await fetchAppointments({ from: today, to: addDays(today, 6) });
   const groups = new Map();
   for (const a of rows) {
     if (!groups.has(a.date)) groups.set(a.date, []);

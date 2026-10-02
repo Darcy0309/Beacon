@@ -31,6 +31,14 @@ export function makeIso(year, month, day) {
 /** Today on the viewer's own calendar. */
 export const todayIso = (now = new Date()) => `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 
+/**
+ * Today in a given time zone (the business's), for the server, whose own
+ * clock runs on UTC: after 5 pm in Phoenix it is already tomorrow in UTC.
+ */
+export const todayIn = (timeZone, now = new Date()) =>
+  // en-CA formats as YYYY-MM-DD.
+  new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+
 export function addDays(iso, n) {
   const d = fromIso(iso);
   d.setUTCDate(d.getUTCDate() + n);

@@ -15,6 +15,7 @@ import LeadPicker from "@/features/leads/components/lead-picker";
 import DatePicker from "@/components/shared/date-picker";
 import { DURATIONS, APPOINTMENT_TIMES } from "@/lib/validate";
 import { fullName } from "@/lib/format";
+import { todayIso } from "@/lib/dates";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -41,7 +42,8 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
   const { apptStatuses = [], managers = [] } = options ?? {};
   const record = appointment
     ? { ...appointment, status_id: appointment.status?.id ?? "", user_id: appointment.user?.id ?? "" }
-    : { appt_date: new Date().toISOString().slice(0, 10), appt_time: "9:00 AM", duration_min: "30", lead_id: defaultLeadId ?? "" };
+    // Today on the viewer's calendar (toISOString() would be UTC: tomorrow by a US evening).
+    : { appt_date: todayIso(), appt_time: "9:00 AM", duration_min: "30", lead_id: defaultLeadId ?? "" };
   const { fe, invalid, dv } = formHelpers(state, record);
 
   const lockedLead = defaultLeadId ? leads.find((l) => String(l.id) === String(defaultLeadId)) : null;
