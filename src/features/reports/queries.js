@@ -2,6 +2,7 @@
 
 import "server-only";
 import { fullName, shortName } from "@/lib/format";
+import { readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -76,14 +77,21 @@ export async function getXdateMonthLeads({ month, bucket = null, projectId = nul
  */
 export async function getProductionReport({ from, to, projectId = null, userId = null }) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("production_report", {
-    p_from: from,
-    p_to: to,
-    p_project_id: projectId,
-    p_user_id: userId,
-  });
-  if (error) throw error;
-  return (data ?? []).map((r) => ({
+  // A row per day, rep and project passes the API's 1,000-row cap within a
+  // few weeks for a busy team, so every page is read: the totals and the
+  // payroll CSV must never quietly lose the earliest days.
+  const data = await readAll((first, last) =>
+    supabase
+      .rpc("production_report", { p_from: from, p_to: to, p_project_id: projectId, p_user_id: userId })
+      .order("day", { ascending: false })
+      .order("first_name")
+      .order("last_name")
+      .order("user_id")
+      .order("project", { nullsFirst: false })
+      .order("project_id", { nullsFirst: false })
+      .range(first, last)
+  );
+  return data.map((r) => ({
     day: r.day,
     userId: r.user_id,
     rep: fullName({ first_name: r.first_name, last_name: r.last_name, email: r.email }) || "—",

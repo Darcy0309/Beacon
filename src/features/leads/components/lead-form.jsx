@@ -40,7 +40,11 @@ export default function LeadForm({ lead, options, trigger }) {
     }
   }, [state, isEdit, router, setOpen]);
 
-  const { statuses = [], projects = [], managers = [], agencies = [] } = options ?? {};
+  const { statuses = [], projects = [], managers: staff = [], agencies = [] } = options ?? {};
+  // Whoever holds the lead now is always an option (an administrator who set an
+  // appointment holds it, and is not in the list), so saving never unassigns it.
+  const holder = lead?.assigned;
+  const managers = holder?.id && !staff.some((m) => m.id === holder.id) ? [holder, ...staff] : staff;
 
   // Existing record flattened to the field names the form uses.
   const record = lead

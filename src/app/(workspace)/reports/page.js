@@ -1,5 +1,5 @@
 import {
-  Download, Target, CalendarCheck, Star, CheckCheck, BarChart3, Map, PieChart, Radio, UserCheck,
+  Target, CalendarCheck, Star, CheckCheck, BarChart3, Map, PieChart, Radio, UserCheck,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
@@ -59,7 +59,8 @@ export default async function ReportsPage() {
     { label: "Appointments Set", value: r.appts.toLocaleString(), note: `${r.conversion}% of leads`,
       icon: CalendarCheck, accent: "var(--neon-emerald)", series: r.months.map((m) => m.appts) },
     { label: "Avg. Client Rating", value: r.avgRating ? `${r.avgRating}/5` : "—", note: "client feedback",
-      icon: Star, accent: "var(--neon-amber)", series: [3, 4, 4, 5, 4, 5], bars: true },
+      // Each month's average rating; a month with none draws as zero.
+      icon: Star, accent: "var(--neon-amber)", series: r.months.map((m) => Number(m.rating) || 0), bars: true },
     { label: "Show Rate", value: `${r.showRate}%`, note: "appointments held",
       icon: CheckCheck, accent: "var(--neon-violet)", series: r.months.map((m) => m.appts), bars: true },
   ];
@@ -118,7 +119,8 @@ export default async function ReportsPage() {
               </div>
               <div className="flex h-56 items-stretch gap-3">
                 {r.months.map((m, i) => (
-                  <div key={m.key} className="flex min-h-0 flex-1 flex-col items-center gap-2">
+                  <div key={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
+                    className="flex min-h-0 flex-1 flex-col items-center gap-2">
                     <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
                       <div
                         className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
@@ -168,15 +170,7 @@ export default async function ReportsPage() {
           {/* Rep-by-rep productivity is internal; clients never see it. */}
           {view.reps ? (
             <Card>
-              <SectionHeader
-                label="Appointments by Rep"
-                icon={Radio}
-                action={
-                  <button className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75">
-                    <Download className="size-3" /> Export CSV
-                  </button>
-                }
-              />
+              <SectionHeader label="Appointments by Rep" icon={Radio} />
               <div className="space-y-2.5 p-4">
                 {repRows.map((rep, i) => (
                   <MetricBar key={rep.name} label={rep.name === me?.short ? `${rep.name} (me)` : rep.name}

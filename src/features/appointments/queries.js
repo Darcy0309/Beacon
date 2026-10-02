@@ -4,7 +4,7 @@ import "server-only";
 import { cityState, colorFor, initialsOf, isoDay, longDate, shortName, splitTime, timeRank } from "@/lib/format";
 import { addDays } from "@/lib/dates";
 import { getBusinessToday } from "@/lib/server/business-day";
-import { one } from "@/lib/server/query-helpers";
+import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 // Accent bar per lead status, matching the palette used across the UI.
@@ -68,14 +68,18 @@ function toApptView(a) {
   };
 }
 
-async function fetchAppointments({ from, to, limit = 400 } = {}) {
+/** Every appointment between two ISO days, inclusive, in date and time order. */
+async function fetchAppointments({ from, to } = {}) {
   const supabase = await createClient();
-  let q = supabase.from("appointments").select(APPT_SELECT).order("appt_date").limit(limit);
-  if (from) q = q.gte("appt_date", from);
-  if (to) q = q.lte("appt_date", to);
-  const { data, error } = await q;
-  if (error) throw error;
-  return (data ?? [])
+  // A busy month passes the API's 1,000-row cap, so it is read in pages.
+  const rows = await readAll((first, last) => {
+    // Ones marked invalid were charged back: they are not on the calendar or in its counts.
+    let q = supabase.from("appointments").select(APPT_SELECT).is("invalid_at", null).order("appt_date").order("id").range(first, last);
+    if (from) q = q.gte("appt_date", from);
+    if (to) q = q.lte("appt_date", to);
+    return q;
+  });
+  return rows
     .map(toApptView)
     .sort((a, b) => a.date.localeCompare(b.date) || timeRank(a.appt_time) - timeRank(b.appt_time));
 }

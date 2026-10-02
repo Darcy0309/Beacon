@@ -79,6 +79,14 @@ section("Part A: attacks through the API");
   check("email lookup treats * and _ literally", (star ?? []).length === 0 && (under ?? []).length === 0, `${star?.length} / ${under?.length}`);
   check("email lookup ignores case and spaces", (exact ?? []).length === 1);
 }
+{
+  // The proxy stamps the verified user on a request header; a visitor who
+  // sends it themselves, on a path the proxy would otherwise skip, gets nothing.
+  const adminAuth = sql("select auth_id from public.users where email='admin@beacon.test'");
+  const r = await fetch(`${APP_URL}/users.png`, { redirect: "manual", headers: { "x-lighthouse-auth-id": adminAuth } });
+  const body = r.status === 200 ? await r.text() : "";
+  check("a forged auth-id header is not believed", r.status !== 200 || !body.includes("Users & Access"), `${r.status}`);
+}
 
 section("Part B: user management in the browser (admin)");
 const browser = await launchBrowser();

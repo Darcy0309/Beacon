@@ -1,4 +1,4 @@
-import { BellRing, Send, XCircle, ToggleRight } from "lucide-react";
+import { BellRing, Send, Clock, ToggleRight } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToggleSwitch from "@/components/shared/toggle-switch";
 import StatTile from "@/components/shared/stat-tile";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 const dot = { hot: "var(--neon-rose)", appt: "var(--neon-emerald)", survey: "var(--neon-violet)", new: "var(--muted-foreground)" };
 
 export default async function AlertsPage() {
-  const { alertRules, recentAlerts } = await getAlerts();
+  const { alertRules, recentAlerts, sentLastWeek, sentPerDay, notRunning } = await getAlerts();
   const enabled = alertRules.filter((r) => r.on).length;
 
   const tiles = [
@@ -20,10 +20,11 @@ export default async function AlertsPage() {
       icon: BellRing, accent: "var(--neon-cyan)", series: alertRules.map((r) => (r.on ? 1 : 0.4)), bars: true },
     { label: "Active", value: String(enabled), note: `${alertRules.length - enabled} paused`,
       icon: ToggleRight, accent: "var(--neon-emerald)", series: alertRules.map((r) => (r.on ? 1 : 0)), bars: true },
-    { label: "Recently Sent", value: String(recentAlerts.length), note: "latest dispatches",
-      icon: Send, accent: "var(--neon-amber)", series: recentAlerts.map((_, i) => i + 1) },
-    { label: "Delivery Issues", value: "0", note: "in the last 24h",
-      icon: XCircle, accent: "var(--neon-violet)", series: [0, 0, 0, 0, 0, 0], bars: true },
+    { label: "Sent, Last 7 Days", value: sentLastWeek.toLocaleString(), note: "alerts dispatched, per day",
+      icon: Send, accent: "var(--neon-amber)", series: sentPerDay, bars: true },
+    // In-app delivery cannot fail on its own, so what is worth counting is the rules with nothing behind them yet.
+    { label: "Not Sending Yet", value: String(notRunning), note: "scheduled reminders still to build",
+      icon: Clock, accent: "var(--neon-violet)" },
   ];
 
   return (
@@ -43,7 +44,14 @@ export default async function AlertsPage() {
               {alertRules.map((r) => (
                 <div key={r.id} data-list-row className="flex items-center justify-between gap-4 px-5 py-4">
                   <div className="min-w-0">
-                    <div className="font-medium">{r.name}</div>
+                    <div className="flex flex-wrap items-center gap-2 font-medium">
+                      {r.name}
+                      {r.running ? null : (
+                        <span data-not-running className="rounded border border-amber-500/40 px-1.5 py-px text-[0.6rem] font-bold uppercase tracking-[0.1em] text-amber-600 dark:text-amber-400">
+                          Not sending yet
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-muted-foreground">{r.desc}</div>
                   </div>
                   <ToggleSwitch id={r.id} defaultChecked={r.on} name={r.name} action={setAlertRuleEnabled} field="enabled" />
@@ -60,7 +68,10 @@ export default async function AlertsPage() {
                   <span className="mt-1.5 size-2 shrink-0 rounded-full" style={{ background: dot[a.tone] ?? dot.new, boxShadow: `0 0 8px ${dot[a.tone] ?? dot.new}` }} />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm">{a.text}</div>
-                    <div className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">{a.time}</div>
+                    <div className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">
+                      {a.detail ? `${a.detail} · ` : ""}
+                      {a.time}
+                    </div>
                   </div>
                 </div>
               ))}

@@ -9,6 +9,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import XdateMonths from "@/features/reports/components/xdate-months";
 import { getXdateMonthLeads, getXdatesByMonth, MONTHS, XDATE_BUCKETS } from "@/features/reports/queries";
 import { getLookups } from "@/lib/server/lookups";
+import { getBusinessToday } from "@/lib/server/business-day";
 import { pageInfo, readListParams } from "@/lib/paging";
 import { mediumDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -31,10 +32,11 @@ export default async function XdatesReport({ searchParams }) {
   const bucket = XDATE_BUCKETS[sp?.bucket] ? sp.bucket : null;
   const list = readListParams(sp);
 
-  const [options, data, names] = await Promise.all([
+  const [options, data, names, today] = await Promise.all([
     getLookups(),
     getXdatesByMonth({ projectId, companyId }),
     month === null ? null : getXdateMonthLeads({ month, bucket, projectId, companyId, page: list.page, perPage: list.perPage }),
+    getBusinessToday(),
   ]);
 
   const client = options.companies.find((c) => c.id === companyId);
@@ -74,7 +76,7 @@ export default async function XdatesReport({ searchParams }) {
               options={projects.map((p) => ({ value: String(p.id), label: p.name }))} />
           </div>
           <div className="p-5">
-            <XdateMonths data={data} href={href} selected={month === null ? null : { month, bucket }} />
+            <XdateMonths data={data} href={href} today={today} selected={month === null ? null : { month, bucket }} />
           </div>
         </Card>
 

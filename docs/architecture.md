@@ -57,9 +57,18 @@ in the database, which in a single transaction:
 - promotes a Lead to the linked appointment (Appt) project, handing it to the
   appointment manager with the fewest names and recording who developed it;
 - sets an appointment on the calendar, staged for QA (the client hears only
-  when QA passes), as a confirmation follow-up for whoever set it;
-- pays the rep at the project's rate, and charges back an invalid lead or
-  appointment against whoever was paid for it.
+  when QA passes, from the rep who set it), as a confirmation follow-up for
+  whoever set it; recording an appointment again on a name whose
+  appointment is still to come (or waiting for QA) moves that one instead
+  of booking and paying a second;
+- pays the rep at the project's rate (a lead once, unless that payment was
+  charged back), and charges back an invalid lead or appointment against
+  whoever was paid for it.
+
+QA, confirmation and invalid marks change only through these steps: a
+trigger refuses them written straight to `appointments` by anyone but an
+administrator, and an appointment saved from a form waits for QA like one
+set from a call.
 
 `call_list()` gives a rep their names least-called first ("Not Shopping"
 last), which cycles by itself; `distribute_project_names()` re-splits a
@@ -85,6 +94,40 @@ every result against the sheet.
 - **Days** are counted in the business's time zone, `business_tz()`: the
   `business_timezone` row of `app_settings` (`{"name": "America/Chicago"}`),
   or America/Phoenix when there is none.
+
+## Search
+
+Every search box matches **every word typed**, in any order and any field:
+"Sean Fitzgerald" finds the first and last name, "Drain, LLC" ignores the
+comma, and a phone number is found however it is written ("(602) 851-8511",
+"602.851.8511", "+1 602 851 8511", "6028518511"). A number-like word matches
+as typed or as its digits, so "24-7" and "2026-09-23" still find text
+written that way. `lib/search-words.js` and the database's `search_words()`
+and `search_doc()` follow the same rules. A list applies one PostgREST `or`
+filter per word (`paged()` in `lib/server/query-helpers.js`), and
+consecutive filters are ANDed; tables filtered in the browser use
+`matchesAll()`.
+
+- **Leads** are searched through `leads.search_text`, a generated column
+  (company, contact, city, state, ZIP, email and phone, through
+  `search_doc()`) with a trigram index, so a search stays fast across 100k+
+  leads. A rep's call list (`call_list()`) searches it the same way.
+- **Ctrl+K** (`global_search()`, through `/api/search`) returns each group's
+  total and, beside a lead, its client and status. The app asks only for
+  the groups the role's pages allow, and Row Level Security scopes the rest.
+- **The Lead Explorer** (`lead_explore()`) uses the same words. A lead's
+  renewal is its ultimate X-date, else its soonest policy line (as
+  `lead_renewal_date()` defines it). A lead's carrier is its carrier
+  record, or when it has none the carrier name an import stored on the
+  policy; the picker lists both, each once (`carrier_key()`). The CSV holds
+  at most `EXPORT_LIMIT` leads, and the page says when an export would be
+  cut short.
+
+`tests/unit/search-words.test.mjs`, `tests/integration/search.test.mjs` and
+`tests/e2e/search.test.mjs` cover these.
+
+Anything that returns rows past the API's 1,000-row cap (the production
+report, a busy calendar month) reads every page with `readAll()`.
 
 ## Dates
 
@@ -151,9 +194,9 @@ signs out.
 
 | Command | Needs | What |
 |---|---|---|
-| `npm test` | nothing | Unit tests: CSV import, validation rules, form ↔ schema contract |
-| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, dropdowns in both themes, forms, security, notifications, in headless Chrome |
+| `npm test` | nothing | Unit tests: CSV import, dates, search words, validation rules, form ↔ schema contract |
+| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures) |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, dropdowns in both themes, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

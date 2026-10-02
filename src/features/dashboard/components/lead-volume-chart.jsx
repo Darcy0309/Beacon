@@ -19,16 +19,19 @@ const HEIGHT = 220;
 const PAD = { left: 40, right: 14, top: 14, bottom: 28 };
 const RISE_MS = 900;
 
-// Dates are UTC calendar days ("2026-09-29"), the same days the database groups by.
+// Dates are calendar days ("2026-09-29") in the business's time zone, the
+// days the database groups by; the arithmetic runs in UTC so no day shifts.
 const dayKey = (d) => d.toISOString().slice(0, 10);
 const addDays = (d, n) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n));
 const short = (d) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 
 /** Group daily counts into the buckets a range is drawn in, oldest first. */
-function bucket(days, range) {
+function bucket(days, range, todayIso) {
   const byDay = new Map(days.map((d) => [d.day, Number(d.leads) || 0]));
   const now = new Date();
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const today = /^\d{4}-\d{2}-\d{2}$/.test(todayIso ?? "")
+    ? new Date(`${todayIso}T00:00:00Z`)
+    : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   const sum = (from, to) => {
     let n = 0;
     for (let d = from; d <= to; d = addDays(d, 1)) n += byDay.get(dayKey(d)) ?? 0;
@@ -97,7 +100,7 @@ function useRise(key) {
  * `days` comes from lead_volume_daily(); `fallback` (the old eight weekly
  * buckets) is drawn instead if that function is not available yet.
  */
-export default function LeadVolumeChart({ days, fallback }) {
+export default function LeadVolumeChart({ days, fallback, today }) {
   const [range, setRange] = useState(DEFAULT_RANGE);
   const [width, setWidth] = useState(0);
   const [hover, setHover] = useState(null);
@@ -134,8 +137,8 @@ export default function LeadVolumeChart({ days, fallback }) {
 
   const meta = RANGES.find((r) => r.key === range);
   const points = useMemo(
-    () => (days ? bucket(days, range) : (fallback ?? []).map((w) => ({ label: w.label, full: w.label, value: w.leads }))),
-    [days, fallback, range]
+    () => (days ? bucket(days, range, today) : (fallback ?? []).map((w) => ({ label: w.label, full: w.label, value: w.leads }))),
+    [days, fallback, range, today]
   );
   const total = points.reduce((s, p) => s + p.value, 0);
   const peak = Math.max(0, ...points.map((p) => p.value));

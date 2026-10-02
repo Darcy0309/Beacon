@@ -10,10 +10,13 @@ export const MONTHS = [
   { value: "10", label: "October" }, { value: "11", label: "November" }, { value: "12", label: "December" },
 ];
 
+/** The most leads one CSV export holds; beyond this, narrow the question. */
+export const EXPORT_LIMIT = 10000;
+
 /** Every criterion, in the order the panel lays them out. */
 export const FIELDS = [
   { key: "sic", label: "Industry", options: "industries", hint: "SIC code" },
-  { key: "months", label: "Renewal month", options: "months", hint: "Ultimate X-date" },
+  { key: "months", label: "Renewal month", options: "months", hint: "Ultimate X-date, else the soonest line" },
   { key: "states", label: "State", options: "states" },
   { key: "counties", label: "County", options: "counties" },
   { key: "statuses", label: "Status", options: "statuses" },
@@ -26,10 +29,11 @@ const LIST_KEYS = FIELDS.map((f) => f.key);
 
 // Keys whose values are numbers in the database. Anything else typed into
 // the URL is dropped here rather than reaching Postgres as a cast error.
+// (Carriers are named by carrier_key(), "the hartford"; an old link's
+// numeric carrier id still works too.)
 const VALID = {
   months: (v) => /^(?:[1-9]|1[0-2])$/.test(v),
   clients: (v) => /^\d{1,12}$/.test(v),
-  carriers: (v) => /^\d{1,12}$/.test(v),
   reps: (v) => /^\d{1,12}$/.test(v),
 };
 

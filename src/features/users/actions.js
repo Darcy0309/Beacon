@@ -13,6 +13,13 @@ import { createClient } from "@/lib/supabase/server";
 import { cross, schemas } from "@/lib/validate";
 
 /**
+ * An administrator whose own account is active. The role alone is not
+ * enough: a disabled or still-invited administrator's session may outlive
+ * the change, and the Auth admin API below would take its word.
+ */
+const activeAdmin = (me) => me?.role === "admin" && me.status === "active";
+
+/**
  * Invite a new user or change an existing one. Administrators only — the
  * database enforces that too, but this uses the Auth admin API, which does
  * not, so the check is made here as well.
@@ -27,7 +34,7 @@ export async function saveUser(prevState, formData) {
 
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
-  if (me?.role !== "admin") return fail("Only administrators can manage user accounts.");
+  if (!activeAdmin(me)) return fail("Only administrators can manage user accounts.");
 
   const id = idFrom(formData);
   const payload = {
@@ -47,6 +54,10 @@ export async function saveUser(prevState, formData) {
     }
     const { data: before } = await supabase.from("users").select("auth_id, status, email").eq("id", id).maybeSingle();
     if (!before) return fail("That user no longer exists.");
+    // Invited lasts until they set a password; putting an account back there would lift a ban without enabling it.
+    if (status === "invited" && before.status !== "invited") {
+      return fail("An account can't be put back to Invited. Disable it instead.", { status: "Choose Active or Disabled" });
+    }
     const sameEmail = (before.email ?? "").toLowerCase() === payload.email;
     if (before.auth_id && !sameEmail) {
       return fail("The email of an account that can sign in can't be changed here. Invite a new user instead.", { email: "Can't change" });
@@ -54,8 +65,10 @@ export async function saveUser(prevState, formData) {
     // Keep the stored spelling; only the letter case of what was typed may differ.
     if (sameEmail) payload.email = before.email;
 
-    const { error } = await supabase.from("users").update({ ...payload, status }).eq("id", id);
+    // .select() so a write Row Level Security refused reads as a failure, before the Auth change below.
+    const { data: saved, error } = await supabase.from("users").update({ ...payload, status }).eq("id", id).select("id");
     if (error) return fail(error);
+    if (!saved?.length) return fail("You don't have permission to change that account.");
 
     if (before.status !== status && before.auth_id) {
       const admin = createAdminClient();
@@ -134,7 +147,7 @@ export async function resendInvitation(formData) {
   if (!id) return fail("Missing id.");
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
-  if (me?.role !== "admin") return fail("Only administrators can send invitations.");
+  if (!activeAdmin(me)) return fail("Only administrators can send invitations.");
 
   const { data: target } = await supabase
     .from("users")
@@ -166,7 +179,7 @@ export async function resetUserTwoFactor(formData) {
 
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
-  if (me?.role !== "admin") return fail("Only administrators can reset two-factor.");
+  if (!activeAdmin(me)) return fail("Only administrators can reset two-factor.");
 
   const { data: target } = await supabase.from("users").select("auth_id, email").eq("id", id).maybeSingle();
   if (!target) return fail("That user no longer exists.");
@@ -193,7 +206,7 @@ export async function deleteUser(formData) {
 
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
-  if (me?.role !== "admin") return fail("Only administrators can delete user accounts.");
+  if (!activeAdmin(me)) return fail("Only administrators can delete user accounts.");
   if (me.id === id) return fail("You can't delete your own account.");
 
   const { data: target } = await supabase.from("users").select("auth_id, email").eq("id", id).maybeSingle();

@@ -6,16 +6,18 @@
 
 import "server-only";
 import { cache } from "react";
+import { daysBetween, todayIn } from "@/lib/dates";
 import { shortDate, timeAgo } from "@/lib/format";
+import { getBusinessTimeZone } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
 import { createClient } from "@/lib/supabase/server";
 
 const TYPE_LABEL = { DBDV: "Database development", APPT: "Appointment setting" };
 
-/** "Worked today" … "Never" — the Last worked filter. */
-function workedBucket(iso) {
+/** "Worked today" … "Never" — the Last worked filter, by calendar day where the business is. */
+function workedBucket(iso, tz) {
   if (!iso) return "Never";
-  const days = (Date.now() - new Date(iso).getTime()) / 86400000;
+  const days = daysBetween(todayIn(tz, new Date(iso)), todayIn(tz));
   if (days < 1) return "Today";
   if (days < 7) return "This week";
   return "Over a week ago";
@@ -24,7 +26,7 @@ function workedBucket(iso) {
 /** My Projects: what the signed-in person is assigned to (everything, for an administrator). Cached per request. */
 export const getWorkProjects = cache(async function getWorkProjects() {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("work_projects");
+  const [{ data, error }, tz] = await Promise.all([supabase.rpc("work_projects"), getBusinessTimeZone()]);
   if (error) throw error;
   return (data ?? []).map((p) => ({
     id: p.id,
@@ -41,7 +43,7 @@ export const getWorkProjects = cache(async function getWorkProjects() {
     followUps: Number(p.follow_ups),
     lastWorkedAt: p.last_worked,
     lastWorked: p.last_worked ? timeAgo(p.last_worked) : "Never",
-    worked: workedBucket(p.last_worked),
+    worked: workedBucket(p.last_worked, tz),
   }));
 });
 
@@ -76,12 +78,18 @@ export async function getCallList(projectId, { page = 1, perPage = 50, q = "", r
   }));
   return { rows, total: Number(data?.[0]?.total ?? 0) };
 }
-/** The first name on a rep's list, skipping `except` (the name just worked). */
-export async function getNextOnList(projectId, except = null) {
+/**
+ * The first name on a rep's list that is not in `except` (the name on screen
+ * and any skipped on the way to it). Skipping writes nothing, so the list's
+ * order stays put; without the skipped names Skip would bounce between the
+ * top two.
+ */
+export async function getNextOnList(projectId, except = []) {
+  const skip = new Set(except);
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("call_list", { p_project_id: Number(projectId), p_limit: 2 });
+  const { data, error } = await supabase.rpc("call_list", { p_project_id: Number(projectId), p_limit: Math.min(skip.size + 1, 500) });
   if (error) throw error;
-  const next = (data ?? []).find((r) => r.id !== except);
+  const next = (data ?? []).find((r) => !skip.has(r.id));
   return { next: next?.id ?? null, left: Number(data?.[0]?.total ?? 0) };
 }
 

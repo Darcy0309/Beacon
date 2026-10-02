@@ -57,9 +57,9 @@ const project = projects[0];
 // Pages every signed-in staff user should get, with a string proving the page
 // rendered real database content rather than an empty shell.
 const PAGES = [
-  ["/", "Dashboard", ["Active Leads", "Recent Leads", "Command Center"]],
+  ["/", "Dashboard", ["Total Leads", "Recent Leads", "Command Center"]],
   ["/leads", "Leads", ["All leads", lead.company_name]],
-  ["/appointments", "Appointments", ["This Week"]],
+  ["/appointments", "Appointments", ["Next 7 Days"]],
   ["/calendar", "Calendar", ["Mon", "Sun"]],
   ["/clients", "Clients", companies.slice(0, 2).map((c) => c.name)],
   ["/projects", "Projects", [project.name]],

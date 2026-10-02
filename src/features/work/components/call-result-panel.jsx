@@ -65,7 +65,13 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
         return;
       }
       const d = result.data;
-      const where = d.promoted ? " — promoted to the appointment project" : d.appointment_id ? " — on the calendar, waiting for QA" : "";
+      const where = d.rescheduled
+        ? " — the appointment is moved, not booked twice"
+        : d.promoted
+          ? " — promoted to the appointment project"
+          : d.appointment_id
+            ? " — on the calendar, waiting for QA"
+            : "";
       toast.success(`${d.result} saved${where}`);
       setState(EMPTY);
       setChosen(null);

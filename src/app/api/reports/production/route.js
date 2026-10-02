@@ -20,7 +20,7 @@ const COLUMNS = [
 const cell = (v) => {
   const s = v == null ? "" : String(v);
   // Quote anything with a delimiter, quote or newline; neutralise spreadsheet formulas.
-  const safe = /^[=+\-@]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s) ? `'${s}` : s;
+  const safe = /^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s) ? `'${s}` : s;
   return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 

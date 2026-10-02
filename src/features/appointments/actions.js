@@ -32,6 +32,8 @@ export async function createAppointment(prevState, formData) {
       duration_min: n(formData, "duration_min") ?? 30,
       status_id: n(formData, "status_id"),
       list_source: s(formData, "list_source"),
+      // Like one set from a call: the client sees and hears of it once QA passes it.
+      qa_status: "pending",
     })
     .select("id")
     .single();

@@ -18,10 +18,11 @@ const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newP
 const CHART = "svg[aria-label^='New leads per']";
 const heading = (page) => page.ev(`[...document.querySelectorAll('.eyebrow')].find((e) => /Lead Volume/i.test(e.textContent))?.textContent ?? ''`);
 const pressed = (page) => page.ev(`document.querySelector('[role=group][aria-label=Period] [aria-pressed=true]')?.textContent ?? ''`);
-const figure = (page, label) => page.ev(`[...document.querySelectorAll('span')].find((s) => s.textContent.startsWith('${label} '))?.textContent.slice(${label.length + 1}) ?? ''`);
+// A label followed by its number ("Total 1,234"), not a tile whose name only starts the same ("Total Leads").
+const figure = (page, label) => page.ev(`[...document.querySelectorAll('span')].find((s) => /^${label} [\\d,]/.test(s.textContent))?.textContent.slice(${label.length + 1}) ?? ''`);
 const num = (s) => Number(String(s).replace(/[^\d.]/g, ""));
-// The same calendar days the chart groups by (UTC), counted in the database.
-const leadsSince = (since) => Number(sql(`select count(*) from public.leads where (coalesce(lead_date, created_at) at time zone 'UTC')::date between ${since} and (now() at time zone 'UTC')::date`));
+// The same calendar days the chart groups by (the business's, business_tz()), counted in the database.
+const leadsSince = (since) => Number(sql(`select count(*) from public.leads where (coalesce(lead_date, created_at) at time zone public.business_tz())::date between ${since} and (now() at time zone public.business_tz())::date`));
 
 try {
   section("Lead Volume chart");
@@ -43,13 +44,13 @@ try {
   await admin.click("[role=group][aria-label=Period] button", "1Y");
   await sleep(1400);
   check("1Y shows the last year", /Last year/i.test(await heading(admin)) && (await pressed(admin)) === "1Y");
-  const yearSince = "(date_trunc('month', now() at time zone 'UTC') - interval '11 months')::date";
+  const yearSince = "(date_trunc('month', now() at time zone public.business_tz()) - interval '11 months')::date";
   check("…its total matches the database, month by month", num(await figure(admin, "Total")) === leadsSince(yearSince), `${await figure(admin, "Total")} vs ${leadsSince(yearSince)}`);
   check("…twelve monthly points", (await admin.ev(`document.querySelector("${CHART}").getAttribute('aria-label')`)).startsWith("New leads per month"));
 
   await admin.click("[role=group][aria-label=Period] button", "1M");
   await sleep(1400);
-  const monthSince = "((now() at time zone 'UTC')::date - 29)";
+  const monthSince = "((now() at time zone public.business_tz())::date - 29)";
   check("1M totals the last 30 days by day", num(await figure(admin, "Total")) === leadsSince(monthSince) && /per day/.test(await admin.ev(`document.querySelector("${CHART}").getAttribute('aria-label')`)),
     `${await figure(admin, "Total")} vs ${leadsSince(monthSince)}`);
   await admin.click("[role=group][aria-label=Period] button", "6M");

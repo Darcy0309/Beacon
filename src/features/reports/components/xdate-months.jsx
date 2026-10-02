@@ -13,12 +13,14 @@ const SEGMENTS = [
  * Renewals per month of the year, as stacked columns and as a table. Every
  * number is a link to the names behind it: `href(month, bucket)` builds it
  * (bucket null for the month's total). `selected` marks the one open.
- * `compact` draws the columns only, for the project page.
+ * `compact` draws the columns only, for the project page. `today` (the
+ * business's "YYYY-MM-DD") marks the current month; the server's own clock
+ * runs on UTC, a month ahead on the last evening of one.
  */
-export default function XdateMonths({ data, href, selected, compact = false }) {
+export default function XdateMonths({ data, href, selected, today, compact = false }) {
   const { months, undated, totals } = data;
   const max = Math.max(1, ...months.map((m) => m.total));
-  const thisMonth = new Date().getMonth() + 1;
+  const thisMonth = today ? Number(today.slice(5, 7)) : new Date().getMonth() + 1;
   const isOpen = (month, bucket) => selected?.month === month && (selected?.bucket ?? null) === bucket;
 
   const number = (m, bucket) => {

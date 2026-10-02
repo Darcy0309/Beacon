@@ -124,5 +124,10 @@ export const config = {
   matcher: [
     // Everything except static assets and image files.
     "/((?!_next/static|_next/image|favicon.ico|logo.svg|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // And any request that arrives carrying the auth-id header itself (it must
+    // be the literal AUTH_ID_HEADER: matchers are read at build time). Then the
+    // proxy runs and overwrites it, even on a path the line above skips, such
+    // as /anything.png, which the app would still render.
+    { source: "/:path*", has: [{ type: "header", key: "x-lighthouse-auth-id" }] },
   ],
 };

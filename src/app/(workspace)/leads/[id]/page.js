@@ -19,6 +19,8 @@ import { getLead, getLeadActivity } from "@/features/leads/queries";
 import { getCallResults, getNextOnList, getOpenAppointment, getWorkProject } from "@/features/work/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
+import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
+import { daysBetween, todayIn } from "@/lib/dates";
 import { fullName, mediumDate, shortDate, telHref } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +47,7 @@ function Box({ label, icon, children }) {
   );
 }
 
-// The X-date rows worth showing on a lead sheet.
+// The X-date rows on a lead sheet: every line the renewal date can come from.
 const XDATE_ROWS = [
   ["Ultimate", "ultimate_xdate", "agency_name"],
   ["Package", "pkg_xdate", "pkg_carrier"],
@@ -53,7 +55,10 @@ const XDATE_ROWS = [
   ["Auto", "auto_xdate", "auto_carrier"],
   ["Health", "health_xdate", "health_carrier"],
   ["Dental", "dental_xdate", "dental_provider"],
+  ["Vision", "vision_xdate", "vision_provider"],
   ["Prof. liability", "prof_liab_xdate", "prof_liab_carrier"],
+  ["D&O", "do_xdate", "do_carrier"],
+  ["E&O", "eo_xdate", "eo_carrier"],
 ];
 
 const APPT_TONE = { Scheduled: "cyan", Confirmed: "emerald", Held: "violet", Rescheduled: "amber", Cancelled: "rose", "No Show": "slate", Invalid: "rose" };
@@ -69,9 +74,12 @@ export default async function LeadSheet({ params, searchParams }) {
   const { id } = await params;
   const sp = await searchParams;
   const listId = /^[1-9]\d{0,17}$/.test(sp?.project ?? "") ? Number(sp.project) : null;
+  // Names already skipped on this pass through the list, so Skip keeps going down it.
+  const skipped = String(sp?.skipped ?? "").split(",").filter((v) => /^[1-9]\d{0,17}$/.test(v)).map(Number).slice(-50);
 
-  const [lead, activity, options, me, results, openAppt] = await Promise.all([
-    getLead(id), getLeadActivity(id), getLookups(), getCurrentUser(), getCallResults(), getOpenAppointment(id),
+  const [lead, activity, options, me, results, openAppt, today, tz] = await Promise.all([
+    getLead(id), getLeadActivity(id), getLookups(), getCurrentUser(), getCallResults(), getOpenAppointment(id), getBusinessToday(),
+    getBusinessTimeZone(),
   ]);
   if (!lead) notFound();
 
@@ -84,7 +92,7 @@ export default async function LeadSheet({ params, searchParams }) {
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
   const [list, listProject, inProject] = await Promise.all([
-    listId ? getNextOnList(listId, lead.id) : null,
+    listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
   ]);
@@ -104,7 +112,8 @@ export default async function LeadSheet({ params, searchParams }) {
   const tel = telHref(r.phone);
   const phone = tel ? <a href={tel} className="tabular-nums transition-colors hover:text-primary">{r.phone}</a> : null;
 
-  const daysOut = r.renewal ? Math.round((new Date(r.renewal).getTime() - Date.now()) / 86400000) : null;
+  // Whole days from the business's today: the server's clock runs on UTC.
+  const daysOut = r.renewal ? daysBetween(today, String(r.renewal).slice(0, 10)) : null;
   const back = listId
     ? { href: `/work/${listId}`, label: "Back to call list" }
     : me?.role === "manager"
@@ -126,7 +135,7 @@ export default async function LeadSheet({ params, searchParams }) {
               </span>
               {list.next ? (
                 <Button asChild size="sm" variant="outline">
-                  <Link href={`/leads/${list.next}?project=${listId}`}>Skip to next <ArrowRight /></Link>
+                  <Link href={`/leads/${list.next}?project=${listId}&skipped=${[...skipped, lead.id].slice(-50).join(",")}`}>Skip to next <ArrowRight /></Link>
                 </Button>
               ) : null}
               <Button asChild size="sm" variant="ghost">
@@ -250,7 +259,8 @@ export default async function LeadSheet({ params, searchParams }) {
                 {admin ? <Field label="Calls this stage"><span className="tabular-nums">{r.call_weight}</span></Field> : <Field label="List source">{r.list_source}</Field>}
                 {r.developer ? <Field label="Developed by">{fullName(r.developer)}</Field> : null}
                 {r.source && r.source.id !== r.project?.id ? <Field label="Came from">{r.source.name}</Field> : null}
-                <Field label="Last worked">{r.date_last_worked ? shortDate(r.date_last_worked) : "Not yet"}</Field>
+                {/* The business's calendar day: a 6 pm call in Phoenix is already tomorrow in UTC. */}
+                <Field label="Last worked">{r.date_last_worked ? shortDate(todayIn(tz, new Date(r.date_last_worked))) : "Not yet"}</Field>
                 <Field label="Lead ID"><span className="tabular-nums">#{lead.id}</span></Field>
               </Box>
             </div>

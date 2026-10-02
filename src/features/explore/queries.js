@@ -39,7 +39,8 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
       place: cityState(r),
       initials: initialsOf(r.company_name || ""),
       color: colorFor(r.company_name || ""),
-      xdate: shortDate(r.ultimate_xdate),
+      // The ultimate X-date, or else the soonest line's: the same date the months filter uses.
+      xdate: shortDate(r.renewal_date ?? r.ultimate_xdate),
       rep: r.rep_name || "Unassigned",
       client: r.client_name || "—",
     })),

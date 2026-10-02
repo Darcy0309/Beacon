@@ -9,7 +9,8 @@ export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""
 /**
  * Request header carrying the verified auth user id from the proxy to the
  * app, so Server Components can skip a second round-trip to Supabase Auth.
- * The proxy always overwrites it, so a client cannot supply its own.
+ * The proxy always overwrites it, so a client cannot supply its own: its
+ * matcher also runs it on any request that arrives with this header.
  */
 export const AUTH_ID_HEADER = "x-lighthouse-auth-id";
 

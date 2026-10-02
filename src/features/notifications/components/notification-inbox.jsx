@@ -49,7 +49,10 @@ export default function NotificationInbox({ rows, unread, empty }) {
     });
   };
 
-  const remaining = allRead ? 0 : Math.max(0, unread - [...readIds].length);
+  // `unread` is the server's count. Take off only what was marked here and the
+  // server does not know yet: once the page refreshes, those rows come back read.
+  const markedHere = rows.filter((r) => !r.read && readIds.has(r.id)).length;
+  const remaining = allRead ? 0 : Math.max(0, unread - markedHere);
 
   return (
     <div>
@@ -90,6 +93,7 @@ export default function NotificationInbox({ rows, unread, empty }) {
                   </span>
                   {n.body ? <span className="mt-0.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{n.body}</span> : null}
                   <span className="mt-1 block text-[0.7rem] text-muted-foreground">
+                    {n.from ? `From ${n.from} · ` : ""}
                     {n.when}
                     {n.kind === "message" ? " · Open to reply" : ""}
                   </span>

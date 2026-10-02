@@ -32,7 +32,7 @@ export default async function LeadsPage({ searchParams }) {
     <>
       <Topbar
         title="Leads"
-        sub={`${summary.total} active leads across ${summary.clients} client${summary.clients === 1 ? "" : "s"}`}
+        sub={`${summary.total.toLocaleString()} lead${summary.total === 1 ? "" : "s"} across ${summary.clients} client${summary.clients === 1 ? "" : "s"}`}
       />
       <div className="flex-1 p-4 sm:p-6">
         <Card>

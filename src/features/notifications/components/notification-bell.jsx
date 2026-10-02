@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 const SHOWN = 8;
 const POLL_MS = 60_000;
-const COLUMNS = "id, kind, sender_id, title, body, link, read_at, created_at";
+const COLUMNS = "id, kind, sender_id, sender_name, title, body, link, read_at, created_at";
 // Hover intent: a pointer passing over the bell does not open it, and the
 // panel stays while the pointer crosses from the bell into it.
 const HOVER_OPEN_MS = 120;
@@ -180,7 +180,13 @@ export default function NotificationBell() {
             popups.current.set(n.id, Date.now());
             toast(n.title, {
               id: toastId(n.id),
-              description: n.body || undefined,
+              description:
+                n.sender_name || n.body ? (
+                  <>
+                    {n.sender_name ? <span className="block font-medium">From {n.sender_name}</span> : null}
+                    {n.body ? <span className="line-clamp-3">{n.body}</span> : null}
+                  </>
+                ) : undefined,
               icon: (() => {
                 const Icon = KIND_ICONS[n.kind] ?? Bell;
                 return <Icon className="size-4 text-primary" />;
@@ -352,7 +358,10 @@ export default function NotificationBell() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold">{n.title}</span>
                         {n.body ? <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span> : null}
-                        <span className="mt-0.5 block text-[0.66rem] text-muted-foreground">{ago(n.created_at)}</span>
+                        <span className="mt-0.5 block truncate text-[0.66rem] text-muted-foreground">
+                          {n.sender_name ? `From ${n.sender_name} · ` : ""}
+                          {ago(n.created_at)}
+                        </span>
                       </span>
                       <span className="mt-2 size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />
                     </button>

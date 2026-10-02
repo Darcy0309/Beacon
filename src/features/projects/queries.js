@@ -2,7 +2,7 @@
 
 import "server-only";
 import { colorFor, fullName, shortDate, shortName, timeAgo } from "@/lib/format";
-import { inner, one, paged, runPaged } from "@/lib/server/query-helpers";
+import { inner, one, paged, runPaged, searchWords } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 const projectSelect = ({ company = false, type = false, status = false } = {}) => `
@@ -43,9 +43,22 @@ export async function getProjects() {
   return (data ?? []).map(toProjectView);
 }
 
-/** One page of projects, searched and filtered in the database. */
+/**
+ * One page of projects, searched and filtered in the database. A search
+ * word matches the project's name or its client's: the client is a linked
+ * company (client_name is only the old free-text field, empty on projects
+ * saved through the app).
+ */
 export async function listProjects(params) {
   const supabase = await createClient();
+  const words = searchWords(params.q);
+  const clientIds = await Promise.all(
+    words.map(async (w) => {
+      const { data } = await supabase.from("companies").select("id").ilike("name", `%${w}%`).limit(500);
+      return (data ?? []).map((c) => c.id);
+    })
+  );
+  const alsoOr = (_word, i) => (clientIds[i]?.length ? [`company_id.in.(${clientIds[i].join(",")})`] : []);
   const { rows, total } = await runPaged(
     (p) =>
       paged(
@@ -57,7 +70,7 @@ export async function listProjects(params) {
           )
           .order("id"),
         p,
-        { search: ["name", "client_name"], columns: { status: "status.name", type: "type.code", client: "company.name" } }
+        { search: ["name", "client_name"], alsoOr, columns: { status: "status.name", type: "type.code", client: "company.name" } }
       ),
     params
   );

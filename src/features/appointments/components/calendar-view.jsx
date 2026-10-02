@@ -115,7 +115,8 @@ export default function CalendarView(props) {
         </div>
       </div>
 
-      {view === "month" ? <MonthView {...props} /> : <TimeGrid {...props} />}
+      {/* Keyed by month: a day picked in one month must not stay picked in the next. */}
+      {view === "month" ? <MonthView key={`${props.year}-${props.month}`} {...props} /> : <TimeGrid {...props} />}
     </div>
     <AppointmentDialog a={selected} onClose={() => setSelected(null)} />
     </OpenAppointment.Provider>
@@ -211,19 +212,21 @@ function AppointmentDialog({ a, onClose }) {
 /* --------------------------------------------------------------------------
    Day and week: an hour grid with appointments placed by start time.
    -------------------------------------------------------------------------- */
-function TimeGrid({ view, title, days, byDate, rows, today }) {
+function TimeGrid({ view, title, days, byDate, rows, today, timeZone }) {
   const [nowMin, setNowMin] = useState(null);
 
-  // The "now" line, refreshed every minute.
+  // The "now" line, refreshed every minute, on the business's clock: "today"
+  // is the business's day, so the time across it must be the business's too.
   useEffect(() => {
+    const clock = new Intl.DateTimeFormat("en-US", { timeZone: timeZone || undefined, hour: "numeric", minute: "numeric", hourCycle: "h23" });
     const tick = () => {
-      const n = new Date();
-      setNowMin(n.getHours() * 60 + n.getMinutes());
+      const parts = Object.fromEntries(clock.formatToParts(new Date()).map((p) => [p.type, p.value]));
+      setNowMin(Number(parts.hour) * 60 + Number(parts.minute));
     };
     tick();
     const timer = setInterval(tick, 60_000);
     return () => clearInterval(timer);
-  }, []);
+  }, [timeZone]);
 
   const timed = rows.filter((a) => a.startMin < UNTIMED);
   const untimed = rows.filter((a) => a.startMin >= UNTIMED);

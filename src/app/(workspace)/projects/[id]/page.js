@@ -20,6 +20,7 @@ import { getProject, getProjectOverview, getProjectTeam } from "@/features/proje
 import { getXdatesByMonth } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
+import { getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -42,7 +43,7 @@ export default async function ProjectDetail({ params, searchParams }) {
   const admin = me?.role === "admin";
   const canManage = admin || me?.role === "manager";
 
-  const [p, overview, team, leads, options, staff, xdates] = await Promise.all([
+  const [p, overview, team, leads, options, staff, xdates, today] = await Promise.all([
     getProject(id),
     getProjectOverview(id),
     getProjectTeam(id),
@@ -50,6 +51,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getLookups(),
     canManage ? getAssignableStaff() : [],
     getXdatesByMonth({ projectId: Number(id) }),
+    getBusinessToday(),
   ]);
   if (!p) notFound();
 
@@ -142,7 +144,7 @@ export default async function ProjectDetail({ params, searchParams }) {
             }
           />
           <div className="p-5">
-            <XdateMonths data={xdates} href={xdateHref} compact />
+            <XdateMonths data={xdates} href={xdateHref} today={today} compact />
           </div>
         </Card>
 

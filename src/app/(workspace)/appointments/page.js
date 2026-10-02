@@ -70,7 +70,7 @@ export default async function AppointmentsPage() {
   const perDay = groups.map(([, list]) => list.length);
 
   const tiles = [
-    { label: "This Week", value: String(rows.length), note: "appointments scheduled",
+    { label: "Next 7 Days", value: String(rows.length), note: "appointments scheduled",
       icon: CalendarClock, accent: "var(--neon-cyan)", series: perDay, bars: true },
     { label: "Today", value: String(todayCount), note: "on the calendar",
       icon: Clock, accent: "var(--neon-amber)", series: perDay },
@@ -88,7 +88,7 @@ export default async function AppointmentsPage() {
 
   return (
     <>
-      <Topbar title="Appointments" sub={`${rows.length} appointments scheduled this week`} />
+      <Topbar title="Appointments" sub={`${rows.length} appointment${rows.length === 1 ? "" : "s"} in the next 7 days`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((t, i) => (
@@ -98,7 +98,7 @@ export default async function AppointmentsPage() {
 
         <Card>
           <SectionHeader
-            label="This Week's Schedule"
+            label="The Next 7 Days"
             icon={CalendarClock}
             action={
               <AppointmentForm

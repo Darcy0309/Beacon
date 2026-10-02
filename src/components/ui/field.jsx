@@ -1,3 +1,6 @@
+"use client";
+
+import { Children, cloneElement, isValidElement, useId } from "react";
 import { cn } from "@/lib/utils";
 
 export function Label({ className, ...props }) {
@@ -25,20 +28,33 @@ export function Select({ className, ...props }) {
 /**
  * Label + control stacked, the standard form row used across record forms.
  * Pass `error` to show a validation message beneath the control; pair it with
- * `aria-invalid` on the control itself so the border turns red.
+ * `aria-invalid` on the control itself so the border turns red. A single
+ * control is tied to its label (an id and htmlFor) and to the message beneath
+ * it (aria-describedby), so a screen reader names it and reads the error.
  */
 export function Field({ label, children, className, hint, error, required }) {
+  const id = useId();
+  const noteId = `${id}-note`;
+  const note = error || hint;
+  const only = Children.count(children) === 1 && isValidElement(children) ? children : null;
+  const controlId = only?.props.id ?? id;
+  const control = only
+    ? cloneElement(only, {
+        id: controlId,
+        "aria-describedby": [only.props["aria-describedby"], note ? noteId : null].filter(Boolean).join(" ") || undefined,
+      })
+    : children;
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
-      <Label>
+      <Label htmlFor={only ? controlId : undefined}>
         {label}
         {required ? <span className="ml-0.5 text-destructive" aria-hidden>*</span> : null}
       </Label>
-      {children}
+      {control}
       {error ? (
-        <p role="alert" className="text-[0.7rem] font-medium text-destructive">{error}</p>
+        <p id={noteId} role="alert" className="text-[0.7rem] font-medium text-destructive">{error}</p>
       ) : hint ? (
-        <p className="text-[0.7rem] text-muted-foreground">{hint}</p>
+        <p id={noteId} className="text-[0.7rem] text-muted-foreground">{hint}</p>
       ) : null}
     </div>
   );

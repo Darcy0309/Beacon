@@ -13,6 +13,8 @@ const toNotificationView = (n) => ({
   title: n.title,
   body: n.body ?? "",
   link: n.link,
+  // Who sent it, named on the row itself: a client may not read the users table.
+  from: n.sender_name ?? null,
   read: Boolean(n.read_at),
   when: timeAgo(n.created_at),
   at: n.created_at,
@@ -27,7 +29,7 @@ export async function getInbox({ page = 1, perPage = PAGE_SIZE, unreadOnly = fal
   const build = (p) => {
     let q = supabase
       .from("notifications")
-      .select("id, kind, title, body, link, read_at, created_at", { count: "exact" })
+      .select("id, kind, title, body, link, sender_name, read_at, created_at", { count: "exact" })
       .eq("user_id", me.id)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });

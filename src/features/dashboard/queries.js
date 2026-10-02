@@ -9,7 +9,8 @@ export async function getDashboardStats() {
   const { data: s, error } = await supabase.rpc("dashboard_stats");
   if (error) throw error;
 
-  const pct = (c, p) => (p === 0 ? (c > 0 ? 100 : 0) : Math.round(((c - p) / p) * 1000) / 10);
+  // Null when there is nothing to compare with: "+100%" from zero says nothing.
+  const pct = (c, p) => (p === 0 ? null : Math.round(((c - p) / p) * 1000) / 10);
 
   // Eight-week buckets, oldest first, drive both the big chart and the tile sparklines.
   const weeks = (s?.weeks ?? []).map((w, i) => ({
@@ -26,6 +27,7 @@ export async function getDashboardStats() {
     activeClients: s?.active_clients ?? 0,
     conversion: s?.leads_total ? Math.round((s.appts_total / s.leads_total) * 1000) / 10 : 0,
     leadDelta: pct(s?.leads_30d ?? 0, s?.leads_30_60d ?? 0),
+    leadsNew: s?.leads_30d ?? 0,
     apptDelta: (s?.appts_7d ?? 0) - (s?.appts_7_14d ?? 0),
     weeks,
     series: {

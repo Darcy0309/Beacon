@@ -472,19 +472,17 @@ insert into public.alert_rules (name, trigger, channel, recipients, enabled) val
   ('New appointment set',     'appt_created',  'email', 'ops@beacon.test',             true),
   ('Appointment reminder',    'appt_reminder', 'email', 'reps@beacon.test',            true),
   ('Hot lead assigned',       'hot_lead',      'inapp', null,                          true),
-  ('Daily import summary',    'import_done',   'email', 'admin@beacon.test',           true),
+  ('Import finished',         'import_done',   'email', 'admin@beacon.test',           true),
   ('Client feedback received','feedback_new',  'email', 'admin@beacon.test',           false);
 
 insert into public.alert_log (rule_id, subject, detail, status, created_at)
 select r.id, v.subject, v.detail, v.status, now() - (v.age || ' hours')::interval
+-- Only rules that really send: the X-date and appointment reminders have no job behind them yet.
 from (values
-  ('X-date 30-day warning',    'X-date approaching: Insurance Pro AZ',  'Ultimate x-date 2026-09-29 is within 30 days.',          'sent',   3),
-  ('New appointment set',      'Appointment set: Garry Insurance',      'Sean Fitzgerald set a 9:30 AM appointment.',             'sent',   7),
-  ('Appointment reminder',     'Reminder: 4 appointments today',        'Daily reminder dispatched to 3 reps.',                   'sent',  11),
-  ('Hot lead assigned',        'Hot lead: Zimmermann Agency',           'Assigned to Rachel Colestock.',                          'sent',  26),
-  ('Daily import summary',     'Import complete: az-commercial-q3.csv', '1218 of 1240 rows imported, 22 errors.',                 'sent',  50),
-  ('X-date 30-day warning',    'X-date approaching: Zimmermann Agency', 'Ultimate x-date 2026-09-24 is within 30 days.',          'sent',  74),
-  ('New appointment set',      'Appointment set: Bender Group',         'Sean Fitzgerald set a 10:00 AM appointment.',            'failed',98)
+  ('New appointment set',      'Appointment set: Garry Insurance',      'In-app to 3 people',                                     'sent',   7),
+  ('Hot lead assigned',        'Hot lead: Zimmermann Agency',           'In-app to 1 person',                                     'sent',  26),
+  ('Import finished',          'Import finished: az-commercial-q3.csv', 'In-app to 1 person',                                     'sent',  50),
+  ('New appointment set',      'Appointment set: Bender Group',         'In-app to 2 people',                                     'sent',  98)
 ) as v(rule, subject, detail, status, age)
 join public.alert_rules r on r.name = v.rule;
 

@@ -77,6 +77,7 @@ const STYLES = {
   full: { weekday: "long", month: "long", day: "numeric", year: "numeric" }, // Thursday, October 1, 2026
   month: { month: "long", year: "numeric" }, // October 2026
   short: { month: "short", day: "numeric" }, // Oct 1
+  weekday: { weekday: "short" }, // Thu
 };
 
 export function formatIso(iso, style = "long") {

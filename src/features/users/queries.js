@@ -35,29 +35,30 @@ function toUserView(u) {
 
 /**
  * One page of users, searched and filtered in the database, with each
- * account's two-factor status attached. The `mfa` facet filters on the
- * page's rows, since the status lives in the auth schema rather than a
- * column we can sort or window on.
+ * account's two-factor status attached. Two-factor lives in the auth schema,
+ * so the accounts that have it are read first and the `mfa` facet becomes an
+ * id filter on the query itself: paging and totals count only matches.
  */
 export async function listUsers(params) {
   const supabase = await createClient();
   const { mfa: mfaFilter, ...filters } = params.filters ?? {};
-  const [{ rows, total }, { data: mfa }] = await Promise.all([
-    runPaged(
-      (p) =>
-        paged(supabase.from("users").select("*, company:companies(id, name)", { count: "exact" }).order("id"), p, {
-          search: ["first_name", "last_name", "email"],
-          columns: { role: "role", status: "status" },
-        }),
-      { ...params, filters }
-    ),
-    supabase.rpc("mfa_status"),
-  ]);
-
+  // Without it the filter and every row's status would be wrong, not just missing.
+  const { data: mfa, error: mfaError } = await supabase.rpc("mfa_status");
+  if (mfaError) throw mfaError;
   const enabled = new Set((mfa ?? []).filter((m) => m.enabled).map((m) => m.user_id));
-  let list = rows.map((u) => toUserView({ ...u, mfa: enabled.has(u.id) }));
-  if (mfaFilter) list = list.filter((u) => String(u.mfa) === mfaFilter);
-  return { rows: list, total };
+  const ids = [...enabled];
+
+  const { rows, total } = await runPaged((p) => {
+    let query = supabase.from("users").select("*, company:companies(id, name)", { count: "exact" }).order("id");
+    if (mfaFilter === "true") query = query.in("id", ids);
+    else if (mfaFilter === "false" && ids.length) query = query.not("id", "in", `(${ids.join(",")})`);
+    return paged(query, p, {
+      search: ["first_name", "last_name", "email"],
+      columns: { role: "role", status: "status" },
+    });
+  }, { ...params, filters });
+
+  return { rows: rows.map((u) => toUserView({ ...u, mfa: enabled.has(u.id) })), total };
 }
 
 /** Whole-table figures for the users page tiles, including two-factor uptake. */

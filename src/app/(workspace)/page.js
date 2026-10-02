@@ -20,6 +20,7 @@ import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
+import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function Dashboard() {
   const role = me?.role ?? "client";
   const view = dashboardView(role);
 
-  const [recentLeads, appointments, s, report, projects, mine, volume] = await Promise.all([
+  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday] = await Promise.all([
     getRecentLeads(6),
     getAppointments(),
     getDashboardStats(),
@@ -52,6 +53,8 @@ export default async function Dashboard() {
     view.campaigns ? getProjects() : null,
     view.myPerformance ? getMyWorkload() : null,
     view.trend === "weeks" ? getLeadVolume() : null,
+    getBusinessTimeZone(),
+    getBusinessToday(),
   ]);
 
   // Appointments per rep ride along with the dashboard stats.
@@ -59,9 +62,11 @@ export default async function Dashboard() {
   const months = report?.months ?? [];
   const maxMonth = Math.max(1, ...months.map((m) => Math.max(m.leads, m.appts)));
 
-  const hour = new Date().getHours();
+  // The business's clock, not the server's (which runs on UTC).
+  const now = new Date();
+  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hourCycle: "h23" }).format(now));
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const today = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: tz });
 
   // Campaign progress: cumulative leads delivered per campaign, biggest first.
   const campaigns = (projects ?? []).slice().sort((a, b) => b.leads - a.leads).slice(0, 6);
@@ -85,8 +90,8 @@ export default async function Dashboard() {
     ];
   } else {
     tiles = [
-      { label: "Active Leads", value: s.totalLeads.toLocaleString(),
-        note: `${s.leadDelta >= 0 ? "+" : ""}${s.leadDelta}% vs last month`,
+      { label: "Total Leads", value: s.totalLeads.toLocaleString(),
+        note: s.leadDelta === null ? `${s.leadsNew.toLocaleString()} new this month` : `${s.leadDelta >= 0 ? "+" : ""}${s.leadDelta}% new vs last month`,
         icon: Target, accent: "var(--neon-cyan)", series: s.series.leads },
       { label: "Appointments / Week", value: String(s.apptsThisWeek),
         note: `${s.apptDelta >= 0 ? "+" : ""}${s.apptDelta} vs last week`,
@@ -160,9 +165,9 @@ export default async function Dashboard() {
               <div className="flex items-center gap-2 text-sm">
                 <Trend className={s.leadDelta >= 0 ? "size-4 text-emerald-400" : "size-4 text-rose-400"} />
                 <span className={s.leadDelta >= 0 ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
-                  {s.leadDelta >= 0 ? "+" : ""}{s.leadDelta}%
+                  {s.leadDelta === null ? s.leadsNew.toLocaleString() : `${s.leadDelta >= 0 ? "+" : ""}${s.leadDelta}%`}
                 </span>
-                <span className="text-muted-foreground">lead volume, 30 days</span>
+                <span className="text-muted-foreground">{s.leadDelta === null ? "new leads, 30 days" : "lead volume, 30 days"}</span>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm">
@@ -186,7 +191,7 @@ export default async function Dashboard() {
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             {view.trend === "weeks" ? (
-              <LeadVolumeChart days={volume} fallback={s.weeks} />
+              <LeadVolumeChart days={volume} fallback={s.weeks} today={businessToday} />
             ) : (
               <>
                 {/* Monthly totals: quiet weeks in a campaign do not read as a dip. */}
@@ -202,7 +207,8 @@ export default async function Dashboard() {
                   </div>
                   <div className="flex h-52 items-stretch gap-3">
                     {months.map((m, i) => (
-                      <div key={m.key} className="flex min-h-0 flex-1 flex-col items-center gap-2">
+                      <div key={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
+                        className="flex min-h-0 flex-1 flex-col items-center gap-2">
                         <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
                           <div className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
                             style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)", animationDelay: `${i * 70}ms` }}

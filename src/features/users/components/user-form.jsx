@@ -85,7 +85,8 @@ export default function UserForm({ user, options, trigger }) {
               {isEdit ? (
                 <Select name="status" defaultValue={dv("status", "invited")} aria-invalid={invalid("status")}>
                   <option value="active">Active</option>
-                  <option value="invited">Invited</option>
+                  {/* Invited is where an account starts, not somewhere it can be put back. */}
+                  {user?.status === "invited" ? <option value="invited">Invited</option> : null}
                   <option value="disabled">Disabled</option>
                 </Select>
               ) : (

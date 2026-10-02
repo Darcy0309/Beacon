@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
+import { matchesAll, searchWords } from "@/lib/search-words";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
@@ -153,7 +154,8 @@ export default function FilterTable({
     [filters, rows]
   );
 
-  const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
+  // The same word rules as every server-side search: each word, in any order.
+  const terms = searchWords(q);
   const shown = server
     ? rows
     : rows.filter((r) => {
@@ -161,9 +163,7 @@ export default function FilterTable({
           const want = picked[f.key];
           if (want && String(r.facets?.[f.key] ?? "") !== want) return false;
         }
-        if (terms.length === 0) return true;
-        const hay = String(r.search ?? "").toLowerCase();
-        return terms.every((t) => hay.includes(t));
+        return terms.length === 0 || matchesAll(r.search, terms);
       });
 
   const active = terms.length > 0 || Object.values(picked).some(Boolean);

@@ -21,5 +21,10 @@ export const getBusinessTimeZone = cache(async function getBusinessTimeZone() {
  * runs on UTC, where a US evening is already tomorrow.
  */
 export async function getBusinessToday() {
-  return todayIn(await getBusinessTimeZone());
+  try {
+    return todayIn(await getBusinessTimeZone());
+  } catch {
+    // A zone name the database knows but this runtime does not: Phoenix, as the database's own default.
+    return todayIn("America/Phoenix");
+  }
 }

@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { NOT_DELETED, check, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
 
 function leadPayload(formData) {
@@ -17,7 +18,8 @@ function leadPayload(formData) {
     website: s(formData, "website"),
     address: s(formData, "address"),
     city: s(formData, "city"),
-    state: s(formData, "state"),
+    // "az" or "Arizona" is stored as "AZ", as the importer stores it, so one state is one value.
+    state: normalizeState(s(formData, "state")) ?? s(formData, "state"),
     zip: s(formData, "zip"),
     county: s(formData, "county"),
     sic_code: s(formData, "sic_code"),
@@ -44,6 +46,11 @@ export async function createLead(prevState, formData) {
 
   const supabase = await createClient();
   const payload = leadPayload(formData);
+  // A lead saved without a status is New, so it is counted and filtered as New too.
+  if (!payload.status_id) {
+    const { data: fresh } = await supabase.from("lead_statuses").select("id").eq("code", "new").maybeSingle();
+    payload.status_id = fresh?.id ?? null;
+  }
 
   const { data, error } = await supabase
     .from("leads")
@@ -67,7 +74,8 @@ export async function updateLead(prevState, formData) {
   const supabase = await createClient();
   const { error } = await supabase
     .from("leads")
-    .update({ ...onlySubmitted(formData, leadPayload(formData)), date_last_worked: new Date().toISOString() })
+    // Editing the record is not working the name: only a call (record_call_result) sets date_last_worked.
+    .update(onlySubmitted(formData, leadPayload(formData)))
     .eq("id", id);
   if (error) return fail(error);
 

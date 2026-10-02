@@ -96,7 +96,8 @@ export async function searchLeadOptions(q) {
   const { data, error } = await paged(
     supabase.from("leads").select("id, company_name, contact_name, city, state").order("company_name").order("id"),
     { q, perPage: 20 },
-    { search: ["company_name", "contact_name", "phone", "city"] }
+    // search_text: company, contact, city, email and phone (also as digits), indexed.
+    { search: ["search_text"] }
   );
   if (error) throw error;
   return (data ?? []).map((l) => ({ id: l.id, co: l.company_name, contact: l.contact_name, city: cityState(l) }));
@@ -118,7 +119,8 @@ export async function listLeads(params, { projectId } = {}) {
         .order("id", { ascending: false });
       if (projectId) query = query.eq("project_id", Number(projectId));
       return paged(query, p, {
-        search: ["company_name", "contact_name", "city", "phone", "email"],
+        // search_text: company, contact, city, email and phone (also as digits), indexed.
+        search: ["search_text"],
         columns: { status: "status.code", rep: "assigned_user_id" },
       });
     },

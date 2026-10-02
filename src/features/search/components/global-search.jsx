@@ -6,13 +6,22 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
   Search, Loader2, CornerDownLeft, Target, Users, FolderKanban, UserCog, FileText, Building2, X,
 } from "lucide-react";
-import { navGroups } from "@/lib/nav";
+import { navGroups, rolesForPath } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
 import { cn } from "@/lib/utils";
 
 const MIN_CHARS = 2;
 const DEBOUNCE_MS = 250;
-const GROUP_ICONS = { leads: Target, clients: Users, projects: FolderKanban, users: UserCog, documents: FileText, carriers: Building2 };
+// What can be searched, and a page each kind opens: a role sees only the kinds it can open.
+const GROUPS = [
+  ["leads", "Leads", Target, "/leads/1"],
+  ["clients", "Clients", Users, "/clients/x"],
+  ["projects", "Projects", FolderKanban, "/projects/1"],
+  ["users", "Users", UserCog, "/users"],
+  ["documents", "Documents", FileText, "/documents"],
+  ["carriers", "Carriers", Building2, "/insurance-companies"],
+];
+const GROUP_ICONS = Object.fromEntries(GROUPS.map(([key, , icon]) => [key, icon]));
 
 /**
  * The global search palette. Opens from the topbar box or with Ctrl+K (⌘K on
@@ -61,7 +70,8 @@ export default function GlobalSearch() {
   }, [open]);
 
   // Search as the user types, debounced, dropping responses that are stale
-  // by the time they arrive.
+  // by the time they arrive. "Searching" from the first keystroke, so the
+  // palette never says "No matches" before it has looked.
   useEffect(() => {
     const term = q.trim();
     if (term.length < MIN_CHARS) {
@@ -70,9 +80,10 @@ export default function GlobalSearch() {
       setError("");
       return;
     }
+    setLoading(true);
+    setError("");
     const ctrl = new AbortController();
     const timer = setTimeout(async () => {
-      setLoading(true);
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { signal: ctrl.signal });
         const json = await res.json();
@@ -90,10 +101,11 @@ export default function GlobalSearch() {
     };
   }, [q]);
 
-  // Pages whose name matches, limited to what this role can open.
+  // Pages whose name matches, limited to what this role can open (and only
+  // once a search would run too, so nothing is listed while the hint shows).
   const pages = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return [];
+    if (term.length < MIN_CHARS) return [];
     return navGroups
       .flatMap((g) => g.items)
       .filter((i) => i.roles.includes(role) && i.label.toLowerCase().includes(term))
@@ -104,13 +116,17 @@ export default function GlobalSearch() {
   // where the group changes.
   const flat = useMemo(
     () => [
-      ...pages.map((p) => ({ key: `page:${p.href}`, href: p.href, title: p.label, subtitle: "Go to page", icon: p.icon, group: "Pages" })),
+      ...pages.map((p) => ({ key: `page:${p.href}`, href: p.href, title: p.label, subtitle: "Go to page", icon: p.icon, group: "Pages", groupKey: "pages" })),
       ...groups.flatMap((g) =>
-        g.items.map((i) => ({ key: `${g.key}:${i.id}`, href: i.href, title: i.title, subtitle: i.subtitle, icon: GROUP_ICONS[g.key] ?? Search, group: g.label }))
+        g.items.map((i) => ({
+          key: `${g.key}:${i.id}`, href: i.href, title: i.title, subtitle: i.subtitle, icon: GROUP_ICONS[g.key] ?? Search,
+          group: g.label, groupKey: g.key, count: g.total > g.items.length ? `${g.items.length} of ${g.total.toLocaleString()}` : String(g.total),
+        }))
       ),
     ],
     [pages, groups]
   );
+  const searchable = useMemo(() => GROUPS.filter(([, , , sample]) => rolesForPath(sample)?.includes(role)), [role]);
 
   useEffect(() => setActive(0), [flat]);
   useEffect(() => {
@@ -132,7 +148,8 @@ export default function GlobalSearch() {
       setActive((a) => Math.max(a - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      go(flat[active]);
+      // Only what is on screen: never a page hidden behind a hint or an error.
+      if (!status) go(flat[active]);
     }
   };
 
@@ -227,15 +244,13 @@ export default function GlobalSearch() {
                 <div className="px-3 py-6 text-center">
                   <p className="text-sm text-muted-foreground">Type at least two letters to search across</p>
                   <div className="mt-3 flex flex-wrap justify-center gap-2">
-                    {[
-                      ["Leads", Target], ["Clients", Users], ["Projects", FolderKanban],
-                      ["Users", UserCog], ["Documents", FileText], ["Carriers", Building2],
-                    ].map(([label, Icon]) => (
-                      <span key={label} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--panel-border)] bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+                    {searchable.map(([key, label, Icon]) => (
+                      <span key={key} data-search-kind={key} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--panel-border)] bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
                         <Icon className="size-3.5 text-primary" /> {label}
                       </span>
                     ))}
                   </div>
+                  <p className="mt-3 text-xs text-muted-foreground">Every word counts: “sean fitzgerald”, “drain llc”, or a phone number however it is written.</p>
                 </div>
               ) : status ? (
                 <p className="px-3 py-8 text-center text-sm text-muted-foreground" aria-live="polite">{status}</p>
@@ -246,7 +261,12 @@ export default function GlobalSearch() {
                   const isActive = i === active;
                   return (
                     <div key={item.key}>
-                      {heading ? <div className="eyebrow px-3 pb-1 pt-3 first:pt-1">{item.group}</div> : null}
+                      {heading ? (
+                        <div data-search-group={item.groupKey} className="flex items-baseline justify-between px-3 pb-1 pt-3 first:pt-1">
+                          <span className="eyebrow">{item.group}</span>
+                          {item.count ? <span className="text-[0.66rem] tabular-nums text-muted-foreground" data-group-count>{item.count}</span> : null}
+                        </div>
+                      ) : null}
                       <button
                         type="button"
                         id={`gs-${item.key}`}
