@@ -65,6 +65,16 @@ in the database, which in a single transaction:
   charged back), and charges back an invalid lead or appointment against
   whoever was paid for it.
 
+A name becomes a Lead or an Appointment only with its **Ultimate X-Date**
+(a date on a policy line is a renewal the account manager has not confirmed
+yet): the call result panel asks for it with the result, and
+`record_call_result()` refuses one without it, and an appointment without
+its date and time. The panel names everything missing at once. "Lead-Hot
+Lead" promotes like Lead, marked as an X-date hot lead, which alerts the
+appointment manager. New names from an import start on "Viable-CallBack"
+(once "Viable-No Contact", which still finds it). Notes open with the date
+and the writer's username ("10/2/26 seanf:").
+
 QA, confirmation and invalid marks change only through these steps: a
 trigger refuses them written straight to `appointments` by anyone but an
 administrator, and an appointment saved from a form waits for QA like one
@@ -227,7 +237,7 @@ signs out.
 | Command | Needs | What |
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), validation rules, form ↔ schema contract |
-| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked) |
+| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs) |
 | `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, dropdowns in both themes, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 

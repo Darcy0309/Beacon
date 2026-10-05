@@ -100,7 +100,8 @@ export async function importLeadsCsv(prevState, formData) {
         result = resultFor("APPT", lead.call_result_appt)
           ?? byName("APPT", result.effect === "appointment" ? result.name : "Lead-No Contact");
       }
-      result ??= byName(stageType, stageType === "DBDV" ? "Viable-No Contact" : "Lead-No Contact");
+      // New names start on the client's first result: Viable-CallBack (DBDev) or Lead-No Contact (Appt).
+      result ??= byName(stageType, stageType === "DBDV" ? "Viable-CallBack" : "Lead-No Contact");
       return {
         ...lead,
         project_id: target,

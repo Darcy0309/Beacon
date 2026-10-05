@@ -126,7 +126,7 @@ try {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const r1 = await seanApi.sb.rpc("record_call_result", { p_lead_id: a, p_result_id: result("DBDV", "Not Interested"), p_notes: null, p_appointment: null, p_corrected_xdate: null });
   const r2 = await seanApi.sb.rpc("record_call_result", { p_lead_id: b, p_result_id: result("DBDV", "Appointment"), p_notes: null,
-    p_appointment: { date: tomorrow, time: "10:00 AM", duration: 30, rep_name: "Bret Godsey" }, p_corrected_xdate: null });
+    p_appointment: { date: tomorrow, time: "10:00 AM", duration: 30, rep_name: "Bret Godsey" }, p_corrected_xdate: null, p_ultimate_xdate: "2027-03-01" });
   check("Sean makes two calls, one an appointment", !r1.error && !r2.error, r1.error?.message ?? r2.error?.message);
 
   await admin.go(`/reports/production?period=today&project=${PROJECT}`, 4000);

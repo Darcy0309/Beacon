@@ -109,6 +109,10 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  // With no Ultimate X-Date, the soonest policy line is a renewal to confirm before a Lead or Appointment.
+  const soonest = ins?.ultimate_xdate ? null : xdates.filter(([, k]) => k !== "ultimate_xdate").map(([label, k]) => ({ label, date: ins[k] }))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+  const renewalHint = soonest ? `${soonest.label} renews ${shortDate(soonest.date)}` : null;
   const tel = telHref(r.phone);
   // data-lead-id: pressing a phone link starts the call's time for this name.
   const phone = tel ? <a href={tel} data-lead-id={lead.id} className="tabular-nums transition-colors hover:text-primary">{r.phone}</a> : null;
@@ -323,6 +327,9 @@ export default async function LeadSheet({ params, searchParams }) {
                 projectType={r.projectType}
                 results={results}
                 followUp={followUp}
+                ultimateXdate={ins?.ultimate_xdate ?? null}
+                renewalHint={renewalHint}
+                timeZone={tz}
               />
             ) : staff ? (
               <Card className="p-5 text-sm text-muted-foreground">

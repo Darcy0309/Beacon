@@ -57,9 +57,13 @@ const rachel = await signIn("rachel@beacon.test");
 const agent = await signIn("agent@beacon.test");
 const as = (uid) => (uid === SEAN ? sean : uid === RACHEL ? rachel : uid === MIKE ? mike : null);
 
+// A Lead or an Appointment needs the name's Ultimate X-Date: give one when the name has none.
+const needsXdate = (name) => /^(Lead|Lead-Hot Lead|Appointment|Appointment-Phone)$/.test(name);
+const hasXdate = (leadId) => sql(`select count(*) from public.insurance_details where lead_id=${leadId} and ultimate_xdate is not null`) !== "0";
 const record = (who, leadId, type, name, extra = {}) => who.sb.rpc("record_call_result", {
   p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: null,
   p_appointment: extra.appointment ?? null, p_corrected_xdate: null,
+  p_ultimate_xdate: needsXdate(name) && !hasXdate(leadId) ? "2027-03-01" : null,
 });
 const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
 const APPOINTMENT = { date: tomorrow, time: "10:30 AM", duration: 30, rep_name: "Bret Godsey" };

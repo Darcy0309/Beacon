@@ -52,8 +52,12 @@ const mike = await signIn("mike@beacon.test");
 const agent = await signIn("agent@beacon.test");
 const client = await signIn("client@beacon.test");
 
+// A Lead or an Appointment needs the name's Ultimate X-Date: give one when the name has none.
+const needsXdate = (name) => /^(Lead|Lead-Hot Lead|Appointment|Appointment-Phone)$/.test(name);
+const hasXdate = (leadId) => sql(`select count(*) from public.insurance_details where lead_id=${leadId} and ultimate_xdate is not null`) !== "0";
 const record = (who, leadId, type, name, appointment = null) =>
-  who.sb.rpc("record_call_result", { p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: null, p_appointment: appointment, p_corrected_xdate: null });
+  who.sb.rpc("record_call_result", { p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: null, p_appointment: appointment, p_corrected_xdate: null,
+    p_ultimate_xdate: needsXdate(name) && !hasXdate(leadId) ? "2027-03-01" : null });
 
 try {
   section("Recording an appointment again moves it");

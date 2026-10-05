@@ -271,6 +271,8 @@ export const schemas = {
     duration_min: [oneOf(DURATIONS, "Choose a duration")],
     rep_name: [max(80)],
     corrected_xdate: [date],
+    // A Lead or an Appointment needs it; the action says so when it is missing.
+    ultimate_xdate: [date],
   },
 
   // Settings › Pay & time: the ranges project and hourly rates are picked from, and how time is counted.

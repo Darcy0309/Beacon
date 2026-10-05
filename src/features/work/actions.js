@@ -8,15 +8,31 @@ import { schemas } from "@/lib/validate";
 
 // record_call_result() explains what a result needs; show it beside the field.
 const FIELD_FOR = [
+  [/Ultimate X-Date/i, "ultimate_xdate"],
   [/appointment date|date has passed/i, "appt_date"],
-  [/like 9:30 AM/i, "appt_time"],
+  [/appointment time|like 9:30 AM/i, "appt_time"],
   [/corrected renewal date/i, "corrected_xdate"],
 ];
 
+// What a Lead or an Appointment cannot be saved without: [field, what it is, what to say beside it].
+const NEEDS = {
+  promote: [["ultimate_xdate", "the Ultimate X-Date", "Required for a Lead: confirm the renewal date"]],
+  appointment: [
+    ["ultimate_xdate", "the Ultimate X-Date", "Required for an Appointment: confirm the renewal date"],
+    ["appt_date", "the appointment date", "Choose the date"],
+    ["appt_time", "the appointment time", "Choose the time"],
+  ],
+};
+
+const listed = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`);
+
 /**
  * Record one call result. The database applies everything the result does
- * (list, weight, promotion, appointment, QA, pay) in one transaction. When
- * the call came from a call list, the answer carries the next name on it.
+ * (list, weight, promotion, appointment, QA, pay) in one transaction. A Lead
+ * or an Appointment needs its Ultimate X-Date, and an appointment its date
+ * and time: anything missing is named, all at once, before anything is
+ * saved. When the call came from a call list, the answer carries the next
+ * name on it.
  */
 export async function recordCallResult(prevState, formData) {
   const { values, failed } = check(formData, schemas.callResult);
@@ -24,6 +40,17 @@ export async function recordCallResult(prevState, formData) {
 
   const supabase = await createClient();
   const leadId = Number(values.lead_id);
+
+  const { data: result } = await supabase.from("call_results").select("effect").eq("id", Number(values.result_id)).maybeSingle();
+  const missing = (NEEDS[result?.effect] ?? []).filter(([field]) => !values[field]);
+  if (missing.length) {
+    return fail(
+      `Missing ${listed(missing.map(([, what]) => what))}.`,
+      Object.fromEntries(missing.map(([field, , say]) => [field, say])),
+      values
+    );
+  }
+
   const appointment = values.appt_date
     ? { date: values.appt_date, time: values.appt_time || null, duration: n(formData, "duration_min"), rep_name: s(formData, "rep_name") }
     : null;
@@ -34,6 +61,7 @@ export async function recordCallResult(prevState, formData) {
     p_notes: values.notes || null,
     p_appointment: appointment,
     p_corrected_xdate: values.corrected_xdate || null,
+    p_ultimate_xdate: values.ultimate_xdate || null,
   });
   if (error) {
     const field = FIELD_FOR.find(([re]) => re.test(error.message))?.[1];

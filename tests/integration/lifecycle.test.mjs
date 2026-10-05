@@ -62,10 +62,16 @@ const admin = await signIn("admin@beacon.test");
 const agent = await signIn("agent@beacon.test");
 const client = await signIn("client@beacon.test");
 
+// A Lead or an Appointment needs the name's Ultimate X-Date: give one when
+// the name has none, as the account manager would enter it with the result.
+const needsXdate = (name) => /^(Lead|Lead-Hot Lead|Appointment|Appointment-Phone)$/.test(name);
+const hasXdate = (leadId) => sql(`select count(*) from public.insurance_details where lead_id=${leadId} and ultimate_xdate is not null`) !== "0";
+
 async function record(who, leadId, type, name, extra = {}) {
   const { data, error } = await who.sb.rpc("record_call_result", {
     p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: extra.notes ?? null,
     p_appointment: extra.appointment ?? null, p_corrected_xdate: extra.xdate ?? null,
+    p_ultimate_xdate: extra.ultimate ?? (needsXdate(name) && !hasXdate(leadId) ? "2027-03-01" : null),
   });
   return { data, error };
 }
@@ -79,7 +85,7 @@ const APPOINTMENT = { date: tomorrow, time: "10:30 AM", duration: 45, rep_name: 
 
 try {
   section("DBDev: results that keep the name on the list");
-  for (const name of ["Viable-No Contact", "Viable-Staged", "Viable-Left Message", "Viable-Email"]) {
+  for (const name of ["Viable-CallBack", "Viable-Staged", "Viable-Left Message", "Viable-Email"]) {
     const id = newName(DBDV, SEAN);
     const { error } = await record(sean, id, "DBDV", name, { notes: "called" });
     const s = lead(id);
@@ -222,7 +228,7 @@ try {
     check("Someone not on the project cannot record on the name", /not on your call list/i.test(stranger.error?.message ?? ""), stranger.error?.message);
     const byClient = await record(client, id, "DBDV", "Not Interested");
     check("A client cannot record results", !!byClient.error);
-    check("…and none of that touched the name", lead(id).weight === 0 && lead(id).result === "Viable-No Contact");
+    check("…and none of that touched the name", lead(id).weight === 0 && lead(id).result === "Viable-CallBack");
   }
   {
     // A DBDev project not linked to an Appt project cannot promote.

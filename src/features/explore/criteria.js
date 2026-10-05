@@ -11,7 +11,7 @@ export const MONTHS = [
 ];
 
 /** The most leads one CSV export holds; beyond this, narrow the question. */
-export const EXPORT_LIMIT = 10000;
+export const EXPORT_LIMIT = 20000;
 
 /** Every criterion, in the order the panel lays them out. */
 export const FIELDS = [

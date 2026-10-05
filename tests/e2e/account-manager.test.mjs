@@ -74,30 +74,49 @@ try {
   check("four boxes: business, contact, coverage, where it stands", ["BUSINESS", "CONTACT", "COVERAGE", "WHERE IT STANDS"].every((b) => t.toUpperCase().includes(b)));
   check("history underneath", /CALL HISTORY/i.test(t) && /APPOINTMENTS/i.test(t));
   const dbdvButtons = await buttons(sean);
-  check("DBDev result buttons on the right", ["Viable-No Contact", "Viable-Left Message", "Lead", "Appointment-Phone", "Not Interested", "Pending"].every((b) => dbdvButtons.includes(b)), dbdvButtons.join(", "));
+  check("DBDev result buttons on the right", ["Viable-CallBack", "Viable-Left Message", "Lead", "Lead-Hot Lead", "Appointment-Phone", "Not Interested", "Pending"].every((b) => dbdvButtons.includes(b)), dbdvButtons.join(", "));
+  check("Viable-No Contact is now Viable-CallBack", !dbdvButtons.includes("Viable-No Contact"));
   check("no appointment-project buttons on a DBDev name", !dbdvButtons.includes("Lead-No Contact") && !dbdvButtons.includes("Lead-Not Shopping"));
   check("the list position and Change project are shown", /5\s*left/.test(t) && /Change project/i.test(t));
   await shot(sean, "am-lead-sheet");
 
   section("Working the list");
   await pick(sean, "Viable-Left Message");
-  check("choosing a result shows what it will do (the client's words)", /Stays on active DBDev call lists/.test(await sean.text()));
-  await sean.fill('textarea[name="notes"]', "Left a message with the office manager");
+  check("choosing a result shows no description over the notes", !/Stays on active DBDev call lists/.test(await sean.text()));
+  check("…which shows on hover instead", /Stays on active DBDev call lists/.test(await sean.ev(`[...document.querySelectorAll('button[aria-pressed]')].find((b) => b.textContent.trim() === 'Viable-Left Message')?.title ?? ''`)));
+  // The notes open with the date (the business's) and who is writing: "10/2/26 seanf: ".
+  const [y, m, d] = sql("select (now() at time zone public.business_tz())::date").split("-");
+  const stamp = `${Number(m)}/${Number(d)}/${y.slice(2)} seanf:`;
+  const opened = await until(() => sean.ev(`document.querySelector('textarea[name="notes"]')?.value ?? ''`).then((v) => v.startsWith(stamp) && v));
+  check("entering the notes starts them with the date and username", Boolean(opened), `${await sean.ev(`document.querySelector('textarea[name="notes"]')?.value`)} vs ${stamp}`);
+  await sean.fill('textarea[name="notes"]', `${stamp} Left a message with the office manager`);
   await save(sean);
+  check("…and the note is saved with it", sql(`select notes from public.call_records where lead_id=${names[0]} order by id desc limit 1`) === `${stamp} Left a message with the office manager`);
   check("saving moves on to the next name", (await sean.url()) === `/leads/${names[1]}?project=${DBDV}`, await sean.url());
   check("the first name stays on the list, called once", lead(names[0]).result === "Viable-Left Message" && lead(names[0]).weight === 1);
 
   await pick(sean, "Lead");
+  check("a Lead asks for the Ultimate X-Date", await until(() => sean.ev(`!!document.querySelector('input[name="ultimate_xdate"]')`)));
+  await sean.click("button", "Save:");
+  check("saving without it says what is missing", Boolean(await until(() => sean.ev(`[...document.querySelectorAll('[role=alert]')].some((e) => /Missing the Ultimate X-Date/.test(e.textContent))`))));
+  check("…and records nothing", lead(names[1]).weight === 0 && lead(names[1]).stage === "dbdev");
+  // Typed into the date box, as a person would; leaving it sets the date.
+  await sean.fill('input[aria-label="Ultimate X-Date"]', "3/1/27");
+  await sean.ev("document.activeElement?.blur()");
   await save(sean);
+  check("…with it, the X-date is on the record", sql(`select ultimate_xdate from public.insurance_details where lead_id=${names[1]}`) === "2027-03-01");
   const promoted = lead(names[1]);
   check("Lead: promoted to the appointment project, handed to Mike", promoted.project_id === APPT && promoted.stage === "appt" && promoted.rep === MIKE && promoted.result === "Lead-No Contact", JSON.stringify(promoted));
   check("…and Sean moved on to the third name", (await sean.url()) === `/leads/${names[2]}?project=${DBDV}`);
 
   await pick(sean, "Appointment-Phone");
-  check("an appointment result asks for the date and time", await sean.ev(`!!document.querySelector('input[name="appt_date"]') && !!document.querySelector('select[name="appt_time"]')`));
+  check("an appointment result asks for the X-date, date and time", await sean.ev(`!!document.querySelector('input[name="ultimate_xdate"]') && !!document.querySelector('input[name="appt_date"]') && !!document.querySelector('select[name="appt_time"]')`));
   await sean.click("button", "Save:");
-  check("saving without a date explains, beside the date", !!(await until(() => sean.ev(`[...document.querySelectorAll('[role=alert]')].some((e) => /appointment date/i.test(e.textContent))`))));
+  const missing = await until(() => sean.ev(`[...document.querySelectorAll('[role=alert]')].map((e) => e.textContent).find((t) => /^Missing/.test(t)) ?? ''`));
+  check("saving with nothing filled in names everything missing at once", /Ultimate X-Date/.test(missing) && /appointment date/.test(missing) && /appointment time/.test(missing), missing);
   check("…and records nothing", lead(names[2]).weight === 0);
+  await sean.fill('input[aria-label="Ultimate X-Date"]', "4/1/27");
+  await sean.ev("document.activeElement?.blur()");
   await sean.fill('input[name="appt_date"]', tomorrow);
   await sean.fill('select[name="appt_time"]', "2:30 PM");
   await sean.fill('input[name="rep_name"]', "Bret Godsey");

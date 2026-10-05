@@ -133,7 +133,7 @@ try {
     check("the renewal-month panel shows every month with leads", shownMonths === months, `${shownMonths} vs ${months}`);
     const total = Number(sql("select count(*) from public.leads"));
     const capNote = await page.ev("document.querySelector('[data-export-cap]')?.textContent ?? ''");
-    check("the export says when it would be cut short", total > 10000 ? /first 10,000/.test(capNote) : capNote === "", `${total} leads; "${capNote}"`);
+    check("the export says when it would be cut short", total > 20000 ? /first 20,000/.test(capNote) : capNote === "", `${total} leads; "${capNote}"`);
     const download = await page.ev("(() => { const a = [...document.querySelectorAll('a')].find((e) => e.textContent.includes('Export CSV')); return a ? { download: a.hasAttribute('download'), href: a.getAttribute('href') } : null; })()");
     check("Export CSV is a plain download link", download?.download === true && download.href.startsWith("/api/explore/export"), JSON.stringify(download));
     const res = await fetch(`${APP_URL}/api/explore/export?months=9`, { headers: { cookie: cookies["admin@beacon.test"] ?? cookieHeader(await sessionCookies("admin@beacon.test")) } });
@@ -141,7 +141,7 @@ try {
     check("the CSV has the renewal date column", csv.split("\r\n")[0].includes("Renewal Date"), csv.split("\r\n")[0]);
     const sept = Number(sql("select count(*) from public.leads l where extract(month from public.lead_renewal_date(l.id)) = 9"));
     check("September in the CSV counts every policy line, like the page", Number(res.headers.get("x-total-count")) === sept, `${res.headers.get("x-total-count")} vs ${sept}`);
-    check("not marked cut short when it is whole", res.headers.get("x-truncated") === (sept > 10000 ? "true" : null), String(res.headers.get("x-truncated")));
+    check("not marked cut short when it is whole", res.headers.get("x-truncated") === (sept > 20000 ? "true" : null), String(res.headers.get("x-truncated")));
     await shot(page, "explore");
     page.close();
   }

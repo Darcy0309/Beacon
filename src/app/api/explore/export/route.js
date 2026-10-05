@@ -5,6 +5,9 @@ import { rolesForPath } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
 
+// Leads read per request: under the database's 10,000-row page, and small enough to stream steadily.
+const BATCH = 5000;
+
 const COLUMNS = [
   ["Company", (r) => r.company_name],
   ["Contact", (r) => r.contact_name],
@@ -35,7 +38,8 @@ const cell = (v) => {
 /**
  * The explorer's current question as a CSV. Same criteria as the page, run
  * as the signed-in user, so Row Level Security scopes the export too. At
- * most EXPORT_LIMIT leads, newest first; X-Truncated marks a partial file.
+ * most EXPORT_LIMIT (20,000) leads, newest first, streamed in batches;
+ * X-Truncated marks a partial file.
  */
 export async function GET(request) {
   // The same roles that can open the explorer page may export from it.
@@ -47,17 +51,44 @@ export async function GET(request) {
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const criteria = readCriteria(sp);
   try {
-    const { rows, total } = await exploreLeads(criteria, { page: 1, perPage: EXPORT_LIMIT });
-    const lines = [COLUMNS.map(([h]) => h).join(","), ...rows.map((r) => COLUMNS.map(([, get]) => cell(get(r))).join(","))];
+    // Read in batches and stream them out: a file of EXPORT_LIMIT (20,000)
+    // leads is too big to build whole within the host's response limits.
+    // The first batch also says how many leads match.
+    const first = await exploreLeads(criteria, { page: 1, perPage: BATCH });
+    const total = first.total;
+    const count = Math.min(total, EXPORT_LIMIT);
+    const encoder = new TextEncoder();
+    const line = (r) => COLUMNS.map(([, get]) => cell(get(r))).join(",");
+    const body = new ReadableStream({
+      async start(controller) {
+        try {
+          controller.enqueue(encoder.encode(`﻿${COLUMNS.map(([h]) => h).join(",")}\r\n`));
+          let rows = first.rows;
+          let sent = 0;
+          for (let page = 1; rows.length && sent < count; ) {
+            const take = rows.slice(0, count - sent);
+            controller.enqueue(encoder.encode(`${take.map(line).join("\r\n")}\r\n`));
+            sent += take.length;
+            if (sent >= count || rows.length < BATCH) break;
+            page += 1;
+            rows = (await exploreLeads(criteria, { page, perPage: BATCH })).rows;
+          }
+          controller.close();
+        } catch (err) {
+          console.error("[explore/export]", err?.message ?? err);
+          controller.error(err);
+        }
+      },
+    });
     const stamp = new Date().toISOString().slice(0, 10);
-    return new Response(`﻿${lines.join("\r\n")}\r\n`, {
+    return new Response(body, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": `attachment; filename="lighthouse-leads-${stamp}.csv"`,
         "X-Total-Count": String(total),
-        "X-Exported-Count": String(rows.length),
+        "X-Exported-Count": String(count),
         // Set when the question matched more leads than one export holds; the page says so beside the button.
-        ...(total > rows.length ? { "X-Truncated": "true" } : {}),
+        ...(total > count ? { "X-Truncated": "true" } : {}),
         "Cache-Control": "no-store",
       },
     });

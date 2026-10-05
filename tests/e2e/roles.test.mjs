@@ -132,6 +132,9 @@ try {
   await saveResult(sean);
   check("manager: a result saves and the next name opens", (await sean.path()) !== first && (await sean.url()).includes(`project=${DBDV}`));
   await pick(sean, "Appointment-Phone");
+  // An appointment needs the name's Ultimate X-Date as well as its own date and time.
+  await sean.fill('input[aria-label="Ultimate X-Date"]', "5/1/27");
+  await sean.ev("document.activeElement?.blur()");
   await sean.fill('input[name="appt_date"]', tomorrow);
   await sean.fill('select[name="appt_time"]', "11:00 AM");
   await saveResult(sean);
