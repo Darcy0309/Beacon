@@ -88,7 +88,8 @@ try {
   section("Pay & Hours");
   {
     await admin.go("/reports/pay", 4000);
-    const row = await admin.ev(`[...document.querySelectorAll('tr[data-person="${RACHEL}"] td')].map((td) => td.innerText.trim())`);
+    // textContent: the badge is upper-cased by CSS, which innerText would report.
+    const row = await admin.ev(`[...document.querySelectorAll('tr[data-person="${RACHEL}"] td')].map((td) => td.textContent.replace(/\\s+/g, ' ').trim())`);
     check("Rachel's row: hybrid at $16/hr, with her time today", row[1]?.includes("Hybrid · $16.00/hr") && /\dm|\dh/.test(row[2] ?? ""), JSON.stringify(row));
     check("the rules are spelled out", /stops after 5 minutes/.test(await admin.ev(`document.querySelector('[data-rules]')?.textContent ?? ''`)));
     await admin.click(`tr[data-person="${RACHEL}"] a`, "Rachel");

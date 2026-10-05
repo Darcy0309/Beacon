@@ -54,6 +54,8 @@ export async function getPayReport({ from, to, userId = null }) {
   return (data ?? []).map((r) => {
     const paidMinutes = n(r.paid_minutes);
     const pay = n(r.pay);
+    // Hourly pay applies to hybrid pay only; a rate kept on a commission profile earns nothing.
+    const hourlyPay = r.pay_model === "hybrid" ? n(r.hourly_pay) : 0;
     return {
       id: r.user_id,
       name: fullName(r) || r.email,
@@ -63,11 +65,11 @@ export async function getPayReport({ from, to, userId = null }) {
       rate: r.hourly_rate == null ? null : n(r.hourly_rate),
       workedMinutes: n(r.worked_minutes),
       paidMinutes,
-      hourlyPay: n(r.hourly_pay),
+      hourlyPay,
       commission: n(r.commission),
       pay,
       // Which side of a hybrid won, for the report to say so.
-      paidBy: r.pay_model === "hybrid" ? (n(r.hourly_pay) > n(r.commission) ? "hourly" : "commission") : "commission",
+      paidBy: r.pay_model === "hybrid" && hourlyPay > n(r.commission) ? "hourly" : "commission",
       perHour: paidMinutes ? pay / (paidMinutes / 60) : null,
       calls: n(r.calls),
       leads: n(r.leads),

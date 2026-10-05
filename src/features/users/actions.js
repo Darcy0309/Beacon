@@ -10,7 +10,7 @@ import { revalidatePath } from "next/cache";
 import { NOT_DELETED, check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { cross, schemas } from "@/lib/validate";
+import { cross, formValues, schemas } from "@/lib/validate";
 
 /**
  * An administrator whose own account is active. The role alone is not
@@ -25,7 +25,7 @@ const activeAdmin = (me) => me?.role === "admin" && me.status === "active";
  * range in Settings is refused by the database; say so beside the field.
  * The rate is kept when switching to commission, so switching back restores it.
  */
-async function savePay(supabase, userId, role, formData) {
+async function savePay(supabase, userId, role, formData, values) {
   if (!["manager", "agent"].includes(role) || !formData.has("pay_model")) return null;
   const row = { user_id: userId, pay_model: s(formData, "pay_model") || "commission" };
   if (formData.has("hourly_rate")) {
@@ -34,7 +34,7 @@ async function savePay(supabase, userId, role, formData) {
   }
   const { error } = await supabase.from("pay_profiles").upsert(row, { onConflict: "user_id" });
   if (!error) return null;
-  return fail(error, /hourly rate/i.test(error.message) ? { hourly_rate: error.message } : null);
+  return fail(error, /hourly rate/i.test(error.message) ? { hourly_rate: error.message } : null, values);
 }
 
 /**
@@ -54,6 +54,11 @@ export async function saveUser(prevState, formData) {
   const me = await currentAppUser(supabase);
   if (!activeAdmin(me)) return fail("Only administrators can manage user accounts.");
 
+  // A refused save sends back what was submitted: the form resets to it, so
+  // nothing the administrator chose (a role, hybrid pay) quietly reverts.
+  const values = formValues(formData, Object.keys(schemas.user));
+  const back = (error, fields = null) => fail(error, fields, values);
+
   const id = idFrom(formData);
   const payload = {
     first_name: s(formData, "first_name"),
@@ -68,29 +73,29 @@ export async function saveUser(prevState, formData) {
   if (id) {
     const status = s(formData, "status") || "active";
     if (id === me.id && (payload.role !== "admin" || status !== "active")) {
-      return fail("You can't remove your own administrator access. Ask another administrator to.");
+      return back("You can't remove your own administrator access. Ask another administrator to.");
     }
     const { data: before } = await supabase.from("users").select("auth_id, status, email").eq("id", id).maybeSingle();
-    if (!before) return fail("That user no longer exists.");
+    if (!before) return back("That user no longer exists.");
     // Invited lasts until they set a password; putting an account back there would lift a ban without enabling it.
     if (status === "invited" && before.status !== "invited") {
-      return fail("An account can't be put back to Invited. Disable it instead.", { status: "Choose Active or Disabled" });
+      return back("An account can't be put back to Invited. Disable it instead.", { status: "Choose Active or Disabled" });
     }
     const sameEmail = (before.email ?? "").toLowerCase() === payload.email;
     if (before.auth_id && !sameEmail) {
-      return fail("The email of an account that can sign in can't be changed here. Invite a new user instead.", { email: "Can't change" });
+      return back("The email of an account that can sign in can't be changed here. Invite a new user instead.", { email: "Can't change" });
     }
     // Keep the stored spelling; only the letter case of what was typed may differ.
     if (sameEmail) payload.email = before.email;
 
     // Pay first: a rate outside its range stops the save before anything has changed.
-    const payFailed = await savePay(supabase, id, payload.role, formData);
+    const payFailed = await savePay(supabase, id, payload.role, formData, values);
     if (payFailed) return payFailed;
 
     // .select() so a write Row Level Security refused reads as a failure, before the Auth change below.
     const { data: saved, error } = await supabase.from("users").update({ ...payload, status }).eq("id", id).select("id");
-    if (error) return fail(error);
-    if (!saved?.length) return fail("You don't have permission to change that account.");
+    if (error) return back(error);
+    if (!saved?.length) return back("You don't have permission to change that account.");
 
     if (before.status !== status && before.auth_id) {
       const admin = createAdminClient();
@@ -114,12 +119,12 @@ export async function saveUser(prevState, formData) {
   // invitation (expired link, lost email) is simply sent again.
   const existing = await userByEmail(supabase, payload.email);
   if (existing?.auth_id && existing.status !== "invited") {
-    return fail("An account with that email already exists.", { email: "Already in use" });
+    return back("An account with that email already exists.", { email: "Already in use" });
   }
 
   const sent = await sendInvitation(supabase, payload.email, payload, existing);
-  if (sent.error) return fail(sent.error);
-  const payFailed = await savePay(supabase, sent.id, payload.role, formData);
+  if (sent.error) return back(sent.error);
+  const payFailed = await savePay(supabase, sent.id, payload.role, formData, values);
   if (payFailed) return { ...payFailed, error: `Invitation sent, but their pay was not saved: ${payFailed.error}` };
 
   await logActivity(supabase, existing?.auth_id ? "user.reinvite" : "user.invite", { entity: "user", entityId: sent.id, detail: payload.email });

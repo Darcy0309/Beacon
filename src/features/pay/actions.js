@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { check, currentAppUser, fail, logActivity, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
-import { cross, schemas } from "@/lib/validate";
+import { cross, formValues, schemas } from "@/lib/validate";
 
 const money = (formData, key) => Math.round(Number(String(formData.get(key) ?? "").replace(/[$,\s]/g, "")) * 100) / 100;
 const whole = (formData, key) => Number.parseInt(String(formData.get(key) ?? ""), 10);
@@ -43,7 +43,7 @@ export async function savePayRules(prevState, formData) {
     { key: "pay_rates", value: rates, updated_at: now },
     { key: "time_tracking", value: time, updated_at: now },
   ]);
-  if (error) return fail(error);
+  if (error) return fail(error, null, formValues(formData, Object.keys(schemas.payRules)));
 
   await logActivity(supabase, "settings.pay", {
     entity: "settings",

@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { check, deleteRow, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
-import { cross, schemas } from "@/lib/validate";
+import { cross, formValues, schemas } from "@/lib/validate";
 
 export async function saveProject(prevState, formData) {
   const { failed } = check(formData, schemas.project, cross.project);
@@ -103,7 +103,8 @@ export async function saveProjectRates(prevState, formData) {
     // A rate outside its range in Settings: say so beside that rate.
     const field = [[/^Lead pay/, "lead_rate"], [/^Appointment pay/, "appointment_rate"], [/^Special pay/, "confirmation_rate"]]
       .find(([re]) => re.test(error.message))?.[1];
-    return fail(error, field ? { [field]: error.message } : null);
+    // With what was chosen, so the form resets to it rather than to the old rates.
+    return fail(error, field ? { [field]: error.message } : null, formValues(formData, Object.keys(schemas.projectRates)));
   }
 
   await logActivity(supabase, "project.rates", {

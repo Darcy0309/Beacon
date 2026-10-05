@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, cloneElement, isValidElement, useId } from "react";
+import { Children, cloneElement, isValidElement, useCallback, useId, useLayoutEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export function Label({ className, ...props }) {
@@ -12,9 +12,36 @@ export function Label({ className, ...props }) {
   );
 }
 
-export function Select({ className, ...props }) {
+/**
+ * A native select in the app's style. An uncontrolled one keeps its
+ * `defaultValue` in step with the page: React applies a select's default
+ * only when it mounts, so after a refused save (React resets the form, and
+ * the action sends back what was submitted) it would otherwise snap back to
+ * the choice the form opened with, and the next save would quietly send that.
+ */
+export function Select({ className, ref, ...props }) {
+  const own = useRef(null);
+  const setRef = useCallback(
+    (node) => {
+      own.current = node;
+      if (typeof ref === "function") ref(node);
+      else if (ref) ref.current = node;
+    },
+    [ref]
+  );
+  const { value, defaultValue } = props;
+  useLayoutEffect(() => {
+    const el = own.current;
+    if (!el || value !== undefined || defaultValue === undefined) return;
+    const want = String(defaultValue ?? "");
+    if (![...el.options].some((o) => o.value === want)) return;
+    for (const o of el.options) o.defaultSelected = o.value === want;
+    el.value = want;
+  }, [value, defaultValue]);
+
   return (
     <select
+      ref={setRef}
       className={cn(
         "h-9 w-full rounded-md border border-input bg-background/60 px-2.5 text-sm outline-none transition-colors focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50",
         "aria-[invalid=true]:border-destructive aria-[invalid=true]:focus-visible:ring-destructive/30",

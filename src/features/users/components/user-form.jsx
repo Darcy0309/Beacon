@@ -40,6 +40,15 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
     }
   }, [state, isEdit, router, setOpen]);
 
+  // After a save, React resets the form to what the action sent back (or to
+  // the saved record); the parts shown for a role or for hybrid pay follow
+  // the fields, so the form never shows hybrid fields under "Commission only".
+  useEffect(() => {
+    if (state === EMPTY) return;
+    setRole(state?.values?.role || user?.role || "agent");
+    setPayModel(state?.values?.pay_model || pay?.model || "commission");
+  }, [state, user?.role, pay?.model]);
+
   const { companies = [] } = options ?? {};
   const record = {
     ...(user ? { ...user, company_id: user.company?.id ?? "" } : { role: "agent", status: "invited" }),
