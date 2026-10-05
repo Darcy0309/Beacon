@@ -20,6 +20,24 @@ import { cross, schemas } from "@/lib/validate";
 const activeAdmin = (me) => me?.role === "admin" && me.status === "active";
 
 /**
+ * How an account manager or agent is paid (pay_profiles), from the user
+ * form: commission only, or hybrid with an hourly rate. A rate outside the
+ * range in Settings is refused by the database; say so beside the field.
+ * The rate is kept when switching to commission, so switching back restores it.
+ */
+async function savePay(supabase, userId, role, formData) {
+  if (!["manager", "agent"].includes(role) || !formData.has("pay_model")) return null;
+  const row = { user_id: userId, pay_model: s(formData, "pay_model") || "commission" };
+  if (formData.has("hourly_rate")) {
+    const raw = s(formData, "hourly_rate");
+    row.hourly_rate = raw === null ? null : Math.round(Number(raw.replace(/[$,\s]/g, "")) * 100) / 100;
+  }
+  const { error } = await supabase.from("pay_profiles").upsert(row, { onConflict: "user_id" });
+  if (!error) return null;
+  return fail(error, /hourly rate/i.test(error.message) ? { hourly_rate: error.message } : null);
+}
+
+/**
  * Invite a new user or change an existing one. Administrators only — the
  * database enforces that too, but this uses the Auth admin API, which does
  * not, so the check is made here as well.
@@ -65,6 +83,10 @@ export async function saveUser(prevState, formData) {
     // Keep the stored spelling; only the letter case of what was typed may differ.
     if (sameEmail) payload.email = before.email;
 
+    // Pay first: a rate outside its range stops the save before anything has changed.
+    const payFailed = await savePay(supabase, id, payload.role, formData);
+    if (payFailed) return payFailed;
+
     // .select() so a write Row Level Security refused reads as a failure, before the Auth change below.
     const { data: saved, error } = await supabase.from("users").update({ ...payload, status }).eq("id", id).select("id");
     if (error) return fail(error);
@@ -82,6 +104,7 @@ export async function saveUser(prevState, formData) {
     }
     await logActivity(supabase, "user.update", { entity: "user", entityId: id, detail: payload.email });
     revalidatePath("/users");
+    revalidatePath("/reports/pay");
     return ok({ email: payload.email });
   }
 
@@ -96,6 +119,8 @@ export async function saveUser(prevState, formData) {
 
   const sent = await sendInvitation(supabase, payload.email, payload, existing);
   if (sent.error) return fail(sent.error);
+  const payFailed = await savePay(supabase, sent.id, payload.role, formData);
+  if (payFailed) return { ...payFailed, error: `Invitation sent, but their pay was not saved: ${payFailed.error}` };
 
   await logActivity(supabase, existing?.auth_id ? "user.reinvite" : "user.invite", { entity: "user", entityId: sent.id, detail: payload.email });
   revalidatePath("/users");

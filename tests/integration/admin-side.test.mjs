@@ -200,14 +200,14 @@ try {
     const notAdmin = await sean.sb.rpc("set_project_rates", { p_project_id: DBDV, p_lead: 99, p_appointment: 99, p_confirmation: 99 });
     check("an account manager cannot set rates", notAdmin.error?.code === "42501", notAdmin.error?.message);
     const negative = await admin.sb.rpc("set_project_rates", { p_project_id: DBDV, p_lead: -1, p_appointment: 0, p_confirmation: 0 });
-    check("a negative rate is refused", /between/i.test(negative.error?.message ?? ""), negative.error?.message);
-    const set = await admin.sb.rpc("set_project_rates", { p_project_id: DBDV, p_lead: 20.555, p_appointment: 30, p_confirmation: 7.5 });
-    check("an administrator sets them, rounded to the cent", !set.error && Number(set.data?.lead_rate) === 20.56 && Number(set.data?.confirmation_rate) === 7.5, set.error?.message ?? JSON.stringify(set.data));
+    check("a negative rate is refused", /negative/i.test(negative.error?.message ?? ""), negative.error?.message);
+    const set = await admin.sb.rpc("set_project_rates", { p_project_id: DBDV, p_lead: 10.505, p_appointment: 30, p_confirmation: 7.5 });
+    check("an administrator sets them, rounded to the cent", !set.error && Number(set.data?.lead_rate) === 10.51 && Number(set.data?.confirmation_rate) === 7.5, set.error?.message ?? JSON.stringify(set.data));
     const [p3] = all(`select id from public.leads where project_id=${DBDV} and assigned_user_id=${SEAN}
       and result_id in (select id from public.call_results where viable and callable) order by id limit 1`).map((x) => x.id);
     await record(sean, p3, "DBDV", "Lead");
     const paid = all(`select amount::float as amount from public.pay_events where user_id=${SEAN} and kind='lead' and not is_chargeback and project_id=${DBDV} order by id`).map((x) => x.amount);
-    check("the next Lead is paid at the new rate; the earlier one keeps $15", JSON.stringify(paid) === JSON.stringify([15, 20.56]), JSON.stringify(paid));
+    check("the next Lead is paid at the new rate; the earlier one keeps $15", JSON.stringify(paid) === JSON.stringify([15, 10.51]), JSON.stringify(paid));
   }
 
   section("The business day");

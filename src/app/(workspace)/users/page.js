@@ -11,6 +11,8 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
 import { listUsers, getUserStats, USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
+import { getPayProfiles, getPayRules } from "@/features/pay/queries";
+import { usd } from "@/lib/pay";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteUser, resetUserTwoFactor, resendInvitation } from "@/features/users/actions";
 
@@ -24,7 +26,10 @@ const statusTone = { Active: "emerald", Invited: "amber", Disabled: "slate" };
 
 export default async function UsersPage({ searchParams }) {
   const params = readListParams(await searchParams, ["role", "status", "mfa"]);
-  const [{ rows, total }, users, options] = await Promise.all([listUsers(params), getUserStats(), getLookups()]);
+  const [{ rows, total }, users, options, payProfiles, payRules] = await Promise.all([
+    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(),
+  ]);
+  const hourly = payRules.rates.hourly;
 
   // Tiles describe every account; the table shows one page of them.
   const active = users.filter((u) => u.status === "active").length;
@@ -58,7 +63,7 @@ export default async function UsersPage({ searchParams }) {
           <SectionHeader
             label="Users"
             icon={Users}
-            action={<UserForm options={options} trigger={<Button size="sm"><UserPlus /> Invite user</Button>} />}
+            action={<UserForm options={options} hourly={hourly} trigger={<Button size="sm"><UserPlus /> Invite user</Button>} />}
           />
           <FilterTable
             columns={["User", "Role", "Two-Factor", "Last login", "Status", { label: "Action", className: "text-right" }]}
@@ -85,7 +90,12 @@ export default async function UsersPage({ searchParams }) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><ToneBadge tone={roleTone[u.roleTone] ?? "slate"}>{u.role}</ToneBadge></TableCell>
+                  <TableCell>
+                    <ToneBadge tone={roleTone[u.roleTone] ?? "slate"}>{u.role}</ToneBadge>
+                    {payProfiles.get(u.id)?.model === "hybrid" ? (
+                      <div className="mt-1 text-xs text-muted-foreground" data-pay={u.id}>Hybrid · {usd(payProfiles.get(u.id).rate)}/hr</div>
+                    ) : null}
+                  </TableCell>
                   <TableCell>
                     <ToneBadge tone={u.mfa ? "emerald" : "slate"}>{u.mfa ? "On" : "Off"}</ToneBadge>
                   </TableCell>
@@ -95,7 +105,7 @@ export default async function UsersPage({ searchParams }) {
                     <RowActions
                       name={u.name}
                       id={u.id}
-                      edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} />}
+                      edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} pay={payProfiles.get(u.id)} hourly={hourly} />}
                       onResetTwoFactor={u.mfa ? resetUserTwoFactor : undefined}
                       onResendInvite={awaitingInvite(u.raw) ? resendInvitation : undefined}
                       onDelete={deleteUser}

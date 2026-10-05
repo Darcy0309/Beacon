@@ -110,7 +110,8 @@ export default async function LeadSheet({ params, searchParams }) {
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
   const tel = telHref(r.phone);
-  const phone = tel ? <a href={tel} className="tabular-nums transition-colors hover:text-primary">{r.phone}</a> : null;
+  // data-lead-id: pressing a phone link starts the call's time for this name.
+  const phone = tel ? <a href={tel} data-lead-id={lead.id} className="tabular-nums transition-colors hover:text-primary">{r.phone}</a> : null;
 
   // Whole days from the business's today: the server's clock runs on UTC.
   const daysOut = r.renewal ? daysBetween(today, String(r.renewal).slice(0, 10)) : null;
@@ -184,7 +185,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 {/* One click to dial: a tel: link opens the softphone, or the dialer on a phone. */}
                 {tel ? (
                   <Button asChild size="sm" className="ml-auto bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] hover:brightness-110">
-                    <a href={tel} title={`Call ${lead.co}`}>
+                    <a href={tel} title={`Call ${lead.co}`} data-lead-id={lead.id}>
                       <Phone /> Call now
                       <span className="font-medium normal-case tracking-normal tabular-nums opacity-85">{r.phone}</span>
                     </a>

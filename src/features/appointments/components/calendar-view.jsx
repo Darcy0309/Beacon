@@ -129,7 +129,7 @@ const APPT_TONE = {
 };
 
 /** One row of the detail list, hidden when there is nothing to show. */
-function Detail({ icon: Icon, label, children, href, wide = false }) {
+function Detail({ icon: Icon, label, children, href, leadId, wide = false }) {
   if (!children || children === "—") return null;
   return (
     <div className={cn("flex items-start gap-3", wide && "sm:col-span-2")}>
@@ -140,7 +140,7 @@ function Detail({ icon: Icon, label, children, href, wide = false }) {
         <span className="eyebrow block">{label}</span>
         <span className="block truncate text-sm">
           {href ? (
-            <a href={href} className="transition-colors hover:text-primary">{children}</a>
+            <a href={href} data-lead-id={leadId ?? undefined} className="transition-colors hover:text-primary">{children}</a>
           ) : (
             children
           )}
@@ -177,7 +177,7 @@ function AppointmentDialog({ a, onClose }) {
             <Detail icon={User} label="Contact">
               {[a.contact, a.contactTitle].filter(Boolean).join(" · ") || null}
             </Detail>
-            <Detail icon={Phone} label="Phone" href={tel}>{a.phone}</Detail>
+            <Detail icon={Phone} label="Phone" href={tel} leadId={a.leadId}>{a.phone}</Detail>
             <Detail icon={Mail} label="Email" href={a.email ? `mailto:${a.email}` : null}>{a.email}</Detail>
             <Detail icon={MapPin} label="Location">{a.location}</Detail>
             <Detail icon={Clock} label="Rep">{a.rep}</Detail>
@@ -189,7 +189,7 @@ function AppointmentDialog({ a, onClose }) {
           <DialogFooter>
             {tel ? (
               <Button asChild>
-                <a href={tel}><Phone /> Call now</a>
+                <a href={tel} data-lead-id={a.leadId ?? undefined}><Phone /> Call now</a>
               </Button>
             ) : (
               // Keep pointer events so the cursor and the reason still show.

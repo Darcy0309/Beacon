@@ -99,11 +99,16 @@ export async function saveProjectRates(prevState, formData) {
     p_appointment: rate("appointment_rate"),
     p_confirmation: rate("confirmation_rate"),
   });
-  if (error) return fail(error);
+  if (error) {
+    // A rate outside its range in Settings: say so beside that rate.
+    const field = [[/^Lead pay/, "lead_rate"], [/^Appointment pay/, "appointment_rate"], [/^Special pay/, "confirmation_rate"]]
+      .find(([re]) => re.test(error.message))?.[1];
+    return fail(error, field ? { [field]: error.message } : null);
+  }
 
   await logActivity(supabase, "project.rates", {
     entity: "project", entityId: projectId,
-    detail: `lead ${data.lead_rate} · appointment ${data.appointment_rate} · confirmation ${data.confirmation_rate}`,
+    detail: `lead ${data.lead_rate} · appointment ${data.appointment_rate} · special pay ${data.confirmation_rate}`,
   });
   revalidatePath("/reports/production");
   revalidatePath(`/projects/${projectId}`);

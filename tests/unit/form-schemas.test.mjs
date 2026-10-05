@@ -22,6 +22,9 @@ const FORMS = {
   "src/features/work/components/call-result-panel.jsx": { schema: "callResult", extra: [] },
   "src/features/imports/components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
   "src/features/settings/components/settings-form.jsx":    { schema: "settings",    extra: [] },
+  "src/features/pay/components/pay-rules-form.jsx":        { schema: "payRules",    extra: [] },
+  // The three rates are named from RATE_KINDS (name={name}), so only the hidden id is literal here.
+  "src/features/projects/components/project-rates-form.jsx": { schema: "projectRates", extra: ["project_id"] },
   "src/features/auth/components/login-form.jsx":       { schema: "login",       extra: ["next", "code"] },  // `code` belongs to the two-factor step
 };
 

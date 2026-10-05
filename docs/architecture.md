@@ -95,6 +95,38 @@ every result against the sheet.
   `business_timezone` row of `app_settings` (`{"name": "America/Chicago"}`),
   or America/Phoenix when there is none.
 
+## Pay and time
+
+All the rules live in **Settings › Pay & time** (`pay_rules()`, stored in
+`app_settings` as `pay_rates` and `time_tracking`, with defaults until an
+administrator saves them):
+
+- **Project rates** are picked from ranges: lead pay $8–$12, appointment pay
+  $30–$50, special pay (the account manager who confirms an appointment)
+  $5–$20, or $0 when a project does not pay for that event.
+  `set_project_rates()` refuses a new rate outside its range; to pay more, an
+  administrator widens the range. The choices come from `rateOptions()` in
+  `lib/pay.js`.
+- **Hybrid pay**: `pay_profiles` holds, per account manager or agent,
+  commission only or hybrid with an hourly rate ($15.15–$25), set on the user
+  form by an administrator. For each pay period `pay_report()` pays the
+  commission, or for hybrid whichever is higher: the paid hours at their rate,
+  or the commission (lead, appointment and special pay, less chargebacks).
+- **Time worked** comes from `work_activity`: the app reports clicks and key
+  presses (`components/activity-tracker.jsx`, at most twice a minute; never
+  mouse movement) and Call now presses with the name called, through
+  `track_activity()`, which stamps the server's time. Nobody can write the
+  table directly, and a call record's person and time are the server's too.
+  `work_minutes()` counts each active minute, the minutes between two actions
+  at most `idle_minutes` (5) apart, and a call from Call now to its saved
+  result (up to `call_minutes`, 30); `work_days()` applies the rounding
+  (default: each hour rounds up to 15 minutes).
+
+**Pay & Hours** (`/reports/pay`, CSV at `/api/reports/pay`) shows it per pay
+period: everyone for an administrator, only themselves for anyone else. The
+production report's CSV comes day by day or as totals per account manager,
+project or client (`?by=`), each ending in a Total row.
+
 ## Search
 
 Every search box matches **every word typed**, in any order and any field:
@@ -194,9 +226,9 @@ signs out.
 
 | Command | Needs | What |
 |---|---|---|
-| `npm test` | nothing | Unit tests: CSV import, dates, search words, validation rules, form ↔ schema contract |
-| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, dropdowns in both themes, forms, security, notifications, in headless Chrome |
+| `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), validation rules, form ↔ schema contract |
+| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked) |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, dropdowns in both themes, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

@@ -106,15 +106,18 @@ try {
   section("Pay rates and the production report");
   await admin.go("/reports/production#rates", 4000);
   await admin.click(`tr[data-project="${PROJECT}"] button`, "Set rates");
-  await until(() => admin.ev("!!document.querySelector('input[name=lead_rate]')"));
-  await admin.fill("input[name=lead_rate]", "12.5");
-  await admin.fill("input[name=appointment_rate]", "30");
-  await admin.fill("input[name=confirmation_rate]", "5");
+  // Each rate is picked from the range in Settings: lead $8–$12, appointment $30–$50, special pay $5–$20.
+  await until(() => admin.ev("!!document.querySelector('select[name=lead_rate]')"));
+  const leadChoices = await admin.ev("[...document.querySelectorAll('select[name=lead_rate] option')].map((o) => o.value).join(' ')");
+  check("lead pay is picked from $0 or $8–$12 in 50¢ steps", leadChoices === "0.00 8.00 8.50 9.00 9.50 10.00 10.50 11.00 11.50 12.00", leadChoices);
+  await admin.fill("select[name=lead_rate]", "12.00");
+  await admin.fill("select[name=appointment_rate]", "30.00");
+  await admin.fill("select[name=confirmation_rate]", "5.00");
   await admin.click("button", "Save rates");
   await admin.waitToast(/Pay rates saved/);
-  check("the rates are saved", await until(() => sql(`select lead_rate || '/' || appointment_rate || '/' || confirmation_rate from public.projects where id=${PROJECT}`) === "12.50/30.00/5.00"),
+  check("the rates are saved", await until(() => sql(`select lead_rate || '/' || appointment_rate || '/' || confirmation_rate from public.projects where id=${PROJECT}`) === "12.00/30.00/5.00"),
     sql(`select lead_rate || '/' || appointment_rate || '/' || confirmation_rate from public.projects where id=${PROJECT}`));
-  check("…and shown in the table", await until(async () => (await cells(admin, `tr[data-project="${PROJECT}"]`)).slice(2, 5).join(" ") === "$12.50 $30.00 $5.00"));
+  check("…and shown in the table", await until(async () => (await cells(admin, `tr[data-project="${PROJECT}"]`)).slice(2, 5).join(" ") === "$12.00 $30.00 $5.00"));
 
   // Sean works two names: one not interested, one appointment ($30).
   const seanApi = await signIn("sean@beacon.test");
@@ -133,7 +136,8 @@ try {
   const callBars = await admin.ev(`[...document.querySelectorAll('[data-panel]')].find((p) => /^calls$/i.test(p.querySelector('.stat-label')?.textContent.trim()))?.querySelectorAll(':scope > svg rect').length ?? 0`);
   check("even for one day, the tiles plot the last 14", callBars === 14, `${callBars} bars`);
   const csv = await admin.ev(`fetch('/api/reports/production?period=today&project=${PROJECT}').then((r) => r.text())`);
-  check("the CSV export has the same row", /Sean Fitzgerald,"?[^\n]*DBDev"?,2,0,1,0,0,30\.00/.test(csv), csv.split("\n").slice(0, 2).join(" | "));
+  // Day, account manager, client, project, five counts, then lead, appointment and special pay, chargebacks and the total.
+  check("the CSV export has the same row", /Sean Fitzgerald,"?[^\n]*DBDev"?,2,0,1,0,0,0\.00,30\.00,0\.00,0\.00,30\.00/.test(csv), csv.split("\n").slice(0, 2).join(" | "));
   await shot(admin, "admin-production");
 
   const manager = await (await browser.newContext({ as: "mike@beacon.test" })).newPage();

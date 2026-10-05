@@ -21,6 +21,7 @@ import { getXdatesByMonth } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getBusinessToday } from "@/lib/server/business-day";
+import { getPayRules } from "@/features/pay/queries";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ export default async function ProjectDetail({ params, searchParams }) {
   const admin = me?.role === "admin";
   const canManage = admin || me?.role === "manager";
 
-  const [p, overview, team, leads, options, staff, xdates, today] = await Promise.all([
+  const [p, overview, team, leads, options, staff, xdates, today, payRules] = await Promise.all([
     getProject(id),
     getProjectOverview(id),
     getProjectTeam(id),
@@ -52,6 +53,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     canManage ? getAssignableStaff() : [],
     getXdatesByMonth({ projectId: Number(id) }),
     getBusinessToday(),
+    admin ? getPayRules() : null,
   ]);
   if (!p) notFound();
 
@@ -100,7 +102,7 @@ export default async function ProjectDetail({ params, searchParams }) {
               <div className="flex flex-wrap items-center gap-2">
                 <ToneBadge tone={typeTone[p.type] ?? "slate"}>{p.type}</ToneBadge>
                 <ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge>
-                {admin ? <ProjectRatesForm project={rates} /> : null}
+                {admin ? <ProjectRatesForm project={rates} ranges={payRules?.rates} /> : null}
                 <ProjectForm project={p.raw ? { ...p.raw, company: p.raw.company?.[0] ?? p.raw.company, type: p.raw.type?.[0] ?? p.raw.type, status: p.raw.status?.[0] ?? p.raw.status } : p} options={options} />
               </div>
             </div>
@@ -111,7 +113,7 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <span>Promotes leads to <Link href={`/projects/${apptProject.id}`} className="text-primary hover:underline">{apptProject.name}</Link></span>
               ) : null}
               {admin ? (
-                <span data-rates>Pays {usd(rates.lead)} a lead · {usd(rates.appointment)} an appointment · {usd(rates.confirmation)} a confirmation</span>
+                <span data-rates>Pays {usd(rates.lead)} a lead · {usd(rates.appointment)} an appointment · {usd(rates.confirmation)} special pay a confirmation</span>
               ) : null}
             </div>
           </div>

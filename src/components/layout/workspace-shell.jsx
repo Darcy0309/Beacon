@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { useRole } from "@/components/layout/role-provider";
 import { rolesForPath } from "@/lib/nav";
 import { signOut } from "@/features/auth/actions";
+import ActivityTracker from "@/features/pay/components/activity-tracker";
 
 /**
  * The chrome around every workspace page: sidebar, access checks, and the
@@ -40,8 +41,12 @@ export default function WorkspaceShell({ children }) {
   const allowed = rolesForPath(path);
   const denied = allowed && !allowed.includes(role) && !(invited && path === "/security");
 
+  // Time worked counts for the people paid by it: account managers and agents.
+  const tracked = (role === "manager" || role === "agent") && user?.status === "active";
+
   return (
     <div className="flex min-h-svh">
+      {tracked ? <ActivityTracker /> : null}
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
         {denied ? <NoAccess /> : children}

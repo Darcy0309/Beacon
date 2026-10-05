@@ -1,21 +1,10 @@
 import { getBusinessTimeZone, getProductionReport } from "@/features/reports/queries";
 import { readPeriod } from "@/features/reports/period";
+import { CSV_COLUMNS, groupProduction, totalOf, totalRow } from "@/features/reports/production";
 import { getCurrentUser } from "@/lib/server/session";
 import { rolesForPath } from "@/lib/nav";
 
 export const dynamic = "force-dynamic";
-
-const COLUMNS = [
-  ["Day", (r) => r.day],
-  ["Rep", (r) => r.rep],
-  ["Project", (r) => r.project],
-  ["Calls", (r) => r.calls],
-  ["Leads", (r) => r.leads],
-  ["Appointments", (r) => r.appointments],
-  ["Confirmations", (r) => r.confirmations],
-  ["Chargebacks", (r) => r.chargebacks],
-  ["Pay (USD)", (r) => r.amount.toFixed(2)],
-];
 
 const cell = (v) => {
   const s = v == null ? "" : String(v);
@@ -28,7 +17,9 @@ const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
 
 /**
  * The production report as a CSV, for payroll: the same range and filters as
- * the page, run as the signed-in user, so only an administrator gets every rep.
+ * the page, run as the signed-in user, so only an administrator gets every
+ * rep. ?by=day (each day, account manager and project), rep, project or
+ * client (totals for each); every layout ends with a Total row.
  */
 export async function GET(request) {
   const me = await getCurrentUser();
@@ -39,6 +30,7 @@ export async function GET(request) {
   const sp = Object.fromEntries(new URL(request.url).searchParams);
   const range = readPeriod(sp, await getBusinessTimeZone());
   if (range.error) return new Response(range.error, { status: 400 });
+  const by = Object.hasOwn(CSV_COLUMNS, sp.by ?? "") ? sp.by : "day";
 
   try {
     const rows = await getProductionReport({
@@ -47,12 +39,16 @@ export async function GET(request) {
       projectId: idParam(sp.project),
       userId: me.role === "admin" ? idParam(sp.rep) : null,
     });
-    const lines = [COLUMNS.map(([h]) => h).join(","), ...rows.map((r) => COLUMNS.map(([, get]) => cell(get(r))).join(","))];
+    const columns = CSV_COLUMNS[by];
+    const line = (r) => columns.map(([, get]) => cell(get(r))).join(",");
+    const total = totalRow(columns, totalOf(rows)).map(cell).join(",");
+    const lines = [columns.map(([h]) => h).join(","), ...groupProduction(rows, by).map(line), ...(rows.length ? [total] : [])];
     const name = range.from === range.to ? range.from : `${range.from}_to_${range.to}`;
+    const suffix = by === "day" ? "" : `-by-${by === "rep" ? "account-manager" : by}`;
     return new Response(`﻿${lines.join("\r\n")}\r\n`, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="lighthouse-production-${name}.csv"`,
+        "Content-Disposition": `attachment; filename="lighthouse-production-${name}${suffix}.csv"`,
         "Cache-Control": "no-store",
       },
     });

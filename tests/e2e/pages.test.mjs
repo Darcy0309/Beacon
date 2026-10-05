@@ -73,9 +73,10 @@ const PAGES = [
   ["/reports", "Reports", ["Leads Delivered", "Appointments Set", "Leads by Status"]],
   ["/reports/x-dates", "X-Dates by Month", ["Renewals by Month", "All months", project.name]],
   ["/reports/production", "Production & Pay", ["By Rep", "Pay Rates by Project", project.name]],
+  ["/reports/pay", "Pay & Hours", ["Pay for the Period", "Hours Paid", "Commission", "Sean Fitzgerald"]],
   ["/alerts", "Alerts", ["Alert rules"]],
   ["/users", "Users", ["Users", "beacon.test"]],
-  ["/settings", "Settings", ["Branding", "Email (SMTP)", "Sign-in Security"]],
+  ["/settings", "Settings", ["Branding", "Email (SMTP)", "Sign-in Security", "Pay Rates", "Time Worked"]],
 ];
 
 section("Signed out: protected routes must redirect");

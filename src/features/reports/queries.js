@@ -97,11 +97,18 @@ export async function getProductionReport({ from, to, projectId = null, userId =
     rep: fullName({ first_name: r.first_name, last_name: r.last_name, email: r.email }) || "—",
     projectId: r.project_id,
     project: r.project ?? "—",
+    clientId: r.client_id ?? null,
+    client: r.client ?? "—",
     calls: Number(r.calls),
     leads: Number(r.leads),
     appointments: Number(r.appointments),
     confirmations: Number(r.confirmations),
     chargebacks: Number(r.chargebacks),
+    // What the day's pay came to, by kind; chargebacks are negative.
+    leadPay: Number(r.lead_pay ?? 0),
+    appointmentPay: Number(r.appointment_pay ?? 0),
+    specialPay: Number(r.special_pay ?? 0),
+    chargebackAmount: Number(r.chargeback_amount ?? 0),
     amount: Number(r.amount),
   }));
 }

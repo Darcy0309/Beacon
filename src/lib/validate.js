@@ -148,6 +148,9 @@ export function formValues(formData, fields) {
 // ---------------------------------------------------------------------------
 
 export const ROLES = ["admin", "manager", "agent", "client"];
+export const PAY_MODEL_KEYS = ["commission", "hybrid"];
+export const ROUNDING_KEYS = ["hour_up", "day_up", "day_nearest", "none"];
+export const PAY_PERIOD_KEYS = ["weekly", "biweekly", "semimonthly", "monthly"];
 export const USER_STATUSES = ["active", "invited", "disabled"];
 export const DURATIONS = ["15", "30", "45", "60", "90"];
 
@@ -244,6 +247,9 @@ export const schemas = {
     status: [oneOf(USER_STATUSES)],
     username: [username],
     company_id: [id],
+    // How an account manager or agent is paid. The hourly range is the one in Settings, checked by the database.
+    pay_model: [oneOf(PAY_MODEL_KEYS, "Choose how they are paid")],
+    hourly_rate: [num({ min: 0, max: 1000 })],
   },
 
   bulletin: {
@@ -265,6 +271,27 @@ export const schemas = {
     duration_min: [oneOf(DURATIONS, "Choose a duration")],
     rep_name: [max(80)],
     corrected_xdate: [date],
+  },
+
+  // Settings › Pay & time: the ranges project and hourly rates are picked from, and how time is counted.
+  payRules: {
+    lead_min: [required("Required"), num({ min: 0, max: 10000 })],
+    lead_max: [required("Required"), num({ min: 0, max: 10000 })],
+    lead_step: [required("Required"), num({ min: 0.01, max: 1000 })],
+    appointment_min: [required("Required"), num({ min: 0, max: 10000 })],
+    appointment_max: [required("Required"), num({ min: 0, max: 10000 })],
+    appointment_step: [required("Required"), num({ min: 0.01, max: 1000 })],
+    special_min: [required("Required"), num({ min: 0, max: 10000 })],
+    special_max: [required("Required"), num({ min: 0, max: 10000 })],
+    special_step: [required("Required"), num({ min: 0.01, max: 1000 })],
+    hourly_min: [required("Required"), num({ min: 0, max: 1000 })],
+    hourly_max: [required("Required"), num({ min: 0, max: 1000 })],
+    idle_minutes: [required("Required"), int({ min: 1, max: 60 })],
+    call_minutes: [required("Required"), int({ min: 0, max: 240 })],
+    rounding: [required("Choose how time rounds"), oneOf(ROUNDING_KEYS)],
+    round_to: [required("Required"), oneOf(["1", "5", "6", "10", "15", "30", "60"], "Choose 1, 5, 6, 10, 15, 30 or 60 minutes")],
+    pay_period: [required("Choose the pay period"), oneOf(PAY_PERIOD_KEYS)],
+    period_start: [required("Choose the day a pay period starts"), date],
   },
 
   csvImport: {
@@ -332,6 +359,18 @@ export const cross = {
     // Client-portal users are scoped to a company by RLS; without one they see nothing.
     if (!errors.company_id && values.role === "client" && !values.company_id) {
       errors.company_id = "Client users must belong to a client account";
+    }
+    // Hybrid pay compares the hourly pay with the commission, so it needs a rate.
+    if (!errors.hourly_rate && values.pay_model === "hybrid" && str(values.hourly_rate) === "") {
+      errors.hourly_rate = "Hybrid pay needs an hourly rate";
+    }
+  },
+  payRules(values, errors) {
+    const amount = (k) => Number(str(values[k]).replace(/[$,]/g, ""));
+    for (const kind of ["lead", "appointment", "special", "hourly"]) {
+      if (!errors[`${kind}_min`] && !errors[`${kind}_max`] && amount(`${kind}_max`) < amount(`${kind}_min`)) {
+        errors[`${kind}_max`] = "Must be at least the lowest rate";
+      }
     }
   },
   appointment(values, errors) {

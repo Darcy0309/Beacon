@@ -11,10 +11,13 @@ import DateRangePicker from "@/components/shared/date-range-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import { getProjectRates } from "@/features/projects/queries";
 import { getBusinessTimeZone, getProductionReport } from "@/features/reports/queries";
 import { daysBetween, PERIODS, readPeriod, trendStart } from "@/features/reports/period";
+import { GROUPINGS, groupProduction } from "@/features/reports/production";
+import { getPayRules } from "@/features/pay/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
@@ -48,16 +51,19 @@ export default async function ProductionReport({ searchParams }) {
   // The tiles show a trend of at least two weeks, so one read covers the
   // range and the days before it that the trend needs.
   const trendFrom = trendStart(range);
-  const [trendRows, options, staff, rates] = await Promise.all([
+  const [trendRows, options, staff, rates, payRules] = await Promise.all([
     getProductionReport({ from: trendFrom, to: range.to, projectId, userId }),
     getLookups(),
     admin ? getAssignableStaff() : [],
     admin ? getProjectRates() : [],
+    admin ? getPayRules() : null,
   ]);
   const rows = trendRows.filter((r) => r.day >= range.from && r.day <= range.to);
 
   const totals = rows.reduce(add, {});
   for (const k of COUNTS) totals[k] ??= 0;
+  // What each client's projects cost in the period, for an administrator.
+  const clients = admin ? groupProduction(rows, "client") : [];
   const reps = Object.values(
     rows.reduce((acc, r) => {
       acc[r.userId] ??= { id: r.userId, rep: r.rep };
@@ -125,9 +131,19 @@ export default async function ProductionReport({ searchParams }) {
                 options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
             ) : null}
             <span className="text-xs text-muted-foreground">Days run midnight to midnight, {timeZone.replace(/_/g, " ")} time.</span>
-            <Button asChild size="sm" variant="outline" className="ml-auto">
-              <a href={csv} download><Download /> Export CSV</a>
-            </Button>
+            {/* Day by day, or totals per account manager, project or client; every file ends with a Total row. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="ml-auto"><Download /> Export CSV</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {GROUPINGS.map(([by, label]) => (
+                  <DropdownMenuItem key={by} asChild>
+                    <a href={`${csv}&by=${by}`} download data-export={by}>{label}</a>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           {range.error ? <p role="alert" className="border-t border-[var(--panel-border)] px-5 py-2 text-sm text-destructive">{range.error} Showing today instead.</p> : null}
         </Card>
@@ -180,6 +196,36 @@ export default async function ProductionReport({ searchParams }) {
           </Table>
         </Card>
 
+        {clients.length ? (
+          <Card>
+            <SectionHeader label="By Client" icon={Banknote} />
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Client</TableHead>
+                  <TableHead className="text-right">Lead pay</TableHead>
+                  <TableHead className="text-right">Appointment pay</TableHead>
+                  <TableHead className="text-right">Special pay</TableHead>
+                  <TableHead className="text-right">Chargebacks</TableHead>
+                  <TableHead className="text-right">Total pay</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {clients.map((c) => (
+                  <TableRow key={c.clientId ?? "none"} data-client={c.clientId ?? "none"}>
+                    <TableCell className="font-medium">{c.client}</TableCell>
+                    <TableCell className="text-right tabular-nums">{usd(c.leadPay)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{usd(c.appointmentPay)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{usd(c.specialPay)}</TableCell>
+                    <TableCell className={cn("text-right tabular-nums", c.chargebackAmount && "text-rose-400")}>{usd(c.chargebackAmount)}</TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">{usd(c.amount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        ) : null}
+
         {rows.length ? (
           <Card>
             <SectionHeader label="Day by Day" icon={ListChecks} />
@@ -215,7 +261,7 @@ export default async function ProductionReport({ searchParams }) {
           <Card id="rates">
             <SectionHeader label="Pay Rates by Project" icon={Banknote} />
             <p className="border-b border-[var(--panel-border)] px-5 py-3 text-sm text-muted-foreground">
-              What each project pays per lead, appointment and confirmation.
+              What each project pays for a lead, an appointment, and the special pay for confirming an appointment, picked from the ranges in Settings.
               {unratedProjects ? ` ${unratedProjects} of ${rates.length} still pay $0: set them when the rate sheet arrives.` : ""}
               {" "}A new rate applies from the next event; what is already earned keeps its rate.
             </p>
@@ -224,9 +270,9 @@ export default async function ProductionReport({ searchParams }) {
                 <TableRow>
                   <TableHead>Project</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead className="text-right">Per lead</TableHead>
-                  <TableHead className="text-right">Per appointment</TableHead>
-                  <TableHead className="text-right">Per confirmation</TableHead>
+                  <TableHead className="text-right">Lead pay</TableHead>
+                  <TableHead className="text-right">Appointment pay</TableHead>
+                  <TableHead className="text-right">Special pay</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -242,7 +288,7 @@ export default async function ProductionReport({ searchParams }) {
                     <TableCell className="text-right tabular-nums">{usd(p.appointment)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(p.confirmation)}</TableCell>
                     <TableCell className="text-right">
-                      <ProjectRatesForm project={p} trigger={<Button size="sm" variant="ghost"><Banknote /> Set rates</Button>} />
+                      <ProjectRatesForm project={p} ranges={payRules?.rates} trigger={<Button size="sm" variant="ghost"><Banknote /> Set rates</Button>} />
                     </TableCell>
                   </TableRow>
                 ))}

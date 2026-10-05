@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
-  CalendarSearch, Banknote,
+  CalendarSearch, Banknote, Clock,
 } from "lucide-react";
 
 export const ROLES = {
@@ -81,6 +81,8 @@ export const navGroups = [
       { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin", "manager"] },
       // Calls and paid events per day; everyone but an administrator sees only their own.
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
+      // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.
+      { href: "/reports/pay", label: "Pay & Hours", icon: Clock, roles: ["admin", "manager", "agent"] },
       { href: "/alerts", label: "Alert Engine", icon: BellRing, roles: ["admin"] },
     ],
   },

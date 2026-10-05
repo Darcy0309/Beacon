@@ -1,28 +1,24 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import Link from "@/components/shared/intent-link";
 import { toast } from "sonner";
 import { Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Field, formHelpers } from "@/components/ui/field";
+import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { saveProjectRates } from "@/features/projects/actions";
+import { RATE_KINDS, rateOptions, usd } from "@/lib/pay";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
-const RATES = [
-  ["lead_rate", "Per lead", "A DBDev Lead result: the name promoted to appointment setting"],
-  ["appointment_rate", "Per appointment", "An appointment set from a call"],
-  ["confirmation_rate", "Per confirmation", "A follow-up call that confirms the appointment"],
-];
-
 /**
- * An administrator sets what a project pays its reps, in USD. A chargeback
- * reverses whatever was paid at the time, so changing a rate never changes
- * what has already been earned.
+ * An administrator sets what a project pays, picking each rate from the
+ * range in Settings › Pay & time ($0 means that event is not paid on this
+ * project). A chargeback reverses whatever was paid at the time, so changing
+ * a rate never changes what has already been earned.
  */
-export default function ProjectRatesForm({ project, trigger }) {
+export default function ProjectRatesForm({ project, ranges, trigger }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(saveProjectRates, EMPTY);
 
@@ -35,11 +31,8 @@ export default function ProjectRatesForm({ project, trigger }) {
     }
   }, [state, project.name]);
 
-  const { fe, invalid, dv } = formHelpers(state, {
-    lead_rate: project.lead.toFixed(2),
-    appointment_rate: project.appointment.toFixed(2),
-    confirmation_rate: project.confirmation.toFixed(2),
-  });
+  const current = { lead_rate: project.lead, appointment_rate: project.appointment, confirmation_rate: project.confirmation };
+  const { fe, invalid, dv } = formHelpers(state, Object.fromEntries(Object.entries(current).map(([k, v]) => [k, Number(v ?? 0).toFixed(2)])));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -53,17 +46,23 @@ export default function ProjectRatesForm({ project, trigger }) {
         <form action={formAction} noValidate className="flex flex-col gap-4">
           <input type="hidden" name="project_id" value={project.id} />
           <p className="text-sm text-muted-foreground">
-            What a rep earns on this project for each event, in dollars. New events are paid at these rates; what is
+            What an account manager earns on this project for each event. New events are paid at these rates; what is
             already on the production report keeps the rate it was paid at.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {RATES.map(([name, label, hint]) => (
+            {RATE_KINDS.map(([key, name, label, hint]) => (
               <Field key={name} label={label} hint={hint} error={fe(name)}>
-                <Input name={name} type="number" inputMode="decimal" step="0.01" min="0" max="10000"
-                  defaultValue={dv(name)} aria-invalid={invalid(name)} />
+                <Select name={name} defaultValue={dv(name)} aria-invalid={invalid(name)} data-rate={key}>
+                  {rateOptions(ranges?.[key], current[name]).map((v) => (
+                    <option key={v} value={v.toFixed(2)}>{v === 0 ? "$0.00 · not paid" : usd(v)}</option>
+                  ))}
+                </Select>
               </Field>
             ))}
           </div>
+          <p className="text-xs text-muted-foreground">
+            The choices come from <Link href="/settings" className="text-primary hover:underline">Settings › Pay &amp; time</Link>.
+          </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save rates"}</Button>

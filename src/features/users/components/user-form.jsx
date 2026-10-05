@@ -12,19 +12,23 @@ import {
 } from "@/components/ui/dialog";
 import { saveUser } from "@/features/users/actions";
 import { ROLES } from "@/lib/nav";
+import { PAY_MODELS, usd } from "@/lib/pay";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
-export default function UserForm({ user, options, trigger }) {
+/** `pay`: how they are paid ({ model, rate }); `hourly`: the hourly range from Settings. */
+export default function UserForm({ user, options, pay, hourly, trigger }) {
   const isEdit = Boolean(user?.id);
   // Inside a row's action menu the menu owns the open state and there is no trigger.
   const [open, setOpen, inRowMenu, onCloseAutoFocus] = useDialogOpen();
   const router = useRouter();
   const [state, formAction, pending] = useActionState(saveUser, EMPTY);
 
-  // Track role locally so the company field can be marked required for clients.
+  // Track role locally so the company field can be marked required for clients,
+  // and pay shows only for the people who are paid (account managers and agents).
   const [role, setRole] = useState(user?.role ?? "agent");
+  const [payModel, setPayModel] = useState(pay?.model ?? "commission");
 
   useEffect(() => {
     if (state?.ok) {
@@ -37,9 +41,12 @@ export default function UserForm({ user, options, trigger }) {
   }, [state, isEdit, router, setOpen]);
 
   const { companies = [] } = options ?? {};
-  const record = user
-    ? { ...user, company_id: user.company?.id ?? "" }
-    : { role: "agent", status: "invited" };
+  const record = {
+    ...(user ? { ...user, company_id: user.company?.id ?? "" } : { role: "agent", status: "invited" }),
+    pay_model: pay?.model ?? "commission",
+    hourly_rate: pay?.rate == null ? "" : Number(pay.rate).toFixed(2),
+  };
+  const paid = role === "manager" || role === "agent";
   const { fe, invalid, dv } = formHelpers(state, record);
 
   return (
@@ -116,6 +123,24 @@ export default function UserForm({ user, options, trigger }) {
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
+
+            {paid ? (
+              <>
+                <Field label="Pay" error={fe("pay_model")} className="sm:col-span-2"
+                  hint={payModel === "hybrid" ? "Each pay period: their hours at this rate, or their commission, whichever is higher." : "Lead, appointment and special pay at each project's rates."}>
+                  <Select name="pay_model" defaultValue={dv("pay_model")} onChange={(e) => setPayModel(e.target.value)} aria-invalid={invalid("pay_model")}>
+                    {PAY_MODELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </Select>
+                </Field>
+                {payModel === "hybrid" ? (
+                  <Field label="Hourly rate ($)" required error={fe("hourly_rate")}
+                    hint={hourly ? `Between ${usd(hourly.min)} and ${usd(hourly.max)} (Settings › Pay & time).` : undefined}>
+                    <Input name="hourly_rate" type="number" inputMode="decimal" step="0.01" min={hourly?.min} max={hourly?.max}
+                      defaultValue={dv("hourly_rate")} aria-invalid={invalid("hourly_rate")} />
+                  </Field>
+                ) : null}
+              </>
+            ) : null}
           </div>
 
           <DialogFooter>
