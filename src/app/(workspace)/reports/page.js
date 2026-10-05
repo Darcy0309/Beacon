@@ -106,9 +106,10 @@ export default async function ReportsPage() {
         ) : null}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+          {/* The chart fills its card: beside a long status list the card grows, and so do the bars. */}
+          <Card className="flex flex-col lg:col-span-2">
             <SectionHeader label="Leads vs Appointments — 6 Months" icon={BarChart3} />
-            <div className="p-5">
+            <div className="flex flex-1 flex-col p-5">
               <div className="mb-4 flex items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                 <span className="flex items-center gap-1.5">
                   <span className="size-2 rounded-full" style={{ background: "var(--neon-cyan)" }} /> Leads
@@ -117,7 +118,7 @@ export default async function ReportsPage() {
                   <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
                 </span>
               </div>
-              <div className="flex h-56 items-stretch gap-3">
+              <div className="flex min-h-56 flex-1 items-stretch gap-3" data-months-chart>
                 {r.months.map((m, i) => (
                   <div key={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
                     className="flex min-h-0 flex-1 flex-col items-center gap-2">

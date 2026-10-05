@@ -189,14 +189,15 @@ export default async function Dashboard() {
 
         {/* volume over time + today */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+          {/* The monthly chart fills its card, which grows beside a long schedule. */}
+          <Card className={view.trend === "weeks" ? "lg:col-span-2" : "flex flex-col lg:col-span-2"}>
             {view.trend === "weeks" ? (
               <LeadVolumeChart days={volume} fallback={s.weeks} today={businessToday} />
             ) : (
               <>
                 {/* Monthly totals: quiet weeks in a campaign do not read as a dip. */}
                 <SectionHeader label="Delivered — Last 6 Months" icon={Activity} />
-                <div className="p-5">
+                <div className="flex flex-1 flex-col p-5">
                   <div className="mb-4 flex items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <span className="size-2 rounded-full" style={{ background: "var(--neon-cyan)" }} /> Leads
@@ -205,7 +206,7 @@ export default async function Dashboard() {
                       <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
                     </span>
                   </div>
-                  <div className="flex h-52 items-stretch gap-3">
+                  <div className="flex min-h-52 flex-1 items-stretch gap-3" data-months-chart>
                     {months.map((m, i) => (
                       <div key={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
                         className="flex min-h-0 flex-1 flex-col items-center gap-2">

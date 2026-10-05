@@ -105,10 +105,29 @@ try {
   check("…and flowing right on hover", (await arrows()) === "arrow-flow,arrow-flow", await arrows());
   await shot(admin, "signout-hover");
 
+  // A six-month chart beside a longer card (the status list, today's schedule)
+  // fills its own card: no empty band under the months, only the padding.
+  const gapUnderMonths = (page) => page.ev(`(() => { const c = document.querySelector('[data-months-chart]'); if (!c) return null;
+    const card = c.closest('[data-panel]'); return Math.round(card.getBoundingClientRect().bottom - c.getBoundingClientRect().bottom); })()`);
+
+  section("Reports: the six-month chart fills its card");
+  {
+    const wide = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1920, height: 1080 });
+    await wide.go("/reports", 4500);
+    const gap = await gapUnderMonths(wide);
+    check("only the card's padding under the months", gap !== null && gap <= 24, `${gap}px`);
+    const sameRow = await wide.ev(`(() => { const card = document.querySelector('[data-months-chart]').closest('[data-panel]');
+      return Math.round(card.getBoundingClientRect().height) === Math.round(card.parentElement.getBoundingClientRect().height); })()`);
+    check("…and the card is as tall as its row", sameRow);
+    await shot(wide, "reports-months");
+  }
+
   section("Client dashboard and phone width");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage();
   await client.go("/");
   check("client keeps the six-month delivery bars", /Delivered/i.test(await client.text()) && (await client.ev(`document.querySelectorAll('.animate-grow-height').length`)) > 0);
+  const clientGap = await gapUnderMonths(client);
+  check("…filling their card, with no empty band under the months", clientGap !== null && clientGap <= 24, `${clientGap}px`);
   const phone = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go("/", 4500);
   const overflow = await phone.ev("document.documentElement.scrollWidth - document.documentElement.clientWidth");
