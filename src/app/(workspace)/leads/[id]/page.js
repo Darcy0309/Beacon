@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarPlus, ChevronDown, Mail, Pencil, Phone, Repeat } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, CalendarPlus, ChevronDown, Mail, Pencil, Phone, PhoneCall, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
@@ -99,6 +99,16 @@ function Rows({ rows }) {
           <span className="min-w-0 break-words">{value == null || value === "" ? <span className="text-muted-foreground">—</span> : value}</span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/** A history tab with nothing in it yet: a quiet message in the middle of the space. */
+function Empty({ icon: Icon, children }) {
+  return (
+    <div className="flex min-h-44 flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+      <Icon className="size-6 opacity-50" aria-hidden />
+      {children}
     </div>
   );
 }
@@ -465,6 +475,7 @@ export default async function LeadSheet({ params, searchParams }) {
         <Card className="overflow-hidden">
           <Tabs
             label="History"
+            panelClassName="min-h-44"
             tabs={[
               {
                 id: "calls",
@@ -488,7 +499,7 @@ export default async function LeadSheet({ params, searchParams }) {
                     </table>
                   </div>
                 ) : (
-                  <p className="px-4 py-3 text-sm text-muted-foreground">No calls yet.</p>
+                  <Empty icon={PhoneCall}>No calls yet.</Empty>
                 ),
               },
               {
@@ -519,7 +530,7 @@ export default async function LeadSheet({ params, searchParams }) {
                     </table>
                   </div>
                 ) : (
-                  <p className="px-4 py-3 text-sm text-muted-foreground">No appointments yet.</p>
+                  <Empty icon={CalendarClock}>No appointments yet.</Empty>
                 ),
               },
               ...(staff
@@ -551,7 +562,7 @@ export default async function LeadSheet({ params, searchParams }) {
                             <p className="mt-1 whitespace-pre-line break-words pl-5 text-xs text-muted-foreground">{e.body}</p>
                           </details>
                         ))}
-                        {activity.emails.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">No emails yet.</p>}
+                        {activity.emails.length === 0 && <Empty icon={Mail}>No emails yet.</Empty>}
                       </div>
                     ),
                   }]

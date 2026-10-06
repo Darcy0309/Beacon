@@ -26,7 +26,11 @@ export default function Tabs({ tabs, initial, className, listClassName, panelCla
 
   return (
     <div className={className}>
-      <div role="tablist" aria-label={label} onKeyDown={onKey} className={cn("flex gap-1 overflow-x-auto border-b border-[var(--panel-border)] px-3", listClassName)}>
+      <div role="tablist" aria-label={label} onKeyDown={onKey} className={cn(
+          // Scrolls sideways on a narrow screen, without a scroll bar; never up and down.
+          "flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[var(--panel-border)] px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          listClassName
+        )}>
         {tabs.map((t) => {
           const on = t.id === current;
           return (
@@ -42,7 +46,7 @@ export default function Tabs({ tabs, initial, className, listClassName, panelCla
               data-tab={t.id}
               onClick={() => setCurrent(t.id)}
               className={cn(
-                "-mb-px flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-2.5 py-2.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] transition-colors",
+                "flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-2.5 py-2.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] transition-colors",
                 on ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
               )}
             >
