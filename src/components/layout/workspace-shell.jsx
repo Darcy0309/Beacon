@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { useRole } from "@/components/layout/role-provider";
 import { rolesForPath } from "@/lib/nav";
 import { signOut } from "@/features/auth/actions";
+import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import ActivityTracker from "@/features/pay/components/activity-tracker";
 
 /**
@@ -67,7 +68,7 @@ function AccountDisabled({ email }) {
           {email ? <>{email} can no longer use Lighthouse. </> : null}
           If you think this is a mistake, contact an administrator.
         </p>
-        <form action={signOut} className="mt-5">
+        <form action={signOut} onSubmit={forgetPushThenSubmit} className="mt-5">
           <button
             type="submit"
             className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-colors hover:border-primary/40"

@@ -35,7 +35,8 @@
     "react-dom": "19.2.8",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
-    "undici": "^8.10.2"
+    "undici": "^8.10.2",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/oxide-linux-x64-gnu": "^4.3.3",

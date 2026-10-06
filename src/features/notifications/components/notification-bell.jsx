@@ -10,7 +10,7 @@ import { useRole } from "@/components/layout/role-provider";
 import { markNotificationRead, markAllNotificationsRead } from "@/features/notifications/actions";
 import { KIND_ICONS } from "@/features/notifications/kinds";
 import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/features/notifications/active-chat";
-import { showDesktop, trackFrontTab } from "@/features/notifications/desktop";
+import { closePushed, pushSupported, showDesktop, syncPush, trackFrontTab } from "@/features/notifications/desktop";
 import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { cn } from "@/lib/utils";
 
@@ -93,10 +93,25 @@ export default function NotificationBell() {
     popups.current.delete(id);
     desktop.current.get(id)?.close();
     desktop.current.delete(id);
+    closePushed(id);
   }, []);
 
   // Which Lighthouse tab is in front, so only nobody-looking shows a desktop pop-up.
   useEffect(() => trackFrontTab(), []);
+
+  // Push: keep this browser subscribed for whoever is signed in, and open the
+  // notification its desktop pop-up was clicked for (public/sw.js asks).
+  useEffect(() => {
+    if (!me || !pushSupported()) return;
+    syncPush();
+    const onMessage = (e) => {
+      if (e.data?.type !== "lighthouse:open") return;
+      const url = new URL(String(e.data.url), window.location.origin);
+      if (url.origin === window.location.origin) router.push(url.pathname + url.search);
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
+  }, [me, router]);
 
   // The bell lists unread notifications only: once read, one leaves the list
   // (the inbox keeps them all).

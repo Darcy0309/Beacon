@@ -175,9 +175,32 @@ and reading it anywhere takes it down. Each person turns them on in the bell
 or the inbox (the browser asks once), can turn them off for that browser, and
 can send a test. With several tabs open, only the one in front shows the
 in-app pop-up, and the tabs' desktop pop-ups share a tag so the system shows
-it once. Nothing arrives while every Lighthouse tab is closed: that would
-need Web Push (a service worker and a push service).
-`tests/e2e/desktop-notifications.test.mjs` covers it.
+it once.
+
+**With Lighthouse closed**, Web Push carries them. Turning desktop
+notifications on also subscribes the browser with its push service and
+saves it for the person (`push_subscriptions`, through
+`save_push_subscription()`, which accepts only the browsers' own push
+services; a browser moves to whoever signs in on it, and signing out
+forgets it). When notifications are added, the database's
+`tg_notifications_push` trigger asks the app to push them, one call per
+batch through pg_net, with a secret: `POST /api/push/deliver` claims each
+once (`notifications.pushed_at`), encrypts and signs it (`web-push`,
+VAPID keys in `lib/server/push.js`) and sends it to each of the person's
+browsers, forgetting any the push service says are gone. The browser's
+worker (`public/sw.js`) shows it unless someone is looking at Lighthouse,
+and a click opens it. While a browser is subscribed, the worker shows all
+its desktop pop-ups and the tabs none of their own.
+
+To switch it on: the app needs `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+`VAPID_SUBJECT` and `PUSH_DELIVER_SECRET`; the database needs Vault's
+`push_deliver_url` (the app's `/api/push/deliver`) and `push_deliver_secret`.
+Without them, desktop pop-ups still come while a tab is open.
+
+`tests/e2e/desktop-notifications.test.mjs`, `tests/integration/push.test.mjs`
+and `tests/e2e/push.test.mjs` cover it. Headless Chrome has no push
+service, so the browser test hands pushes to the worker through DevTools
+and subscribes with a stand-in.
 
 ## Search
 
@@ -279,8 +302,8 @@ signs out.
 | Command | Needs | What |
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), email (one address, why a send failed), validation rules, form ↔ schema contract |
-| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs); emails to leads (who may send, nobody writes the history) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, emailing a lead (with its own mail catcher), chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications (in the app and on the desktop), in headless Chrome |
+| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs); emails to leads (who may send, nobody writes the history); push subscriptions (only real push services, one browser one person) |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, emailing a lead (with its own mail catcher), chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications (in the app, on the desktop, and pushed with Lighthouse closed), in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

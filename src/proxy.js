@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_ID_HEADER, supabaseConfigProblem } from "@/lib/supabase/config";
 import { supabaseFetch } from "@/lib/supabase/fetch";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/setup"];
+// Open without a session: signing in, the browser's push worker (fetched again
+// by the browser on its own), and push delivery, which the database calls
+// with its own secret (app/api/push/deliver).
+const PUBLIC_PATHS = ["/login", "/auth", "/setup", "/sw.js", "/api/push/deliver"];
 
 /**
  * True when the session has cleared two-factor. The assurance level is a

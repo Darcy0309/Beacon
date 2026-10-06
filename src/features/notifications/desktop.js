@@ -14,9 +14,18 @@
  * tab someone is looking at shows the in-app pop-up, and when none is in
  * front each tab's desktop pop-up carries the same tag, so the system shows
  * it once.
+ *
+ * With Lighthouse closed: Web Push. Turning them on also subscribes this
+ * browser with its push service (save_push_subscription()), so the server
+ * can push each new notification to the browser's worker (public/sw.js),
+ * which shows it whether or not a tab is open. While this browser is
+ * subscribed, the worker shows them all and the tabs show none of their
+ * own. When the server has no push keys, the tabs' own pop-ups still work.
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { pushPublicKey } from "@/features/notifications/push-actions";
 
 const OFF_KEY = "lighthouse:desktop-notifications-off";
 const FRONT_KEY = "lighthouse:front-tab"; // "<tab id> <time>" while a tab is in front
@@ -89,7 +98,7 @@ export function trackFrontTab() {
  * desktop notification, or null when none was shown.
  */
 export function showDesktop(n, onOpen) {
-  if (desktopPermission() !== "granted" || store.get(OFF_KEY) === "1" || anyTabInFront()) return null;
+  if (push.active || desktopPermission() !== "granted" || store.get(OFF_KEY) === "1" || anyTabInFront()) return null;
   try {
     const shown = new window.Notification(n.title, {
       body: [n.sender_name ? `From ${n.sender_name}` : null, n.body].filter(Boolean).join("\n"),
@@ -132,6 +141,111 @@ export function testDesktop() {
 const listeners = new Set();
 const changed = () => listeners.forEach((fn) => fn());
 
+// ---------------------------------------------------------------------------
+// Web Push
+// ---------------------------------------------------------------------------
+
+/** active: this browser is subscribed, and the worker shows the pop-ups. */
+const push = { active: false, syncing: null };
+
+export const pushSupported = () =>
+  typeof window !== "undefined" && window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window;
+
+const toBytes = (base64url) => {
+  const s = atob(base64url.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(base64url.length / 4) * 4, "="));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+};
+const sameKey = (buffer, key) => {
+  if (!buffer) return false;
+  const a = new Uint8Array(buffer);
+  const b = toBytes(key);
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+};
+
+let keyPromise = null;
+const serverKey = () => (keyPromise ??= pushPublicKey().catch(() => null));
+
+/**
+ * Make sure this browser is subscribed and saved for whoever is signed in
+ * (it may have been someone else's), when desktop notifications are on.
+ * Once per page load; the bell calls it, and turnOn() after the browser
+ * says yes. Resolves true when push is working.
+ */
+export function syncPush({ force = false } = {}) {
+  if (push.syncing && !force) return push.syncing;
+  push.syncing = (async () => {
+    if (!pushSupported() || desktopPermission() !== "granted" || store.get(OFF_KEY) === "1") return false;
+    const key = await serverKey();
+    if (!key) return false;
+    try {
+      const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (sub && !sameKey(sub.options?.applicationServerKey, key)) {
+        // The server's keys changed: this subscription is no use any more.
+        await createClient().rpc("remove_push_subscription", { p_endpoint: sub.endpoint });
+        await sub.unsubscribe();
+        sub = null;
+      }
+      sub ??= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(key) });
+      const { endpoint, keys } = sub.toJSON();
+      const { error } = await createClient().rpc("save_push_subscription", {
+        p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth, p_user_agent: navigator.userAgent,
+      });
+      if (error) throw error;
+      push.active = true;
+    } catch (err) {
+      console.warn("[push] not subscribed:", err?.message ?? err);
+      push.active = false;
+    }
+    changed();
+    return push.active;
+  })();
+  return push.syncing;
+}
+
+/** Stop pushes to this browser (turned off, or signing out). Never throws. */
+export async function forgetPush() {
+  push.active = false;
+  push.syncing = null;
+  try {
+    const reg = pushSupported() ? await navigator.serviceWorker.getRegistration("/") : null;
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) {
+      await createClient().rpc("remove_push_subscription", { p_endpoint: sub.endpoint });
+      await sub.unsubscribe();
+    }
+  } catch (err) {
+    console.warn("[push] could not forget this browser:", err?.message ?? err);
+  }
+  changed();
+}
+
+/** Take down the worker's pop-up for a notification read somewhere. */
+export async function closePushed(id) {
+  try {
+    const reg = pushSupported() ? await navigator.serviceWorker.getRegistration("/") : null;
+    for (const n of (await reg?.getNotifications({ tag: `lighthouse-notification-${id}` })) ?? []) n.close();
+  } catch {
+    /* nothing to close */
+  }
+}
+
+/**
+ * For a sign-out form's onSubmit: forget this browser first, so the next
+ * person to use it does not get this person's notifications, then sign out.
+ */
+export function forgetPushThenSubmit(e) {
+  const form = e.currentTarget;
+  if (form.dataset.pushForgotten) return;
+  e.preventDefault();
+  const timeout = new Promise((resolve) => setTimeout(resolve, 2000));
+  Promise.race([forgetPush(), timeout]).finally(() => {
+    form.dataset.pushForgotten = "1";
+    form.requestSubmit();
+  });
+}
+
 /**
  * The person's choice, for the switch in the bell and the inbox:
  *   status    "on", "off", "ask" (not asked yet), "blocked" (the browser said no), "unsupported"
@@ -148,9 +262,13 @@ export function useDesktopNotifications() {
   };
   // "unsupported" on the server and in the first render, so both agree.
   const [status, setStatus] = useState("unsupported");
+  const [pushOn, setPushOn] = useState(false);
 
   useEffect(() => {
-    const refresh = () => setStatus(read());
+    const refresh = () => {
+      setStatus(read());
+      setPushOn(push.active);
+    };
     refresh();
     listeners.add(refresh);
     // The answer can change in the browser's own site settings, or in another tab.
@@ -174,12 +292,19 @@ export function useDesktopNotifications() {
     store.set(OFF_KEY, null);
     if (desktopPermission() === "default") await window.Notification.requestPermission();
     changed();
+    await syncPush({ force: true });
   }, []);
 
-  const turnOff = useCallback(() => {
+  const turnOff = useCallback(async () => {
     store.set(OFF_KEY, "1");
     changed();
+    await forgetPush();
   }, []);
 
-  return { status, turnOn, turnOff };
+  // Granted in the browser's own settings, or here: subscribe.
+  useEffect(() => {
+    if (status === "on") syncPush();
+  }, [status]);
+
+  return { status, pushing: status === "on" && pushOn, turnOn, turnOff };
 }

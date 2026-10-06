@@ -9,6 +9,7 @@ import LighthouseMark from "@/components/brand/logo-mark";
 import { navGroups, ROLES } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
 import { signOut } from "@/features/auth/actions";
+import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import { useSidebar } from "@/components/layout/sidebar-provider";
 import { cn } from "@/lib/utils";
 
@@ -156,7 +157,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
               <div className="truncate text-xs text-sidebar-foreground/60">{ROLES[role]?.label}</div>
             </div>
           )}
-          <form action={signOut}>
+          <form action={signOut} onSubmit={forgetPushThenSubmit}>
             <button
               type="submit"
               title="Sign out"

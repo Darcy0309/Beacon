@@ -6,8 +6,7 @@ import { testDesktop, useDesktopNotifications } from "@/features/notifications/d
 import { cn } from "@/lib/utils";
 
 const SAYS = {
-  ask: "Get a desktop pop-up for new notifications while Lighthouse is in the background.",
-  on: "Desktop notifications are on.",
+  ask: "Get a desktop pop-up for new notifications, even when Lighthouse is in the background or closed.",
   off: "Desktop notifications are off.",
   blocked: "Your browser is blocking desktop notifications. To allow them, click the icon left of the address bar, then Notifications → Allow.",
 };
@@ -19,8 +18,11 @@ const link = "cursor-pointer text-[0.66rem] font-bold uppercase tracking-[0.1em]
  * Nothing at all in a browser that cannot show them.
  */
 export default function DesktopSwitch({ className }) {
-  const { status, turnOn, turnOff } = useDesktopNotifications();
+  const { status, pushing, turnOn, turnOff } = useDesktopNotifications();
   if (status === "unsupported") return null;
+  const says = status === "on"
+    ? pushing ? "Desktop notifications are on, even when Lighthouse is closed." : "Desktop notifications are on while Lighthouse is open."
+    : SAYS[status];
 
   const on = async () => {
     await turnOn();
@@ -29,9 +31,9 @@ export default function DesktopSwitch({ className }) {
   };
 
   return (
-    <div data-desktop-switch={status} className={cn("flex items-start gap-2.5 text-xs text-muted-foreground", className)}>
+    <div data-desktop-switch={status} data-push={pushing ? "on" : "off"} className={cn("flex items-start gap-2.5 text-xs text-muted-foreground", className)}>
       <Monitor className={cn("mt-0.5 size-3.5 shrink-0", status === "on" && "text-primary")} aria-hidden />
-      <span className="min-w-0 flex-1">{SAYS[status]}</span>
+      <span className="min-w-0 flex-1">{says}</span>
       {status === "ask" || status === "off" ? (
         <button type="button" onClick={on} className={link}>Turn on</button>
       ) : status === "on" ? (
