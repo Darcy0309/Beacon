@@ -49,6 +49,55 @@ function Box({ label, icon, children }) {
   );
 }
 
+/**
+ * One person to reach, as the contact card shows them: name and title, then
+ * each number with a Call button beside it and each address with an Email
+ * button. A Call button is a tel: link (data-lead-id: pressing it starts the
+ * call's time for this name), so it rings whichever number it sits by.
+ */
+function Person({ who, name, title, phone, mobile, email, leadId, emailButton }) {
+  const lines = [
+    phone ? { kind: "Business", value: phone, tel: telHref(phone) } : null,
+    mobile ? { kind: "Mobile", value: mobile, tel: telHref(mobile) } : null,
+    email ? { kind: "Email", value: email } : null,
+  ].filter(Boolean);
+  return (
+    <div className="col-span-2" data-person={who}>
+      <div className="eyebrow">{who}</div>
+      <div className="mt-1 break-words text-sm">
+        {name ? <span className="font-medium">{name}</span> : <span className="text-muted-foreground">—</span>}
+        {title ? <span className="text-muted-foreground"> · {title}</span> : null}
+      </div>
+      {lines.length ? (
+        <div className="mt-2 divide-y divide-[var(--panel-border)] rounded-lg border border-[var(--panel-border)]">
+          {lines.map((l) => (
+            <div key={l.kind} data-contact-line={l.kind} className="flex items-center justify-between gap-3 px-3 py-1.5">
+              <div className="min-w-0">
+                <div className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{l.kind}</div>
+                <div className={l.tel ? "truncate text-sm tabular-nums" : "break-all text-sm"}>{l.value}</div>
+              </div>
+              {l.tel ? (
+                <a
+                  href={l.tel}
+                  data-lead-id={leadId}
+                  aria-label={`Call ${who.toLowerCase()}, ${l.kind.toLowerCase()}: ${l.value}`}
+                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_14px_-6px_var(--neon-emerald)] transition-all hover:brightness-110 active:scale-95"
+                >
+                  <Phone className="size-4" />
+                </a>
+              ) : l.kind === "Email" && emailButton ? (
+                emailButton(l.value)
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1 text-xs text-muted-foreground">No phone or email on file.</p>
+      )}
+    </div>
+  );
+}
+
 // The X-date rows on a lead sheet: every line the renewal date can come from.
 const XDATE_ROWS = [
   ["Ultimate", "ultimate_xdate", "agency_name"],
@@ -224,13 +273,20 @@ export default async function LeadSheet({ params, searchParams }) {
               </Box>
 
               <Box label="Contact" icon={UserRound}>
-                <Field label="Contact">{lead.contact}</Field>
-                <Field label="Title">{r.contact_title}</Field>
-                <Field label="Decision maker">{r.decision_maker}</Field>
-                <Field label="DM title">{r.dm_title}</Field>
-                <Field label="Phone">{phone}</Field>
+                {[
+                  { who: "Contact", name: r.contact_name, title: r.contact_title, phone: r.phone, mobile: r.contact_mobile, email: r.email },
+                  { who: "Decision maker", name: r.decision_maker, title: r.dm_title, phone: r.dm_phone, mobile: r.dm_mobile, email: r.dm_email },
+                ].map((p) => (
+                  <Person
+                    key={p.who}
+                    {...p}
+                    leadId={lead.id}
+                    emailButton={canRecord && sender
+                      ? (to) => <EmailLead compact leadId={lead.id} company={lead.co} to={to} contact={p.name} sender={sender} admin={admin} />
+                      : null}
+                  />
+                ))}
                 <Field label="Fax"><span className="tabular-nums">{r.fax}</span></Field>
-                <Field label="Email" wide><span className="break-all">{r.email}</span></Field>
               </Box>
 
               <Box label="Coverage" icon={ShieldCheck}>

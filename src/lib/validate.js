@@ -9,6 +9,7 @@
 
 import { normalizeState } from "./csv.js";
 import { EMAIL_LIMITS, isMailbox } from "./email.js";
+import { PHONE_EXTENSION } from "./format.js";
 
 const str = (v) => (v == null ? "" : String(v).trim());
 const empty = (v) => str(v) === "";
@@ -40,13 +41,15 @@ export const rules = {
   /** Exactly one address to send to: no names, commas or angle brackets. */
   mailbox: (v) => (!empty(v) && !isMailbox(v) ? "Enter one email address, like name@company.com" : null),
 
-  // Lenient North-American phone: 10 digits, optional +1, any common punctuation.
+  // Lenient North-American phone: 10 digits, optional +1, any common
+  // punctuation, and an optional extension ("x203", "ext. 203").
   phone: (v) => {
     if (empty(v)) return null;
-    const digits = str(v).replace(/\D/g, "");
+    const main = str(v).replace(PHONE_EXTENSION, "");
+    const digits = main.replace(/\D/g, "");
     const ok = (digits.length === 10 || (digits.length === 11 && digits.startsWith("1"))) &&
-      /^[+\d\s().-]+$/.test(str(v));
-    return ok ? null : "Enter a valid phone number, e.g. (602) 555-0100";
+      /^[+\d\s().-]+$/.test(main);
+    return ok ? null : "Enter a valid phone number, e.g. (602) 555-0100 or (602) 555-0100 x203";
   },
 
   date: (v) => {
@@ -188,7 +191,13 @@ export const schemas = {
     contact_name: [max(80)],
     contact_title: [max(60)],
     phone: [phone],
+    contact_mobile: [phone],
     email: [email, max(120)],
+    decision_maker: [max(80)],
+    dm_title: [max(60)],
+    dm_phone: [phone],
+    dm_mobile: [phone],
+    dm_email: [email, max(120)],
     website: [max(120)],
     address: [max(120)],
     city: [max(60)],

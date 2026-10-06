@@ -11,6 +11,7 @@ const leadSelect = ({ status = false } = {}) => `
   employees, covered_employees, autos, sales_volume, years_in_business,
   estimated_annual_premium, notes_dcm, notes_client, lead_date, import_date,
   date_last_worked, created_at, decision_maker, dm_title, fax,
+  contact_mobile, dm_phone, dm_mobile, dm_email,
   stage, call_weight, original_xdate, promoted_at,
   status:lead_statuses${inner(status)}(id, code, name),
   result:call_results(id, name, viable, callable, project_type),

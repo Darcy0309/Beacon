@@ -93,5 +93,12 @@ eq("empty state", normalizeState(""), null);
 eq("header-only file yields nothing", rowsToLeads(parseCsv("Company\n")).records, []);
 eq("empty input", parseCsv(""), []);
 
+// --- more ways to reach a name ------------------------------------------------
+{
+  const cols = mapHeaders(["Company", "Phone", "Mobile Phone", "Cell", "Email", "Decision Maker", "DM Phone", "DM Cell", "Decision Maker Email"]);
+  check("mobile, DM phone, DM mobile and DM email headings land in their own columns",
+    JSON.stringify(cols) === JSON.stringify(["company_name", "phone", "contact_mobile", "contact_mobile", "email", "decision_maker", "dm_phone", "dm_mobile", "dm_email"]), JSON.stringify(cols));
+}
+
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
 process.exit(failures ? 1 : 0);

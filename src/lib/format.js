@@ -5,12 +5,20 @@
 
 const PALETTE = ["#2b6cb0", "#2c9d78", "#b7791f", "#6d47c9", "#c1362c", "#3f74e6", "#0e7490", "#7c53d6"];
 
-/** A tel: link a softphone can dial: digits only, with the US country code. Null when there is no number. */
+/** An extension at the end of a number: "x203", "ext. 203", "extension 203", "#203". */
+export const PHONE_EXTENSION = /\s*(?:x|ext\.?|extension|#)\s*(\d{1,6})\s*$/i;
+
+/**
+ * A tel: link a softphone can dial: digits only, with the US country code,
+ * and an extension after a pause (",203"), which the dialer sends once the
+ * call connects. Null when there is no number.
+ */
 export function telHref(phone) {
-  const digits = String(phone ?? "").replace(/\D/g, "");
-  if (digits.length === 10) return `tel:+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `tel:+${digits}`;
-  return digits ? `tel:${digits}` : null;
+  const text = String(phone ?? "");
+  const ext = text.match(PHONE_EXTENSION)?.[1];
+  const digits = text.replace(PHONE_EXTENSION, "").replace(/\D/g, "");
+  const number = digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits.startsWith("1") ? `+${digits}` : digits;
+  return number ? `tel:${number}${ext ? `,${ext}` : ""}` : null;
 }
 
 /** Stable colour for a name, so a record always looks the same. */

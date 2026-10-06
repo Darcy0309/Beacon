@@ -25,6 +25,9 @@ passes("phone: 602-555-0100", rules.phone, "602-555-0100");
 passes("phone: +1 6025550100", rules.phone, "+1 6025550100");
 fails("phone: too short", rules.phone, "555-0100");
 fails("phone: letters", rules.phone, "call me");
+passes("phone: with an extension, x203", rules.phone, "(214) 269-7488 x203");
+passes("phone: with an extension, ext. 15", rules.phone, "214-269-7488 ext. 15");
+fails("phone: an extension alone is not a number", rules.phone, "x203");
 
 passes("date: valid", rules.date, "2026-10-14");
 fails("date: Feb 30", rules.date, "2026-02-30");

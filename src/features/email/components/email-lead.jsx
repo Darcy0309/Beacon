@@ -29,8 +29,10 @@ const NOT_READY = {
  *
  * `sender` says how it will go out (getEmailSender()); until email is
  * connected the dialog says what is missing and Send stays off.
+ *
+ * `compact`: a round icon button, for beside an address on the sheet.
  */
-export default function EmailLead({ leadId, company, to, contact, sender, admin }) {
+export default function EmailLead({ leadId, company, to, contact, sender, admin, compact = false }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(sendLeadEmail, EMPTY);
@@ -66,9 +68,20 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline" data-email-lead>
-          <Mail /> Email
-        </Button>
+        {compact ? (
+          <button
+            type="button"
+            data-email-to={to ?? ""}
+            aria-label={`Email ${to}`}
+            className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_14px_-6px_var(--primary)] transition-all hover:brightness-110 active:scale-95"
+          >
+            <Mail className="size-4" />
+          </button>
+        ) : (
+          <Button size="sm" variant="outline" data-email-lead>
+            <Mail /> Email
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="max-w-xl">
         <DialogHeader className="shrink-0">

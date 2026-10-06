@@ -137,6 +137,18 @@ period: everyone for an administrator, only themselves for anyone else. The
 production report's CSV comes day by day or as totals per account manager,
 project or client (`?by=`), each ending in a Total row.
 
+## Reaching a name
+
+The contact and the decision maker each have a business phone, a mobile
+and an email (`leads.phone`, `contact_mobile`, `email`; `dm_phone`,
+`dm_mobile`, `dm_email`). The lead sheet's contact card puts a Call button
+beside every number (a `tel:` link with `data-lead-id`, so it counts the
+call's time like Call now) and an Email button beside every address (for
+whoever may work the name). A number may carry an extension ("x203"),
+which `telHref()` dials after a pause (`,203`). Imports take headings such
+as "Mobile", "Cell", "DM Phone", "DM Cell" and "DM Email", and
+`leads.search_text` includes the new numbers and the decision maker's name.
+
 ## Email to leads
 
 **Email**, beside Call now on the lead sheet, writes to the name's contact
