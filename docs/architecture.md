@@ -139,6 +139,14 @@ project or client (`?by=`), each ending in a Total row.
 
 ## Reaching a name
 
+The lead sheet is laid out as the client asked, after VanillaSoft: the
+contact card on the left (the contact and the decision maker with their
+numbers and addresses, then where the name stands), the business,
+coverage and notes in tabs in the middle (`components/shared/tabs.jsx`),
+the call result buttons on the right, and the history (calls,
+appointments, emails) in tabs along the bottom, as tables with each call's
+date and time on the business's clock.
+
 The contact and the decision maker each have a business phone, a mobile
 and an email (`leads.phone`, `contact_mobile`, `email`; `dm_phone`,
 `dm_mobile`, `dm_email`). The lead sheet's contact card puts a Call button

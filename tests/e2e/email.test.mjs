@@ -62,7 +62,12 @@ const write = async (page, { to, subject, body }) => {
 const send = (page) => page.click("[role=dialog] button[type=submit]");
 const kept = (leadId) => JSON.parse(sql(`select coalesce(json_agg(t order by t.id), '[]') from (select id, to_address, subject, body, status, error, message_id, user_id
   from public.lead_emails where lead_id = ${leadId}) t`));
-const history = (page) => page.ev(`[...document.querySelectorAll('[data-email-row]')].map((r) => ({ text: r.innerText, open: r.open }))`);
+/** The Emails tab of the history, opened. */
+const emailsTab = (page) => page.click('[role=tab][data-tab="emails"]');
+const history = async (page) => {
+  await emailsTab(page);
+  return page.ev(`[...document.querySelectorAll('[data-email-row]')].map((r) => ({ text: r.innerText, open: r.open }))`);
+};
 
 try {
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage();
@@ -70,12 +75,11 @@ try {
   section("The Email button");
   await sean.go(`/leads/${roofing}`, 4000);
   const place = await sean.ev(`(() => { const e = document.querySelector('[data-email-lead]');
-    const c = [...document.querySelectorAll('a[href^="tel:"]')].find((a) => a.textContent.includes('Call now'));
-    if (!e || !c) return { e: Boolean(e), c: Boolean(c) };
-    const er = e.getBoundingClientRect(), cr = c.getBoundingClientRect();
-    return { text: e.textContent.trim(), next: e.nextElementSibling === c, gap: Math.round(cr.left - er.right), sameRow: Math.abs(er.top - cr.top) < 4 }; })()`);
-  check("an Email button on the lead sheet", place.text === "Email", JSON.stringify(place));
-  check("…right beside Call now, on the same row", place.next && place.sameRow && place.gap >= 0 && place.gap <= 12, JSON.stringify(place));
+    const line = e?.closest('[data-contact-line]'); const person = e?.closest('[data-person]');
+    return { line: line?.dataset.contactLine ?? null, person: person?.dataset.person ?? null, address: line?.innerText.split('\\n')[1] ?? null }; })()`);
+  check("an Email button on the lead sheet, beside the contact's address", place.line === "Email" && place.person === "Contact", JSON.stringify(place));
+  check("…next to the Call buttons beside the numbers", await sean.ev(`!!document.querySelector('[data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')`));
+  await emailsTab(sean);
   check("…and an Emails list in the history, empty so far", /No emails yet/.test(await sean.text()));
   await shot(sean, "email-button");
 

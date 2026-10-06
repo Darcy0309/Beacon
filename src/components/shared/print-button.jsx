@@ -3,10 +3,11 @@
 import { Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function PrintButton({ children = "Print" }) {
+/** Print the page. `compact`: the icon alone, for a tight row of actions. */
+export default function PrintButton({ children = "Print", variant = "outline", compact = false }) {
   return (
-    <Button variant="outline" size="sm" onClick={() => window.print()}>
-      <Printer /> {children}
+    <Button variant={variant} size={compact ? "icon" : "sm"} className={compact ? "size-8" : undefined} aria-label={compact ? "Print" : undefined} onClick={() => window.print()}>
+      <Printer /> {compact ? null : children}
     </Button>
   );
 }

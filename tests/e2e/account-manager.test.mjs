@@ -71,8 +71,10 @@ try {
 
   section("The lead sheet");
   t = await sean.text();
-  check("four boxes: business, contact, coverage, where it stands", ["BUSINESS", "CONTACT", "COVERAGE", "WHERE IT STANDS"].every((b) => t.toUpperCase().includes(b)));
-  check("history underneath", /CALL HISTORY/i.test(t) && /APPOINTMENTS/i.test(t));
+  check("the contact card on the left, with a Call button by the number",
+    await sean.ev(`!!document.querySelector('[data-contact-card] [data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')`));
+  check("business, coverage and notes in tabs in the middle", ["BUSINESS", "COVERAGE", "NOTES"].every((b) => t.toUpperCase().includes(b)));
+  check("history in tabs underneath", /CALL HISTORY/i.test(t) && /APPOINTMENTS/i.test(t));
   const dbdvButtons = await buttons(sean);
   check("DBDev result buttons on the right", ["Viable-CallBack", "Viable-Left Message", "Lead", "Lead-Hot Lead", "Appointment-Phone", "Not Interested", "Pending"].every((b) => dbdvButtons.includes(b)), dbdvButtons.join(", "));
   check("Viable-No Contact is now Viable-CallBack", !dbdvButtons.includes("Viable-No Contact"));
@@ -172,8 +174,8 @@ try {
   const apptButtons = await buttons(mike);
   check("appointment-project buttons on his sheet", ["Lead-No Contact", "Lead-Not Shopping", "Lead-Corrected", "Lead-Invalid"].every((b) => apptButtons.includes(b)) && !apptButtons.includes("Viable-Staged"), apptButtons.join(", "));
   check("the sheet shows who developed it", /Developed by\s*Sean Fitzgerald/i.test(await mike.text()));
-  const dial = await mike.ev(`[...document.querySelectorAll('a[href^="tel:"]')].filter((a) => /Call now/i.test(a.textContent)).map((a) => a.getAttribute('href'))`);
-  check("Call now dials the lead's number", dial.length === 1 && dial[0] === "tel:+16145550110", JSON.stringify(dial));
+  const dial = await mike.ev(`[...document.querySelectorAll('[data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')].map((a) => a.getAttribute('href'))`);
+  check("the contact's Call button dials the lead's number", dial.length === 1 && dial[0] === "tel:+16145550110", JSON.stringify(dial));
 
   // At 1280px the panel is at its narrowest. Whatever the result, Save and
   // Cancel stay whole inside it (a long name once pushed Cancel off the edge).

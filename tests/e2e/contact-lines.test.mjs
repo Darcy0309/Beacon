@@ -28,7 +28,7 @@ const lead = Number(sql(`insert into public.leads (company_name, contact_name, c
 const browser = await launchBrowser();
 const shot = (page, name) => (SHOTS ? page.screenshot(`${SHOTS}/${name}.png`) : null);
 const card = (page) => page.ev(`[...document.querySelectorAll('[data-person]')].map((p) => ({
-  who: p.dataset.person, text: p.querySelector('.text-sm')?.innerText ?? '',
+  who: p.dataset.person, text: p.innerText,
   lines: [...p.querySelectorAll('[data-contact-line]')].map((l) => ({ kind: l.dataset.contactLine, value: l.innerText.split('\\n').pop(),
     call: l.querySelector('a[href^="tel:"]')?.getAttribute('href') ?? null, email: l.querySelector('[data-email-to]')?.dataset.emailTo ?? null })) }))`);
 
@@ -50,7 +50,11 @@ try {
     && dm.lines.find((l) => l.kind === "Business")?.call === "tel:+12142697400"
     && dm.lines.find((l) => l.kind === "Mobile")?.call === "tel:+12147852055"
     && dm.lines.find((l) => l.kind === "Email")?.email === "robert@agsi.test", JSON.stringify(dm));
-  check("Call now and Email are still in the header", await sean.ev(`!!document.querySelector('[data-email-lead]') && [...document.querySelectorAll('a[href^="tel:"]')].some((a) => a.textContent.includes('Call now'))`));
+  check("laid out as the client's example: the contact card on the left, tabs in the middle, results on the right",
+    await sean.ev(`(() => { const card = document.querySelector('[data-contact-card]').getBoundingClientRect(), tabs = document.querySelector('[role=tablist]').getBoundingClientRect(),
+      results = [...document.querySelectorAll('button[aria-pressed]')][0]?.getBoundingClientRect();
+      return card.right <= tabs.left && results && tabs.right <= results.left; })()`));
+  check("the contact's Email button is the sheet's main one", await sean.ev(`!!document.querySelector('[data-person="Contact"] [data-email-lead]')`));
   await sean.ev(`document.querySelector('[data-person]').scrollIntoView({ block: 'center' })`);
   await shot(sean, "contact-card");
 

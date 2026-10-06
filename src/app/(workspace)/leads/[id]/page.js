@@ -1,15 +1,11 @@
-import { isValidElement } from "react";
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import {
-  ArrowLeft, ArrowRight, CalendarPlus, ShieldCheck, Phone, PhoneCall, CalendarClock, Building2, UserRound,
-  Flag, StickyNote, Repeat, Mail, ChevronDown,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarPlus, ChevronDown, Mail, Pencil, Phone, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
 import PrintButton from "@/components/shared/print-button";
-import SectionHeader from "@/components/shared/section-header";
+import Tabs from "@/components/shared/tabs";
 import LeadForm from "@/features/leads/components/lead-form";
 import AppointmentForm from "@/features/appointments/components/appointment-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
@@ -24,79 +20,91 @@ import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { daysBetween, todayIn } from "@/lib/dates";
 import { fullName, mediumDate, shortDate, telHref } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-/** Nothing to show: no value, or a wrapper (a <span>) around no value. */
-const isBlank = (node) =>
-  node == null || node === false || node === "" || (isValidElement(node) && isBlank(node.props.children));
+const ROUND = "flex size-8 shrink-0 items-center justify-center rounded-full text-white transition-all hover:brightness-110 active:scale-95";
 
-function Field({ label, children, wide }) {
+/** Call a number: a tel: link (data-lead-id: pressing it starts the call's time for this name). */
+function CallButton({ tel, leadId, label }) {
   return (
-    <div className={wide ? "col-span-2" : undefined}>
-      <div className="eyebrow">{label}</div>
-      <div className="mt-1 break-words text-sm">{isBlank(children) ? <span className="text-muted-foreground">—</span> : children}</div>
-    </div>
+    <a href={tel} data-lead-id={leadId} aria-label={label} className={cn(ROUND, "bg-emerald-500 shadow-[0_0_14px_-6px_var(--neon-emerald)]")}>
+      <Phone className="size-4" />
+    </a>
   );
 }
 
-function Box({ label, icon, children }) {
+/** One way to reach someone: what it is, the number or address, and its button. */
+function Line({ kind, children, action }) {
   return (
-    <Card className="flex flex-col">
-      <SectionHeader label={label} icon={icon} />
-      <div className="grid flex-1 grid-cols-2 content-start gap-x-5 gap-y-4 p-5">{children}</div>
-    </Card>
+    <div data-contact-line={kind} className="flex items-center justify-between gap-3 border-t border-[var(--panel-border)] py-2">
+      <div className="min-w-0">
+        <div className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{kind}</div>
+        <div className="break-all text-sm tabular-nums">{children}</div>
+      </div>
+      {action}
+    </div>
   );
 }
 
 /**
- * One person to reach, as the contact card shows them: name and title, then
- * each number with a Call button beside it and each address with an Email
- * button. A Call button is a tel: link (data-lead-id: pressing it starts the
- * call's time for this name), so it rings whichever number it sits by.
+ * A person to reach, as the contact card lists them: each number with a Call
+ * button beside it and each address with an Email button. The contact always
+ * has an Email line, so an address the contact gives on the phone can be
+ * typed in and used at once.
  */
-function Person({ who, name, title, phone, mobile, email, leadId, emailButton }) {
-  const lines = [
-    phone ? { kind: "Business", value: phone, tel: telHref(phone) } : null,
-    mobile ? { kind: "Mobile", value: mobile, tel: telHref(mobile) } : null,
-    email ? { kind: "Email", value: email } : null,
-  ].filter(Boolean);
+function Person({ who, phone, mobile, email: address, leadId, emailButton, alwaysEmail = false, children }) {
+  const label = who.toLowerCase();
   return (
-    <div className="col-span-2" data-person={who}>
-      <div className="eyebrow">{who}</div>
-      <div className="mt-1 break-words text-sm">
-        {name ? <span className="font-medium">{name}</span> : <span className="text-muted-foreground">—</span>}
-        {title ? <span className="text-muted-foreground"> · {title}</span> : null}
-      </div>
-      {lines.length ? (
-        <div className="mt-2 divide-y divide-[var(--panel-border)] rounded-lg border border-[var(--panel-border)]">
-          {lines.map((l) => (
-            <div key={l.kind} data-contact-line={l.kind} className="flex items-center justify-between gap-3 px-3 py-1.5">
-              <div className="min-w-0">
-                <div className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{l.kind}</div>
-                <div className={l.tel ? "truncate text-sm tabular-nums" : "break-all text-sm"}>{l.value}</div>
-              </div>
-              {l.tel ? (
-                <a
-                  href={l.tel}
-                  data-lead-id={leadId}
-                  aria-label={`Call ${who.toLowerCase()}, ${l.kind.toLowerCase()}: ${l.value}`}
-                  className="flex size-8 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_14px_-6px_var(--neon-emerald)] transition-all hover:brightness-110 active:scale-95"
-                >
-                  <Phone className="size-4" />
-                </a>
-              ) : l.kind === "Email" && emailButton ? (
-                emailButton(l.value)
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-1 text-xs text-muted-foreground">No phone or email on file.</p>
-      )}
+    <div data-person={who}>
+      {children}
+      {address || (alwaysEmail && emailButton) ? (
+        <Line kind="Email" action={emailButton?.(address)}>
+          {address ?? <span className="text-muted-foreground">None on file</span>}
+        </Line>
+      ) : null}
+      {phone ? (
+        <Line kind="Business" action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} label={`Call ${label}, business: ${phone}`} /> : null}>
+          {phone}
+        </Line>
+      ) : null}
+      {mobile ? (
+        <Line kind="Mobile" action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
+          {mobile}
+        </Line>
+      ) : null}
     </div>
   );
 }
+
+/** A fact under the contact card: label on the left, value on the right. */
+function Fact({ label, children }) {
+  const blank = children == null || children === "" || children === false;
+  return (
+    <div className="flex items-baseline justify-between gap-3 py-1 text-xs">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="min-w-0 text-right break-words">{blank ? <span className="text-muted-foreground">—</span> : children}</span>
+    </div>
+  );
+}
+
+/** The middle panel's rows: label and value, striped. */
+function Rows({ rows }) {
+  return (
+    <div className="divide-y divide-[var(--panel-border)]">
+      {rows.map(([label, value]) => (
+        <div key={label} className="grid grid-cols-[minmax(8rem,40%)_1fr] gap-3 px-4 py-2.5 text-sm odd:bg-muted/30">
+          <span className="text-muted-foreground">{label}</span>
+          <span className="min-w-0 break-words">{value == null || value === "" ? <span className="text-muted-foreground">—</span> : value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const TH = "px-3 py-2 text-left text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground";
+const TD = "px-3 py-2 align-top";
 
 // The X-date rows on a lead sheet: every line the renewal date can come from.
 const XDATE_ROWS = [
@@ -116,10 +124,13 @@ const APPT_TONE = { Scheduled: "cyan", Confirmed: "emerald", Held: "violet", Res
 const STAGE = { dbdev: "Database development", appt: "Appointment setting" };
 
 /**
- * The lead sheet: four boxes (the business, the contact, their coverage,
- * where the name is in its life), the history underneath, and the call
- * result buttons on the right. Opened from a call list (?project=), it moves
- * on to the next name on that list after each result.
+ * The lead sheet, laid out as the client asked (after VanillaSoft): the
+ * contact card on the left (who to reach, with a Call button by every number
+ * and an Email button by every address, then where the name stands), the
+ * business, coverage and notes in tabs in the middle, the call result
+ * buttons on the right, and the history in tabs along the bottom. Opened
+ * from a call list (?project=), it moves on to the next name on that list
+ * after each result.
  */
 export default async function LeadSheet({ params, searchParams }) {
   const { id } = await params;
@@ -165,9 +176,6 @@ export default async function LeadSheet({ params, searchParams }) {
   const soonest = ins?.ultimate_xdate ? null : xdates.filter(([, k]) => k !== "ultimate_xdate").map(([label, k]) => ({ label, date: ins[k] }))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
   const renewalHint = soonest ? `${soonest.label} renews ${shortDate(soonest.date)}` : null;
-  const tel = telHref(r.phone);
-  // data-lead-id: pressing a phone link starts the call's time for this name.
-  const phone = tel ? <a href={tel} data-lead-id={lead.id} className="tabular-nums transition-colors hover:text-primary">{r.phone}</a> : null;
 
   // Whole days from the business's today: the server's clock runs on UTC.
   const daysOut = r.renewal ? daysBetween(today, String(r.renewal).slice(0, 10)) : null;
@@ -176,6 +184,24 @@ export default async function LeadSheet({ params, searchParams }) {
     : me?.role === "manager"
       ? { href: "/work", label: "My projects" }
       : { href: "/leads", label: "Back to leads" };
+
+  // Dates and times in the history, on the business's clock.
+  const stamp = (iso) =>
+    iso
+      ? new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "2-digit", day: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" })
+          .format(new Date(iso))
+      : "—";
+  const emailButton = (name, primary = false) =>
+    canRecord && sender
+      ? (to) => <EmailLead compact primary={primary} leadId={lead.id} company={lead.co} to={to} contact={name} sender={sender} admin={admin} />
+      : null;
+  const address = [r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean);
+  const website = r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null;
+  const notes = [
+    r.description ? ["Description", r.description] : null,
+    r.notes_dcm ? ["Ours", r.notes_dcm] : null,
+    r.notes_client ? ["Client", r.notes_client] : null,
+  ].filter(Boolean);
 
   return (
     <>
@@ -202,217 +228,173 @@ export default async function LeadSheet({ params, searchParams }) {
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-4">
-          <div className="space-y-4 xl:col-span-3">
-            <Card accent="var(--neon-cyan)">
-              <div className="flex flex-wrap items-start justify-between gap-4 p-5">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-12 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ background: lead.color }}>{lead.initials}</span>
-                  <div>
-                    <h2 className="text-lg font-bold tracking-tight">{lead.co}</h2>
-                    <p className="text-sm text-muted-foreground">{lead.city}</p>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {daysOut !== null ? (
-                    <span
-                      className="rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em]"
-                      style={{
-                        borderColor: `color-mix(in srgb, ${daysOut <= 30 ? "var(--neon-rose)" : "var(--neon-amber)"} 45%, transparent)`,
-                        color: daysOut <= 30 ? "var(--neon-rose)" : "var(--neon-amber)",
-                      }}
-                    >
-                      {daysOut < 0 ? `${Math.abs(daysOut)}d past renewal` : `${daysOut}d to renewal`}
-                    </span>
-                  ) : null}
-                  {r.result ? <ToneBadge tone={r.result.viable ? "cyan" : "slate"}>{r.result.name}</ToneBadge> : null}
-                  <StatusBadge status={lead.status} />
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 border-t border-[var(--panel-border)] px-5 py-3">
-                <LeadForm lead={r} options={options} />
-                <AppointmentForm
-                  options={options}
-                  leads={[{ id: lead.id, company_name: lead.co }]}
-                  defaultLeadId={lead.id}
-                  trigger={<Button size="sm" variant="outline"><CalendarPlus /> Add appointment by hand</Button>}
-                />
-                <PrintButton />
-                <div className="ml-auto flex flex-wrap items-center gap-2">
-                  {/* Write to the contact from Lighthouse: for whoever may work the name, as calls are. */}
-                  {canRecord && sender ? (
-                    <EmailLead leadId={lead.id} company={lead.co} to={r.email} contact={r.contact_name} sender={sender} admin={admin} />
-                  ) : null}
-                  {/* One click to dial: a tel: link opens the softphone, or the dialer on a phone. */}
-                  {tel ? (
-                    <Button asChild size="sm" className="bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] hover:brightness-110">
-                      <a href={tel} title={`Call ${lead.co}`} data-lead-id={lead.id}>
-                        <Phone /> Call now
-                        <span className="font-medium normal-case tracking-normal tabular-nums opacity-85">{r.phone}</span>
-                      </a>
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">No phone number on file</span>
-                  )}
-                </div>
-              </div>
-            </Card>
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(17rem,1fr)_minmax(0,1.5fr)] xl:grid-cols-[minmax(17rem,1fr)_minmax(0,1.45fr)_minmax(19rem,1fr)]">
+          {/* Left: the contact card. */}
+          <Card data-contact-card className="overflow-hidden">
+            <div className="flex flex-wrap items-center gap-0.5 border-b border-[var(--panel-border)] px-1.5 py-1.5">
+              <LeadForm lead={r} options={options} trigger={<Button size="sm" variant="ghost" className="px-2"><Pencil /> Edit</Button>} />
+              <AppointmentForm
+                options={options}
+                leads={[{ id: lead.id, company_name: lead.co }]}
+                defaultLeadId={lead.id}
+                trigger={<Button size="sm" variant="ghost" className="px-2" aria-label="Add an appointment by hand"><CalendarPlus /> Appointment</Button>}
+              />
+              <span className="ml-auto"><PrintButton variant="ghost" compact /></span>
+            </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Box label="Business" icon={Building2}>
-                <Field label="Company" wide>{lead.co}</Field>
-                <Field label="Address" wide>{[r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean).join(", ")}</Field>
-                <Field label="Phone">{phone}</Field>
-                <Field label="Website">{r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null}</Field>
-                <Field label="Employees"><span className="tabular-nums">{r.employees}</span></Field>
-                <Field label="Autos"><span className="tabular-nums">{r.autos}</span></Field>
-                <Field label="Sales volume">{r.sales_volume}</Field>
-                <Field label="Years in business">{r.years_in_business}</Field>
-                <Field label="SIC code">{r.sic_code}</Field>
-                <Field label="Est. premium">{r.estimated_annual_premium}</Field>
-              </Box>
-
-              <Box label="Contact" icon={UserRound}>
-                {[
-                  { who: "Contact", name: r.contact_name, title: r.contact_title, phone: r.phone, mobile: r.contact_mobile, email: r.email },
-                  { who: "Decision maker", name: r.decision_maker, title: r.dm_title, phone: r.dm_phone, mobile: r.dm_mobile, email: r.dm_email },
-                ].map((p) => (
-                  <Person
-                    key={p.who}
-                    {...p}
-                    leadId={lead.id}
-                    emailButton={canRecord && sender
-                      ? (to) => <EmailLead compact leadId={lead.id} company={lead.co} to={to} contact={p.name} sender={sender} admin={admin} />
-                      : null}
-                  />
-                ))}
-                <Field label="Fax"><span className="tabular-nums">{r.fax}</span></Field>
-              </Box>
-
-              <Box label="Coverage" icon={ShieldCheck}>
-                <Field label="Renewal"><span className="font-semibold tabular-nums text-primary">{r.renewal ? mediumDate(r.renewal) : null}</span></Field>
-                <Field label="Current carrier">{r.agency?.name ?? ins?.agency_name}</Field>
-                {r.original_xdate ? (
-                  <Field label="Original renewal" wide>
-                    <span className="tabular-nums">{mediumDate(r.original_xdate)}</span>
-                    <span className="text-muted-foreground"> · corrected on a call</span>
-                  </Field>
+            <div className="px-4 pb-3 pt-4">
+              <Person
+                who="Contact"
+                phone={r.phone}
+                mobile={r.contact_mobile}
+                email={r.email}
+                leadId={lead.id}
+                alwaysEmail
+                emailButton={emailButton(r.contact_name, true)}
+              >
+                <h2 className="text-lg font-bold leading-tight tracking-tight">{r.contact_name || <span className="text-muted-foreground">No contact name</span>}</h2>
+                {r.contact_title ? (
+                  <div className="mt-1 inline-block rounded border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs text-primary">{r.contact_title}</div>
                 ) : null}
-                {xdates.length ? (
-                  <div className="col-span-2 divide-y divide-[var(--panel-border)] rounded-lg border border-[var(--panel-border)]">
-                    {xdates.map(([label, dateKey, carrierKey]) => (
-                      <div key={label} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                        <span className="font-medium">{label}</span>
-                        <span className="flex items-center gap-3">
-                          <span className="text-muted-foreground">{ins[carrierKey] ?? "—"}</span>
-                          <span className="font-semibold tabular-nums">{shortDate(ins[dateKey])}</span>
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="col-span-2 text-sm text-muted-foreground">No policy dates on file.</p>
-                )}
-              </Box>
+                <div className="mt-3 text-sm font-semibold">{lead.co}</div>
+                {address.map((line) => <div key={line} className="text-xs text-muted-foreground">{line}</div>)}
+                {website ? <div className="mb-2 text-xs">{website}</div> : <div className="mb-2" />}
+              </Person>
 
-              <Box label="Where it stands" icon={Flag}>
-                <Field label="Project" wide>
-                  {r.project ? (
-                    staff && me?.role !== "agent"
-                      ? <Link href={`/projects/${r.project.id}`} className="hover:text-primary">{r.project.name}</Link>
-                      : r.project.name
-                  ) : null}
-                </Field>
-                <Field label="Stage">{STAGE[r.stage]}</Field>
-                <Field label="Result">{r.result?.name}</Field>
-                <Field label="Rep">{lead.rep}</Field>
-                {admin ? <Field label="Calls this stage"><span className="tabular-nums">{r.call_weight}</span></Field> : <Field label="List source">{r.list_source}</Field>}
-                {r.developer ? <Field label="Developed by">{fullName(r.developer)}</Field> : null}
-                {r.source && r.source.id !== r.project?.id ? <Field label="Came from">{r.source.name}</Field> : null}
-                {/* The business's calendar day: a 6 pm call in Phoenix is already tomorrow in UTC. */}
-                <Field label="Last worked">{r.date_last_worked ? shortDate(todayIn(tz, new Date(r.date_last_worked))) : "Not yet"}</Field>
-                <Field label="Lead ID"><span className="tabular-nums">#{lead.id}</span></Field>
-              </Box>
+              {r.decision_maker || r.dm_phone || r.dm_mobile || r.dm_email ? (
+                <div className="mt-3">
+                  <Person
+                    who="Decision maker"
+                    phone={r.dm_phone}
+                    mobile={r.dm_mobile}
+                    email={r.dm_email}
+                    leadId={lead.id}
+                    emailButton={emailButton(r.decision_maker)}
+                  >
+                    <div className="eyebrow">Decision maker</div>
+                    <div className="mb-2 mt-1 text-sm">
+                      <span className="font-semibold">{r.decision_maker || "—"}</span>
+                      {r.dm_title ? <span className="text-muted-foreground"> · {r.dm_title}</span> : null}
+                    </div>
+                  </Person>
+                </div>
+              ) : null}
+              {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
+              {!r.phone && !r.contact_mobile ? <p className="border-t border-[var(--panel-border)] pt-2 text-xs text-muted-foreground">No phone number on file.</p> : null}
             </div>
 
-            {r.description || r.notes_dcm || r.notes_client ? (
-              <Card>
-                <SectionHeader label="Notes" icon={StickyNote} />
-                <div className="space-y-3 p-5 text-sm">
-                  {r.description ? <p className="text-muted-foreground">{r.description}</p> : null}
-                  {r.notes_dcm ? <p><span className="eyebrow mr-2">Ours</span>{r.notes_dcm}</p> : null}
-                  {r.notes_client ? <p><span className="eyebrow mr-2">Client</span>{r.notes_client}</p> : null}
-                </div>
-              </Card>
-            ) : null}
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <Card>
-                <SectionHeader label="Call History" icon={PhoneCall} />
-                <div className="space-y-1 p-4">
-                  {activity.calls.map((c) => (
-                    <div key={c.id} data-list-row className="-mx-2 rounded-lg px-2 py-2">
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        <span className="font-medium">{c.result}</span>
-                        <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">{c.when}</span>
-                      </div>
-                      {c.notes ? <p className="mt-0.5 whitespace-pre-line text-xs text-muted-foreground">{c.notes}</p> : null}
-                      <p className="text-[0.66rem] text-muted-foreground">{[c.by, c.stage].filter(Boolean).join(" · ")}</p>
-                    </div>
-                  ))}
-                  {activity.calls.length === 0 && <p className="text-sm text-muted-foreground">No calls yet.</p>}
-                </div>
-              </Card>
-              <Card>
-                <SectionHeader label="Appointments" icon={CalendarClock} />
-                <div className="space-y-1 p-4">
-                  {activity.appointments.map((a) => (
-                    <div key={a.id} data-list-row className="-mx-2 rounded-lg px-2 py-2">
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        <span className="font-semibold tabular-nums">{a.date}</span>
-                        <span className="flex gap-1.5">
-                          {a.qa === "pending" ? <ToneBadge tone="amber">QA pending</ToneBadge> : a.qa === "failed" ? <ToneBadge tone="rose">QA failed</ToneBadge> : null}
-                          <ToneBadge tone={APPT_TONE[a.status] ?? "slate"}>{a.status}</ToneBadge>
-                        </span>
-                      </div>
-                      <div className="text-xs text-muted-foreground">{[a.time, `${a.duration} min`, a.rep !== "—" ? `with ${a.rep}` : null, a.setBy ? `set by ${a.setBy}` : null].filter(Boolean).join(" · ")}</div>
-                    </div>
-                  ))}
-                  {activity.appointments.length === 0 && <p className="text-sm text-muted-foreground">No appointments yet.</p>}
-                </div>
-              </Card>
+            <div className="border-t border-[var(--panel-border)] px-4 py-3">
+              <div className="flex flex-wrap items-center gap-1.5 pb-2">
+                <StatusBadge status={lead.status} />
+                {r.result ? <ToneBadge tone={r.result.viable ? "cyan" : "slate"}>{r.result.name}</ToneBadge> : null}
+                {daysOut !== null ? (
+                  <span
+                    className="rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em]"
+                    style={{
+                      borderColor: `color-mix(in srgb, ${daysOut <= 30 ? "var(--neon-rose)" : "var(--neon-amber)"} 45%, transparent)`,
+                      color: daysOut <= 30 ? "var(--neon-rose)" : "var(--neon-amber)",
+                    }}
+                  >
+                    {daysOut < 0 ? `${Math.abs(daysOut)}d past renewal` : `${daysOut}d to renewal`}
+                  </span>
+                ) : null}
+              </div>
+              <Fact label="Renewal"><span className="font-semibold tabular-nums text-primary">{r.renewal ? mediumDate(r.renewal) : null}</span></Fact>
+              <Fact label="Project">
+                {r.project ? (
+                  staff && me?.role !== "agent"
+                    ? <Link href={`/projects/${r.project.id}`} className="hover:text-primary">{r.project.name}</Link>
+                    : r.project.name
+                ) : null}
+              </Fact>
+              <Fact label="Stage">{STAGE[r.stage]}</Fact>
+              <Fact label="Rep">{lead.rep}</Fact>
+              {r.developer ? <Fact label="Developed by">{fullName(r.developer)}</Fact> : null}
+              {r.source && r.source.id !== r.project?.id ? <Fact label="Came from">{r.source.name}</Fact> : null}
+              {/* The business's calendar day: a 6 pm call in Phoenix is already tomorrow in UTC. */}
+              <Fact label="Last worked">{r.date_last_worked ? shortDate(todayIn(tz, new Date(r.date_last_worked))) : "Not yet"}</Fact>
+              {admin ? <Fact label="Calls this stage"><span className="tabular-nums">{r.call_weight}</span></Fact> : null}
+              <Fact label="List source">{r.list_source}</Fact>
+              <Fact label="Lead ID"><span className="tabular-nums">#{lead.id}</span></Fact>
+              <Fact label="Added on">{r.lead_date ? shortDate(r.lead_date) : null}</Fact>
             </div>
+          </Card>
 
-            {staff ? (
-              <Card>
-                <SectionHeader label="Emails" icon={Mail} />
-                <div className="space-y-1 p-4">
-                  {activity.emails.map((e) => (
-                    <details key={e.id} data-list-row data-email-row className="group -mx-2 rounded-lg px-2 py-2">
-                      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                        <div className="flex items-center justify-between gap-2 text-sm">
-                          <span className="min-w-0 truncate font-medium">{e.subject}</span>
-                          <span className="flex shrink-0 items-center gap-2">
-                            {e.sent ? null : <ToneBadge tone="rose">Not sent</ToneBadge>}
-                            <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">{e.when}</span>
-                          </span>
-                        </div>
-                        <p className="flex items-center gap-1 text-[0.66rem] text-muted-foreground">
-                          <span className="min-w-0 truncate">To {e.to} · {e.by}</span>
-                          <ChevronDown className="size-3 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
-                        </p>
-                      </summary>
-                      {e.error ? <p className="mt-1 text-xs text-destructive">{e.error}</p> : null}
-                      <p className="mt-1 whitespace-pre-line break-words text-xs text-muted-foreground">{e.body}</p>
-                    </details>
-                  ))}
-                  {activity.emails.length === 0 && <p className="text-sm text-muted-foreground">No emails yet.</p>}
-                </div>
-              </Card>
-            ) : null}
-          </div>
+          {/* Middle: what the name is, in tabs. */}
+          <Card className="overflow-hidden">
+            <Tabs
+              label="About this name"
+              tabs={[
+                {
+                  id: "business",
+                  label: "Business",
+                  content: (
+                    <Rows
+                      rows={[
+                        ["Company", lead.co],
+                        ["Phone", r.phone],
+                        ["Website", website],
+                        ["Employees", r.employees],
+                        ["Autos", r.autos],
+                        ["Sales volume", r.sales_volume],
+                        ["Years in business", r.years_in_business],
+                        ["SIC code", r.sic_code],
+                        ["Est. premium", r.estimated_annual_premium],
+                        ["County", r.county],
+                      ]}
+                    />
+                  ),
+                },
+                {
+                  id: "coverage",
+                  label: "Coverage",
+                  count: xdates.length || null,
+                  content: (
+                    <div>
+                      <Rows
+                        rows={[
+                          ["Renewal", r.renewal ? <span className="font-semibold tabular-nums text-primary">{mediumDate(r.renewal)}</span> : null],
+                          ["Current carrier", r.agency?.name ?? ins?.agency_name],
+                          ...(r.original_xdate
+                            ? [["Original renewal", <span key="o"><span className="tabular-nums">{mediumDate(r.original_xdate)}</span><span className="text-muted-foreground"> · corrected on a call</span></span>]]
+                            : []),
+                        ]}
+                      />
+                      {xdates.length ? (
+                        <table className="w-full border-t border-[var(--panel-border)] text-sm">
+                          <thead><tr><th className={TH}>Policy line</th><th className={TH}>Carrier</th><th className={cn(TH, "text-right")}>X-date</th></tr></thead>
+                          <tbody className="divide-y divide-[var(--panel-border)]">
+                            {xdates.map(([label, dateKey, carrierKey]) => (
+                              <tr key={label}>
+                                <td className={cn(TD, "font-medium")}>{label}</td>
+                                <td className={cn(TD, "text-muted-foreground")}>{ins[carrierKey] ?? "—"}</td>
+                                <td className={cn(TD, "text-right font-semibold tabular-nums")}>{shortDate(ins[dateKey])}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="border-t border-[var(--panel-border)] px-4 py-3 text-sm text-muted-foreground">No policy dates on file.</p>
+                      )}
+                    </div>
+                  ),
+                },
+                {
+                  id: "notes",
+                  label: "Notes",
+                  count: notes.length || null,
+                  content: notes.length ? (
+                    <Rows rows={notes.map(([label, text]) => [label, <span key={label} className="whitespace-pre-line">{text}</span>])} />
+                  ) : (
+                    <p className="px-4 py-3 text-sm text-muted-foreground">No notes yet.</p>
+                  ),
+                },
+              ]}
+            />
+          </Card>
 
-          <div className="space-y-4 xl:sticky xl:top-20">
+          {/* Right: the call result buttons. */}
+          <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">
             {canRecord ? (
               <CallResultPanel
                 leadId={lead.id}
@@ -431,6 +413,105 @@ export default async function LeadSheet({ params, searchParams }) {
             ) : null}
           </div>
         </div>
+
+        {/* Along the bottom: the history. */}
+        <Card className="overflow-hidden">
+          <Tabs
+            label="History"
+            tabs={[
+              {
+                id: "calls",
+                label: "Call History",
+                count: activity.calls.length,
+                content: activity.calls.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[40rem] text-sm">
+                      <thead><tr><th className={TH}>Call date &amp; time</th><th className={TH}>Result</th><th className={TH}>Caller</th><th className={TH}>Stage</th><th className={TH}>Comments</th></tr></thead>
+                      <tbody className="divide-y divide-[var(--panel-border)]">
+                        {activity.calls.map((c) => (
+                          <tr key={c.id} data-list-row data-call-row>
+                            <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(c.at)}</td>
+                            <td className={cn(TD, "whitespace-nowrap font-medium")}>{c.result}</td>
+                            <td className={cn(TD, "whitespace-nowrap")}>{c.by}</td>
+                            <td className={cn(TD, "whitespace-nowrap text-muted-foreground")}>{c.stage ?? "—"}</td>
+                            <td className={cn(TD, "whitespace-pre-line text-muted-foreground")}>{c.notes || "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">No calls yet.</p>
+                ),
+              },
+              {
+                id: "appointments",
+                label: "Appointments",
+                count: activity.appointments.length,
+                content: activity.appointments.length ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[40rem] text-sm">
+                      <thead><tr><th className={TH}>Date</th><th className={TH}>Time</th><th className={TH}>Length</th><th className={TH}>Status</th><th className={TH}>With</th><th className={TH}>Set by</th></tr></thead>
+                      <tbody className="divide-y divide-[var(--panel-border)]">
+                        {activity.appointments.map((a) => (
+                          <tr key={a.id} data-list-row>
+                            <td className={cn(TD, "whitespace-nowrap font-semibold tabular-nums")}>{a.date}</td>
+                            <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{a.time ?? "—"}</td>
+                            <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{a.duration} min</td>
+                            <td className={TD}>
+                              <span className="flex flex-wrap gap-1.5">
+                                <ToneBadge tone={APPT_TONE[a.status] ?? "slate"}>{a.status}</ToneBadge>
+                                {a.qa === "pending" ? <ToneBadge tone="amber">QA pending</ToneBadge> : a.qa === "failed" ? <ToneBadge tone="rose">QA failed</ToneBadge> : null}
+                              </span>
+                            </td>
+                            <td className={TD}>{a.rep}</td>
+                            <td className={cn(TD, "text-muted-foreground")}>{a.setBy ?? "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="px-4 py-3 text-sm text-muted-foreground">No appointments yet.</p>
+                ),
+              },
+              ...(staff
+                ? [{
+                    id: "emails",
+                    label: "Emails",
+                    count: activity.emails.length,
+                    content: (
+                      <div className="divide-y divide-[var(--panel-border)]">
+                        {activity.emails.map((e) => (
+                          <details key={e.id} data-list-row data-email-row className="group px-4 py-2.5">
+                            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                              <div className="flex items-center justify-between gap-3 text-sm">
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <Mail className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                  <span className="truncate font-medium">{e.subject}</span>
+                                </span>
+                                <span className="flex shrink-0 items-center gap-2">
+                                  {e.sent ? null : <ToneBadge tone="rose">Not sent</ToneBadge>}
+                                  <span className="text-xs tabular-nums text-muted-foreground">{stamp(e.at)}</span>
+                                </span>
+                              </div>
+                              <p className="flex items-center gap-1 pl-5 text-[0.7rem] text-muted-foreground">
+                                <span className="min-w-0 truncate">To {e.to} · {e.by}</span>
+                                <ChevronDown className="size-3 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+                              </p>
+                            </summary>
+                            {e.error ? <p className="mt-1 pl-5 text-xs text-destructive">{e.error}</p> : null}
+                            <p className="mt-1 whitespace-pre-line break-words pl-5 text-xs text-muted-foreground">{e.body}</p>
+                          </details>
+                        ))}
+                        {activity.emails.length === 0 && <p className="px-4 py-3 text-sm text-muted-foreground">No emails yet.</p>}
+                      </div>
+                    ),
+                  }]
+                : []),
+            ]}
+          />
+        </Card>
       </div>
     </>
   );

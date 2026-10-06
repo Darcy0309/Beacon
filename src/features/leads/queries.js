@@ -184,6 +184,7 @@ export async function getLeadActivity(leadId) {
       result: c.call_result ?? "Call",
       notes: c.notes,
       when: timeAgo(c.call_date),
+      at: c.call_date,
       by: fullName(one(c.user)) || "—",
       stage: c.stage === "dbdev" ? "DBDev" : c.stage === "appt" ? "Appt" : null,
     })),
@@ -195,6 +196,7 @@ export async function getLeadActivity(leadId) {
       sent: e.status === "sent",
       error: e.error,
       when: timeAgo(e.created_at),
+      at: e.created_at,
       by: fullName(one(e.user)) || "—",
     })),
   };
