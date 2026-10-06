@@ -8,6 +8,7 @@
 // only get checked when the user actually typed something.
 
 import { normalizeState } from "./csv.js";
+import { EMAIL_LIMITS, isMailbox } from "./email.js";
 
 const str = (v) => (v == null ? "" : String(v).trim());
 const empty = (v) => str(v) === "";
@@ -35,6 +36,9 @@ export const rules = {
 
   email: (v) =>
     !empty(v) && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(str(v)) ? "Enter a valid email address" : null,
+
+  /** Exactly one address to send to: no names, commas or angle brackets. */
+  mailbox: (v) => (!empty(v) && !isMailbox(v) ? "Enter one email address, like name@company.com" : null),
 
   // Lenient North-American phone: 10 digits, optional +1, any common punctuation.
   phone: (v) => {
@@ -160,7 +164,7 @@ export const APPOINTMENT_TIMES = [
   "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
   "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM",
 ];
-const { required, max, email, phone, date, time12, int, num, id, oneOf, stateCode, zip, urlOrPath, hostname, username } = rules;
+const { required, max, email, mailbox, phone, date, time12, int, num, id, oneOf, stateCode, zip, urlOrPath, username } = rules;
 
 /**
  * A path inside this app, or the fallback. Used wherever a URL parameter
@@ -301,13 +305,20 @@ export const schemas = {
     list_source: [max(80)],
   },
 
+  // The mail server itself is set in the server's environment, not here.
   settings: {
     org_name: [required("Company name is required"), max(80)],
     product_name: [max(40)],
     logo: [urlOrPath, max(200)],
-    mail_host: [hostname],
-    mail_from: [email, max(120)],
-    mail_provider: [max(40)],
+    mail_from: [mailbox, max(120)],
+  },
+
+  // An email to a name's contact, from its lead sheet.
+  leadEmail: {
+    lead_id: [required("Missing lead"), id],
+    to: [required("Enter the address to send it to"), mailbox, max(254)],
+    subject: [required("Give the email a subject"), max(EMAIL_LIMITS.subject)],
+    body: [required("Write the email first"), max(EMAIL_LIMITS.body)],
   },
 
   // Set or change your own password. Matching is a cross-field rule below.

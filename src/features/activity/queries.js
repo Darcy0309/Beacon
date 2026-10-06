@@ -22,6 +22,8 @@ const ACTION_LABEL = {
   "lead.create": "Created a lead",
   "lead.update": "Updated a lead",
   "lead.delete": "Deleted a lead",
+  "lead.call": "Recorded a call",
+  "lead.email": "Emailed a lead",
   "project.create": "Created a project",
   "project.update": "Updated a project",
   "company.create": "Created a client",

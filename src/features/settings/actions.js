@@ -7,7 +7,12 @@ import { check, fail, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
-/** Saves the whole settings screen in one submit: organization, branding and mail. */
+/**
+ * Saves the whole settings screen in one submit: organization, branding and
+ * the address emails are sent from. The mail server and its login are the
+ * server's environment, never a setting: whoever could point the host at a
+ * server of their own could have the password sent there.
+ */
 export async function saveSettings(prevState, formData) {
   const { values, failed } = check(formData, schemas.settings);
   if (failed) return failed;
@@ -20,14 +25,7 @@ export async function saveSettings(prevState, formData) {
       key: "branding",
       value: { product: s(formData, "product_name"), logo: s(formData, "logo") },
     },
-    {
-      key: "mail",
-      value: {
-        host: s(formData, "mail_host"),
-        from: s(formData, "mail_from"),
-        provider: s(formData, "mail_provider"),
-      },
-    },
+    { key: "mail", value: { from: s(formData, "mail_from") } },
   ];
 
   // Merge into whatever is already stored so untouched keys survive.

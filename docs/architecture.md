@@ -137,6 +137,34 @@ period: everyone for an administrator, only themselves for anyone else. The
 production report's CSV comes day by day or as totals per account manager,
 project or client (`?by=`), each ending in a Total row.
 
+## Email to leads
+
+**Email**, beside Call now on the lead sheet, writes to the name's contact
+from Lighthouse (`features/email`). Whoever may work the name can send one
+(the people `record_call_result()` lets record a result, as
+`can_work_lead()` decides), at most 50 an hour each (`EMAIL_LIMITS` in
+`lib/email.js`).
+
+- It goes out from the **From address** in Settings › Email, under the
+  sender's name, with replies going to the sender (Reply-To). One plain
+  address per email: the one on file, or one typed in.
+- **The mail server** is the server's environment, never a setting:
+  `SMTP_HOST`, `SMTP_PORT` (587 with STARTTLS, or 465), `SMTP_USER` and
+  `SMTP_PASSWORD` (`lib/server/mail.js`, nodemailer). Whoever could change
+  the host in the database could have the password sent to a server of
+  their own. The login never crosses the network unencrypted
+  (`requireTLS`), except to this machine, for the tests. Until it is set,
+  the dialog says what is missing and Send stays off.
+- **Every attempt is kept** in `lead_emails`, sent or not, with the reason
+  when the mail server refused it (`mailFailure()`), and listed under
+  Emails on the lead sheet. Only the server writes the table (the service
+  role, after sending); staff read it, as they read the calls.
+
+`tests/unit/email.test.mjs`, `tests/integration/lead-emails.test.mjs` and
+`tests/e2e/email.test.mjs` cover these. The browser test needs the app
+started with `SMTP_HOST=127.0.0.1 SMTP_PORT=2525` and any `SMTP_USER` and
+`SMTP_PASSWORD`; it catches the mail there itself.
+
 ## Search
 
 Every search box matches **every word typed**, in any order and any field:
@@ -236,9 +264,9 @@ signs out.
 
 | Command | Needs | What |
 |---|---|---|
-| `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), validation rules, form ↔ schema contract |
-| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications, in headless Chrome |
+| `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), email (one address, why a send failed), validation rules, form ↔ schema contract |
+| `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs); emails to leads (who may send, nobody writes the history) |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, emailing a lead (with its own mail catcher), chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

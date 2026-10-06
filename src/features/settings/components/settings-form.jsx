@@ -30,7 +30,8 @@ function Field({ label, children, error, hint, required }) {
   );
 }
 
-export default function SettingsForm({ settings }) {
+/** `mailServer`: where email goes (host, port, login), or null when the server has none. */
+export default function SettingsForm({ settings, mailServer }) {
   const [state, formAction, pending] = useActionState(saveSettings, EMPTY);
   const router = useRouter();
 
@@ -73,14 +74,26 @@ export default function SettingsForm({ settings }) {
         <Card>
           <SectionHeader label="Email (SMTP)" icon={Mail} />
           <div className="space-y-4 p-5">
-            <Field label="SMTP host" error={fe("mail_host")}>
-              <Input name="mail_host" placeholder="smtp.office365.com" defaultValue={dv("mail_host", mail.host ?? "")} aria-invalid={inv("mail_host")} />
-            </Field>
-            <Field label="From address" error={fe("mail_from")}>
-              <Input name="mail_from" type="email" inputMode="email" defaultValue={dv("mail_from", mail.from ?? "")} aria-invalid={inv("mail_from")} />
-            </Field>
-            <Field label="Authentication" error={fe("mail_provider")}>
-              <Input name="mail_provider" maxLength={40} defaultValue={dv("mail_provider", mail.provider ?? "")} aria-invalid={inv("mail_provider")} />
+            {/* Set in the server's environment, so the password never sits in Lighthouse. */}
+            <div data-mail-server className="space-y-1.5">
+              <span className="eyebrow block">Mail server</span>
+              {mailServer ? (
+                <p className="text-sm">
+                  <span className="font-medium">{mailServer.host}:{mailServer.port}</span>
+                  <span className="text-muted-foreground"> · signed in as {mailServer.user}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  Not connected. Add SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASSWORD to the server&apos;s
+                  environment variables (on Vercel: Settings › Environment Variables), then redeploy.
+                </p>
+              )}
+              <p className="text-[0.7rem] text-muted-foreground">
+                Set on the server, never here: the password is not stored in Lighthouse.
+              </p>
+            </div>
+            <Field label="From address" error={fe("mail_from")} hint="Emails to leads go out from this address under the sender's name; replies go to the sender.">
+              <Input name="mail_from" type="email" inputMode="email" maxLength={120} defaultValue={dv("mail_from", mail.from ?? "")} aria-invalid={inv("mail_from")} />
             </Field>
           </div>
         </Card>

@@ -3,7 +3,7 @@ import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft, ArrowRight, CalendarPlus, ShieldCheck, Phone, PhoneCall, CalendarClock, Building2, UserRound,
-  Flag, StickyNote, Repeat,
+  Flag, StickyNote, Repeat, Mail, ChevronDown,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatusBadge from "@/components/shared/status-badge";
@@ -13,6 +13,8 @@ import SectionHeader from "@/components/shared/section-header";
 import LeadForm from "@/features/leads/components/lead-form";
 import AppointmentForm from "@/features/appointments/components/appointment-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
+import EmailLead from "@/features/email/components/email-lead";
+import { getEmailSender } from "@/features/email/queries";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getLead, getLeadActivity } from "@/features/leads/queries";
@@ -91,10 +93,11 @@ export default async function LeadSheet({ params, searchParams }) {
 
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
-  const [list, listProject, inProject] = await Promise.all([
+  const [list, listProject, inProject, sender] = await Promise.all([
     listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
+    staff ? getEmailSender(me) : null,
   ]);
 
   // The confirmation follow-up belongs to whoever set the appointment.
@@ -186,17 +189,23 @@ export default async function LeadSheet({ params, searchParams }) {
                   trigger={<Button size="sm" variant="outline"><CalendarPlus /> Add appointment by hand</Button>}
                 />
                 <PrintButton />
-                {/* One click to dial: a tel: link opens the softphone, or the dialer on a phone. */}
-                {tel ? (
-                  <Button asChild size="sm" className="ml-auto bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] hover:brightness-110">
-                    <a href={tel} title={`Call ${lead.co}`} data-lead-id={lead.id}>
-                      <Phone /> Call now
-                      <span className="font-medium normal-case tracking-normal tabular-nums opacity-85">{r.phone}</span>
-                    </a>
-                  </Button>
-                ) : (
-                  <span className="ml-auto text-xs text-muted-foreground">No phone number on file</span>
-                )}
+                <div className="ml-auto flex flex-wrap items-center gap-2">
+                  {/* Write to the contact from Lighthouse: for whoever may work the name, as calls are. */}
+                  {canRecord && sender ? (
+                    <EmailLead leadId={lead.id} company={lead.co} to={r.email} contact={r.contact_name} sender={sender} admin={admin} />
+                  ) : null}
+                  {/* One click to dial: a tel: link opens the softphone, or the dialer on a phone. */}
+                  {tel ? (
+                    <Button asChild size="sm" className="bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] hover:brightness-110">
+                      <a href={tel} title={`Call ${lead.co}`} data-lead-id={lead.id}>
+                        <Phone /> Call now
+                        <span className="font-medium normal-case tracking-normal tabular-nums opacity-85">{r.phone}</span>
+                      </a>
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">No phone number on file</span>
+                  )}
+                </div>
               </div>
             </Card>
 
@@ -317,6 +326,34 @@ export default async function LeadSheet({ params, searchParams }) {
                 </div>
               </Card>
             </div>
+
+            {staff ? (
+              <Card>
+                <SectionHeader label="Emails" icon={Mail} />
+                <div className="space-y-1 p-4">
+                  {activity.emails.map((e) => (
+                    <details key={e.id} data-list-row data-email-row className="group -mx-2 rounded-lg px-2 py-2">
+                      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="min-w-0 truncate font-medium">{e.subject}</span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            {e.sent ? null : <ToneBadge tone="rose">Not sent</ToneBadge>}
+                            <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">{e.when}</span>
+                          </span>
+                        </div>
+                        <p className="flex items-center gap-1 text-[0.66rem] text-muted-foreground">
+                          <span className="min-w-0 truncate">To {e.to} · {e.by}</span>
+                          <ChevronDown className="size-3 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
+                        </p>
+                      </summary>
+                      {e.error ? <p className="mt-1 text-xs text-destructive">{e.error}</p> : null}
+                      <p className="mt-1 whitespace-pre-line break-words text-xs text-muted-foreground">{e.body}</p>
+                    </details>
+                  ))}
+                  {activity.emails.length === 0 && <p className="text-sm text-muted-foreground">No emails yet.</p>}
+                </div>
+              </Card>
+            ) : null}
           </div>
 
           <div className="space-y-4 xl:sticky xl:top-20">

@@ -144,10 +144,10 @@ export async function getLeadCounts() {
   return { total: data?.total ?? 0, counts: data?.counts ?? {}, clients: data?.clients ?? 0 };
 }
 
-/** Appointments and call history for one lead. */
+/** Appointments, call history and the emails sent to its contact, for one lead. */
 export async function getLeadActivity(leadId) {
   const supabase = await createClient();
-  const [appts, calls] = await Promise.all([
+  const [appts, calls, emails] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, appt_date, appt_time, duration_min, rep_name, qa_status, confirmed_at, invalid_at, status:appointment_statuses(name), setter:users!appointments_user_id_fkey(first_name, last_name)")
@@ -158,6 +158,12 @@ export async function getLeadActivity(leadId) {
       .select("id, call_date, call_result, notes, stage, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("call_date", { ascending: false })
+      .limit(20),
+    supabase
+      .from("lead_emails")
+      .select("id, to_address, subject, body, status, error, created_at, user:users(first_name, last_name)")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
       .limit(20),
   ]);
 
@@ -179,6 +185,16 @@ export async function getLeadActivity(leadId) {
       when: timeAgo(c.call_date),
       by: fullName(one(c.user)) || "—",
       stage: c.stage === "dbdev" ? "DBDev" : c.stage === "appt" ? "Appt" : null,
+    })),
+    emails: (emails.data ?? []).map((e) => ({
+      id: e.id,
+      to: e.to_address,
+      subject: e.subject,
+      body: e.body,
+      sent: e.status === "sent",
+      error: e.error,
+      when: timeAgo(e.created_at),
+      by: fullName(one(e.user)) || "—",
     })),
   };
 }
