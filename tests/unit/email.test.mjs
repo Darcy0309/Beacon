@@ -4,7 +4,7 @@
  * plain address, its subject stays on one line, and a failed send is
  * explained in words the sender can act on.
  */
-import { EMAIL_LIMITS, isMailbox, mailFailure, oneLine } from "../../src/lib/email.js";
+import { EMAIL_LIMITS, isMailbox, mailFailure, mailboxHeader, oneLine, resendFailure } from "../../src/lib/email.js";
 import { schemas, validate } from "../../src/lib/validate.js";
 
 let failures = 0;
@@ -65,6 +65,14 @@ check("a long reply is cut short, on one line", (() => {
   const m = mailFailure({ code: "EENVELOPE", response: `550 ${"x".repeat(400)}\r\nmore` });
   return m.length < 260 && !/[\r\n]/.test(m) && m.endsWith("…");
 })());
+
+// --- Resend's API ----------------------------------------------------------------
+check("a sender is written \"Name\" <address>", mailboxHeader({ name: "Sean Fitzgerald", address: "alerts@signaturemktg.net" }) === '"Sean Fitzgerald" <alerts@signaturemktg.net>');
+check("…a comma or quote in the name cannot split it", mailboxHeader({ name: 'Fitz, "Sean"', address: "a@x.com" }) === '"Fitz, Sean" <a@x.com>');
+check("…no name, just the address", mailboxHeader({ name: "", address: "a@x.com" }) === "a@x.com");
+says("Resend: a bad key is a refused login", resendFailure(401, { message: "API key is invalid" }), /didn't accept the server's login/);
+says("Resend: an unverified domain, in its own words", resendFailure(403, { message: "The signaturemktg.net domain is not verified." }), /refused the email: The signaturemktg\.net domain is not verified/);
+says("Resend: down on its side", resendFailure(503, {}), /Couldn't reach the mail server/);
 
 console.log(failures ? `\n${failures} email check(s) failed.\n` : "\nAll email checks passed.\n");
 process.exit(failures ? 1 : 0);

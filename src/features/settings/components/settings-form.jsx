@@ -84,8 +84,9 @@ export default function SettingsForm({ settings, mailServer }) {
                 </p>
               ) : (
                 <p className="text-sm text-amber-600 dark:text-amber-400">
-                  Not connected. Add SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASSWORD to the server&apos;s
-                  environment variables (on Vercel: Settings › Environment Variables), then redeploy.
+                  Not connected. Add RESEND_API_KEY (or SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASSWORD for
+                  another mail server) to the server&apos;s environment variables (on Vercel: Settings › Environment
+                  Variables), then redeploy.
                 </p>
               )}
               <p className="text-[0.7rem] text-muted-foreground">

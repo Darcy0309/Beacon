@@ -55,3 +55,20 @@ export function mailFailure(err) {
         : `The email could not be sent${err?.message ? `: ${clip(err.message)}` : "."}`;
   }
 }
+
+/** "Name <address>", the name quoted (quotes and backslashes dropped) so a comma in it cannot split it. */
+export function mailboxHeader({ name, address }) {
+  const clean = oneLine(name).replace(/["\\]/g, "");
+  return clean ? `"${clean}" <${address}>` : address;
+}
+
+/**
+ * Resend's API refusing an email, as the mail library's errors look, so
+ * mailFailure() explains it the same way: a bad key is a refused login,
+ * anything else the service's own reason.
+ */
+export function resendFailure(status, body) {
+  const reason = body?.message || body?.error || `HTTP ${status}`;
+  const code = status === 401 || (status === 403 && /api key/i.test(reason)) ? "EAUTH" : status >= 500 ? "ECONNECTION" : "EMESSAGE";
+  return Object.assign(new Error(reason), { code, response: reason });
+}

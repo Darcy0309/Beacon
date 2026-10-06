@@ -174,9 +174,10 @@ from Lighthouse (`features/email`). Whoever may work the name can send one
 - It goes out from the **From address** in Settings › Email, under the
   sender's name, with replies going to the sender (Reply-To). One plain
   address per email: the one on file, or one typed in.
-- **The mail server** is the server's environment, never a setting:
+- **The mail service** is the server's environment, never a setting:
+  `RESEND_API_KEY` (Resend's API over HTTPS, which needs no mail port), or
   `SMTP_HOST`, `SMTP_PORT` (587 with STARTTLS, or 465), `SMTP_USER` and
-  `SMTP_PASSWORD` (`lib/server/mail.js`, nodemailer). Whoever could change
+  `SMTP_PASSWORD` for any mail server (`lib/server/mail.js`, nodemailer). Whoever could change
   the host in the database could have the password sent to a server of
   their own. The login never crosses the network unencrypted
   (`requireTLS`), except to this machine, for the tests. Until it is set,
