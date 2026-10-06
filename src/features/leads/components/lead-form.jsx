@@ -123,6 +123,26 @@ export default function LeadForm({ lead, options, trigger }) {
               <Input name="dm_email" type="email" inputMode="email" defaultValue={dv("dm_email")} maxLength={120} aria-invalid={invalid("dm_email")} />
             </Field>
 
+            <Field label="Secondary contact" error={fe("contact2_name")}>
+              <Input name="contact2_name" defaultValue={dv("contact2_name")} maxLength={80} aria-invalid={invalid("contact2_name")} />
+            </Field>
+            <Field label="Secondary contact's title" error={fe("contact2_title")}>
+              <Input name="contact2_title" defaultValue={dv("contact2_title")} maxLength={60} aria-invalid={invalid("contact2_title")} />
+            </Field>
+            <Field label="Secondary contact's business phone" error={fe("contact2_phone")}>
+              <Input name="contact2_phone" type="tel" inputMode="tel" placeholder="(602) 555-0100 x203" defaultValue={dv("contact2_phone")} aria-invalid={invalid("contact2_phone")} />
+            </Field>
+            <Field label="Secondary contact's mobile" error={fe("contact2_mobile")}>
+              <Input name="contact2_mobile" type="tel" inputMode="tel" placeholder="(602) 555-0100" defaultValue={dv("contact2_mobile")} aria-invalid={invalid("contact2_mobile")} />
+            </Field>
+            <Field label="Secondary contact's email" error={fe("contact2_email")} className="sm:col-span-2">
+              <Input name="contact2_email" type="email" inputMode="email" defaultValue={dv("contact2_email")} maxLength={120} aria-invalid={invalid("contact2_email")} />
+            </Field>
+
+            <Field label="Producer" error={fe("producer_name")} className="sm:col-span-2" hint="The client's producer this name is for">
+              <Input name="producer_name" defaultValue={dv("producer_name")} maxLength={80} aria-invalid={invalid("producer_name")} />
+            </Field>
+
             <Field label="City" error={fe("city")}>
               <Input name="city" defaultValue={dv("city")} maxLength={60} aria-invalid={invalid("city")} />
             </Field>

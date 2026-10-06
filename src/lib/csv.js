@@ -69,6 +69,11 @@ export const COLUMN_ALIASES = {
   dmphone: "dm_phone", decisionmakerphone: "dm_phone", dmbusinessphone: "dm_phone", dmofficephone: "dm_phone",
   dmmobile: "dm_mobile", dmcell: "dm_mobile", dmcellphone: "dm_mobile", decisionmakermobile: "dm_mobile", decisionmakercell: "dm_mobile",
   dmemail: "dm_email", decisionmakeremail: "dm_email",
+  contact2: "contact2_name", contact2name: "contact2_name", secondarycontact: "contact2_name", secondcontact: "contact2_name",
+  contact2title: "contact2_title", secondarycontacttitle: "contact2_title", title2: "contact2_title",
+  contact2phone: "contact2_phone", secondarycontactphone: "contact2_phone",
+  contact2mobile: "contact2_mobile", contact2cell: "contact2_mobile", secondarycontactmobile: "contact2_mobile", secondarycontactcell: "contact2_mobile",
+  contact2email: "contact2_email", secondarycontactemail: "contact2_email", email2: "contact2_email",
   website: "website", web: "website", url: "website",
 
   // --- location -------------------------------------------------------

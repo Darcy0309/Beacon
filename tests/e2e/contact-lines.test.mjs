@@ -21,9 +21,11 @@ const company = Number(sql(`insert into public.companies (name) values (${lit(`$
 const project = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
   values (${lit(`${TAG} DBDev`)}, ${company}, (select id from public.project_types where code='DBDV'), 1) returning id`));
 const lead = Number(sql(`insert into public.leads (company_name, contact_name, contact_title, phone, contact_mobile, email,
-    decision_maker, dm_title, dm_phone, dm_mobile, dm_email, project_id, assigned_user_id)
+    decision_maker, dm_title, dm_phone, dm_mobile, dm_email,
+    contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email, producer_name, list_source, project_id, assigned_user_id)
   values (${lit(`${TAG} AGSI Business`)}, 'Anna Huff', 'Office Manager', '(214) 269-7488 x203', ${lit(MOBILE)}, 'anna.huff@agsi.test',
-    'Robert Huff', 'President', '(214) 269-7400', '(214) 785-2055', 'robert@agsi.test', ${project}, ${SEAN}) returning id`));
+    'Robert Huff', 'President', '(214) 269-7400', '(214) 785-2055', 'robert@agsi.test',
+    'Randall Porter', 'IT Contact', '(214) 269-7411', '(214) 330-9912', 'randall@agsi.test', 'Garry Ins - Dana', 'Referral', ${project}, ${SEAN}) returning id`));
 
 const browser = await launchBrowser();
 const shot = (page, name) => (SHOTS ? page.screenshot(`${SHOTS}/${name}.png`) : null);
@@ -57,6 +59,25 @@ try {
   check("the contact's Email button is the sheet's main one", await sean.ev(`!!document.querySelector('[data-person="Contact"] [data-email-lead]')`));
   await sean.ev(`document.querySelector('[data-person]').scrollIntoView({ block: 'center' })`);
   await shot(sean, "contact-card");
+
+  const second = people.find((p) => p.who === "Secondary contact");
+  check("a secondary contact under the decision maker: name, title, business phone, mobile and email, each with its button",
+    second?.text.includes("Randall Porter") && second.text.includes("IT Contact")
+    && second.lines.find((l) => l.kind === "Business")?.call === "tel:+12142697411"
+    && second.lines.find((l) => l.kind === "Mobile")?.call === "tel:+12143309912"
+    && second.lines.find((l) => l.kind === "Email")?.email === "randall@agsi.test", JSON.stringify(second));
+  const banner = await sean.ev(`Object.fromEntries([...document.querySelectorAll('[data-banner-item]')].map((b) => [b.dataset.bannerItem, b.querySelector('dd').innerText]))`);
+  check("client information along the top: client, project, producer name and list source",
+    banner.Client === `${TAG} Insurance` && banner.Project === `${TAG} DBDev` && banner["Producer name"] === "Garry Ins - Dana" && banner["List source"] === "Referral",
+    JSON.stringify(banner));
+  sql(`update public.leads set producer_name = null where id = ${lead}`);
+  sql(`update public.projects set contact_name = 'Jacob Termini' where id = ${project}`);
+  await sean.go(`/leads/${lead}`, 4000);
+  const fromProject = await sean.ev(`document.querySelector('[data-banner-item="Producer name"] dd').innerText`);
+  check("…the producer being the project's contact (the client's agent on it) when the name has none of its own", fromProject === "Jacob Termini", fromProject);
+  const facts = await sean.ev(`[...document.querySelectorAll('[data-contact-card] .justify-between.text-xs > span:first-child')].map((x) => x.innerText)`);
+  check("an account manager's card lists only last worked, lead account manager and appointment manager",
+    JSON.stringify(facts) === JSON.stringify(["Last worked", "Lead account mgr", "Appt mgr"]), JSON.stringify(facts));
 
   section("Calling and emailing from the card");
   const before = Number(sql(`select count(*) from public.work_activity where user_id=${SEAN} and kind='call' and lead_id=${lead}`));

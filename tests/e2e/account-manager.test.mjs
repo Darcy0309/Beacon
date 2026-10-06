@@ -173,7 +173,8 @@ try {
   await until(() => mike.ev("document.querySelectorAll('button[aria-pressed]').length > 0"), { timeout: 10000 });
   const apptButtons = await buttons(mike);
   check("appointment-project buttons on his sheet", ["Lead-No Contact", "Lead-Not Shopping", "Lead-Corrected", "Lead-Invalid"].every((b) => apptButtons.includes(b)) && !apptButtons.includes("Viable-Staged"), apptButtons.join(", "));
-  check("the sheet shows who developed it", /Developed by\s*Sean Fitzgerald/i.test(await mike.text()));
+  check("the sheet shows who developed it (the lead account manager) and who holds it now (the appointment manager)",
+    /Lead account mgr\s*Sean Fitzgerald/i.test(await mike.text()) && /Appt mgr\s*Mike Preston/i.test(await mike.text()));
   const dial = await mike.ev(`[...document.querySelectorAll('[data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')].map((a) => a.getAttribute('href'))`);
   check("the contact's Call button dials the lead's number", dial.length === 1 && dial[0] === "tel:+16145550110", JSON.stringify(dial));
 

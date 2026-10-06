@@ -185,6 +185,11 @@ export default async function LeadSheet({ params, searchParams }) {
       ? { href: "/work", label: "My projects" }
       : { href: "/leads", label: "Back to leads" };
 
+  // The lead account manager developed the name (database development); the
+  // appointment manager holds it once it is promoted to appointment setting.
+  const leadManager = r.developer ?? (r.stage === "dbdev" ? r.assigned : null);
+  const apptManager = r.stage === "appt" ? r.assigned : null;
+
   // Dates and times in the history, on the business's clock.
   const stamp = (iso) =>
     iso
@@ -208,9 +213,11 @@ export default async function LeadSheet({ params, searchParams }) {
       <Topbar title="Lead Sheet" sub={lead.co} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href={back.href} className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
-            <ArrowLeft className="size-3.5" /> {back.label}
-          </Link>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
+            <Link href={back.href} className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+              <ArrowLeft className="size-3.5" /> {back.label}
+            </Link>
+          </div>
           {list ? (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="text-muted-foreground">
@@ -227,6 +234,32 @@ export default async function LeadSheet({ params, searchParams }) {
             </div>
           ) : null}
         </div>
+
+        {/* Client information, as the old lead sheet led with: whose name this is. */}
+        <Card data-client-info className="overflow-hidden">
+          <div className="border-b border-[var(--panel-border)] px-4 py-2 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+            Client information
+          </div>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-3 px-4 py-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Client", r.project?.company?.name],
+              ["Project", r.project ? (
+                staff && me?.role !== "agent"
+                  ? <Link href={`/projects/${r.project.id}`} className="hover:text-primary">{r.project.name}</Link>
+                  : r.project.name
+              ) : null],
+              // The client's agent taking this project's leads and appointments: the
+              // name's own producer when an import gave one, else the project's contact.
+              ["Producer name", r.producer_name || r.project?.contact_name],
+              ["List source", r.list_source],
+            ].map(([label, value]) => (
+              <div key={label} data-banner-item={label} className="min-w-0">
+                <dt className="text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">{label}</dt>
+                <dd className="mt-0.5 break-words font-medium">{value || <span className="text-muted-foreground">—</span>}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(17rem,1fr)_minmax(0,1.5fr)] xl:grid-cols-[minmax(17rem,1fr)_minmax(0,1.45fr)_minmax(19rem,1fr)]">
           {/* Left: the contact card. */}
@@ -279,6 +312,24 @@ export default async function LeadSheet({ params, searchParams }) {
                   </Person>
                 </div>
               ) : null}
+              {r.contact2_name || r.contact2_phone || r.contact2_mobile || r.contact2_email ? (
+                <div className="mt-3">
+                  <Person
+                    who="Secondary contact"
+                    phone={r.contact2_phone}
+                    mobile={r.contact2_mobile}
+                    email={r.contact2_email}
+                    leadId={lead.id}
+                    emailButton={emailButton(r.contact2_name)}
+                  >
+                    <div className="eyebrow">Secondary contact</div>
+                    <div className="mb-2 mt-1 text-sm">
+                      <span className="font-semibold">{r.contact2_name || "—"}</span>
+                      {r.contact2_title ? <span className="text-muted-foreground"> · {r.contact2_title}</span> : null}
+                    </div>
+                  </Person>
+                </div>
+              ) : null}
               {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
               {!r.phone && !r.contact_mobile ? <p className="border-t border-[var(--panel-border)] pt-2 text-xs text-muted-foreground">No phone number on file.</p> : null}
             </div>
@@ -287,7 +338,7 @@ export default async function LeadSheet({ params, searchParams }) {
               <div className="flex flex-wrap items-center gap-1.5 pb-2">
                 <StatusBadge status={lead.status} />
                 {r.result ? <ToneBadge tone={r.result.viable ? "cyan" : "slate"}>{r.result.name}</ToneBadge> : null}
-                {daysOut !== null ? (
+                {admin && daysOut !== null ? (
                   <span
                     className="rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em]"
                     style={{
@@ -299,24 +350,20 @@ export default async function LeadSheet({ params, searchParams }) {
                   </span>
                 ) : null}
               </div>
-              <Fact label="Renewal"><span className="font-semibold tabular-nums text-primary">{r.renewal ? mediumDate(r.renewal) : null}</span></Fact>
-              <Fact label="Project">
-                {r.project ? (
-                  staff && me?.role !== "agent"
-                    ? <Link href={`/projects/${r.project.id}`} className="hover:text-primary">{r.project.name}</Link>
-                    : r.project.name
-                ) : null}
-              </Fact>
-              <Fact label="Stage">{STAGE[r.stage]}</Fact>
-              <Fact label="Rep">{lead.rep}</Fact>
-              {r.developer ? <Fact label="Developed by">{fullName(r.developer)}</Fact> : null}
-              {r.source && r.source.id !== r.project?.id ? <Fact label="Came from">{r.source.name}</Fact> : null}
               {/* The business's calendar day: a 6 pm call in Phoenix is already tomorrow in UTC. */}
               <Fact label="Last worked">{r.date_last_worked ? shortDate(todayIn(tz, new Date(r.date_last_worked))) : "Not yet"}</Fact>
-              {admin ? <Fact label="Calls this stage"><span className="tabular-nums">{r.call_weight}</span></Fact> : null}
-              <Fact label="List source">{r.list_source}</Fact>
-              <Fact label="Lead ID"><span className="tabular-nums">#{lead.id}</span></Fact>
-              <Fact label="Added on">{r.lead_date ? shortDate(r.lead_date) : null}</Fact>
+              <Fact label="Lead account mgr">{leadManager ? fullName(leadManager) : null}</Fact>
+              <Fact label="Appt mgr">{apptManager ? fullName(apptManager) : null}</Fact>
+              {admin ? (
+                <>
+                  <Fact label="Stage">{STAGE[r.stage]}</Fact>
+                  <Fact label="Calls this stage"><span className="tabular-nums">{r.call_weight}</span></Fact>
+                  <Fact label="Renewal"><span className="font-semibold tabular-nums text-primary">{r.renewal ? mediumDate(r.renewal) : null}</span></Fact>
+                  {r.source && r.source.id !== r.project?.id ? <Fact label="Came from">{r.source.name}</Fact> : null}
+                  <Fact label="Lead ID"><span className="tabular-nums">#{lead.id}</span></Fact>
+                  <Fact label="Added on">{r.lead_date ? shortDate(r.lead_date) : null}</Fact>
+                </>
+              ) : null}
             </div>
           </Card>
 

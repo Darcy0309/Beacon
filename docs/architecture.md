@@ -147,9 +147,15 @@ the call result buttons on the right, and the history (calls,
 appointments, emails) in tabs along the bottom, as tables with each call's
 date and time on the business's clock.
 
-The contact and the decision maker each have a business phone, a mobile
-and an email (`leads.phone`, `contact_mobile`, `email`; `dm_phone`,
-`dm_mobile`, `dm_email`). The lead sheet's contact card puts a Call button
+The contact, the decision maker and a secondary contact each have a
+business phone, a mobile and an email (`leads.phone`, `contact_mobile`,
+`email`; `dm_phone`, `dm_mobile`, `dm_email`; `contact2_name`,
+`contact2_title`, `contact2_phone`, `contact2_mobile`, `contact2_email`).
+The client, project and the client's producer (`leads.producer_name`) sit
+across the top of the sheet; under the contacts, an account manager sees
+only the list source, when the name was last worked, its lead account
+manager (who developed it) and its appointment manager (who holds it at
+appointment setting); an administrator sees a few more. The lead sheet's contact card puts a Call button
 beside every number (a `tel:` link with `data-lead-id`, so it counts the
 call's time like Call now) and an Email button beside every address (for
 whoever may work the name). A number may carry an extension ("x203"),
