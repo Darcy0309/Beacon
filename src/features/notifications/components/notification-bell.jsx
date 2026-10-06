@@ -10,6 +10,8 @@ import { useRole } from "@/components/layout/role-provider";
 import { markNotificationRead, markAllNotificationsRead } from "@/features/notifications/actions";
 import { KIND_ICONS } from "@/features/notifications/kinds";
 import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/features/notifications/active-chat";
+import { showDesktop, trackFrontTab } from "@/features/notifications/desktop";
+import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { cn } from "@/lib/utils";
 
 const SHOWN = 8;
@@ -24,6 +26,9 @@ const HOVER_CLOSE_MS = 300;
 // navigation. The count it last showed lives here, outside the component,
 // so the badge shakes when the count goes up, not on every page change.
 let lastCount = 0;
+// The desktop pop-ups still up, by notification id: kept across pages too,
+// so reading one after a page change still takes its pop-up down.
+const desktop = { current: new Map() };
 
 function ago(iso) {
   const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -86,7 +91,12 @@ export default function NotificationBell() {
   const dismissPopup = useCallback((id) => {
     toast.dismiss(toastId(id));
     popups.current.delete(id);
+    desktop.current.get(id)?.close();
+    desktop.current.delete(id);
   }, []);
+
+  // Which Lighthouse tab is in front, so only nobody-looking shows a desktop pop-up.
+  useEffect(() => trackFrontTab(), []);
 
   // The bell lists unread notifications only: once read, one leaves the list
   // (the inbox keeps them all).
@@ -178,6 +188,12 @@ export default function NotificationBell() {
             if (announced.current.has(n.id)) return;
             announced.current.add(n.id);
             popups.current.set(n.id, Date.now());
+            // Nobody looking at Lighthouse: the system's own pop-up too (desktop.js).
+            const shown = showDesktop(n, () => openItem(n));
+            if (shown) {
+              desktop.current.set(n.id, shown);
+              shown.onclose = () => desktop.current.delete(n.id);
+            }
             toast(n.title, {
               id: toastId(n.id),
               description:
@@ -369,6 +385,8 @@ export default function NotificationBell() {
                 })
               )}
             </div>
+
+            <DesktopSwitch className="border-t border-[var(--panel-border)] px-4 py-2.5" />
 
             <Link
               href="/notifications"

@@ -165,6 +165,20 @@ from Lighthouse (`features/email`). Whoever may work the name can send one
 started with `SMTP_HOST=127.0.0.1 SMTP_PORT=2525` and any `SMTP_USER` and
 `SMTP_PASSWORD`; it catches the mail there itself.
 
+## Desktop notifications
+
+A new notification reaches the bell over Realtime and pops up in the app.
+While Lighthouse is open but nobody is looking at it (another tab or app in
+front, the browser minimised), it also shows as the system's own pop-up
+(`features/notifications/desktop.js`); clicking it opens the notification,
+and reading it anywhere takes it down. Each person turns them on in the bell
+or the inbox (the browser asks once), can turn them off for that browser, and
+can send a test. With several tabs open, only the one in front shows the
+in-app pop-up, and the tabs' desktop pop-ups share a tag so the system shows
+it once. Nothing arrives while every Lighthouse tab is closed: that would
+need Web Push (a service worker and a push service).
+`tests/e2e/desktop-notifications.test.mjs` covers it.
+
 ## Search
 
 Every search box matches **every word typed**, in any order and any field:
@@ -266,7 +280,7 @@ signs out.
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), email (one address, why a send failed), validation rules, form ↔ schema contract |
 | `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs); emails to leads (who may send, nobody writes the history) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, emailing a lead (with its own mail catcher), chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications, in headless Chrome |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, emailing a lead (with its own mail catcher), chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications (in the app and on the desktop), in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

@@ -4,6 +4,7 @@ import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import NotificationInbox from "@/features/notifications/components/notification-inbox";
 import NotificationComposer from "@/features/notifications/components/notification-composer";
+import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { Card } from "@/components/ui/card";
 import { getInbox, getSentNotifications, getMessageRecipients } from "@/features/notifications/queries";
 import { getCurrentUser } from "@/lib/server/session";
@@ -102,6 +103,7 @@ export default async function NotificationsPage({ searchParams }) {
                 </div>
               }
             />
+            <DesktopSwitch className="border-b border-[var(--panel-border)] px-5 py-3" />
             <NotificationInbox
               key={`${unreadOnly}-${info.page}`}
               rows={inbox.rows}
