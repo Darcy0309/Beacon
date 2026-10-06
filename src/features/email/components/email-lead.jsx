@@ -71,7 +71,7 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin 
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-xl">
-        <DialogHeader>
+        <DialogHeader className="shrink-0">
           <DialogTitle>Email {company}</DialogTitle>
           <DialogDescription>
             {sender.ready
@@ -81,59 +81,61 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin 
         </DialogHeader>
 
         {!sender.ready ? (
-          <p role="status" data-email-not-ready className="rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          <p role="status" data-email-not-ready className="shrink-0 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
             {NOT_READY[sender.missing]}{" "}
             {admin ? "Settings › Email says what to add." : "Ask an administrator to set it up."}
           </p>
         ) : null}
 
-        <form action={formAction} noValidate className="flex min-h-0 flex-col gap-4">
+        {/* On a short screen the fields scroll and the buttons stay in view. */}
+        <form action={formAction} noValidate className="flex min-h-0 flex-1 flex-col gap-4">
           <input type="hidden" name="lead_id" value={leadId} />
+          <div data-email-fields className="-mx-1 flex min-h-0 flex-col gap-4 overflow-y-auto px-1 pb-1">
+            {problem ? (
+              <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+                {problem}
+              </p>
+            ) : null}
+  
+            <Field label="To" required error={fe("to")} hint={to ? null : "No email on file: type the address the contact gave you."}>
+              <Input
+                name="to"
+                type="email"
+                inputMode="email"
+                autoComplete="off"
+                maxLength={254}
+                defaultValue={dv("to")}
+                aria-invalid={invalid("to")}
+                autoFocus={!to}
+              />
+            </Field>
+  
+            <Field label="Subject" required error={fe("subject")}>
+              <Input
+                name="subject"
+                maxLength={EMAIL_LIMITS.subject}
+                placeholder="Following up on our call"
+                defaultValue={dv("subject")}
+                aria-invalid={invalid("subject")}
+                autoFocus={Boolean(to)}
+              />
+            </Field>
+  
+            <Field label="Message" required error={fe("body")} hint={`${count.toLocaleString()} / ${EMAIL_LIMITS.body.toLocaleString()}`}>
+              <Textarea
+                name="body"
+                rows={9}
+                maxLength={EMAIL_LIMITS.body}
+                placeholder={first ? `Hi ${first},` : "Hi,"}
+                defaultValue={dv("body")}
+                onChange={(e) => setLength(e.target.value.length)}
+                aria-invalid={invalid("body")}
+                className="max-h-[40svh]"
+              />
+            </Field>
+          </div>
 
-          {problem ? (
-            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
-              {problem}
-            </p>
-          ) : null}
-
-          <Field label="To" required error={fe("to")} hint={to ? null : "No email on file: type the address the contact gave you."}>
-            <Input
-              name="to"
-              type="email"
-              inputMode="email"
-              autoComplete="off"
-              maxLength={254}
-              defaultValue={dv("to")}
-              aria-invalid={invalid("to")}
-              autoFocus={!to}
-            />
-          </Field>
-
-          <Field label="Subject" required error={fe("subject")}>
-            <Input
-              name="subject"
-              maxLength={EMAIL_LIMITS.subject}
-              placeholder="Following up on our call"
-              defaultValue={dv("subject")}
-              aria-invalid={invalid("subject")}
-              autoFocus={Boolean(to)}
-            />
-          </Field>
-
-          <Field label="Message" required error={fe("body")} hint={`${count.toLocaleString()} / ${EMAIL_LIMITS.body.toLocaleString()}`}>
-            <Textarea
-              name="body"
-              rows={9}
-              maxLength={EMAIL_LIMITS.body}
-              placeholder={first ? `Hi ${first},` : "Hi,"}
-              defaultValue={dv("body")}
-              onChange={(e) => setLength(e.target.value.length)}
-              aria-invalid={invalid("body")}
-              className="max-h-[40svh]"
-            />
-          </Field>
-
-          <DialogFooter>
+          <DialogFooter className="shrink-0">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={pending || !sender.ready}>
               <Send /> {pending ? "Sending…" : "Send"}

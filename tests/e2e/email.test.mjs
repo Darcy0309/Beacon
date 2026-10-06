@@ -91,6 +91,21 @@ try {
   check("…with email set up (the app was started with the catcher's SMTP_HOST and SMTP_PORT)", !d?.notReady && d?.canSend, d?.notReady ?? "");
   await shot(sean, "email-dialog");
 
+  section("On a short screen");
+  await sean.key("Escape");
+  await sean.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 620, deviceScaleFactor: 1, mobile: false });
+  await openEmail(sean);
+  const fit = await sean.ev(`(() => { const d = document.querySelector('[role=dialog]').getBoundingClientRect();
+    const b = [...document.querySelectorAll('[role=dialog] form button')].map((x) => x.getBoundingClientRect());
+    const f = document.querySelector('[data-email-fields]');
+    return { inDialog: b.every((r) => r.bottom <= d.bottom && r.top >= d.top), onScreen: b.every((r) => r.bottom <= innerHeight), fieldsScroll: f.scrollHeight > f.clientHeight }; })()`);
+  check("Send and Cancel stay inside the dialog and on screen", fit.inDialog && fit.onScreen, JSON.stringify(fit));
+  check("…the fields scroll instead", fit.fieldsScroll, JSON.stringify(fit));
+  await shot(sean, "email-short-screen");
+  await sean.key("Escape");
+  await sean.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 950, deviceScaleFactor: 1, mobile: false });
+  d = await openEmail(sean);
+
   section("Nothing goes out until the email is complete");
   await write(sean, { to: `${DANA}, boss@capitalins.test`, subject: "", body: "" });
   await send(sean);
