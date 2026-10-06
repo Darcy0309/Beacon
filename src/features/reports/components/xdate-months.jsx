@@ -1,4 +1,5 @@
 import Link from "@/components/shared/intent-link";
+import TipLayer from "@/components/shared/tip-layer";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -8,6 +9,17 @@ const SEGMENTS = [
   { key: "off", label: "Off the list", color: "var(--neon-rose)" },
   { key: "viable", label: "Viable left", color: "var(--neon-cyan)" },
 ];
+
+const pct = (n, total) => (total ? Math.round((n / total) * 100) : 0);
+
+/** Each month's figures for its tooltip: every colour with its share, and the total. */
+const monthTips = (months) =>
+  Object.fromEntries(months.map((m) => [m.month, {
+    title: m.label,
+    rows: SEGMENTS.slice().reverse().map((s) => ({ key: s.key, label: s.label, color: s.color, value: m[s.key].toLocaleString(), share: `${pct(m[s.key], m.total)}%` })),
+    total: m.total.toLocaleString(),
+    foot: m.total ? "Click a colour to see those names" : null,
+  }]));
 
 /**
  * Renewals per month of the year, as stacked columns and as a table. Every
@@ -52,12 +64,14 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
         {undated.total ? <span>No renewal date {undated.total.toLocaleString()}</span> : null}
       </div>
 
-      <div className={cn("flex items-stretch gap-1.5 sm:gap-3", compact ? "h-44" : "h-60")}>
+      {/* Hovering a month (or focusing one of its colours) shows its figures above its column. */}
+      <TipLayer tips={monthTips(months)} className={cn("flex items-stretch gap-1.5 sm:gap-3", compact ? "h-44" : "h-60")}>
         {months.map((m, i) => (
-          <div key={m.month} className="flex min-w-0 flex-1 flex-col items-center gap-2">
-            <div className="flex min-h-0 w-full flex-1 flex-col justify-end">
+          <div key={m.month} data-tip={m.month} data-month-column={m.month} className="group/month relative flex min-w-0 flex-1 flex-col items-center gap-2">
+            <div className="flex min-h-0 w-full flex-1 flex-col justify-end rounded-t transition-colors group-hover/month:bg-foreground/[0.04]">
               {m.total ? (
                 <div
+                  data-tip-anchor
                   className="animate-grow-height flex w-full flex-col-reverse overflow-hidden rounded-t transition-[height] duration-500"
                   style={{ height: `${(m.total / max) * 100}%`, animationDelay: `${i * 45}ms` }}
                 >
@@ -66,7 +80,8 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
                       <Link
                         key={s.key}
                         href={href(m.month, s.key)}
-                        title={`${m.label}: ${m[s.key].toLocaleString()} ${s.label.toLowerCase()}`}
+                        data-seg={s.key}
+                        data-tip-row={s.key}
                         aria-label={`${m.label}: ${m[s.key]} ${s.label.toLowerCase()}`}
                         className={cn("block w-full transition-opacity hover:opacity-80", isOpen(m.month, s.key) && "outline-2 -outline-offset-2 outline-foreground")}
                         style={{ height: `${(m[s.key] / m.total) * 100}%`, background: s.color, minHeight: 2 }}
@@ -75,7 +90,7 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
                   )}
                 </div>
               ) : (
-                <div className="h-0.5 w-full rounded bg-[var(--panel-border)]" />
+                <div data-tip-anchor className="h-0.5 w-full rounded bg-[var(--panel-border)]" />
               )}
             </div>
             <span className={cn(
@@ -86,7 +101,7 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
             </span>
           </div>
         ))}
-      </div>
+      </TipLayer>
 
       {compact ? null : (
         <Table>

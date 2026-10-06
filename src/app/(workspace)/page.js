@@ -11,6 +11,8 @@ import MetricBar from "@/components/shared/metric-bar";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
+import TipLayer from "@/components/shared/tip-layer";
+import { monthBarTips } from "@/lib/chart-tips";
 import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
@@ -206,17 +208,18 @@ export default async function Dashboard() {
                       <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
                     </span>
                   </div>
-                  <div className="flex min-h-52 flex-1 items-stretch gap-3" data-months-chart>
+                  {/* Hovering a month shows what was delivered, above its taller bar. */}
+                  <TipLayer tips={monthBarTips(months, { leads: "Leads delivered", appts: "Appointments" })} className="flex min-h-52 flex-1 items-stretch gap-3" data-months-chart>
                     {months.map((m, i) => (
-                      <div key={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
+                      <div key={m.key} data-tip={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
                         className="flex min-h-0 flex-1 flex-col items-center gap-2">
                         <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
-                          <div className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
-                            style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)", animationDelay: `${i * 70}ms` }}
-                            title={`${m.leads} leads in ${m.label}`} />
-                          <div className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
-                            style={{ height: `${(m.appts / maxMonth) * 100}%`, background: "var(--neon-emerald)", boxShadow: "0 0 12px -3px var(--neon-emerald)", animationDelay: `${i * 70 + 35}ms` }}
-                            title={`${m.appts} appointments in ${m.label}`} />
+                          <div data-tip-row="leads" data-tip-anchor={m.leads >= m.appts ? "" : undefined}
+                            className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
+                            style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)", animationDelay: `${i * 70}ms` }} />
+                          <div data-tip-row="appts" data-tip-anchor={m.leads < m.appts ? "" : undefined}
+                            className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
+                            style={{ height: `${(m.appts / maxMonth) * 100}%`, background: "var(--neon-emerald)", boxShadow: "0 0 12px -3px var(--neon-emerald)", animationDelay: `${i * 70 + 35}ms` }} />
                         </div>
                         <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{m.label}</span>
                       </div>
@@ -224,7 +227,7 @@ export default async function Dashboard() {
                     {months.length === 0 && (
                       <p className="m-auto text-sm text-muted-foreground">Nothing delivered yet.</p>
                     )}
-                  </div>
+                  </TipLayer>
                 </div>
               </>
             )}

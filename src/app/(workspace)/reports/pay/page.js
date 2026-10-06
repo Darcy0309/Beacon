@@ -5,6 +5,7 @@ import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import ToneBadge from "@/components/shared/tone-badge";
 import DateRangePicker from "@/components/shared/date-range-picker";
+import TipLayer from "@/components/shared/tip-layer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -19,6 +20,16 @@ export const dynamic = "force-dynamic";
 
 const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
 const ROUNDING_TEXT = Object.fromEntries(ROUNDING);
+
+/** Each hour's tooltip: the hour, the minutes worked in it, and the minutes paid after rounding. */
+const hourTips = (hours) =>
+  Object.fromEntries(hours.map((h) => [h.hour, {
+    title: `${hourLabel(h.hour)} – ${hourLabel((h.hour + 1) % 24)}`,
+    rows: [
+      { key: "worked", label: "Worked", value: `${h.minutes} min` },
+      { key: "paid", label: "Paid", value: `${h.paid} min` },
+    ],
+  }]));
 
 /**
  * Pay & hours for a pay period: for each account manager, the time they
@@ -202,14 +213,13 @@ export default async function PayReport({ searchParams }) {
                     <TableCell className="text-right tabular-nums text-muted-foreground">{hoursLabel(d.worked)}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{hoursLabel(d.paid)}</TableCell>
                     <TableCell>
-                      <div className="flex flex-wrap gap-1.5">
+                      <TipLayer tips={hourTips(d.hours)} className="flex flex-wrap gap-1.5">
                         {d.hours.map((h) => (
-                          <span key={h.hour} className="rounded border border-[var(--panel-border)] px-1.5 py-0.5 text-[0.7rem] tabular-nums text-muted-foreground"
-                            title={`${hourLabel(h.hour)}: ${h.minutes} minutes worked, ${h.paid} paid`}>
+                          <span key={h.hour} data-tip={h.hour} className="rounded border border-[var(--panel-border)] px-1.5 py-0.5 text-[0.7rem] tabular-nums text-muted-foreground">
                             {hourLabel(h.hour)} · {h.minutes}m{h.paid !== h.minutes ? ` → ${h.paid}m` : ""}
                           </span>
                         ))}
-                      </div>
+                      </TipLayer>
                     </TableCell>
                   </TableRow>
                 ))}

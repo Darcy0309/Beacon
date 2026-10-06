@@ -238,7 +238,7 @@ signs out.
 |---|---|---|
 | `npm test` | nothing | Unit tests: CSV import, dates, search words, pay (rate choices, pay periods, production totals), validation rules, form ↔ schema contract |
 | `npm run test:integration` | local stack | Row Level Security for every role, reads and writes; the lead lifecycle; the admin side (reps on projects, X-dates, production and pay); search and the Lead Explorer; the audit fixes (rescheduling, pay once, QA guard, feedback, business-day figures); pay and time (rate ranges, hybrid pay, time worked); the call result buttons (Viable-CallBack, Lead-Hot Lead, the X-date a Lead needs) |
-| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, dropdowns in both themes, forms, security, notifications, in headless Chrome |
+| `npm run test:e2e` | local stack + app | Every page per role, the dashboard, the account manager's day, the admin side, navigation, the calendar, search, pay and hours, chart tooltips (`components/shared/tip-layer.jsx`, the app's own tooltip above what is hovered; with a mouse: `launchBrowser({ mouse: true })`), dropdowns in both themes, forms, security, notifications, in headless Chrome |
 | `npm run test:all` | both | All of the above |
 
 The integration and end-to-end suites create and delete real rows and

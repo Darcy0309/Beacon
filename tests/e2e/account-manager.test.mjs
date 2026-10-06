@@ -83,7 +83,13 @@ try {
   section("Working the list");
   await pick(sean, "Viable-Left Message");
   check("choosing a result shows no description over the notes", !/Stays on active DBDev call lists/.test(await sean.text()));
-  check("…which shows on hover instead", /Stays on active DBDev call lists/.test(await sean.ev(`[...document.querySelectorAll('button[aria-pressed]')].find((b) => b.textContent.trim() === 'Viable-Left Message')?.title ?? ''`)));
+  // The description shows in the app's own tooltip on a short hover, never as a browser title tooltip.
+  const lmButton = await sean.ev(`(() => { const b = [...document.querySelectorAll('button[aria-pressed]')].find((x) => x.textContent.trim() === 'Viable-Left Message');
+    const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, title: b.title }; })()`);
+  await sean.hover({ x: lmButton.x, y: lmButton.y });
+  const described = await until(() => sean.ev(`document.querySelector('[role=tooltip][data-tip-open]')?.textContent ?? ''`).then((t) => /Stays on active DBDev call lists/.test(t) && t));
+  check("…which shows over the button on hover instead, in the app's style", Boolean(described) && lmButton.title === "", lmButton.title || "no tooltip");
+  await sean.hover({ x: 5, y: 5 });
   // The notes open with the date (the business's) and who is writing: "10/2/26 seanf: ".
   const [y, m, d] = sql("select (now() at time zone public.business_tz())::date").split("-");
   const stamp = `${Number(m)}/${Number(d)}/${y.slice(2)} seanf:`;

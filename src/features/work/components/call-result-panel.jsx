@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import SectionHeader from "@/components/shared/section-header";
+import TipLayer from "@/components/shared/tip-layer";
 import DatePicker from "@/components/shared/date-picker";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { recordCallResult } from "@/features/work/actions";
@@ -65,6 +66,8 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
       && (r.effect !== "confirm" || !followUp.confirmed));
   }, [results, followUp]);
   const picked = [...onSheet, ...followUpResults].find((r) => r.id === chosen) ?? null;
+  // What each result does, in the client's words: shown over its button on a short hover.
+  const descriptions = useMemo(() => Object.fromEntries(results.map((r) => [r.id, r.action])), [results]);
 
   // The answer is handled where it is awaited, not in an effect: saving can
   // change the sheet under this panel (a promoted name is no longer the
@@ -122,7 +125,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
       type="button"
       onClick={() => choose(r.id)}
       aria-pressed={chosen === r.id}
-      title={r.action}
+      data-tip={r.id}
       className={cn(
         "cursor-pointer rounded-md border px-2.5 py-1.5 text-left text-xs font-medium transition-colors",
         chosen === r.id
@@ -148,7 +151,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
               <CalendarCheck className="size-3.5" /> Appointment {followUp.when}
               {followUp.qa === "pending" ? <span className="font-normal text-muted-foreground">· waiting for QA</span> : null}
             </div>
-            <div className="flex flex-wrap gap-1.5">{followUpResults.map(button)}</div>
+            <TipLayer tips={descriptions} delay={500} className="flex flex-wrap gap-1.5">{followUpResults.map(button)}</TipLayer>
           </div>
         ) : null}
 
@@ -158,7 +161,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
             return items.length ? (
               <div key={g.key}>
                 <div className="eyebrow mb-1.5">{g.label}</div>
-                <div className="flex flex-wrap gap-1.5">{items.map(button)}</div>
+                <TipLayer tips={descriptions} delay={500} className="flex flex-wrap gap-1.5">{items.map(button)}</TipLayer>
               </div>
             ) : null;
           })

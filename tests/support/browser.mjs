@@ -128,8 +128,16 @@ async function openPage(browser, port, browserContextId, { width = 1440, height 
   return page;
 }
 
-export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 600) } = {}) {
-  const chrome = spawn(process.env.CHROME ?? "google-chrome", ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", `--remote-debugging-port=${port}`, "about:blank"], { stdio: "ignore" });
+/**
+ * Start headless Chrome. `mouse`: report a fine, hover-capable pointer, as
+ * a desktop with a mouse does. Headless Chrome reports none, and hover
+ * styles (Tailwind's `hover:` waits for `(hover: hover)`) never apply
+ * without one.
+ */
+export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 600), mouse = false } = {}) {
+  const args = ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", `--remote-debugging-port=${port}`];
+  if (mouse) args.push("--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4");
+  const chrome = spawn(process.env.CHROME ?? "google-chrome", [...args, "about:blank"], { stdio: "ignore" });
   const version = await until(
     async () => {
       try {

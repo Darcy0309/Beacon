@@ -7,6 +7,8 @@ import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
 import CountUp from "@/components/shared/count-up";
 import { Card } from "@/components/ui/card";
+import TipLayer from "@/components/shared/tip-layer";
+import { monthBarTips } from "@/lib/chart-tips";
 import { reportsView } from "@/features/dashboard/role-views";
 import { getReports } from "@/features/dashboard/queries";
 import { getReps, getMyWorkload } from "@/features/users/queries";
@@ -118,12 +120,15 @@ export default async function ReportsPage() {
                   <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
                 </span>
               </div>
-              <div className="flex min-h-56 flex-1 items-stretch gap-3" data-months-chart>
+              {/* Hovering a month shows its figures above its taller bar, in the app's own tooltip. */}
+              <TipLayer tips={monthBarTips(r.months)} className="flex min-h-56 flex-1 items-stretch gap-3" data-months-chart>
                 {r.months.map((m, i) => (
-                  <div key={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
+                  <div key={m.key} data-tip={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
                     className="flex min-h-0 flex-1 flex-col items-center gap-2">
                     <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
                       <div
+                        data-tip-row="leads"
+                        data-tip-anchor={m.leads >= m.appts ? "" : undefined}
                         className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
                         style={{
                           height: `${(m.leads / maxMonth) * 100}%`,
@@ -131,9 +136,10 @@ export default async function ReportsPage() {
                           boxShadow: "0 0 12px -3px var(--neon-cyan)",
                           animationDelay: `${i * 70}ms`,
                         }}
-                        title={`${m.leads} leads`}
                       />
                       <div
+                        data-tip-row="appts"
+                        data-tip-anchor={m.leads < m.appts ? "" : undefined}
                         className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
                         style={{
                           height: `${(m.appts / maxMonth) * 100}%`,
@@ -141,7 +147,6 @@ export default async function ReportsPage() {
                           boxShadow: "0 0 12px -3px var(--neon-emerald)",
                           animationDelay: `${i * 70 + 35}ms`,
                         }}
-                        title={`${m.appts} appointments`}
                       />
                     </div>
                     <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
@@ -149,7 +154,7 @@ export default async function ReportsPage() {
                     </span>
                   </div>
                 ))}
-              </div>
+              </TipLayer>
             </div>
           </Card>
 
