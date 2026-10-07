@@ -2,7 +2,7 @@
 
 import "server-only";
 import { colorFor, initialsOf } from "@/lib/format";
-import { paged, runPaged } from "@/lib/server/query-helpers";
+import { paged, readAll, runPaged } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 const toCarrierView = (a, states) => ({
@@ -21,6 +21,13 @@ const toCarrierView = (a, states) => ({
  * whole-table figures the tiles need (every carrier's lead count and the
  * states its leads sit in — two small columns per row).
  */
+/** Every carrier's name, A to Z: what the carrier fields on a lead sheet suggest. */
+export async function getCarrierNames() {
+  const supabase = await createClient();
+  const rows = await readAll((from, to) => supabase.from("agencies").select("id, name").order("name").order("id").range(from, to));
+  return [...new Set(rows.map((r) => r.name).filter(Boolean))];
+}
+
 export async function listInsuranceCompanies(params) {
   const supabase = await createClient();
   const [{ rows, total }, { data: all }, { data: leadRows }] = await Promise.all([

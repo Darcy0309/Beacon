@@ -7,6 +7,7 @@ import { NOT_DELETED, check, fail, idFrom, logActivity, n, ok, onlySubmitted, s 
 import { createClient } from "@/lib/supabase/server";
 import { normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
+import { POLICY_LINES } from "@/lib/coverage";
 
 function leadPayload(formData) {
   return {
@@ -125,3 +126,35 @@ export async function setLeadStatus(formData) {
   return ok({ id });
 }
 
+
+/**
+ * Save a name's coverage from the lead sheet's Coverage tab: its Ultimate
+ * X-Date, the prospect's agency, and each policy line's X-date and carrier.
+ * For whoever may work the name, as recording a result is.
+ */
+export async function saveCoverage(prevState, formData) {
+  const { values, failed } = check(formData, schemas.coverage);
+  if (failed) return failed;
+  const leadId = Number(values.lead_id);
+
+  const supabase = await createClient();
+  const { data: allowed, error: notAllowed } = await supabase.rpc("can_work_lead", { p_lead_id: leadId });
+  if (notAllowed) return fail(notAllowed, null, values);
+  if (!allowed) return fail("This name is not on your call list, so you can't change its coverage.", null, values);
+
+  const payload = { ultimate_xdate: values.ultimate_xdate || null, agency_name: values.agency_name || null };
+  for (const line of POLICY_LINES) {
+    payload[line.date] = values[line.date] || null;
+    payload[line.carrier] = values[line.carrier] || null;
+  }
+  const { data: rows, error } = await supabase.from("insurance_details").update(payload).eq("lead_id", leadId).select("id");
+  if (error) return fail(error, null, values);
+  if (!rows?.length) {
+    const { error: added } = await supabase.from("insurance_details").insert({ lead_id: leadId, ...payload });
+    if (added) return fail(added, null, values);
+  }
+
+  await logActivity(supabase, "lead.coverage", { entity: "lead", entityId: leadId });
+  revalidatePath(`/leads/${leadId}`);
+  return ok({ id: leadId });
+}

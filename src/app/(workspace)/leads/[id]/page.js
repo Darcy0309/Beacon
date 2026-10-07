@@ -10,6 +10,9 @@ import LeadForm from "@/features/leads/components/lead-form";
 import AppointmentForm from "@/features/appointments/components/appointment-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
 import EmailLead from "@/features/email/components/email-lead";
+import CoverageForm from "@/features/leads/components/coverage-form";
+import { getCarrierNames } from "@/features/insurance/queries";
+import { POLICY_LINES } from "@/lib/coverage";
 import { getEmailSender } from "@/features/email/queries";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -163,11 +166,12 @@ export default async function LeadSheet({ params, searchParams }) {
 
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
-  const [list, listProject, inProject, sender] = await Promise.all([
+  const [list, listProject, inProject, sender, carriers] = await Promise.all([
     listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
     staff ? getEmailSender(me) : null,
+    staff ? getCarrierNames() : [],
   ]);
 
   // The confirmation follow-up belongs to whoever set the appointment.
@@ -199,6 +203,14 @@ export default async function LeadSheet({ params, searchParams }) {
   // appointment manager holds it once it is promoted to appointment setting.
   const leadManager = r.developer ?? (r.stage === "dbdev" ? r.assigned : null);
   const apptManager = r.stage === "appt" ? r.assigned : null;
+
+  // The policy lines the client always wants listed, and any other with something in it.
+  const lines = POLICY_LINES.filter((l) => l.always || ins?.[l.date] || ins?.[l.carrier]);
+  const coverage = Object.fromEntries([
+    ["ultimate_xdate", ins?.ultimate_xdate ?? ""],
+    ["agency_name", ins?.agency_name ?? ""],
+    ...POLICY_LINES.flatMap((l) => [[l.date, ins?.[l.date] ?? ""], [l.carrier, ins?.[l.carrier] ?? ""]]),
+  ]);
 
   // Dates and times in the history, on the business's clock.
   const stamp = (iso) =>
@@ -405,34 +417,35 @@ export default async function LeadSheet({ params, searchParams }) {
                 {
                   id: "coverage",
                   label: "Coverage",
-                  count: xdates.length || null,
+                  count: lines.filter((l) => ins?.[l.date]).length || null,
                   content: (
                     <div>
+                      {canRecord ? (
+                        <div className="flex justify-end border-b border-[var(--panel-border)] px-4 py-2">
+                          <CoverageForm leadId={lead.id} company={lead.co} coverage={coverage} carriers={carriers} />
+                        </div>
+                      ) : null}
                       <Rows
                         rows={[
-                          ["Renewal", r.renewal ? <span className="font-semibold tabular-nums text-primary">{mediumDate(r.renewal)}</span> : null],
-                          ["Current carrier", r.agency?.name ?? ins?.agency_name],
+                          ["Ultimate XDate", ins?.ultimate_xdate ? <span className="font-semibold tabular-nums text-primary">{mediumDate(ins.ultimate_xdate)}</span> : null],
+                          ["Agency", ins?.agency_name ?? r.agency?.name],
                           ...(r.original_xdate
                             ? [["Original renewal", <span key="o"><span className="tabular-nums">{mediumDate(r.original_xdate)}</span><span className="text-muted-foreground"> · corrected on a call</span></span>]]
                             : []),
                         ]}
                       />
-                      {xdates.length ? (
-                        <table className="w-full border-t border-[var(--panel-border)] text-sm">
-                          <thead><tr><th className={TH}>Policy line</th><th className={TH}>Carrier</th><th className={cn(TH, "text-right")}>X-date</th></tr></thead>
-                          <tbody className="divide-y divide-[var(--panel-border)]">
-                            {xdates.map(([label, dateKey, carrierKey]) => (
-                              <tr key={label}>
-                                <td className={cn(TD, "font-medium")}>{label}</td>
-                                <td className={cn(TD, "text-muted-foreground")}>{ins[carrierKey] ?? "—"}</td>
-                                <td className={cn(TD, "text-right font-semibold tabular-nums")}>{shortDate(ins[dateKey])}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <p className="border-t border-[var(--panel-border)] px-4 py-3 text-sm text-muted-foreground">No policy dates on file.</p>
-                      )}
+                      <table data-policy-lines className="w-full border-t border-[var(--panel-border)] text-sm">
+                        <thead><tr><th className={TH}>Policy line</th><th className={TH}>X-Date</th><th className={TH}>Carrier</th></tr></thead>
+                        <tbody className="divide-y divide-[var(--panel-border)]">
+                          {lines.map((l) => (
+                            <tr key={l.key} data-policy-line={l.key}>
+                              <td className={cn(TD, "font-medium")}>{l.label}</td>
+                              <td className={cn(TD, "tabular-nums", ins?.[l.date] ? "font-semibold" : "text-muted-foreground")}>{ins?.[l.date] ? mediumDate(ins[l.date]) : "—"}</td>
+                              <td className={cn(TD, ins?.[l.carrier] ? null : "text-muted-foreground")}>{ins?.[l.carrier] || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   ),
                 },

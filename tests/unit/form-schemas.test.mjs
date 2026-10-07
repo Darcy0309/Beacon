@@ -21,6 +21,8 @@ const FORMS = {
   "src/features/notifications/components/notification-thread.jsx": { schema: "reply",   extra: ["id"] },
   "src/features/work/components/call-result-panel.jsx": { schema: "callResult", extra: [] },
   "src/features/email/components/email-lead.jsx":       { schema: "leadEmail",  extra: [] },
+  // The policy lines' fields are named from POLICY_LINES (name={line.date}), so only these are literal.
+  "src/features/leads/components/coverage-form.jsx":    { schema: "coverage",   extra: [] },
   "src/features/imports/components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
   "src/features/settings/components/settings-form.jsx":    { schema: "settings",    extra: [] },
   "src/features/pay/components/pay-rules-form.jsx":        { schema: "payRules",    extra: [] },

@@ -163,6 +163,20 @@ which `telHref()` dials after a pause (`,203`). Imports take headings such
 as "Mobile", "Cell", "DM Phone", "DM Cell" and "DM Email", and
 `leads.search_text` includes the new numbers and the decision maker's name.
 
+## Coverage
+
+The lead sheet's Coverage tab shows the Ultimate XDate and the prospect's
+agency (`insurance_details.agency_name`), then each policy line as Policy
+line → X-Date → Carrier: Package, Workers comp, Auto, Group health and
+Personal lines always, other lines once they have something
+(`POLICY_LINES` in `lib/coverage.js`). Whoever may work the name edits it
+there (`saveCoverage()`); each carrier field suggests names from the
+Insurance Cos. list as it is typed (`components/shared/suggest-input.jsx`)
+and flags one that is not on it, so carriers are spelled one way. An
+administrator fills the list from a CSV of carrier names on the Insurance
+Cos. page (`importCarriers()`, which skips names already on file however
+they are written).
+
 ## Email to leads
 
 **Email**, beside Call now on the lead sheet, writes to the name's contact

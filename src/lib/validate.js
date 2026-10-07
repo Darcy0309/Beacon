@@ -10,6 +10,7 @@
 import { normalizeState } from "./csv.js";
 import { EMAIL_LIMITS, isMailbox } from "./email.js";
 import { PHONE_EXTENSION } from "./format.js";
+import { POLICY_LINES } from "./coverage.js";
 
 const str = (v) => (v == null ? "" : String(v).trim());
 const empty = (v) => str(v) === "";
@@ -326,6 +327,15 @@ export const schemas = {
     product_name: [max(40)],
     logo: [urlOrPath, max(200)],
     mail_from: [mailbox, max(120)],
+  },
+
+  // A name's coverage, from the Coverage tab: the Ultimate X-Date, the
+  // prospect's agency, and each policy line's X-date and carrier.
+  coverage: {
+    lead_id: [required("Missing lead"), id],
+    ultimate_xdate: [date],
+    agency_name: [max(120)],
+    ...Object.fromEntries(POLICY_LINES.flatMap((l) => [[l.date, [date]], [l.carrier, [max(120)]]])),
   },
 
   // An email to a name's contact, from its lead sheet.

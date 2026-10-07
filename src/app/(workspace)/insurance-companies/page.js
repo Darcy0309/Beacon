@@ -10,6 +10,7 @@ import FilterTable from "@/components/shared/filter-table";
 import { listInsuranceCompanies } from "@/features/insurance/queries";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteAgency } from "@/features/insurance/actions";
+import CarrierImport from "@/features/insurance/components/carrier-import";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export default async function InsuranceCompaniesPage({ searchParams }) {
         </div>
 
         <Card>
-          <SectionHeader label="Carriers" icon={Building2} />
+          <SectionHeader label="Carriers" icon={Building2} action={<CarrierImport />} />
           <FilterTable
             columns={["Carrier", "Association", "States", "Active X-dates", "Status", { label: "Action", className: "text-right" }]}
             filters={[
