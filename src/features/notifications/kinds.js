@@ -1,5 +1,5 @@
 import {
-  Bell, MessageSquare, CalendarCheck, Target, Star, Upload, Megaphone,
+  AlarmClock, Bell, MessageSquare, CalendarCheck, Target, Star, Upload, Megaphone,
 } from "lucide-react";
 
 /** How each kind of notification is drawn, and what it is called on its own page. */
@@ -11,6 +11,7 @@ export const KIND_ICONS = {
   import: Upload,
   bulletin: Megaphone,
   system: Bell,
+  reminder: AlarmClock,
 };
 
 export const KIND_LABELS = {
@@ -21,6 +22,7 @@ export const KIND_LABELS = {
   import: "Import",
   bulletin: "Announcement",
   system: "Account notice",
+  reminder: "Call-back reminder",
 };
 
 export const ROLE_LABELS = { admin: "Administrator", manager: "Account manager", agent: "Agent", client: "Client" };

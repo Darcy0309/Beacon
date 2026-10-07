@@ -90,8 +90,9 @@ try {
   check("Email opens a dialog for this name", d?.title === `Email ${TAG} Whitfield Roofing`, d?.title);
   check("…addressed to the email on file", d?.to === DANA, d?.to);
   check("…ready to type the subject", d?.focused === "subject", d?.focused);
-  check("…saying it goes out from the company's address as Sean, replies to him",
-    d?.text.includes(`Sent from ${FROM} as Sean Fitzgerald.`) && d?.text.includes("Replies come back to sean@beacon.test."), d?.text);
+  // Sean signs in as sean@beacon.test, a test address no mail reaches: replies go to the From address.
+  check("…saying it goes out from the company's address as Sean, replies to an address that reaches someone",
+    d?.text.includes(`Sent from ${FROM} as Sean Fitzgerald.`) && d?.text.includes(`Replies come back to ${FROM}.`), d?.text);
   check("…with email set up (the app was started with the catcher's SMTP_HOST and SMTP_PORT)", !d?.notReady && d?.canSend, d?.notReady ?? "");
   await shot(sean, "email-dialog");
 
@@ -127,7 +128,7 @@ try {
   const m = mail.messages[0];
   check("the mail server got one email, for Dana alone", mail.messages.length === 1 && m.to.length === 1 && m.to[0] === DANA, JSON.stringify(m?.to));
   check("…from the company's address", m?.from === FROM && /^"?Sean Fitzgerald"? <alerts@signaturemktg\.net>$/.test(m?.headers.from ?? ""), m?.headers.from);
-  check("…replies going to Sean", /sean@beacon\.test/.test(m?.headers["reply-to"] ?? ""), m?.headers["reply-to"]);
+  check("…no reply-to for a test sign-in, so replies go to the From address", !m?.headers["reply-to"], m?.headers["reply-to"]);
   check("…to Dana, with the subject and the message as written",
     m?.headers.to === DANA && m?.headers.subject === "Following up on our call" && m?.text.trim() === body, JSON.stringify({ to: m?.headers.to, subject: m?.headers.subject, text: m?.text }));
   check("…the app signing in to the mail server with its login", mail.logins.length >= 1 && Boolean(mail.logins[0]), JSON.stringify(mail.logins));

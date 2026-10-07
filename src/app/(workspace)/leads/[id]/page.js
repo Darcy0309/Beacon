@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarClock, CalendarPlus, ChevronDown, Mail, Pencil, Phone, PhoneCall, Repeat } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, CalendarPlus, ChevronDown, Mail, Pencil, Phone, PhoneCall, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
@@ -11,6 +11,7 @@ import AppointmentForm from "@/features/appointments/components/appointment-form
 import CallResultPanel from "@/features/work/components/call-result-panel";
 import EmailLead from "@/features/email/components/email-lead";
 import CoverageForm from "@/features/leads/components/coverage-form";
+import ReminderCard from "@/features/leads/components/reminder-card";
 import { getCarrierNames } from "@/features/insurance/queries";
 import { POLICY_LINES } from "@/lib/coverage";
 import { getEmailSender } from "@/features/email/queries";
@@ -57,24 +58,25 @@ function Line({ kind, children, action }) {
  * has an Email line, so an address the contact gives on the phone can be
  * typed in and used at once.
  */
-function Person({ who, phone, mobile, email: address, leadId, emailButton, alwaysEmail = false, children }) {
+function Person({ who, phone, mobile, email: address, leadId, emailButton, alwaysEmail = false, allLines = false, children }) {
   const label = who.toLowerCase();
+  const none = <span className="text-muted-foreground">None on file</span>;
   return (
     <div data-person={who}>
       {children}
-      {address || (alwaysEmail && emailButton) ? (
+      {address || ((alwaysEmail || allLines) && emailButton) ? (
         <Line kind="Email" action={emailButton?.(address)}>
           {address ?? <span className="text-muted-foreground">None on file</span>}
         </Line>
       ) : null}
-      {phone ? (
+      {phone || allLines ? (
         <Line kind="Business" action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} label={`Call ${label}, business: ${phone}`} /> : null}>
-          {phone}
+          {phone || none}
         </Line>
       ) : null}
-      {mobile ? (
+      {mobile || allLines ? (
         <Line kind="Mobile" action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
-          {mobile}
+          {mobile || none}
         </Line>
       ) : null}
     </div>
@@ -212,6 +214,10 @@ export default async function LeadSheet({ params, searchParams }) {
     ...POLICY_LINES.flatMap((l) => [[l.date, ins?.[l.date] ?? ""], [l.carrier, ins?.[l.carrier] ?? ""]]),
   ]);
 
+  // The call history with the reminders set on the name among the calls, newest first.
+  const history = [...activity.calls, ...activity.reminders.map((m) => ({ ...m, reminder: true }))]
+    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+
   // Dates and times in the history, on the business's clock.
   const stamp = (iso) =>
     iso
@@ -320,6 +326,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 <div className="mt-3">
                   <Person
                     who="Decision maker"
+                    allLines
                     phone={r.dm_phone}
                     mobile={r.dm_mobile}
                     email={r.dm_email}
@@ -338,6 +345,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 <div className="mt-3">
                   <Person
                     who="Secondary contact"
+                    allLines
                     phone={r.contact2_phone}
                     mobile={r.contact2_mobile}
                     email={r.contact2_email}
@@ -463,8 +471,15 @@ export default async function LeadSheet({ params, searchParams }) {
             />
           </Card>
 
-          {/* Right: the call result buttons. */}
+          {/* Right: a call-back reminder, then the call result buttons. */}
           <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">
+            {canRecord ? (
+              <ReminderCard
+                leadId={lead.id}
+                company={lead.co}
+                upcoming={activity.reminders.filter((m) => !m.sent && m.userId === me?.id).map((m) => ({ id: m.id, when: stamp(m.remindAt), note: m.note }))}
+              />
+            ) : null}
             {canRecord ? (
               <CallResultPanel
                 leadId={lead.id}
@@ -493,13 +508,26 @@ export default async function LeadSheet({ params, searchParams }) {
               {
                 id: "calls",
                 label: "Call History",
-                count: activity.calls.length,
-                content: activity.calls.length ? (
+                count: history.length,
+                content: history.length ? (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[40rem] text-sm">
                       <thead><tr><th className={TH}>Call date &amp; time</th><th className={TH}>Result</th><th className={TH}>Caller</th><th className={TH}>Stage</th><th className={TH}>Comments</th></tr></thead>
                       <tbody className="divide-y divide-[var(--panel-border)]">
-                        {activity.calls.map((c) => (
+                        {history.map((c) => c.reminder ? (
+                          <tr key={`r${c.id}`} data-list-row data-reminder-row>
+                            <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(c.at)}</td>
+                            <td className={cn(TD, "whitespace-nowrap font-medium text-primary")}>
+                              <span className="inline-flex items-center gap-1.5"><AlarmClock className="size-3.5" /> Call-back reminder</span>
+                            </td>
+                            <td className={cn(TD, "whitespace-nowrap")}>{c.by}</td>
+                            <td className={cn(TD, "whitespace-nowrap text-muted-foreground")}>{c.sent ? "Sent" : "Set"}</td>
+                            <td className={cn(TD, "text-muted-foreground")}>
+                              <span className="font-medium text-foreground">For {stamp(c.remindAt)}</span>
+                              {c.note ? <span className="block whitespace-pre-line">{c.note}</span> : null}
+                            </td>
+                          </tr>
+                        ) : (
                           <tr key={c.id} data-list-row data-call-row>
                             <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(c.at)}</td>
                             <td className={cn(TD, "whitespace-nowrap font-medium")}>{c.result}</td>

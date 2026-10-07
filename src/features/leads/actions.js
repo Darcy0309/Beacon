@@ -158,3 +158,37 @@ export async function saveCoverage(prevState, formData) {
   revalidatePath(`/leads/${leadId}`);
   return ok({ id: leadId });
 }
+
+/**
+ * Remind me to call this name back, at a day and time on the business's
+ * clock: set_reminder() checks I may work the name and that the time is
+ * still ahead; at that time a notification links me to the lead.
+ */
+export async function setReminder(prevState, formData) {
+  const { values, failed } = check(formData, schemas.reminder);
+  if (failed) return failed;
+  const leadId = Number(values.lead_id);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_reminder", {
+    p_lead_id: leadId, p_date: values.remind_date, p_time: values.remind_time, p_note: values.note || null,
+  });
+  if (error) {
+    const field = /time|passed/i.test(error.message) ? "remind_time" : /day/i.test(error.message) ? "remind_date" : null;
+    return fail(error, field ? { [field]: error.message } : null, values);
+  }
+  await logActivity(supabase, "lead.reminder", { entity: "lead", entityId: leadId, detail: `${values.remind_date} ${values.remind_time}` });
+  revalidatePath(`/leads/${leadId}`);
+  return ok(data);
+}
+
+/** Cancel one of my reminders before it goes off. */
+export async function cancelReminder(formData) {
+  const id = idFrom(formData);
+  if (!id) return fail("Missing reminder.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("cancel_reminder", { p_id: id });
+  if (error) return fail(error);
+  const leadId = idFrom(formData, "lead_id");
+  if (leadId) revalidatePath(`/leads/${leadId}`);
+  return ok({ id });
+}

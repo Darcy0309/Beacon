@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the shared form validation. */
-import { rules, validate, schemas, cross, safeInternalPath } from "../../src/lib/validate.js";
+import { rules, validate, schemas, cross, safeInternalPath, REMINDER_TIMES } from "../../src/lib/validate.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -28,6 +28,8 @@ fails("phone: letters", rules.phone, "call me");
 passes("phone: with an extension, x203", rules.phone, "(214) 269-7488 x203");
 passes("phone: with an extension, ext. 15", rules.phone, "214-269-7488 ext. 15");
 fails("phone: an extension alone is not a number", rules.phone, "x203");
+check("reminder times run every quarter hour, 7:00 AM to 8:45 PM", REMINDER_TIMES[0] === "7:00 AM" && REMINDER_TIMES.includes("12:15 PM") && REMINDER_TIMES.at(-1) === "8:45 PM" && REMINDER_TIMES.length === 56, REMINDER_TIMES.join(","));
+check("…each a time the forms accept", REMINDER_TIMES.every((t) => rules.time12(t) === null));
 
 passes("date: valid", rules.date, "2026-10-14");
 fails("date: Feb 30", rules.date, "2026-02-30");

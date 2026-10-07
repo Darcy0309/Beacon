@@ -25,6 +25,7 @@ const ACTION_LABEL = {
   "lead.call": "Recorded a call",
   "lead.email": "Emailed a lead",
   "lead.coverage": "Updated a lead's coverage",
+  "lead.reminder": "Set a call-back reminder",
   "carriers.import": "Imported carriers",
   "project.create": "Created a project",
   "project.update": "Updated a project",
@@ -32,6 +33,7 @@ const ACTION_LABEL = {
   "company.update": "Updated a client",
   "user.create": "Created a user",
   "user.update": "Updated a user",
+  "user.email": "Changed a user's sign-in email",
   "leads.import": "Imported leads",
 };
 

@@ -18,6 +18,13 @@ export const isMailbox = (value) => {
   return v.length <= 254 && MAILBOX.test(v);
 };
 
+/**
+ * An address no mail can reach: the test and example domains set aside by
+ * RFC 2606 and 6761 (a seeded account's sean@beacon.test). Never a reply-to.
+ */
+export const isReservedAddress = (address) =>
+  /\.(test|example|invalid|localhost)$|@example\.(com|net|org)$/i.test(String(address ?? "").trim());
+
 /** A subject on one line: a line break in a header would start a new one. */
 export const oneLine = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
 

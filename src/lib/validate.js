@@ -168,6 +168,13 @@ export const APPOINTMENT_TIMES = [
   "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM", "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
   "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM",
 ];
+/** Call-back reminder times, every quarter hour from 7:00 AM to 8:45 PM. */
+export const REMINDER_TIMES = Array.from({ length: 56 }, (_, i) => {
+  const minutes = 7 * 60 + i * 15;
+  const h = Math.floor(minutes / 60);
+  return `${((h + 11) % 12) + 1}:${String(minutes % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+});
+
 const { required, max, email, mailbox, phone, date, time12, int, num, id, oneOf, stateCode, zip, urlOrPath, username } = rules;
 
 /**
@@ -336,6 +343,14 @@ export const schemas = {
     ultimate_xdate: [date],
     agency_name: [max(120)],
     ...Object.fromEntries(POLICY_LINES.flatMap((l) => [[l.date, [date]], [l.carrier, [max(120)]]])),
+  },
+
+  // A call-back reminder on a lead sheet.
+  reminder: {
+    lead_id: [required("Missing lead"), id],
+    remind_date: [required("Choose the day"), date],
+    remind_time: [required("Choose the time"), time12],
+    note: [max(300)],
   },
 
   // An email to a name's contact, from its lead sheet.

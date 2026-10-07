@@ -82,11 +82,23 @@ export async function saveUser(prevState, formData) {
       return back("An account can't be put back to Invited. Disable it instead.", { status: "Choose Active or Disabled" });
     }
     const sameEmail = (before.email ?? "").toLowerCase() === payload.email;
-    if (before.auth_id && !sameEmail) {
-      return back("The email of an account that can sign in can't be changed here. Invite a new user instead.", { email: "Can't change" });
-    }
     // Keep the stored spelling; only the letter case of what was typed may differ.
     if (sameEmail) payload.email = before.email;
+
+    // A new email for an account that signs in: it signs in with the new one
+    // from now on, and replies to the emails it sends go there. Nobody else
+    // may already have it, and the sign-in changes first, so a refusal there
+    // leaves everything as it was.
+    let movedSignIn = false;
+    if (before.auth_id && !sameEmail) {
+      const { data: taken } = await supabase.rpc("user_by_email", { p_email: payload.email });
+      if ((taken ?? []).some((u) => u.id !== id)) return back("Another account already uses that email.", { email: "Already in use" });
+      const admin = createAdminClient();
+      if (!admin) return back(ADMIN_UNAVAILABLE);
+      const { error: moveError } = await admin.auth.admin.updateUserById(before.auth_id, { email: payload.email, email_confirm: true });
+      if (moveError) return back(moveError.message, { email: moveError.message });
+      movedSignIn = true;
+    }
 
     // Pay first: a rate outside its range stops the save before anything has changed.
     const payFailed = await savePay(supabase, id, payload.role, formData, values);
@@ -94,8 +106,12 @@ export async function saveUser(prevState, formData) {
 
     // .select() so a write Row Level Security refused reads as a failure, before the Auth change below.
     const { data: saved, error } = await supabase.from("users").update({ ...payload, status }).eq("id", id).select("id");
-    if (error) return back(error);
-    if (!saved?.length) return back("You don't have permission to change that account.");
+    if (error || !saved?.length) {
+      // The sign-in moved but the directory did not: put the sign-in back.
+      if (movedSignIn) await createAdminClient()?.auth.admin.updateUserById(before.auth_id, { email: before.email, email_confirm: true });
+      return back(error ?? "You don't have permission to change that account.");
+    }
+    if (movedSignIn) await logActivity(supabase, "user.email", { entity: "user", entityId: id, detail: `${before.email} → ${payload.email}` });
 
     if (before.status !== status && before.auth_id) {
       const admin = createAdminClient();

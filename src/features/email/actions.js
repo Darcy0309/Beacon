@@ -6,7 +6,7 @@ import { check, currentAppUser, fail, logActivity, ok } from "@/lib/server/actio
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { EMAIL_LIMITS, mailFailure, oneLine } from "@/lib/email";
+import { EMAIL_LIMITS, isReservedAddress, mailFailure, oneLine } from "@/lib/email";
 import { fullName } from "@/lib/format";
 import { schemas } from "@/lib/validate";
 
@@ -62,7 +62,9 @@ export async function sendLeadEmail(prevState, formData) {
   try {
     ({ messageId } = await sendMail({
       from: { name, address: from },
-      replyTo: { name, address: profile?.email ?? me.email },
+      // Replies come back to the sender, unless their sign-in is a test
+      // address no mail reaches: then to the From address.
+      replyTo: isReservedAddress(profile?.email ?? me.email) ? undefined : { name, address: profile?.email ?? me.email },
       to: values.to,
       subject,
       text: values.body,

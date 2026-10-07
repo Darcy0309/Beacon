@@ -163,6 +163,17 @@ which `telHref()` dials after a pause (`,203`). Imports take headings such
 as "Mobile", "Cell", "DM Phone", "DM Cell" and "DM Email", and
 `leads.search_text` includes the new numbers and the decision maker's name.
 
+## Call-back reminders
+
+Above the call result buttons, **Remind me** sets a reminder on the name
+for a day and time on the business's clock, with a note (`set_reminder()`,
+for whoever may work the name; never in the past). It is listed there with
+a cancel button and among the calls in the call history. `pg_cron` runs
+`deliver_reminders()` every minute: each due reminder becomes a
+"Call back: <company>" notification linking to the lead, so it pops up in
+the bell and, like any notification, on the desktop or by push. People see
+their own reminders; an administrator sees everyone's.
+
 ## Coverage
 
 The lead sheet's Coverage tab shows the Ultimate XDate and the prospect's
@@ -186,7 +197,10 @@ from Lighthouse (`features/email`). Whoever may work the name can send one
 `lib/email.js`).
 
 - It goes out from the **From address** in Settings › Email, under the
-  sender's name, with replies going to the sender (Reply-To). One plain
+  sender's name, with replies going to the sender (Reply-To), unless their
+  sign-in is a test address no mail reaches (`isReservedAddress()`); then
+  to the From address. An administrator can correct anyone's sign-in email
+  on the Users page; the sign-in moves with it. One plain
   address per email: the one on file, or one typed in.
 - **The mail service** is the server's environment, never a setting:
   `RESEND_API_KEY` (Resend's API over HTTPS, which needs no mail port), or

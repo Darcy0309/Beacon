@@ -4,7 +4,7 @@
  * plain address, its subject stays on one line, and a failed send is
  * explained in words the sender can act on.
  */
-import { EMAIL_LIMITS, isMailbox, mailFailure, mailboxHeader, oneLine, resendFailure } from "../../src/lib/email.js";
+import { EMAIL_LIMITS, isMailbox, isReservedAddress, mailFailure, mailboxHeader, oneLine, resendFailure } from "../../src/lib/email.js";
 import { schemas, validate } from "../../src/lib/validate.js";
 
 let failures = 0;
@@ -65,6 +65,10 @@ check("a long reply is cut short, on one line", (() => {
   const m = mailFailure({ code: "EENVELOPE", response: `550 ${"x".repeat(400)}\r\nmore` });
   return m.length < 260 && !/[\r\n]/.test(m) && m.endsWith("…");
 })());
+
+// --- reply-to ---------------------------------------------------------------------
+check("a test sign-in reaches nobody: never a reply-to", isReservedAddress("sean@beacon.test") && isReservedAddress("x@example.com") && isReservedAddress("a@b.invalid"));
+check("…a real address is", !isReservedAddress("seanf@signaturemktg.net") && !isReservedAddress("someone@testing.com"));
 
 // --- Resend's API ----------------------------------------------------------------
 check("a sender is written \"Name\" <address>", mailboxHeader({ name: "Sean Fitzgerald", address: "alerts@signaturemktg.net" }) === '"Sean Fitzgerald" <alerts@signaturemktg.net>');

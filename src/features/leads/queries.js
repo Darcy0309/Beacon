@@ -149,7 +149,7 @@ export async function getLeadCounts() {
 /** Appointments, call history and the emails sent to its contact, for one lead. */
 export async function getLeadActivity(leadId) {
   const supabase = await createClient();
-  const [appts, calls, emails] = await Promise.all([
+  const [appts, calls, emails, reminders] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, appt_date, appt_time, duration_min, rep_name, qa_status, confirmed_at, invalid_at, status:appointment_statuses(name), setter:users!appointments_user_id_fkey(first_name, last_name)")
@@ -164,6 +164,13 @@ export async function getLeadActivity(leadId) {
     supabase
       .from("lead_emails")
       .select("id, to_address, subject, body, status, error, created_at, user:users(first_name, last_name)")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    // Row Level Security: my own reminders (an administrator's: everyone's).
+    supabase
+      .from("reminders")
+      .select("id, user_id, remind_at, note, created_at, sent_at, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -188,6 +195,15 @@ export async function getLeadActivity(leadId) {
       at: c.call_date,
       by: fullName(one(c.user)) || "—",
       stage: c.stage === "dbdev" ? "DBDev" : c.stage === "appt" ? "Appt" : null,
+    })),
+    reminders: (reminders.data ?? []).map((m) => ({
+      id: m.id,
+      userId: m.user_id,
+      remindAt: m.remind_at,
+      note: m.note,
+      at: m.created_at,
+      sent: Boolean(m.sent_at),
+      by: fullName(one(m.user)) || "—",
     })),
     emails: (emails.data ?? []).map((e) => ({
       id: e.id,

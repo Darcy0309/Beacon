@@ -2,6 +2,7 @@
 
 import "server-only";
 import { mailServer } from "@/lib/server/mail";
+import { isReservedAddress } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -15,5 +16,7 @@ export async function getEmailSender(me) {
   const { data } = await supabase.from("app_settings").select("value").eq("key", "mail").maybeSingle();
   const from = data?.value?.from ?? null;
   const missing = !mailServer() ? "server" : !from ? "from" : null;
-  return { ready: !missing, missing, from, name: me?.name ?? "", replyTo: me?.email ?? "" };
+  // A test sign-in (sean@beacon.test) reaches nobody: replies then go to the From address.
+  const replyTo = me?.email && !isReservedAddress(me.email) ? me.email : from ?? "";
+  return { ready: !missing, missing, from, name: me?.name ?? "", replyTo };
 }
