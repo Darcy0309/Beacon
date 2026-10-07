@@ -39,6 +39,20 @@ export function Select({ className, ref, ...props }) {
     el.value = want;
   }, [value, defaultValue]);
 
+  // A dialog stops the page behind it scrolling by catching the wheel on the
+  // document, and it cannot see that an open list (the browser's own picker)
+  // scrolls: so the wheel never reached it. While the list is open, the wheel
+  // stays with it.
+  const { onWheel } = props;
+  const keepWheel = (e) => {
+    onWheel?.(e);
+    try {
+      if (e.currentTarget.matches(":open")) e.stopPropagation();
+    } catch {
+      /* a browser without :open has no styled picker to scroll */
+    }
+  };
+
   return (
     <select
       ref={setRef}
@@ -48,6 +62,7 @@ export function Select({ className, ref, ...props }) {
         className
       )}
       {...props}
+      onWheel={keepWheel}
     />
   );
 }

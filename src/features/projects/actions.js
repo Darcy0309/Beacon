@@ -25,6 +25,9 @@ export async function saveProject(prevState, formData) {
     start_date: s(formData, "start_date"),
     end_date: s(formData, "end_date"),
     amount_paid: n(formData, "amount_paid"),
+    email: s(formData, "email"),
+    // A checkbox sends nothing when unticked; the hidden "off" before it always does.
+    delivery_link_only: formData.getAll("delivery_link_only").includes("on"),
   };
   const { error } = id
     ? await supabase.from("projects").update(onlySubmitted(formData, payload)).eq("id", id)

@@ -26,6 +26,7 @@ const ACTION_LABEL = {
   "lead.email": "Emailed a lead",
   "lead.coverage": "Updated a lead's coverage",
   "lead.reminder": "Set a call-back reminder",
+  "lead.deliver": "Sent a lead to the client again",
   "carriers.import": "Imported carriers",
   "project.create": "Created a project",
   "project.update": "Updated a project",

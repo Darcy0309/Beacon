@@ -31,6 +31,8 @@ self.addEventListener("push", (event) => {
         tag: data.id ? `lighthouse-notification-${data.id}` : "lighthouse",
         icon: ICON,
         badge: ICON,
+        // A call-back reminder stays on the desktop until it is clicked or closed.
+        requireInteraction: data.kind === "reminder",
         data: { url: data.url || "/notifications" },
       });
     })()

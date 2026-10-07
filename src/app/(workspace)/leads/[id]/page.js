@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, CalendarPlus, ChevronDown, Mail, Pencil, Phone, PhoneCall, Repeat } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, Send, CalendarPlus, ChevronDown, Mail, Pencil, Phone, PhoneCall, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
@@ -12,6 +12,7 @@ import CallResultPanel from "@/features/work/components/call-result-panel";
 import EmailLead from "@/features/email/components/email-lead";
 import CoverageForm from "@/features/leads/components/coverage-form";
 import ReminderCard from "@/features/leads/components/reminder-card";
+import ResendButton from "@/features/delivery/components/resend-button";
 import { getCarrierNames } from "@/features/insurance/queries";
 import { POLICY_LINES } from "@/lib/coverage";
 import { getEmailSender } from "@/features/email/queries";
@@ -576,6 +577,44 @@ export default async function LeadSheet({ params, searchParams }) {
               },
               ...(staff
                 ? [{
+                    id: "deliveries",
+                    label: "Deliveries",
+                    count: activity.deliveries.length,
+                    content: (
+                      <div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--panel-border)] px-4 py-2 text-xs text-muted-foreground">
+                          <span>
+                            The lead sheet, emailed to the client when a call makes this a lead or an appointment
+                            {r.project?.id ? <> (delivery emails: set on the project)</> : null}.
+                          </span>
+                          {canRecord ? <ResendButton leadId={lead.id} /> : null}
+                        </div>
+                        {activity.deliveries.length ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[40rem] text-sm">
+                              <thead><tr><th className={TH}>Sent</th><th className={TH}>For</th><th className={TH}>To</th><th className={TH}>How</th><th className={TH}>Status</th></tr></thead>
+                              <tbody className="divide-y divide-[var(--panel-border)]">
+                                {activity.deliveries.map((d) => (
+                                  <tr key={d.id} data-delivery-row>
+                                    <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(d.at)}</td>
+                                    <td className={cn(TD, "whitespace-nowrap font-medium")}>{d.result}{d.resent ? <span className="block text-xs font-normal text-muted-foreground">sent again by {d.by}</span> : null}</td>
+                                    <td className={cn(TD, "break-all")}>{d.to}</td>
+                                    <td className={cn(TD, "whitespace-nowrap text-muted-foreground")}>{d.linkOnly ? "Link" : "Lead sheet"}</td>
+                                    <td className={TD}>
+                                      {d.sent ? <ToneBadge tone="emerald">Sent</ToneBadge> : <ToneBadge tone="rose">Not sent</ToneBadge>}
+                                      {d.error ? <span className="mt-1 block text-xs text-destructive">{d.error}</span> : null}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <Empty icon={Send}>Not sent to the client yet.</Empty>
+                        )}
+                      </div>
+                    ),
+                  }, {
                     id: "emails",
                     label: "Emails",
                     count: activity.emails.length,

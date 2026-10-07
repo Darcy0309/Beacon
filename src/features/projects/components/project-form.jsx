@@ -124,6 +124,17 @@ export default function ProjectForm({ project, options, trigger }) {
             <Field label="Description" error={fe("description")} className="sm:col-span-2">
               <Textarea name="description" rows={3} maxLength={500} defaultValue={dv("description")} aria-invalid={invalid("description")} />
             </Field>
+
+            {/* Where its leads go: a lead's sheet is emailed here when a call makes it a lead or an appointment. */}
+            <Field label="Lead delivery emails" error={fe("email")} className="sm:col-span-2"
+              hint="Each lead and appointment's sheet is emailed here. Separate several with commas.">
+              <Input name="email" maxLength={500} placeholder="leads@client.com, producer@client.com" defaultValue={dv("email")} aria-invalid={invalid("email")} />
+            </Field>
+            <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
+              <input type="hidden" name="delivery_link_only" value="off" />
+              <input type="checkbox" name="delivery_link_only" value="on" defaultChecked={Boolean(record?.delivery_link_only)} className="mt-0.5 size-4 accent-[var(--primary)]" />
+              <span>Send a link to the lead sheet instead of the sheet itself<span className="block text-xs text-muted-foreground">The link opens the sheet without signing in, for 90 days.</span></span>
+            </label>
           </div>
 
           <DialogFooter>

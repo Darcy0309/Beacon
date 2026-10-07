@@ -11,6 +11,7 @@ import { normalizeState } from "./csv.js";
 import { EMAIL_LIMITS, isMailbox } from "./email.js";
 import { PHONE_EXTENSION } from "./format.js";
 import { POLICY_LINES } from "./coverage.js";
+import { parseDeliveryAddresses } from "./delivery.js";
 
 const str = (v) => (v == null ? "" : String(v).trim());
 const empty = (v) => str(v) === "";
@@ -246,6 +247,12 @@ export const schemas = {
     amount_paid: [num({ min: 0, max: 100000000 })],
     start_date: [date],
     end_date: [date],
+    // Lead delivery: addresses separated by commas (a leading "_" sends that one a link).
+    email: [max(500), rules.custom((v) => {
+      const { bad } = parseDeliveryAddresses(v);
+      return bad.length ? `Not an email address: ${bad.slice(0, 3).join(", ")}` : null;
+    })],
+    delivery_link_only: [oneOf(["off", "on"])],
   },
 
   /** USD paid per lead, appointment and confirmation on a project. */

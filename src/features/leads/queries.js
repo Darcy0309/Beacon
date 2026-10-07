@@ -149,7 +149,7 @@ export async function getLeadCounts() {
 /** Appointments, call history and the emails sent to its contact, for one lead. */
 export async function getLeadActivity(leadId) {
   const supabase = await createClient();
-  const [appts, calls, emails, reminders] = await Promise.all([
+  const [appts, calls, emails, reminders, deliveries] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, appt_date, appt_time, duration_min, rep_name, qa_status, confirmed_at, invalid_at, status:appointment_statuses(name), setter:users!appointments_user_id_fkey(first_name, last_name)")
@@ -174,6 +174,12 @@ export async function getLeadActivity(leadId) {
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase
+      .from("lead_deliveries")
+      .select("id, to_address, result, link_only, resent, status, error, created_at, user:users(first_name, last_name)")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
 
   return {
@@ -204,6 +210,17 @@ export async function getLeadActivity(leadId) {
       at: m.created_at,
       sent: Boolean(m.sent_at),
       by: fullName(one(m.user)) || "—",
+    })),
+    deliveries: (deliveries.data ?? []).map((d) => ({
+      id: d.id,
+      to: d.to_address,
+      result: d.result,
+      linkOnly: d.link_only,
+      resent: d.resent,
+      sent: d.status === "sent",
+      error: d.error,
+      at: d.created_at,
+      by: fullName(one(d.user)) || "—",
     })),
     emails: (emails.data ?? []).map((e) => ({
       id: e.id,

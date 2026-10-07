@@ -28,11 +28,16 @@ const lead = Number(sql(`insert into public.leads (company_name, contact_name, p
 const NEW_EMAIL = `rachel.colestock.${RUN}@signaturemktg.test`;
 
 const browser = await launchBrowser({ mouse: true });
+// Count the notes the page plays (Web Audio), so the chime can be heard by the test.
+const EARS = `(() => { const Real = window.AudioContext; if (!Real) return; window.__notes = 0;
+  window.AudioContext = class extends Real { createOscillator() { window.__notes += 1; return super.createOscillator(); } }; })()`;
 const shot = (page, name) => (SHOTS ? page.screenshot(`${SHOTS}/${name}.png`) : null);
 
 try {
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage();
+  await sean.send("Page.addScriptToEvaluateOnNewDocument", { source: EARS });
   await sean.go(`/leads/${lead}`, 4000);
+  check("someone not yet asked is offered desktop pop-ups, once", /Get notifications on your desktop/.test((await sean.waitToast(/Get notifications on your desktop/, 8000)) ?? ""));
 
   section("The decision maker's lines, even when empty");
   const dm = await sean.ev(`[...document.querySelectorAll('[data-person="Decision maker"] [data-contact-line]')].map((l) => ({
@@ -46,6 +51,19 @@ try {
     return !!r && !!b && (r.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) > 0; })()`));
   await sean.mouseClick("[data-set-reminder]");
   await until(() => sean.ev(`!!document.querySelector('[role=dialog] select[name="remind_time"]')`));
+  // The time list, open in the dialog: the mouse wheel must reach it, not be stopped by the dialog.
+  await sean.mouseClick('[role=dialog] select[name="remind_time"]');
+  await sleep(300);
+  const wheel = await sean.ev(`(() => { const s = document.querySelector('[role=dialog] select[name="remind_time"]'); const open = s.matches(':open');
+    const e = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }); s.querySelectorAll('option')[10].dispatchEvent(e);
+    return { open, blocked: e.defaultPrevented }; })()`);
+  check("the mouse wheel scrolls the open time list", wheel.open && !wheel.blocked, JSON.stringify(wheel));
+  await sean.key("Escape");
+  await sleep(200);
+  if (!(await sean.ev(`!!document.querySelector('[role=dialog]')`))) {
+    await sean.mouseClick("[data-set-reminder]");
+    await until(() => sean.ev(`!!document.querySelector('[role=dialog] select[name="remind_time"]')`));
+  }
   await sean.fill('[role=dialog] input[aria-label="Reminder day"]', "tomorrow");
   await sean.ev("document.activeElement.blur()");
   await sean.fill('[role=dialog] select[name="remind_time"]', "2:00 PM");
@@ -66,8 +84,12 @@ try {
   sql(`update public.notifications set read_at = coalesce(read_at, now()) where user_id = ${SEAN}`);
   sql(`update public.reminders set remind_at = now() - interval '1 minute' where id = ${id}`);
   sql("select public.deliver_reminders()");
+  const notesBefore = await sean.ev("window.__notes ?? 0");
   const toast = await sean.waitToast(/Call back:/, 10000);
   check("the bell pops up “Call back: …” at once", (toast ?? "").includes(`Call back: ${TAG} Sine Wave`), toast);
+  check("…with its sound: the reminder's four notes", Boolean(await until(async () => (await sean.ev("window.__notes ?? 0")) - notesBefore >= 4)), String((await sean.ev("window.__notes ?? 0")) - notesBefore));
+  await sleep(10000);
+  check("…and the pop-up stays until it is dealt with, with Open lead", /Call back:[\s\S]*Open lead/.test((await sean.toasts()) ?? ""), await sean.toasts());
   await sean.click('button[aria-label^="Notifications"]');
   await until(() => sean.ev(`!!document.querySelector('[data-notification-panel]')`));
   await sean.click("[data-notification-panel] button", `Call back: ${TAG}`);
@@ -76,6 +98,20 @@ try {
   check("…with a link to the lead", await sean.ev(`!![...document.querySelectorAll('a')].find((a) => a.getAttribute('href') === '/leads/${lead}')`));
   await sean.go(`/leads/${lead}`, 4000);
   check("the sheet no longer lists it as to come", await sean.ev(`!document.querySelector('[data-reminder="${id}"]')`));
+
+  section("Sound on and off");
+  await sean.click('button[aria-label^="Notifications"]');
+  await until(() => sean.ev(`!!document.querySelector('[data-sound-switch]')`));
+  check("the bell says a sound plays", (await sean.ev(`document.querySelector('[data-sound-switch]').dataset.soundSwitch`)) === "on");
+  await sean.click("[data-sound-switch] button");
+  check("…and it can be turned off", Boolean(await until(async () => (await sean.ev(`document.querySelector('[data-sound-switch]')?.dataset.soundSwitch`)) === "off")));
+  const quiet = await sean.ev("window.__notes ?? 0");
+  sql(`insert into public.notifications (user_id, kind, title, link) values (${SEAN}, 'system', ${lit(`${TAG} quiet`)}, '/leads/${lead}')`);
+  await sean.waitToast(new RegExp(`${TAG} quiet`), 10000);
+  await sleep(800);
+  check("…when nothing plays", (await sean.ev("window.__notes ?? 0")) === quiet);
+  await sean.click("[data-sound-switch] button");
+  await sean.key("Escape");
 
   section("Cancelling one");
   await sean.mouseClick("[data-set-reminder]");
@@ -115,7 +151,7 @@ try {
   sql(`update auth.users set email = 'rachel@beacon.test' where id = (select auth_id from public.users where id = ${RACHEL})`);
   sql(`update public.users set email = 'rachel@beacon.test' where id = ${RACHEL}`);
   sql(`delete from public.activity_log where (entity = 'lead' and entity_id = ${lead}) or (entity = 'user' and entity_id = ${RACHEL} and action = 'user.email')`);
-  sql(`delete from public.notifications where kind = 'reminder' and link = '/leads/${lead}'`);
+  sql(`delete from public.notifications where link = '/leads/${lead}'`);
   sql(`delete from public.leads where id = ${lead}`);
   sql(`delete from public.projects where id = ${project}`);
   sql(`delete from public.companies where id = ${company}`);

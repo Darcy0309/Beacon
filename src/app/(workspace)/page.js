@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import {
-  Target, CalendarCheck, Users, Percent, TrendingUp, TrendingDown,
+  Target, CalendarCheck, Users, Percent,
   Activity, CalendarClock, ListChecks, Radio, FolderKanban, PieChart, CheckCheck, UserCheck,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
@@ -111,76 +111,16 @@ export default async function Dashboard() {
     ];
   }
 
-  const Trend = s.leadDelta >= 0 ? TrendingUp : TrendingDown;
-
   return (
     <>
       <Topbar
         title="Command Center"
+        tag={view.audience === "client"
+          ? [me?.company?.name, "Lighthouse Portal"].filter(Boolean).join(" · ")
+          : "Signature Marketing · Lighthouse Platform"}
         sub={`${today} · ${greeting}${me?.first_name ? `, ${me.first_name}` : ""}`}
       />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        {/* headline banner */}
-        <Card accent="var(--neon-cyan)" trace>
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(90% 120% at 15% 0%, color-mix(in srgb, var(--neon-cyan) 14%, transparent), transparent 60%)",
-            }}
-          />
-          <div className="grid-veil pointer-events-none absolute inset-0 opacity-40" />
-          <div className="relative flex flex-wrap items-end justify-between gap-6 p-6">
-            <div className="max-w-xl">
-              <span className="eyebrow eyebrow-accent">
-                {view.audience === "client"
-                  ? [me?.company?.name, "Lighthouse Portal"].filter(Boolean).join(" · ")
-                  : "Signature Marketing · Lighthouse Platform"}
-              </span>
-              <h2 className="mt-3 text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
-                Qualified leads and set appointments,
-                <br className="hidden sm:block" /> routed to the agencies that bought them.
-              </h2>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {[
-                  ["X-Date Engine", "var(--neon-amber)"],
-                  ["Appointment Setting", "var(--neon-emerald)"],
-                  ["Client Portal", "var(--neon-violet)"],
-                  ["Lead Import", "var(--neon-blue)"],
-                ].map(([t, col]) => (
-                  <span
-                    key={t}
-                    className="rounded-full border px-3 py-1 text-[0.66rem] font-semibold uppercase tracking-[0.1em]"
-                    style={{
-                      borderColor: `color-mix(in srgb, ${col} 40%, transparent)`,
-                      background: `color-mix(in srgb, ${col} 8%, transparent)`,
-                      color: col,
-                    }}
-                  >
-                    {t}
-                  </span>
-                ))}
-              </div>
-            </div>
-            {view.trend === "weeks" ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Trend className={s.leadDelta >= 0 ? "size-4 text-emerald-400" : "size-4 text-rose-400"} />
-                <span className={s.leadDelta >= 0 ? "font-semibold text-emerald-400" : "font-semibold text-rose-400"}>
-                  {s.leadDelta === null ? s.leadsNew.toLocaleString() : `${s.leadDelta >= 0 ? "+" : ""}${s.leadDelta}%`}
-                </span>
-                <span className="text-muted-foreground">{s.leadDelta === null ? "new leads, 30 days" : "lead volume, 30 days"}</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-sm">
-                <CheckCheck className="size-4 text-emerald-400" />
-                <span className="font-semibold text-emerald-400">{(report?.leads ?? 0).toLocaleString()}</span>
-                <span className="text-muted-foreground">leads delivered to date</span>
-              </div>
-            )}
-          </div>
-        </Card>
-
         {/* metric tiles */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((t, i) => (

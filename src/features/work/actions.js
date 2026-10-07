@@ -2,7 +2,9 @@
 
 /** Recording call results from the lead sheet. */
 
-import { check, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
+import { after } from "next/server";
+import { check, currentAppUser, fail, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
+import { deliverLead } from "@/features/delivery/server";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
@@ -41,7 +43,7 @@ export async function recordCallResult(prevState, formData) {
   const supabase = await createClient();
   const leadId = Number(values.lead_id);
 
-  const { data: result } = await supabase.from("call_results").select("effect").eq("id", Number(values.result_id)).maybeSingle();
+  const { data: result } = await supabase.from("call_results").select("effect, delivers").eq("id", Number(values.result_id)).maybeSingle();
   const missing = (NEEDS[result?.effect] ?? []).filter(([field]) => !values[field]);
   if (missing.length) {
     return fail(
@@ -69,6 +71,13 @@ export async function recordCallResult(prevState, formData) {
   }
 
   await logActivity(supabase, "lead.call", { entity: "lead", entityId: leadId, detail: data.result });
+
+  // A lead or an appointment goes to the client: its sheet, emailed to the
+  // project's delivery addresses, once the rep has moved on.
+  if (result?.delivers) {
+    const [me, origin] = await Promise.all([currentAppUser(supabase), requestOrigin()]);
+    after(() => deliverLead({ leadId, callRecordId: data.call_record_id, sentBy: me?.id ?? null, origin }));
+  }
 
   // The next name: on the list the rep came from, if there is one.
   let next = null;

@@ -58,6 +58,7 @@ export const desktopPermission = () => (desktopSupported() ? window.Notification
 
 /** Whether someone is looking at this tab right now. */
 const inFront = () => document.visibilityState === "visible" && document.hasFocus();
+export const tabInFront = () => typeof document !== "undefined" && inFront();
 
 /** Whether someone is looking at any Lighthouse tab in this browser. */
 function anyTabInFront() {
@@ -105,6 +106,8 @@ export function showDesktop(n, onOpen) {
       tag: `lighthouse-notification-${n.id}`,
       icon: ICON,
       badge: ICON,
+      // A call-back reminder stays on the desktop until it is clicked or closed.
+      requireInteraction: n.kind === "reminder",
     });
     shown.onclick = () => {
       window.focus();
@@ -307,4 +310,28 @@ export function useDesktopNotifications() {
   }, [status]);
 
   return { status, pushing: status === "on" && pushOn, turnOn, turnOff };
+}
+
+const ASKED_KEY = "lighthouse:desktop-asked";
+
+/**
+ * Offer, once per browser session, to turn desktop notifications on when
+ * the browser has not been asked yet: a reminder in the corner of the
+ * screen is easy to miss. `offer(turnOn)` shows the offer; returns whether it did.
+ */
+export function offerDesktopOnce(offer) {
+  if (desktopPermission() !== "default" || store.get(OFF_KEY) === "1") return false;
+  try {
+    if (window.sessionStorage.getItem(ASKED_KEY)) return false;
+    window.sessionStorage.setItem(ASKED_KEY, "1");
+  } catch {
+    return false;
+  }
+  offer(async () => {
+    store.set(OFF_KEY, null);
+    await window.Notification.requestPermission();
+    changed();
+    await syncPush({ force: true });
+  });
+  return true;
 }

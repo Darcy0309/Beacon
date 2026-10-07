@@ -10,7 +10,8 @@ import { useRole } from "@/components/layout/role-provider";
 import { markNotificationRead, markAllNotificationsRead } from "@/features/notifications/actions";
 import { KIND_ICONS } from "@/features/notifications/kinds";
 import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/features/notifications/active-chat";
-import { closePushed, pushSupported, showDesktop, syncPush, trackFrontTab } from "@/features/notifications/desktop";
+import { closePushed, offerDesktopOnce, pushSupported, showDesktop, syncPush, tabInFront, trackFrontTab } from "@/features/notifications/desktop";
+import { chimeOnce } from "@/features/notifications/sound";
 import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { cn } from "@/lib/utils";
 
@@ -98,6 +99,21 @@ export default function NotificationBell() {
 
   // Which Lighthouse tab is in front, so only nobody-looking shows a desktop pop-up.
   useEffect(() => trackFrontTab(), []);
+
+  // Once a session, offer desktop pop-ups to someone who has not been asked:
+  // a reminder in the corner of the screen is easy to miss.
+  useEffect(() => {
+    if (!me) return;
+    const t = setTimeout(() => offerDesktopOnce((turnOn) =>
+      toast("Get notifications on your desktop?", {
+        id: "offer-desktop",
+        description: "Call-back reminders and new notifications pop up even when you're in another window.",
+        action: { label: "Turn on", onClick: () => turnOn() },
+        duration: 20000,
+      })
+    ), 2500);
+    return () => clearTimeout(t);
+  }, [me]);
 
   // Push: keep this browser subscribed for whoever is signed in, and open the
   // notification its desktop pop-up was clicked for (public/sw.js asks).
@@ -203,6 +219,8 @@ export default function NotificationBell() {
             if (announced.current.has(n.id)) return;
             announced.current.add(n.id);
             popups.current.set(n.id, Date.now());
+            // Heard, not only seen: one tab chimes (sound.js).
+            chimeOnce(n.id, n.kind, tabInFront());
             // Nobody looking at Lighthouse: the system's own pop-up too (desktop.js).
             const shown = showDesktop(n, () => openItem(n));
             if (shown) {
@@ -222,8 +240,9 @@ export default function NotificationBell() {
                 const Icon = KIND_ICONS[n.kind] ?? Bell;
                 return <Icon className="size-4 text-primary" />;
               })(),
-              action: { label: n.kind === "message" ? "Reply" : "View", onClick: () => openItem(n) },
-              duration: 8000,
+              action: { label: n.kind === "message" ? "Reply" : n.kind === "reminder" ? "Open lead" : "View", onClick: () => openItem(n) },
+              // A call-back reminder stays until it is dealt with; the rest fade after a while.
+              duration: n.kind === "reminder" ? Infinity : 8000,
               onDismiss: () => popups.current.delete(n.id),
               onAutoClose: () => popups.current.delete(n.id),
             });

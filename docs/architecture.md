@@ -163,6 +163,26 @@ which `telHref()` dials after a pause (`,203`). Imports take headings such
 as "Mobile", "Cell", "DM Phone", "DM Cell" and "DM Email", and
 `leads.search_text` includes the new numbers and the decision maker's name.
 
+## Lead delivery
+
+As the old system did (MailAlert), a call that makes a name a lead or an
+appointment emails its lead sheet to the client: to its project's
+delivery emails (`projects.email`, set on the project form; several
+separated by commas). The results that do it are those marked
+`call_results.delivers` (Lead, Lead-Hot Lead, Appointment,
+Appointment-Phone: the old system's rules). An address starting with "_",
+or every address when the project says "send a link", gets a private link
+to the sheet instead (`app/sheet/[token]`: a signed token naming the lead,
+good for 90 days, opened without signing in, never indexed or cached).
+
+The send runs after the call is saved (`after()` in `recordCallResult`),
+so the rep never waits for it (`deliverLead()` in
+`features/delivery/server.js`; the sheet is `renderLeadSheet()` in
+`lib/delivery.js`, HTML with a plain-text copy). Every send is kept in
+`lead_deliveries`, sent or not and why, listed under Deliveries on the
+lead sheet, where "Send to client again" sends it again (the old
+"reprocess"), for whoever works the name now or an administrator.
+
 ## Call-back reminders
 
 Above the call result buttons, **Remind me** sets a reminder on the name

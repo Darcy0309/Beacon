@@ -3,12 +3,16 @@ import ThemeToggle from "@/components/layout/theme-toggle";
 import GlobalSearch from "@/features/search/components/global-search";
 import NotificationBell from "@/features/notifications/components/notification-bell";
 
-export default function Topbar({ title, sub }) {
+/** `tag`: a short line beside the title (the dashboard's "Signature Marketing · Lighthouse Platform"). */
+export default function Topbar({ title, sub, tag }) {
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--panel-border)] bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
       <MobileNav />
       <div className="min-w-0">
-        <h1 className="truncate text-sm font-bold uppercase tracking-[0.16em]">{title}</h1>
+        <div className="flex min-w-0 items-baseline gap-3">
+          <h1 className="shrink-0 truncate text-sm font-bold uppercase tracking-[0.16em]">{title}</h1>
+          {tag ? <span data-topbar-tag className="eyebrow eyebrow-accent hidden truncate sm:inline">{tag}</span> : null}
+        </div>
         {sub ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{sub}</p> : null}
       </div>
       <div className="ml-auto flex items-center gap-2 sm:gap-3">

@@ -41,8 +41,8 @@ export function mailServerInfo() {
 const THIS_MACHINE = new Set(["localhost", "127.0.0.1", "::1"]);
 
 /**
- * Send one email ({ from, replyTo, to, subject, text }, addresses as
- * { name, address }); resolves with its id. Throws an error whose `code`
+ * Send one email ({ from, replyTo, to, subject, text, html? }, addresses
+ * as { name, address }); resolves with its id. Throws an error whose `code`
  * and `response` say what went wrong (see mailFailure()).
  */
 export async function sendMail(message) {
@@ -51,7 +51,7 @@ export async function sendMail(message) {
   return m.kind === "resend" ? sendWithResend(m.key, message) : sendWithSmtp(m, message);
 }
 
-async function sendWithResend(key, { from, replyTo, to, subject, text }) {
+async function sendWithResend(key, { from, replyTo, to, subject, text, html }) {
   let res;
   try {
     res = await fetch(RESEND, {
@@ -63,6 +63,7 @@ async function sendWithResend(key, { from, replyTo, to, subject, text }) {
         reply_to: replyTo ? [mailboxHeader(replyTo)] : undefined,
         subject,
         text,
+        html,
       }),
       // A service that never answers must not hold the request open.
       signal: AbortSignal.timeout(20_000),
