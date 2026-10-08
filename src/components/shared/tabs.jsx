@@ -1,18 +1,21 @@
 "use client";
 
 import { useId, useRef, useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 /**
  * Tabs along the top of a panel, as the lead sheet's middle panel and
  * history use them. `tabs`: [{ id, label, count?, content }]. Every panel
  * stays in the page (hidden when not chosen), so what is in it is there at
- * once on switching. Arrow keys move between tabs.
+ * once on switching. Arrow keys move between tabs. The underline slides to
+ * the chosen tab (Motion), rather than jumping.
  */
 export default function Tabs({ tabs, initial, className, listClassName, panelClassName, label }) {
   const [current, setCurrent] = useState(initial ?? tabs[0]?.id);
   const base = useId();
   const refs = useRef({});
+  const reduced = useReducedMotion();
 
   const onKey = (e) => {
     const i = tabs.findIndex((t) => t.id === current);
@@ -46,10 +49,18 @@ export default function Tabs({ tabs, initial, className, listClassName, panelCla
               data-tab={t.id}
               onClick={() => setCurrent(t.id)}
               className={cn(
-                "flex shrink-0 cursor-pointer items-center gap-1.5 border-b-2 px-2.5 py-2.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] transition-colors",
-                on ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+                "relative flex shrink-0 cursor-pointer items-center gap-1.5 px-2.5 py-2.5 text-[0.68rem] font-bold uppercase tracking-[0.12em] transition-colors",
+                on ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}
             >
+              {on ? (
+                <motion.span
+                  layoutId={`${base}-underline`}
+                  aria-hidden
+                  transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 520, damping: 38 }}
+                  className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-primary shadow-[0_0_10px_var(--primary)]"
+                />
+              ) : null}
               {t.label}
               {t.count != null ? (
                 <span className={cn("rounded px-1 text-[0.6rem] tabular-nums", on ? "bg-primary/15" : "bg-muted")}>{t.count}</span>

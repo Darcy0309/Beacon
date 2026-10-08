@@ -31,7 +31,7 @@ const sheet = {
   address: ["1502 20th St", "Santa Monica CA 90404"], map: "https://www.google.com/maps/search/?api=1&query=1502%2020th%20St", website: "calvarysantamonica.org",
   coverage: { ultimate: "Dec 23, 2026", agency: "Garry Insurance", lines: [{ label: "Package", xdate: "Dec 23, 2026", carrier: null }, { label: "Auto", xdate: null, carrier: null }] },
   profile: [["Locations", 2], ["Employees", 12], ["Autos", null], ["SIC code", "8661 – Religious Organizations"]],
-  notes: [["For the client", "<script>alert(1)</script>"]],
+  notes: [["Client notes", "<script>alert(1)</script>"]],
 };
 const { html, text } = renderLeadSheet(sheet);
 check("the sheet carries the client, project, producer and list source", ["Capital Insurance Services", "CapitalIns-Churches", "Jacob Termini", "IPA_AZ-Churches"].every((x) => html.includes(x) && text.includes(x)));
@@ -42,6 +42,9 @@ check("no date or time of entry anywhere: not under the name, not in the Result"
 check("“Add to calendar” beside the appointment, with each calendar's link",
   html.includes("Add to calendar") && html.includes('href="https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=x"') && html.includes(">Apple</a>")
   && text.includes("Add to calendar, Apple: https://lighthouse.example/sheet/abc.def/appointment.ics"), text);
+check("the website and email addresses open with a click",
+  html.includes('href="https://calvarysantamonica.org"') && html.includes('href="mailto:office@calvary.org"')
+  && text.includes("Website: calvarysantamonica.org\n") && text.includes("Email: office@calvary.org"), text.match(/Website: [^\n]*/)?.[0]);
 check("the address opens Google Maps in any browser", html.includes('href="https://www.google.com/maps/search/?api=1&amp;query=1502%2020th%20St"') && html.includes(">1502 20th St, Santa Monica CA 90404</a>"));
 const policy = text.slice(text.indexOf("POLICY INFORMATION")).split("\n").slice(1, 4);
 check("the agency comes after the policies, not beside the renewal date", JSON.stringify(policy) === JSON.stringify(["Ultimate X-Date: Dec 23, 2026", "Package: Dec 23, 2026", "Agency: Garry Insurance"]), JSON.stringify(policy));

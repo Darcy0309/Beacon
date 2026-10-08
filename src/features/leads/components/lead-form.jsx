@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import StampedTextarea from "@/components/shared/stamped-textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -215,12 +215,12 @@ export default function LeadForm({ lead, options, trigger }) {
               <Input name="description" defaultValue={dv("description")} maxLength={255} aria-invalid={invalid("description")} />
             </Field>
 
-            <Field label="For the client" error={fe("client_note")} className="sm:col-span-2" hint="Sent to the client with the lead sheet">
-              <Textarea name="client_note" rows={2} defaultValue={dv("client_note")} maxLength={2000} aria-invalid={invalid("client_note")} />
+            <Field label="Client notes" error={fe("client_note")} className="sm:col-span-2" hint="The client sees these: in the lead sheet email and on the calendar">
+              <StampedTextarea name="client_note" rows={3} defaultValue={dv("client_note")} maxLength={2000} aria-invalid={invalid("client_note")} />
             </Field>
 
-            <Field label="Internal notes" error={fe("notes_dcm")} className="sm:col-span-2" hint="Staff only: never shown to the client">
-              <Textarea name="notes_dcm" rows={3} defaultValue={dv("notes_dcm")} maxLength={5000} aria-invalid={invalid("notes_dcm")} />
+            <Field label="Internal notes" error={fe("internal_notes")} className="sm:col-span-2" hint="Staff only: never shown to the client">
+              <StampedTextarea name="internal_notes" rows={4} defaultValue={dv("internal_notes")} maxLength={5000} aria-invalid={invalid("internal_notes")} />
             </Field>
           </div>
 

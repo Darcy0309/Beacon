@@ -147,7 +147,8 @@ export function formValues(formData, fields) {
   const out = {};
   for (const f of fields) {
     const v = formData.get(f);
-    out[f] = v == null ? "" : typeof v === "string" ? v.trim() : v;
+    // Line breaks as "\n": a browser sends a textarea's as "\r\n".
+    out[f] = v == null ? "" : typeof v === "string" ? v.replace(/\r\n?/g, "\n").trim() : v;
   }
   return out;
 }
@@ -230,7 +231,7 @@ export const schemas = {
     ein: [rules.custom((v) => (!v || normalizeEin(v) ? null : "An EIN is 9 digits, like 12-3456789"))],
     years_in_business: [int({ min: 0, max: 300 })],
     estimated_annual_premium: [max(30)],
-    notes_dcm: [max(5000)],
+    internal_notes: [max(5000)],
     client_note: [max(2000)],
     status_id: [id],
     project_id: [id],
@@ -366,6 +367,13 @@ export const schemas = {
       const bad = String(v ?? "").split(/[,;]+/).map((x) => x.trim()).filter((x) => x && !normalizeState(x));
       return bad.length ? `Not a US state: ${bad.slice(0, 3).join(", ")}` : null;
     })],
+  },
+
+  // One of a lead's notes, edited on its Notes tab.
+  leadNote: {
+    lead_id: [required("Missing lead"), id],
+    kind: [oneOf(["client", "internal"], "Which notes?")],
+    text: [rules.custom((v) => (String(v ?? "").length > 5000 ? "Keep notes under 5,000 characters" : null))],
   },
 
   // A call-back reminder on a lead sheet.

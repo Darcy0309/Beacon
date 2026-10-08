@@ -198,7 +198,7 @@ function AppointmentDialog({ a, onClose }) {
             <Detail icon={FolderKanban} label="Campaign" wide>
               {[a.client, a.project].filter(Boolean).join(" · ") || null}
             </Detail>
-            <Detail icon={MessageSquareText} label="For the client" wide multiline>{a.clientNote}</Detail>
+            <Detail icon={MessageSquareText} label="Client notes" wide multiline>{a.clientNote}</Detail>
           </div>
 
           <DialogFooter>

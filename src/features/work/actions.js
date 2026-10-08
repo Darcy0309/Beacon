@@ -67,7 +67,7 @@ export async function recordCallResult(prevState, formData) {
     p_ultimate_xdate: values.ultimate_xdate || null,
     // What the client is told, when the result sends them the lead: given
     // only when the panel asked for it, so an empty box clears it.
-    p_client_note: result?.delivers && formData.has("client_note") ? String(formData.get("client_note") ?? "") : null,
+    p_client_note: result?.delivers && formData.has("client_note") ? (s(formData, "client_note") ?? "") : null,
   });
   if (error) {
     const field = FIELD_FOR.find(([re]) => re.test(error.message))?.[1];

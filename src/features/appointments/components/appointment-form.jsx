@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { CalendarPlus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import StampedTextarea from "@/components/shared/stamped-textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -23,7 +23,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
 /**
  * New or edit appointment. `defaultLeadId` (with its row in `leads`) fixes
  * the lead, as on a lead sheet; otherwise the lead is searched for.
- * "For the client" is what the client is told about it: `clientNote`, the
+ * "Client notes" are what the client is told about it: `clientNote`, the
  * lead's note on file, starts it when the lead is known (and saving it
  * empty clears it); for a lead picked here, only a note written is saved.
  */
@@ -112,9 +112,9 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
             </Field>
 
             {!isEdit ? (
-              <Field label="For the client" error={fe("client_note")} className="sm:col-span-2" hint="Sent to the client with the lead sheet. Internal notes stay on the call.">
+              <Field label="Client notes" error={fe("client_note")} className="sm:col-span-2" hint="The client sees these, with the lead sheet. Internal notes stay on the lead.">
                 {noteKnown ? <input type="hidden" name="client_note_known" value="1" /> : null}
-                <Textarea name="client_note" rows={3} maxLength={2000} defaultValue={dv("client_note")} aria-invalid={invalid("client_note")}
+                <StampedTextarea name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note")} aria-invalid={invalid("client_note")}
                   placeholder="e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am" data-client-note />
               </Field>
             ) : null}

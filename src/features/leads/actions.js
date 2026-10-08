@@ -60,8 +60,8 @@ function leadPayload(formData) {
  * staff may read): saved when the form sent them.
  */
 async function saveInternalNotes(supabase, leadId, formData) {
-  if (!formData.has("notes_dcm")) return null;
-  const { error } = await supabase.from("lead_notes").upsert({ lead_id: leadId, notes_dcm: s(formData, "notes_dcm") }, { onConflict: "lead_id" });
+  if (!formData.has("internal_notes")) return null;
+  const { error } = await supabase.from("lead_notes").upsert({ lead_id: leadId, notes: s(formData, "internal_notes") }, { onConflict: "lead_id" });
   return error;
 }
 
@@ -207,4 +207,27 @@ export async function cancelReminder(formData) {
   const leadId = idFrom(formData, "lead_id");
   if (leadId) revalidatePath(`/leads/${leadId}`);
   return ok({ id });
+}
+
+/**
+ * One of a lead's two notes, edited in place on its Notes tab: the client
+ * notes (on the lead, which the client sees) or the internal notes
+ * (lead_notes, staff only). Staff alone may write either; the database says so.
+ */
+export async function saveLeadNote(prevState, formData) {
+  const { values, failed } = check(formData, schemas.leadNote);
+  if (failed) return failed;
+  const leadId = Number(values.lead_id);
+  const text = s(formData, "text");
+  if (values.kind === "client" && (text ?? "").length > 2000) return fail("Keep client notes under 2,000 characters.", { text: "Keep client notes under 2,000 characters" });
+  const supabase = await createClient();
+  const { data, error } = values.kind === "client"
+    ? await supabase.from("leads").update({ client_note: text }).eq("id", leadId).select("id")
+    : await supabase.from("lead_notes").upsert({ lead_id: leadId, notes: text }, { onConflict: "lead_id" }).select("lead_id");
+  if (error) return fail(error);
+  if (!data?.length) return fail("You can't change this lead's notes.");
+
+  await logActivity(supabase, "lead.notes", { entity: "lead", entityId: leadId, detail: values.kind === "client" ? "Client notes" : "Internal notes" });
+  revalidatePath(`/leads/${leadId}`);
+  return ok({ kind: values.kind });
 }

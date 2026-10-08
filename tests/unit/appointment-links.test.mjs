@@ -51,8 +51,8 @@ check("a list's EIN column imports, written one way; one that is not an EIN is l
   imported.rows[0].lead.ein === "12-3456789" && imported.rows[0].lead.location === "3" && !("ein" in imported.rows[1].lead), JSON.stringify(imported.rows));
 
 const withNotes = rowsToImport([["Company", "Notes", "Notes to Client"], ["C Co", "left vm", "old history"]]);
-check("a list's notes columns import apart from the lead (lead_notes, staff only)",
-  JSON.stringify(withNotes.rows[0].notes) === JSON.stringify({ notes_dcm: "left vm", notes_client: "old history" }) && !("notes_dcm" in withNotes.rows[0].lead) && !("notes_client" in withNotes.rows[0].lead),
+check("a list's Notes are the client notes; the old system's notes to client are internal, apart from the lead",
+  withNotes.rows[0].lead.client_note === "left vm" && JSON.stringify(withNotes.rows[0].notes) === JSON.stringify({ internal_notes: "old history" }) && !("internal_notes" in withNotes.rows[0].lead),
   JSON.stringify(withNotes.rows[0]));
 
 check("an SIC code reads with what it means", sicLabel("1731", "Electrical Work") === "1731 – Electrical Work" && sicLabel("9999", null) === "9999" && sicLabel(null, null) === null);

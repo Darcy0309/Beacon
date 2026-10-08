@@ -109,7 +109,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
         ["Est. premium", lead.estimated_annual_premium],
       ],
       // Only what was written for the client: the call notes stay internal.
-      notes: [["Description", lead.description], ["For the client", lead.client_note]],
+      notes: [["Client notes", lead.client_note], ["Description", lead.description]],
     },
   };
 }

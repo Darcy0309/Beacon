@@ -42,6 +42,18 @@ const textOf = (v) => (v != null && typeof v === "object" ? v.text : v);
 const blank = (v) => textOf(v) == null || String(textOf(v)).trim() === "";
 const A = "color:#0e7490;text-decoration:underline;";
 
+// The website and email addresses open with a click, on a desktop too.
+const siteLink = (site) => {
+  const text = String(site ?? "").trim();
+  if (!text) return null;
+  const href = /^https?:\/\//i.test(text) ? text : `https://${text}`;
+  return /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(href) ? { text, href } : text;
+};
+const mailLink = (address) => {
+  const text = String(address ?? "").trim();
+  return text ? (isMailbox(text) ? { text, href: `mailto:${text}` } : text) : null;
+};
+
 function cellHtml(v) {
   if (v == null || typeof v !== "object") return esc(v);
   if (v.href) return `<a href="${esc(v.href)}" style="${A}">${esc(v.text)}</a>`;
@@ -51,7 +63,8 @@ function cellHtml(v) {
 
 function cellText(v) {
   if (v == null || typeof v !== "object") return String(v);
-  if (v.href) return `${v.text} (${v.href})`;
+  // A link that only repeats its text (an address, a website) is the text alone.
+  if (v.href) return v.href.startsWith("mailto:") || v.href.replace(/^https?:\/\//i, "") === String(v.text).replace(/^https?:\/\//i, "") ? String(v.text) : `${v.text} (${v.href})`;
   return [v.text, ...(v.links ?? []).map((l) => `  ${v.linksLabel ? `${v.linksLabel}, ` : ""}${l.label}: ${l.href}`)].join("\n");
 }
 
@@ -83,10 +96,10 @@ export function renderLeadSheet(s) {
     ...(appointment ? [["Appointment", appointment], ["With", s.appointment.with]] : []),
   ])]);
   sections.push(["Prospect", rows([
-    ["Company", s.company], ["Address", s.map && address ? { text: address, href: s.map } : address], ["Website", s.website], ["Fax", s.fax],
+    ["Company", s.company], ["Address", s.map && address ? { text: address, href: s.map } : address], ["Website", siteLink(s.website)], ["Fax", s.fax],
   ])]);
   for (const p of s.people ?? []) {
-    const pairs = rows([["Name", [p.name, p.title].filter(Boolean).join(", ")], ["Business phone", p.phone], ["Mobile", p.mobile], ["Email", p.email]]);
+    const pairs = rows([["Name", [p.name, p.title].filter(Boolean).join(", ")], ["Business phone", p.phone], ["Mobile", p.mobile], ["Email", mailLink(p.email)]]);
     if (pairs.length) sections.push([p.who, pairs]);
   }
   const lines = (s.coverage?.lines ?? []).filter((l) => !blank(l.xdate) || !blank(l.carrier));

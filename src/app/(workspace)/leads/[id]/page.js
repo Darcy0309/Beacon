@@ -11,6 +11,7 @@ import AppointmentForm from "@/features/appointments/components/appointment-form
 import CallResultPanel from "@/features/work/components/call-result-panel";
 import EmailLead from "@/features/email/components/email-lead";
 import CoverageForm from "@/features/leads/components/coverage-form";
+import LeadNotes from "@/features/leads/components/lead-notes";
 import ReminderCard from "@/features/leads/components/reminder-card";
 import ResendButton from "@/features/delivery/components/resend-button";
 import { getCarrierNames } from "@/features/insurance/queries";
@@ -231,14 +232,8 @@ export default async function LeadSheet({ params, searchParams }) {
       : null;
   const address = [r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean);
   const website = r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null;
-  // What the client is told, then the description; the internal notes for
-  // staff alone (the database gives a client none of them).
-  const notes = [
-    r.client_note ? ["For the client", r.client_note] : null,
-    r.description ? ["Description", r.description] : null,
-    staff && r.notes_dcm ? ["Internal notes", r.notes_dcm] : null,
-    staff && r.notes_client ? ["Old system notes", r.notes_client] : null,
-  ].filter(Boolean);
+  // The client notes (the client sees them) and the internal notes (staff only), counted on the tab.
+  const noteCount = [r.client_note, r.internal_notes].filter(Boolean).length;
 
   return (
     <>
@@ -467,11 +462,9 @@ export default async function LeadSheet({ params, searchParams }) {
                 {
                   id: "notes",
                   label: "Notes",
-                  count: notes.length || null,
-                  content: notes.length ? (
-                    <Rows rows={notes.map(([label, text]) => [label, <span key={label} className="whitespace-pre-line">{text}</span>])} />
-                  ) : (
-                    <p className="px-4 py-3 text-sm text-muted-foreground">No notes yet.</p>
+                  count: noteCount || null,
+                  content: (
+                    <LeadNotes leadId={lead.id} clientNote={r.client_note} internalNotes={r.internal_notes} description={r.description} canEdit={staff} />
                   ),
                 },
               ]}

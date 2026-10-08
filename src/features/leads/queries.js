@@ -141,10 +141,10 @@ export async function getLead(id) {
   if (error) throw error;
   if (!data) return null;
   const [{ data: internal }, { data: sic }] = await Promise.all([
-    supabase.from("lead_notes").select("notes_dcm, notes_client").eq("lead_id", data.id).maybeSingle(),
+    supabase.from("lead_notes").select("notes").eq("lead_id", data.id).maybeSingle(),
     data.sic_code ? supabase.from("sic_codes").select("description").eq("code", data.sic_code).maybeSingle() : Promise.resolve({ data: null }),
   ]);
-  return toLeadView({ ...data, notes_dcm: internal?.notes_dcm ?? null, notes_client: internal?.notes_client ?? null, sic_description: sic?.description ?? null });
+  return toLeadView({ ...data, internal_notes: internal?.notes ?? null, sic_description: sic?.description ?? null });
 }
 
 /** Totals per status code and the number of clients with leads, for the leads page header and chips. */

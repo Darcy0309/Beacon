@@ -107,9 +107,11 @@ export const COLUMN_ALIASES = {
   callresultappt: "call_result_appt", callappt: "call_result_appt",
   qadatedbdv: "qa_date_dbdv", qadateappt: "qa_date_appt",
   shoppingdate: "shopping_date",
-  notes: "notes_dcm", note: "notes_dcm", comments: "notes_dcm",
-  notesdcm: "notes_dcm", notesdmc: "notes_dcm",
-  notesclient: "notes_client", notestoclient: "notes_client",
+  // A list's notes are the client's notes on the name; the old system's
+  // "notes to client" column carries its call history, which is internal.
+  notes: "client_note", note: "client_note", comments: "client_note",
+  notesdcm: "client_note", notesdmc: "client_note", clientnotes: "client_note",
+  notesclient: "internal_notes", notestoclient: "internal_notes", internalnotes: "internal_notes",
 };
 
 /** Columns that belong on the lead's insurance_details row. */
@@ -223,7 +225,7 @@ export function mapHeaders(headerRow) {
 
 /** Every heading resolved to { table, column }, or null when unrecognised. */
 // The lead's internal notes live apart from it (lead_notes, staff only).
-const NOTE_COLUMNS = new Set(["notes_dcm", "notes_client"]);
+const NOTE_COLUMNS = new Set(["internal_notes"]);
 
 export function mapAllHeaders(headerRow) {
   return headerRow.map((h) => {

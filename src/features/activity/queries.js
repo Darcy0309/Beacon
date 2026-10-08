@@ -25,6 +25,7 @@ const ACTION_LABEL = {
   "lead.call": "Recorded a call",
   "lead.email": "Emailed a lead",
   "lead.coverage": "Updated a lead's coverage",
+  "lead.notes": "Updated a lead's notes",
   "lead.reminder": "Set a call-back reminder",
   "lead.deliver": "Sent a lead to the client again",
   "carriers.import": "Imported carriers",

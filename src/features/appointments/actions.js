@@ -39,7 +39,7 @@ export async function createAppointment(prevState, formData) {
     .single();
   if (error) return fail(error);
 
-  // "For the client": saved on the lead, where the lead sheet sends it from.
+  // "Client notes": saved on the lead, where the lead sheet sends them from.
   // A note the form started from the lead's own is saved as it stands, even
   // emptied; otherwise only a note written here.
   const note = s(formData, "client_note");

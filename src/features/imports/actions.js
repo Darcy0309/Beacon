@@ -131,7 +131,7 @@ export async function importLeadsCsv(prevState, formData) {
       const source = chunk[j];
       if (!source) return;
       if (source.insurance) insuranceRows.push({ lead_id: row.id, ...source.insurance });
-      if (source.notes) noteRows.push({ lead_id: row.id, notes_dcm: source.notes.notes_dcm ?? null, notes_client: source.notes.notes_client ?? null });
+      if (source.notes?.internal_notes) noteRows.push({ lead_id: row.id, notes: source.notes.internal_notes });
       if (source.appointment) {
         appointmentRows.push({
           lead_id: row.id,

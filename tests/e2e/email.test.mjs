@@ -97,7 +97,10 @@ try {
   await shot(sean, "email-dialog");
 
   section("On a short screen");
+  // Closing plays out (a fraction of a second): the next dialog opens once it has gone.
+  const closed = () => until(() => sean.ev(`!document.querySelector('[role=dialog]')`));
   await sean.key("Escape");
+  await closed();
   await sean.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 620, deviceScaleFactor: 1, mobile: false });
   await openEmail(sean);
   const fit = await sean.ev(`(() => { const d = document.querySelector('[role=dialog]').getBoundingClientRect();
@@ -108,6 +111,7 @@ try {
   check("…the fields scroll instead", fit.fieldsScroll, JSON.stringify(fit));
   await shot(sean, "email-short-screen");
   await sean.key("Escape");
+  await closed();
   await sean.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 950, deviceScaleFactor: 1, mobile: false });
   d = await openEmail(sean);
 

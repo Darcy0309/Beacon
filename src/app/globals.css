@@ -541,6 +541,9 @@ option {
 @keyframes popover-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } }
 .animate-popover-in { transform-origin: top right; animation: popover-in 0.16s ease-out; }
 
+/* A dialog without a footer keeps its bottom padding (the footer brings its own). */
+[data-dialog-content]:not(:has([data-dialog-footer])) { padding-bottom: 1.25rem; }
+
 /* The appointment a notification's "Open calendar" points at: outlined and
    glowing, pulsing a few times as the page opens, then staying outlined. */
 .appt-focus {

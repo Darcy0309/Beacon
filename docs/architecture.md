@@ -191,17 +191,28 @@ Google, Outlook (Microsoft 365) and Apple (an .ics file at
 on the business's clock: `lib/appointment-links.js`); the address as a
 Google Maps link; the SIC code with what it means (`sic_codes`, every
 standard 4-digit code); Locations above Employees; the prospect's agency
-after the policies. Its notes are the lead's description and **For the
-client** (`leads.client_note`), which the call result panel asks for when a
-result sends the sheet (`record_call_result(p_client_note)`) and the
-appointment form can edit; the calendar shows it on the appointment too.
+after the policies. Its notes are the lead's **Client notes**
+(`leads.client_note`) and its description.
 
-**Internal notes stay internal.** The call notes (`call_records`, staff
-only) and the lead's own notes (`notes_dcm`, and `notes_client`, the old
-system's notes, which carry its call history) never reach a client: not
-in the email, not in the app, not through the API: they live apart from
-the lead, in `lead_notes`, which only staff may read or write (the lead
-form saves them there, and an import puts a list's notes columns there).
+**A lead has two notes**, both edited in place on its Notes tab (staff
+only, `saveLeadNote()`) and on the lead form. Each keeps a trail: stepping
+into a notes box begins a new line under what is there, stamped with the
+day and who is writing ("10/8/26 seanf: "; `components/shared/stamped-textarea.jsx`,
+`lib/note-stamp.js`), and a line begun but left empty is dropped.
+
+- **Client notes** (`leads.client_note`): what the client sees, in the lead
+  sheet email and on the calendar's appointment. The call result panel asks
+  for them when a result sends the sheet (`record_call_result(p_client_note)`)
+  and the appointment form can edit them. A list's "Notes" column imports
+  here.
+- **Internal notes** (`lead_notes.notes`): staff only, never shown to a
+  client: not in the email, not in the app, not through the API (the table
+  is staff-only, apart from the lead, which a client may read). The old
+  system's "notes to client" column, which carries its call history,
+  imports here, and the notes written on each call are added to the end
+  (`record_call_result()`), so they stay the lead's running history. The
+  call notes (`call_records`) are staff only too.
+
 Leads also carry their **EIN** (imported from a
 list's EIN or tax ID column, typed on the lead, written as 12-3456789).
 
@@ -322,6 +333,12 @@ service, so the browser test hands pushes to the worker through DevTools
 and subscribes with a stand-in.
 
 ## Search
+
+The Ctrl+K palette (`features/search/components/global-search.jsx`) is
+`cmdk` in a Radix dialog: cmdk does the keys, the pointer and what a
+screen reader is told, the server does the matching (`shouldFilter` off,
+`/api/search`). Before anything is typed it offers the pages the role
+opens most.
 
 Every search box matches **every word typed**, in any order and any field:
 "Sean Fitzgerald" finds the first and last name, "Drain, LLC" ignores the

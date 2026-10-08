@@ -24,6 +24,7 @@ const FORMS = {
   // The policy lines' fields are named from POLICY_LINES (name={line.date}), so only these are literal.
   "src/features/leads/components/coverage-form.jsx":    { schema: "coverage",   extra: [] },
   "src/features/leads/components/reminder-card.jsx":    { schema: "reminder",   extra: [] },
+  "src/features/leads/components/lead-notes.jsx":       { schema: "leadNote",   extra: [] },
   "src/features/insurance/components/carrier-form.jsx": { schema: "carrier",    extra: [] },
   "src/features/imports/components/csv-import.jsx":       { schema: "csvImport",   extra: ["file"] },
   "src/features/settings/components/settings-form.jsx":    { schema: "settings",    extra: [] },

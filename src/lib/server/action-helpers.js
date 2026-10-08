@@ -61,11 +61,14 @@ export function idFrom(formData, key = "id") {
   return /^[1-9]\d*$/.test(v) ? Number(v) : null;
 }
 
-/** Trim a form value, returning null for blanks so empty inputs clear columns. */
+/**
+ * Trim a form value, returning null for blanks so empty inputs clear columns.
+ * Line breaks are stored as "\n": a browser sends a textarea's as "\r\n".
+ */
 export const s = (form, key) => {
   const v = form.get(key);
   if (v === null || v === undefined) return null;
-  const t = String(v).trim();
+  const t = String(v).replace(/\r\n?/g, "\n").trim();
   return t === "" ? null : t;
 };
 

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/sonner";
 import Backdrop from "@/components/brand/backdrop";
 import { RoleProvider } from "@/components/layout/role-provider";
 import { getCurrentUser } from "@/lib/server/session";
+import { getBusinessTimeZone } from "@/lib/server/business-day";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const inter = Inter({
@@ -22,11 +23,14 @@ export const metadata = {
 export default async function RootLayout({ children }) {
   // Null on the login page and for signed-out visitors.
   let user = null;
+  let timeZone = null;
   if (isSupabaseConfigured) {
     try {
       user = await getCurrentUser();
+      // The business's clock, for the date stamped on notes.
+      if (user) timeZone = await getBusinessTimeZone();
     } catch {
-      user = null;
+      user ??= null;
     }
   }
 
@@ -35,7 +39,7 @@ export default async function RootLayout({ children }) {
       <body className="antialiased">
         <Backdrop />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <RoleProvider user={user}>
+          <RoleProvider user={user} timeZone={timeZone}>
             {children}
             <Toaster />
           </RoleProvider>

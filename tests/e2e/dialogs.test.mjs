@@ -45,7 +45,9 @@ try {
     for (const form of FORMS) {
       await page.go(form.path, 3000);
       await form.open(page);
-      const m = await until(() => page.ev(MEASURE), { timeout: 5000 });
+      // It springs (or, on a phone, slides) into place: measured once it has settled.
+      await until(() => page.ev(MEASURE), { timeout: 5000 });
+      const m = (await until(async () => { const x = await page.ev(MEASURE); return x?.onScreen && x.inside ? x : null; }, { timeout: 3000 })) ?? (await page.ev(MEASURE));
       check(`${form.name}: Save is inside the box, on screen and clickable${m?.scrolls ? " (the fields scroll)" : ""}`,
         Boolean(m?.inside && m.onScreen && m.clickable), JSON.stringify(m));
       if (m?.scrolls) {

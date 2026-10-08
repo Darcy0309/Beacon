@@ -6,15 +6,13 @@ import { toast } from "sonner";
 import { PhoneCall, CalendarCheck, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import StampedTextarea from "@/components/shared/stamped-textarea";
 import { Card } from "@/components/ui/card";
 import SectionHeader from "@/components/shared/section-header";
 import TipLayer from "@/components/shared/tip-layer";
 import DatePicker from "@/components/shared/date-picker";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { recordCallResult } from "@/features/work/actions";
-import { useRole } from "@/components/layout/role-provider";
-import { todayIn, todayIso } from "@/lib/dates";
 import { APPOINTMENT_TIMES, DURATIONS } from "@/lib/validate";
 import { cn } from "@/lib/utils";
 
@@ -28,28 +26,17 @@ const GROUPS = [
 ];
 
 /**
- * The date and who, at the start of a note: "10/2/26 seanf: ". The day is
- * the business's; the name is the username, or first name and last initial.
- */
-function noteStamp(user, timeZone) {
-  const [y, m, d] = (timeZone ? todayIn(timeZone) : todayIso()).split("-");
-  const who = (user?.username || `${user?.first_name ?? ""}${(user?.last_name ?? "").slice(0, 1)}` || "me").toLowerCase().replace(/\s+/g, "");
-  return `${Number(m)}/${Number(d)}/${y.slice(2)} ${who}:`;
-}
-
-/**
  * The call result buttons on the right of a lead sheet: the results for the
  * lead's project type, and, when the name has an appointment waiting, the
  * confirmation follow-up. Choosing a result asks for what it needs (each
  * button's own description shows on hover): a Lead or an Appointment its
  * Ultimate X-Date, an appointment its date and time; one that sends the
- * client the lead sheet, the note written for them ("For the client",
+ * client the lead sheet, the notes written for them ("Client notes",
  * `clientNote` on file to start from). The call notes stay internal. Saving
  * moves on to the next name when the sheet was opened from a call list.
  */
 export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", timeZone = null }) {
   const router = useRouter();
-  const { user } = useRole();
   const [state, setState] = useState(EMPTY);
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState(null);
@@ -76,9 +63,8 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
   // caller's), and the move to the next name must not depend on it staying.
   const submit = (event) => {
     event.preventDefault();
+    // The note boxes drop a stamped line left empty as the form is read.
     const form = new FormData(event.currentTarget);
-    // A note that is only the date stamp says nothing: send it as no note.
-    if (String(form.get("notes") ?? "").trim() === noteStamp(user, timeZone)) form.set("notes", "");
     startTransition(async () => {
       const result = await recordCallResult(null, form);
       if (!result?.ok) {
@@ -112,13 +98,6 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
     });
   };
 
-  // Entering the notes starts them with the date and who is writing.
-  const stampNotes = (event) => {
-    const box = event.currentTarget;
-    if (box.value.trim()) return;
-    box.value = `${noteStamp(user, timeZone)} `;
-    requestAnimationFrame(() => box.setSelectionRange(box.value.length, box.value.length));
-  };
   const needsXdate = (r) => r?.effect === "promote" || r?.effect === "appointment";
 
   const button = (r) => (
@@ -216,15 +195,14 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
             </div>
 
             {picked.delivers ? (
-              <Field label="For the client" error={fe("client_note")} hint="Sent to the client with the lead sheet.">
-                <Textarea name="client_note" rows={3} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
+              <Field label="Client notes" error={fe("client_note")} hint="The client sees these, with the lead sheet. Add to them: earlier ones stay, a trail of what took place.">
+                <StampedTextarea name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
                   placeholder="e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am" data-client-note />
               </Field>
             ) : null}
 
-            <Field label={picked.delivers ? "Call notes" : "Notes"} error={fe("notes")} hint={picked.delivers ? "Internal: the client never sees them." : undefined}>
-              <Textarea ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")}
-                onFocus={stampNotes} />
+            <Field label={picked.delivers ? "Call notes" : "Notes"} error={fe("notes")} hint={picked.delivers ? "Internal: the client never sees them. Added to the lead's internal notes." : "Added to the lead's internal notes."}>
+              <StampedTextarea ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")} />
             </Field>
 
             {/* What is missing, all at once, as the old system said it. */}

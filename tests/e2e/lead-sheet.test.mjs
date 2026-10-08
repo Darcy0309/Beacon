@@ -1,14 +1,15 @@
 /**
  * The lead sheet as the client asked (Sean, October 2026), end to end:
- *   - setting an appointment asks for the note "For the client", which is
- *     what the client gets; the call notes and the lead's internal notes
- *     never reach them, in the email or in the app;
+ *   - setting an appointment asks for the "Client notes", which is what the
+ *     client gets; the call notes and the lead's internal notes never reach
+ *     them, in the email or in the app; both notes are edited in place on
+ *     the lead's Notes tab;
  *   - the email says nothing of when it was entered, has "Add to calendar"
  *     (Google, Outlook, Apple's .ics at the right time) beside the
  *     appointment, the address as a Google Maps link, the SIC code with what
  *     it means, Locations above Employees, and the agency after the policies;
  *   - the lead's Business tab has Locations and EIN (typed on the lead,
- *     written one way); the appointment form's "For the client" can be edited.
+ *     written one way); the appointment form's "Client notes" can be edited.
  *
  * Needs the app started with SMTP_HOST=127.0.0.1 SMTP_PORT=2525 (any
  * SMTP_USER and SMTP_PASSWORD), as the delivery test does.
@@ -41,7 +42,7 @@ const lead = Number(sql(`insert into public.leads (company_name, contact_name, p
     sales_volume, years_in_business, project_id, assigned_user_id)
   values (${lit(`${TAG} A & Sons Elect`)}, 'Daniel', '602-555-0101', '12 Main St', 'Phoenix', 'AZ', '85004', '1731', '3', '14',
     '$2.1M', '12', ${APPT}, ${MIKE}) returning id`));
-sql(`insert into public.lead_notes (lead_id, notes_dcm, notes_client) values (${lead}, 'INTERNAL-SECRET owner is hard', 'OLD-HISTORY 9/1/26 seanf: left vm')`);
+sql(`insert into public.lead_notes (lead_id, notes) values (${lead}, 'INTERNAL-SECRET owner is hard. OLD-HISTORY 9/1/26 seanf: left vm')`);
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate, agency_name, pkg_xdate) values (${lead}, '2027-03-01', 'Garry Insurance', '2027-03-01')`);
 const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT_USER}`);
 sql(`update public.users set company_id=${company} where id=${CLIENT_USER}`);
@@ -59,7 +60,7 @@ try {
   const mike = await (await browser.newContext({ as: "mike@beacon.test" })).newPage();
   await mike.go(`/leads/${lead}`, 4000);
   await pick(mike, "Appointment");
-  check("an appointment asks for the note “For the client”, the call notes marked internal",
+  check("an appointment asks for the “Client notes”, the call notes marked internal",
     Boolean(await until(() => mike.ev(`!!document.querySelector('textarea[data-client-note]')`)))
     && /Internal: the client never sees them/.test(await mike.text()));
   await mike.fill('input[name="appt_date"]', tomorrow);
@@ -74,7 +75,7 @@ try {
   section("The email");
   check("the sheet is emailed", Boolean(await until(() => sent(SHEET_TO).length === 1, { timeout: 15000 })));
   const body = sent(SHEET_TO)[0] ? plain(sent(SHEET_TO)[0]) : "";
-  check("“For the client” is the note written now", body.includes(NOTE), body.slice(body.indexOf("NOTES"), body.indexOf("NOTES") + 200));
+  check("“Client notes” are the note written now", body.includes(`Client notes: ${NOTE}`), body.slice(body.indexOf("NOTES"), body.indexOf("NOTES") + 200));
   check("…never the call notes, the internal notes or the old system's", !/INTERNAL-CALL-NOTE|INTERNAL-SECRET|OLD-HISTORY|Call notes/.test(body));
   check("nothing says when it was entered", !/\bWhen\b/.test(body) && !body.includes(new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).replace(",", "")));
   check("“Add to calendar” beside the appointment: Google, Outlook, Apple",
@@ -97,6 +98,34 @@ try {
   check("…with the address and the note for the client, not the internal ones", file.includes("LOCATION:12 Main St\\, Phoenix AZ 85004") && file.includes("Appt set with Daniel and Henry") && !/INTERNAL|OLD-HISTORY/.test(file));
   check("a made-up link gets no calendar file", (await fetch(`${APP_URL}/sheet/AAAA.BBBB/appointment.ics`)).status === 404);
 
+  section("Moving it: the notes keep a trail");
+  check("the call notes were added to the lead's internal notes",
+    /INTERNAL-SECRET[\s\S]*INTERNAL-CALL-NOTE spoke with Daniel/.test(sql(`select notes from public.lead_notes where lead_id = ${lead}`)));
+  await mike.go(`/leads/${lead}`, 4000);
+  await pick(mike, "Appointment");
+  await until(() => mike.ev(`!!document.querySelector('textarea[data-client-note]')`));
+  check("setting it again shows the client notes written before", (await mike.ev(`document.querySelector('textarea[data-client-note]').value`)) === NOTE);
+  await mike.ev(`document.querySelector('textarea[data-client-note]').focus()`);
+  await sleep(100);
+  const begun = await mike.ev(`document.querySelector('textarea[data-client-note]').value`);
+  const stampRe = /\n(\d{1,2}\/\d{1,2}\/\d{2} [a-z0-9._-]+:) $/;
+  check("stepping into them begins a new line under them, with the day and who is writing", begun.startsWith(`${NOTE}\n`) && stampRe.test(begun), JSON.stringify(begun));
+  await mike.ev(`(() => { const t = document.querySelector('textarea[data-client-note]'); t.value += 'Moved to 11am, Henry has a conflict'; })()`);
+  await mike.fill('input[name="appt_date"]', tomorrow);
+  await mike.fill('select[name="appt_time"]', "11:00 AM");
+  await mike.click("button", "Save:");
+  const trail = `${NOTE}\n${begun.match(stampRe)?.[1]} Moved to 11am, Henry has a conflict`;
+  check("saved: the earlier notes, then the new line, stamped", Boolean(await until(() => sql(`select client_note from public.leads where id = ${lead}`) === trail, { timeout: 10000 })),
+    sql(`select coalesce(client_note, '') from public.leads where id = ${lead}`));
+  await mike.go(`/leads/${lead}`, 4000);
+  await pick(mike, "Lead-No Contact");
+  await until(() => mike.ev(`!!document.querySelector('textarea[name="notes"]')`));
+  await mike.ev(`document.querySelector('textarea[name="notes"]').focus()`);
+  await mike.ev(`document.querySelector('textarea[name="notes"]').blur()`);
+  check("a stamped line begun and left empty goes again", (await mike.ev(`document.querySelector('textarea[name="notes"]').value`)) === "");
+  await mike.click("button", "Cancel");
+  sql(`update public.leads set client_note = ${lit(NOTE)} where id = ${lead}`);
+
   section("In the app, for the client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage();
   await client.go(`/leads/${lead}`, 4000);
@@ -110,12 +139,31 @@ try {
   check("the calendar's appointment shows what was written for them", Boolean(await until(() => client.ev(`document.querySelector('[role=dialog]')?.innerText.includes(${JSON.stringify(NOTE)})`))));
   check("…and nothing internal", !/INTERNAL-SECRET|OLD-HISTORY|INTERNAL-CALL-NOTE/.test(await client.ev("document.documentElement.outerHTML")));
 
-  section("For staff: the lead's Business tab");
+  section("For staff: the Notes tab");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage();
   await admin.go(`/leads/${lead}`, 4000);
   await admin.click('[role=tab][data-tab="notes"]');
-  const staffNotes = await admin.ev(`document.querySelector('[data-tab-panel="notes"]').innerText`);
-  check("staff see the internal notes, marked so", /Internal notes[\s\S]*INTERNAL-SECRET/.test(staffNotes) && /Old system notes[\s\S]*OLD-HISTORY/.test(staffNotes), staffNotes);
+  const noteText = (kind) => admin.ev(`document.querySelector('[data-note="${kind}"]')?.innerText ?? ''`);
+  check("Client notes, which the client sees, with what was written for them",
+    /Client notes[\s\S]*The client sees these[\s\S]*Appt set with Daniel/.test(await noteText("client")), await noteText("client"));
+  check("…Internal notes, staff only, with the old system's", /Internal notes[\s\S]*Staff only[\s\S]*INTERNAL-SECRET[\s\S]*OLD-HISTORY/.test(await noteText("internal")), await noteText("internal"));
+  check("…and no “Old system notes” any more", !/Old system notes/.test(await admin.ev(`document.querySelector('[data-tab-panel="notes"]').innerText`)));
+  const editNote = async (kind, text) => {
+    await admin.click(`[data-note="${kind}"] button`, kind === "client" ? "Edit" : "Edit");
+    await until(() => admin.ev(`!!document.querySelector('[data-note="${kind}"] textarea')`));
+    await admin.fill(`[data-note="${kind}"] textarea`, text);
+    await admin.click(`[data-note="${kind}"] button[type=submit]`);
+  };
+  await editNote("internal", "INTERNAL-SECRET owner is hard. Called back 10/8, wants a quote.");
+  check("the internal notes are edited right on the tab", Boolean(await until(() => sql(`select notes from public.lead_notes where lead_id = ${lead}`) === "INTERNAL-SECRET owner is hard. Called back 10/8, wants a quote.")));
+  check("…saying so, and showing them", /Internal notes saved/.test((await admin.waitToast(/notes saved/)) ?? "")
+    && Boolean(await until(async () => (await noteText("internal")).includes("Called back 10/8"))));
+  await editNote("client", `${NOTE} – bring the WC dec page`);
+  check("…and so are the client notes", Boolean(await until(() => sql(`select client_note from public.leads where id = ${lead}`) === `${NOTE} – bring the WC dec page`)));
+  sql(`update public.leads set client_note = ${lit(NOTE)} where id = ${lead}`);
+
+  section("For staff: the lead's Business tab");
+  await admin.go(`/leads/${lead}`, 4000);
   await admin.click("button", "Edit");
   await until(() => admin.ev(`!!document.querySelector('[role=dialog] input[name="ein"]')`));
   await admin.fill('[role=dialog] input[name="ein"]', "1234");
@@ -125,7 +173,7 @@ try {
   await admin.fill('[role=dialog] input[name="ein"]', "123456789");
   await admin.click("[role=dialog] button[type=submit]");
   check("…a good one is saved, written one way", Boolean(await until(() => sql(`select ein from public.leads where id = ${lead}`) === "12-3456789")));
-  check("…and the internal notes are still there", sql(`select notes_dcm from public.lead_notes where lead_id = ${lead}`) === "INTERNAL-SECRET owner is hard");
+  check("…and the internal notes are still there", sql(`select notes from public.lead_notes where lead_id = ${lead}`) === "INTERNAL-SECRET owner is hard. Called back 10/8, wants a quote.");
   await admin.go(`/leads/${lead}`, 4000);
   const business = await admin.ev(`[...document.querySelectorAll('[data-tab-panel="business"] .grid')].map((r) => [...r.children].map((c) => c.innerText.trim()))`);
   const labels = business.map((r) => r[0]);
@@ -134,7 +182,7 @@ try {
   check("EIN between Sales volume and Years in business", labels.indexOf("EIN") === labels.indexOf("Sales volume") + 1 && labels.indexOf("Years in business") === labels.indexOf("EIN") + 1 && value("EIN") === "12-3456789", JSON.stringify(business));
   check("the SIC code with what it means", value("SIC code") === "1731 – Electrical Work", value("SIC code"));
 
-  section("The appointment form's “For the client”");
+  section("The appointment form's “Client notes”");
   await admin.click("button", "Appointment");
   const prefilled = await until(() => admin.ev(`document.querySelector('[role=dialog] textarea[data-client-note]')?.value ?? null`));
   check("it starts from the lead's note, and can be edited", prefilled === NOTE, prefilled);
