@@ -21,7 +21,7 @@ check("…and takes good ones", !validate({ name: "P", email: "a@x.com; _b@y.org
 check("the subject reads “<result> - <company>”", deliverySubject("Lead-Hot Lead", "Calvary Baptist Church") === "Lead-Hot Lead - Calvary Baptist Church");
 
 const sheet = {
-  company: "Calvary <Baptist> & Co", result: "Appointment-Phone", client: "Capital Insurance Services",
+  company: "Calvary <Baptist> & Co", result: "Appointment-Phone", client: "Capital Insurance Services", logo: "https://lighthouse.example/brand/signature-marketing.png",
   project: "CapitalIns-Churches", producer: "Jacob Termini", listSource: "IPA_AZ-Churches", rep: "Sean Fitzgerald",
   appointment: { date: "Oct 9, 2026", time: "10:00 AM", with: "Jacob", links: [
     { label: "Google", href: "https://calendar.google.com/calendar/render?action=TEMPLATE&text=x" },
@@ -50,6 +50,9 @@ const policy = text.slice(text.indexOf("POLICY INFORMATION")).split("\n").slice(
 check("the agency comes after the policies, not beside the renewal date", JSON.stringify(policy) === JSON.stringify(["Ultimate X-Date: Dec 23, 2026", "Package: Dec 23, 2026", "Agency: Garry Insurance"]), JSON.stringify(policy));
 check("the profile: Locations above Employees, the SIC code with what it means",
   text.includes("PROFILE\nLocations: 2\nEmployees: 12\nSIC code: 8661 – Religious Organizations"), text.slice(text.indexOf("PROFILE")));
+check("the business's logo heads the sheet, and the link email", html.includes('<img src="https://lighthouse.example/brand/signature-marketing.png" alt="Signature Marketing"')
+  && renderLeadLink(sheet, "https://lighthouse.example/sheet/abc.def", 90).html.includes('alt="Signature Marketing"'));
+check("…and nothing breaks without one", !renderLeadSheet({ ...sheet, logo: null }).html.includes("<img"));
 check("anything typed on a lead is shown, never run, in the email", html.includes("Calvary &lt;Baptist&gt; &amp; Co") && !html.includes("<script>") && html.includes("&lt;script&gt;"));
 const link = renderLeadLink(sheet, "https://lighthouse.example/sheet/abc.def", 90);
 check("a link-only email has the link and how long it works, not the sheet", link.html.includes('href="https://lighthouse.example/sheet/abc.def"') && /90 days/.test(link.text) && !link.text.includes("310-829-2481"));

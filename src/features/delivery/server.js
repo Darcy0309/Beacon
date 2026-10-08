@@ -78,6 +78,8 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
     sheet: {
       company: lead.company_name,
       result: call?.call_result ?? "Lead",
+      // The business's logo, from the app's own address (an email cannot carry the app's drawn one).
+      logo: origin ? `${origin}/brand/signature-marketing.png` : null,
       client: one(project?.company)?.name ?? null,
       project: project?.name ?? null,
       producer: lead.producer_name || project?.contact_name || null,

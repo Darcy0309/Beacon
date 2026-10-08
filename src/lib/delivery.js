@@ -42,6 +42,10 @@ const textOf = (v) => (v != null && typeof v === "object" ? v.text : v);
 const blank = (v) => textOf(v) == null || String(textOf(v)).trim() === "";
 const A = "color:#0e7490;text-decoration:underline;";
 
+// The logo image is 266 x 103: shown at 180 wide, so it stays sharp on most screens.
+const logoHtml = (url) =>
+  url ? `<img src="${esc(url)}" alt="Signature Marketing" width="180" height="70" style="display:block;border:0;outline:none;height:auto;max-width:180px;margin:0 0 14px;">` : "";
+
 // The website and email addresses open with a click, on a desktop too.
 const siteLink = (site) => {
   const text = String(site ?? "").trim();
@@ -78,7 +82,8 @@ function cellText(v) {
  *   people: [{ who, name, title, phone, mobile, email }],
  *   address: [lines], map: url | null, website, fax,
  *   coverage: { ultimate, agency, lines: [{ label, xdate, carrier }] },
- *   profile: [[label, value]], notes: [[label, text]] }
+ *   profile: [[label, value]], notes: [[label, text]],
+ *   logo: url | null }   (the business's logo, at the top as on its old sheets)
  */
 export function renderLeadSheet(s) {
   const sections = [];
@@ -118,7 +123,7 @@ export function renderLeadSheet(s) {
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;color:#111827;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:680px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:8px;">
 <tr><td style="padding:18px 20px;border-bottom:3px solid #0891b2;">
-<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;">Lead sheet</div>
+${logoHtml(s.logo)}<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;">Lead sheet</div>
 <div style="font-size:20px;font-weight:bold;margin-top:4px;">${esc(s.company)}</div>
 <div style="font-size:14px;color:#0e7490;margin-top:2px;">${esc(s.result)}</div>
 </td></tr>
@@ -142,7 +147,7 @@ ${pairs.map(([k, v]) => `<tr><td style="${td}width:34%;color:#6b7280;">${esc(k)}
 /** The email for an address that gets a link instead of the sheet. */
 export function renderLeadLink(s, url, days) {
   const html = `<!doctype html><html><body style="margin:0;padding:24px;font-family:Arial,Helvetica,sans-serif;color:#111827;">
-<p style="font-size:15px;margin:0 0 6px;"><b>${esc(s.result)}</b>: ${esc(s.company)}</p>
+${logoHtml(s.logo)}<p style="font-size:15px;margin:0 0 6px;"><b>${esc(s.result)}</b>: ${esc(s.company)}</p>
 <p style="font-size:14px;margin:0 0 14px;color:#4b5563;">${esc([s.client, s.project].filter(Boolean).join(" · "))}</p>
 <p style="margin:0 0 14px;"><a href="${esc(url)}" style="display:inline-block;background:#0891b2;color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:6px;font-size:14px;">View the lead sheet</a></p>
 <p style="font-size:12px;color:#9ca3af;margin:0;">The link works for ${days} days. Sent by Lighthouse CRM.</p>

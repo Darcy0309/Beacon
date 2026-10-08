@@ -4,7 +4,7 @@ import { useLinkStatus } from "next/link";
 import Link from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose } from "lucide-react";
-import LighthouseWordmark from "@/components/brand/logo-wordmark";
+import SignatureLogo from "@/components/brand/signature-logo";
 import LighthouseMark from "@/components/brand/logo-mark";
 import { navGroups, ROLES } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
@@ -79,7 +79,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
       ) : (
         <div className="px-4 py-5">
           <div className="flex items-center justify-between gap-2">
-            <LighthouseWordmark className="h-11 w-auto" />
+            <SignatureLogo className="min-w-0 text-sidebar-foreground" />
             {!forceExpanded && (
               <button
                 onClick={toggle}
@@ -92,7 +92,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
             )}
           </div>
           <div className="mt-2 text-[0.6rem] font-bold uppercase leading-[1.5] tracking-[0.2em] text-primary">
-            Signature Marketing
+            Lighthouse Platform
           </div>
         </div>
       )}
