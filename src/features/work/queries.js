@@ -144,7 +144,7 @@ export async function getOpenAppointment(leadId) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("appointments")
-    .select("id, appt_date, appt_time, user_id, set_stage, qa_status, confirmed_at")
+    .select("id, appt_date, appt_time, duration_min, rep_name, user_id, set_stage, qa_status, confirmed_at")
     .eq("lead_id", Number(leadId))
     .is("invalid_at", null)
     .order("appt_create_date", { ascending: false })

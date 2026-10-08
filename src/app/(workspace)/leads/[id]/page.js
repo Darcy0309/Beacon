@@ -192,6 +192,17 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  // The appointment an Appointment result would move (record_call_result's rule: still to come or
+  // waiting for QA, never one that failed it): the panel starts from its day and time.
+  const movable = openAppt && openAppt.qa_status !== "failed" && (openAppt.qa_status === "pending" || String(openAppt.appt_date) >= today)
+    ? {
+        date: String(openAppt.appt_date).slice(0, 10),
+        time: openAppt.appt_time ?? "",
+        duration: openAppt.duration_min ?? 30,
+        repName: openAppt.rep_name ?? "",
+        when: `${mediumDate(openAppt.appt_date)}${openAppt.appt_time ? ` at ${openAppt.appt_time}` : ""}`,
+      }
+    : null;
   // With no Ultimate X-Date, the soonest policy line is a renewal to confirm before a Lead or Appointment.
   const soonest = ins?.ultimate_xdate ? null : xdates.filter(([, k]) => k !== "ultimate_xdate").map(([label, k]) => ({ label, date: ins[k] }))
     .sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
@@ -492,6 +503,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 ultimateXdate={ins?.ultimate_xdate ?? null}
                 renewalHint={renewalHint}
                 clientNote={r.client_note ?? ""}
+                currentAppt={movable}
                 timeZone={tz}
               />
             ) : staff ? (

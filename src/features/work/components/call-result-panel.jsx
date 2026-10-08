@@ -35,7 +35,7 @@ const GROUPS = [
  * `clientNote` on file to start from). The call notes stay internal. Saving
  * moves on to the next name when the sheet was opened from a call list.
  */
-export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", timeZone = null }) {
+export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null }) {
   const router = useRouter();
   const [state, setState] = useState(EMPTY);
   const [pending, startTransition] = useTransition();
@@ -164,24 +164,31 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
 
               {picked.effect === "appointment" ? (
                 <div className="grid grid-cols-2 gap-3">
+                  {/* An appointment already set is moved, not booked twice: it starts from where it stands. */}
+                  {currentAppt ? (
+                    <p data-current-appt className="col-span-2 rounded-md border border-amber-400/40 bg-amber-400/5 px-3 py-2 text-xs">
+                      <span className="font-semibold text-amber-300">Set for {currentAppt.when}.</span>{" "}
+                      <span className="text-muted-foreground">Change the date or time to move it.</span>
+                    </p>
+                  ) : null}
                   {/* Full width: the panel is narrow, and the date reads in words. Set from a call, so today or later. */}
                   <Field label="Date" required error={fe("appt_date")} className="col-span-2">
-                    <DatePicker name="appt_date" required defaultValue={dv("appt_date")} invalid={invalid("appt_date")} aria-label="Appointment date"
+                    <DatePicker name="appt_date" required defaultValue={dv("appt_date", currentAppt?.date ?? "")} invalid={invalid("appt_date")} aria-label="Appointment date"
                       min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future />
                   </Field>
                   <Field label="Time" required error={fe("appt_time")}>
-                    <Select name="appt_time" defaultValue={dv("appt_time", "")} aria-invalid={invalid("appt_time")}>
+                    <Select name="appt_time" defaultValue={dv("appt_time", currentAppt?.time ?? "")} aria-invalid={invalid("appt_time")}>
                       <option value="">Choose a time</option>
                       {APPOINTMENT_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </Select>
                   </Field>
                   <Field label="Duration" error={fe("duration_min")}>
-                    <Select name="duration_min" defaultValue={String(dv("duration_min", "30"))} aria-invalid={invalid("duration_min")}>
+                    <Select name="duration_min" defaultValue={String(dv("duration_min", String(currentAppt?.duration ?? 30)))} aria-invalid={invalid("duration_min")}>
                       {DURATIONS.map((d) => <option key={d} value={d}>{d} minutes</option>)}
                     </Select>
                   </Field>
                   <Field label="Meeting with" hint="The client's producer" error={fe("rep_name")}>
-                    <Input name="rep_name" maxLength={80} defaultValue={dv("rep_name")} aria-invalid={invalid("rep_name")} />
+                    <Input name="rep_name" maxLength={80} defaultValue={dv("rep_name", currentAppt?.repName ?? "")} aria-invalid={invalid("rep_name")} />
                   </Field>
                 </div>
               ) : null}

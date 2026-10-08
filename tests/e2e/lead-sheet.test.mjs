@@ -106,6 +106,12 @@ try {
   await pick(mike, "Appointment");
   await until(() => mike.ev(`!!document.querySelector('textarea[data-client-note]')`));
   check("setting it again shows the client notes written before", (await mike.ev(`document.querySelector('textarea[data-client-note]').value`)) === NOTE);
+  const current = await mike.ev(`({ date: document.querySelector('input[type=hidden][name="appt_date"]')?.value ?? document.querySelector('input[name="appt_date"]')?.value,
+    time: document.querySelector('select[name="appt_time"]').value, duration: document.querySelector('select[name="duration_min"]').value,
+    with: document.querySelector('input[name="rep_name"]').value, note: document.querySelector('[data-current-appt]')?.innerText ?? '' })`);
+  check("…and starts from the appointment as it stands: its day, time, length and whom it is with",
+    current.date === tomorrow && current.time === "10:00 AM" && current.duration === "30" && current.with === "Jacob Termini", JSON.stringify(current));
+  check("…saying when it is set for, and to change it to move it", /Set for .* at 10:00 AM\.[\s\S]*Change the date or time to move it/.test(current.note), current.note);
   await mike.ev(`document.querySelector('textarea[data-client-note]').focus()`);
   await sleep(100);
   const begun = await mike.ev(`document.querySelector('textarea[data-client-note]').value`);
