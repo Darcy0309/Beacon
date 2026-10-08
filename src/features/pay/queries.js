@@ -3,6 +3,7 @@
 import "server-only";
 import { cache } from "react";
 import { fullName } from "@/lib/format";
+import { periodView } from "@/lib/pay";
 import { createClient } from "@/lib/supabase/server";
 
 const n = (v) => Number(v ?? 0);
@@ -13,7 +14,11 @@ const n = (v) => Number(v ?? 0);
  */
 export const getPayRules = cache(async function getPayRules() {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("pay_rules");
+  const [{ data, error }, { data: periods }] = await Promise.all([
+    supabase.rpc("pay_rules"),
+    // The pay period schedule (Settings), for a "Custom schedule" pay period; staff read it.
+    supabase.from("pay_periods").select("id, starts_on, ends_on, pay_date, closed_dates, closed_label, optional_dates, optional_label").order("starts_on"),
+  ]);
   if (error) throw error;
   const range = (r) => ({ min: n(r?.min), max: n(r?.max), step: n(r?.step) || 1 });
   return {
@@ -30,6 +35,7 @@ export const getPayRules = cache(async function getPayRules() {
       round_to: n(data?.time?.round_to) || 15,
       pay_period: data?.time?.pay_period ?? "weekly",
       period_start: data?.time?.period_start ?? "2026-10-05",
+      schedule: (periods ?? []).map(periodView),
     },
   };
 });

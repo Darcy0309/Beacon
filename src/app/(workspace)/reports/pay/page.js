@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getPayReport, getPayRules, getWorkDays } from "@/features/pay/queries";
+import PaySchedule from "@/features/pay/components/pay-schedule";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
 import { formatIso } from "@/lib/dates";
@@ -232,6 +233,9 @@ export default async function PayReport({ searchParams }) {
             </Table>
           </Card>
         ) : null}
+
+        {/* The year's pay periods, when the business plans its own: for every manager to see. */}
+        {rules.time.pay_period === "custom" && rules.time.schedule.length ? <PaySchedule periods={rules.time.schedule} today={today} /> : null}
       </div>
     </>
   );

@@ -59,6 +59,16 @@ try {
   check("the same hour's other appointment is there, plain",
     await admin.ev(`[...document.querySelectorAll('button')].some((b) => b.textContent.includes('Same Hour Co') && !b.hasAttribute('data-focused-appointment'))`));
 
+  section("Hovering an appointment");
+  // The one on the left: the desktop-notifications offer can sit over the bottom right of the page.
+  await admin.hover(await admin.ev(`(() => { const b = [...document.querySelectorAll('[data-tip]')].find((x) => x.textContent.includes('Same Hour Co'));
+    const r = b.getBoundingClientRect(); return { x: r.x + 24, y: r.y + r.height / 2 }; })()`));
+  const tip = await until(() => admin.ev(`document.querySelector('[role=tooltip]')?.innerText ?? null`), { timeout: 4000 });
+  check("a tip shows who, when and how it stands, and that a click opens it",
+    /Same Hour Co/.test(tip ?? "") && /6:00 PM · 30 min/.test(tip ?? "") && /Scheduled/.test(tip ?? "") && /Click for details/.test(tip ?? ""), JSON.stringify(tip));
+  await admin.hover({ x: 5, y: 5 });
+  check("…and goes when the pointer leaves", Boolean(await until(() => admin.ev(`!document.querySelector('[role=tooltip]')`))));
+
   section("Week and month");
   await admin.go(`/calendar?view=week&d=${DAY}&a=${target}`, 3000);
   const week = await until(() => admin.ev(FOCUSED));

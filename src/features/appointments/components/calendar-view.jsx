@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight,
@@ -11,6 +11,7 @@ import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import TipLayer from "@/components/shared/tip-layer";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -42,6 +43,25 @@ const DEFAULT_START_HOUR = 7;
 const DEFAULT_END_HOUR = 19;
 /** timeRank() yields 1441 for a time it cannot parse; those get their own strip. */
 const UNTIMED = 24 * 60;
+
+/**
+ * What a hover over an appointment shows (TipLayer): who, when, how it
+ * stands, whom to call and for which client. A click opens the details.
+ */
+function appointmentTips(rows) {
+  return Object.fromEntries(rows.map((a) => [String(a.id), {
+    title: a.co,
+    rows: [
+      { key: "when", label: "When", value: `${a.time}${a.ampm ? ` ${a.ampm}` : ""} · ${a.duration} min` },
+      { key: "status", label: "Status", value: a.status },
+      a.contact ? { key: "contact", label: "Contact", value: [a.contact, a.contactTitle].filter(Boolean).join(", ") } : null,
+      a.phone ? { key: "phone", label: "Phone", value: a.phone } : null,
+      a.rep ? { key: "rep", label: "Rep", value: a.rep } : null,
+      a.client ? { key: "client", label: "Client", value: a.client } : null,
+    ].filter(Boolean),
+    foot: "Click for details",
+  }]));
+}
 
 const fmtHour = (h) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? "AM" : "PM"}`;
 const endOf = (a) => a.startMin + Math.max(a.duration, MIN_BLOCK_MIN);
@@ -245,6 +265,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
 
   const timed = rows.filter((a) => a.startMin < UNTIMED);
   const untimed = rows.filter((a) => a.startMin >= UNTIMED);
+  const tips = useMemo(() => appointmentTips(rows), [rows]);
 
   // Widen the window to fit anything outside the usual working day.
   const startHour = Math.min(DEFAULT_START_HOUR, ...timed.map((a) => Math.floor(a.startMin / 60)));
@@ -265,7 +286,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
         }
       />
 
-      <div className="max-h-[70svh] overflow-y-auto">
+      <TipLayer tips={tips} delay={250} className="max-h-[70svh] overflow-y-auto">
         {/* The headings live inside the scroller: a scrollbar narrows whatever
             shares its box, so a header outside it would drift a little further
             from the columns with every day across the week. */}
@@ -372,7 +393,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
             })}
           </div>
         </div>
-      </div>
+      </TipLayer>
 
       {timed.length + untimed.length === 0 && (
         <p className="border-t border-[var(--panel-border)] py-6 text-center text-sm text-muted-foreground">
@@ -393,7 +414,8 @@ function Block({ a, dense = false, compact = false }) {
       type="button"
       onClick={() => open(a)}
       data-focused-appointment={focused || undefined}
-      title={`${a.time} ${a.ampm} · ${a.co} · ${a.detail}`}
+      data-tip={a.id}
+      aria-label={`${a.time} ${a.ampm} ${a.co}`}
       className={cn(
         "flex h-full w-full min-w-0 gap-1.5 overflow-hidden rounded-md border border-[var(--panel-border)] bg-card/90 px-1.5 py-1 text-left transition-colors hover:border-primary/50 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         compact && "h-auto",
@@ -422,7 +444,7 @@ function Block({ a, dense = false, compact = false }) {
         <span
           className="flex size-6 shrink-0 items-center justify-center self-start rounded text-[0.55rem] font-bold text-white"
           style={{ background: a.repC }}
-          title={a.rep}
+          aria-hidden
         >
           {a.repI}
         </span>
@@ -452,6 +474,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
   const isoOf = (d) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
   const dayRows = selected ? rows.filter((a) => dayOf(a) === selected) : [];
+  const tips = useMemo(() => appointmentTips(rows), [rows]);
 
   // Month overview: appointments grouped by day, in date order.
   const groups = [];
@@ -524,7 +547,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
             </span>
           }
         />
-        <div className="max-h-[34rem] space-y-1 overflow-y-auto p-4">
+        <TipLayer tips={tips} delay={250} className="max-h-[34rem] space-y-1 overflow-y-auto p-4">
           {selected ? (
             <>
               {dayRows.map((a) => <ApptRow key={a.id} a={a} />)}
@@ -569,7 +592,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
               )}
             </>
           )}
-        </div>
+        </TipLayer>
       </Card>
     </div>
   );
@@ -581,6 +604,7 @@ function ApptRow({ a }) {
   return (
     <button ref={ref} type="button" onClick={() => open(a)} data-list-row
       data-focused-appointment={focused || undefined}
+      data-tip={a.id}
       className={cn("-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2 text-left", focused && "appt-focus")}>
       <span className={cn("h-9 w-[3px] shrink-0 rounded-full", a.bar)} />
       <div className="w-14 shrink-0 text-sm font-bold tabular-nums">
@@ -592,7 +616,7 @@ function ApptRow({ a }) {
         <div className="truncate text-xs text-muted-foreground">{a.detail.split(" · ")[0]}</div>
       </div>
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-[0.6rem] font-bold text-white"
-        style={{ background: a.repC }} title={a.rep}>
+        style={{ background: a.repC }} aria-label={a.rep}>
         {a.repI}
       </span>
     </button>

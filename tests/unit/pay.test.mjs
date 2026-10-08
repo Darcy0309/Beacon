@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for pay: the rates an administrator picks from, pay periods, hours, and production totals. */
-import { hourLabel, hoursDecimal, hoursLabel, payPeriod, rateOptions, readPayPeriod } from "../../src/lib/pay.js";
+import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, workDays } from "../../src/lib/pay.js";
 import { CSV_COLUMNS, groupProduction, totalOf, totalRow } from "../../src/features/reports/production.js";
 
 let failures = 0;
@@ -77,6 +77,36 @@ eq("the total", [total.calls, total.amount, total.chargebackAmount], [25, 25, -3
 eq("the CSV's Total row: names blank, figures summed", totalRow(CSV_COLUMNS.project, total),
   ["Total", "", 25, 2, 1, 1, 1, "20.00", "30.00", "5.00", "-30.00", "25.00"]);
 eq("every layout ends with the total pay", Object.values(CSV_COLUMNS).every((cols) => cols.at(-1)[0] === "Total pay (USD)"), true);
+
+// --- a custom schedule (the business's 2026 pay periods) ---------------------
+const planned = (id, starts_on, ends_on, pay_date, closed = [], optional = []) =>
+  periodView({ id, starts_on, ends_on, pay_date, closed_dates: closed, optional_dates: optional });
+const schedule = [
+  planned(1, "2025-12-30", "2026-01-13", "2026-01-15", ["2025-12-31", "2026-01-01", "2026-01-02"]),
+  planned(2, "2026-01-14", "2026-01-28", "2026-01-31", [], ["2026-01-19"]),
+  planned(19, "2026-09-30", "2026-10-13", "2026-10-15", [], ["2026-10-12"]),
+  planned(20, "2026-10-14", "2026-10-28", "2026-10-30"),
+  planned(22, "2026-11-12", "2026-11-24", "2026-12-01", ["2026-11-25", "2026-11-26", "2026-11-27"]),
+];
+eq("work days: weekdays less the closed days (12/30–1/13, closed 12/31, 1/1, 1/2: 8)", schedule[0].workDays, 8);
+eq("…an optional day still counts (1/14–1/28: 11)", schedule[1].workDays, 11);
+eq("…9/30–10/13: 10, 10/14–10/28: 11", [schedule[2].workDays, schedule[3].workDays], [10, 11]);
+eq("…closed days after the period's end change nothing (11/12–11/24: 9)", workDays("2026-11-12", "2026-11-24", ["2026-11-25"]), 9);
+eq("closed days typed: “12/31, 1/1, 1/2” in 12/30–1/13 take the year that puts them in it",
+  parsePeriodDays("12/31, 1/1, 1/2", "2025-12-30", "2026-01-13"), { dates: ["2025-12-31", "2026-01-01", "2026-01-02"], bad: [] });
+eq("…with the weekday written too (“Mon 1/19”), and once each", parsePeriodDays("Mon 1/19; mon 1/19", "2026-01-14", "2026-01-28").dates, ["2026-01-19"]);
+eq("…a day outside the period is named", parsePeriodDays("1/19, 2/2, soon", "2026-01-14", "2026-01-28").bad, ["2/2", "soon"]);
+const custom = { pay_period: "custom", period_start: "2026-10-05", schedule };
+eq("custom: the period containing today, with its pay date", payPeriod("2026-10-08", custom), { from: "2026-09-30", to: "2026-10-13", payDate: "2026-10-15", scheduled: true });
+eq("…the one before it", payPeriod("2026-10-08", custom, -1), { from: "2026-01-14", to: "2026-01-28", payDate: "2026-01-31", scheduled: true });
+eq("…a day between two periods counts in the one begun", scheduledPeriod(schedule, "2026-11-01")?.from, "2026-10-14");
+eq("…before the first, the first", scheduledPeriod(schedule, "2025-06-01")?.from, "2025-12-30");
+eq("…a step past the end: one as long as the last, after it", payPeriod("2026-11-20", custom, 1), { from: "2026-11-25", to: "2026-12-07" });
+eq("…no schedule yet: two weeks from the start day", payPeriod("2026-10-08", { pay_period: "custom", period_start: "2026-10-05", schedule: [] }), { from: "2026-10-05", to: "2026-10-18" });
+const label = readPayPeriod({}, "2026-10-08", custom).label;
+check("this pay period is named with its pay date", /This pay period · Sep 30 – Oct 13, 2026 · paid Oct 15/.test(label), label);
+const picked = readPayPeriod({ period: "custom", from: "2026-10-14", to: "2026-10-28" }, "2026-10-08", custom);
+check("a period picked from the schedule is called a pay period, with its pay date", /^Pay period · Oct 14 – Oct 28, 2026 · paid Oct 30$/.test(picked.label) && picked.payDate === "2026-10-30", picked.label);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`);

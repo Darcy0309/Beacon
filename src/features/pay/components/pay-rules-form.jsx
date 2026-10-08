@@ -140,7 +140,7 @@ export default function PayRulesForm({ rules }) {
                   {PAY_PERIODS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                 </Select>
               </Field>
-              <Field label="A pay period starts on" error={fe("period_start")} hint="Any first day of a period; weekly and two-weekly periods count from it.">
+              <Field label="A pay period starts on" error={fe("period_start")} hint="Any first day of a period; weekly and two-weekly periods count from it. A custom schedule uses the Pay Periods list below.">
                 <DatePicker name="period_start" defaultValue={dv("period_start")} invalid={invalid("period_start")} aria-label="A pay period starts on" />
               </Field>
             </div>

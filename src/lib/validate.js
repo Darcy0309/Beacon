@@ -12,6 +12,7 @@ import { EMAIL_LIMITS, isMailbox } from "./email.js";
 import { PHONE_EXTENSION } from "./format.js";
 import { POLICY_LINES } from "./coverage.js";
 import { parseDeliveryAddresses } from "./delivery.js";
+import { parsePeriodDays } from "./pay.js";
 
 const str = (v) => (v == null ? "" : String(v).trim());
 const empty = (v) => str(v) === "";
@@ -160,7 +161,7 @@ export function formValues(formData, fields) {
 export const ROLES = ["admin", "manager", "agent", "client"];
 export const PAY_MODEL_KEYS = ["commission", "hybrid"];
 export const ROUNDING_KEYS = ["hour_up", "day_up", "day_nearest", "none"];
-export const PAY_PERIOD_KEYS = ["weekly", "biweekly", "semimonthly", "monthly"];
+export const PAY_PERIOD_KEYS = ["weekly", "biweekly", "semimonthly", "monthly", "custom"];
 export const USER_STATUSES = ["active", "invited", "disabled"];
 export const DURATIONS = ["15", "30", "45", "60", "90"];
 
@@ -369,6 +370,18 @@ export const schemas = {
     })],
   },
 
+  // One pay period on the schedule (Settings): its days, pay date, and the days closed or optional.
+  payPeriod: {
+    id: [id],
+    starts_on: [required("Choose the first day"), date],
+    ends_on: [required("Choose the last day"), date],
+    pay_date: [date],
+    closed_dates: [max(300)],
+    closed_label: [max(80)],
+    optional_dates: [max(300)],
+    optional_label: [max(80)],
+  },
+
   // One of a lead's notes, edited on its Notes tab.
   leadNote: {
     lead_id: [required("Missing lead"), id],
@@ -427,6 +440,8 @@ export const schemas = {
 };
 
 // Cross-field rules that a single-field schema cannot express.
+const daysBetweenIso = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
+
 export const cross = {
   password(values, errors) {
     if (!errors.password && !errors.confirm && values.password !== values.confirm) {
@@ -447,6 +462,19 @@ export const cross = {
     // Hybrid pay compares the hourly pay with the commission, so it needs a rate.
     if (!errors.hourly_rate && values.pay_model === "hybrid" && str(values.hourly_rate) === "") {
       errors.hourly_rate = "Hybrid pay needs an hourly rate";
+    }
+  },
+  payPeriod(values, errors) {
+    if (errors.starts_on || errors.ends_on) return;
+    const { starts_on: from, ends_on: to } = values;
+    if (to < from) {
+      errors.ends_on = "The last day is before the first";
+      return;
+    }
+    if (daysBetweenIso(from, to) > 62) errors.ends_on = "A pay period is two months at most";
+    for (const key of ["closed_dates", "optional_dates"]) {
+      const { bad } = parsePeriodDays(values[key], from, to);
+      if (bad.length && !errors[key]) errors[key] = `Not a day in this period: ${bad.slice(0, 3).join(", ")}`;
     }
   },
   payRules(values, errors) {

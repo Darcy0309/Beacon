@@ -138,6 +138,17 @@ period: everyone for an administrator, only themselves for anyone else. The
 production report's CSV comes day by day or as totals per account manager,
 project or client (`?by=`), each ending in a Total row.
 
+**Pay periods** are weekly, every two weeks, twice a month or monthly
+(`payPeriod()` in `lib/pay.js`), or the business's own **custom schedule**:
+an administrator enters each period in Settings (`pay_periods`: first and
+last day, pay date, the closed days and the optional ones, each set with
+what it is; no two overlap), a new one starting the day after the last.
+Work days count Monday to Friday less the closed days (`workDays()`), as
+the schedule the business sends round does. Pay & Hours then follows it
+(this period, paid on its date; any period opened from the list) and shows
+every account manager the year's schedule; staff read it, administrators
+alone change it.
+
 ## Reaching a name
 
 The lead sheet is laid out as the client asked, after VanillaSoft: the
