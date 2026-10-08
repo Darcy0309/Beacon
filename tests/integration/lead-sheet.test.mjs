@@ -49,6 +49,7 @@ const lastNotes = (id) => sql(`select coalesce(notes, '') from public.call_recor
 const sean = await signIn("sean@beacon.test");
 const mike = await signIn("mike@beacon.test");
 const client = await signIn("client@beacon.test");
+const agent = await signIn("agent@beacon.test");
 const record = (who, leadId, type, name, extra = {}) =>
   who.sb.rpc("record_call_result", { p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: "10/7/26 seanf: spoke with Daniel", ...extra });
 
@@ -77,9 +78,30 @@ try {
   const write = await client.sb.from("lead_notes").update({ notes: "client wrote this" }).eq("lead_id", lead).select("lead_id");
   check("…nor write them", (write.data ?? []).length === 0 && /^Internal: owner is difficult/.test(sql(`select notes from public.lead_notes where lead_id = ${lead}`)));
   const calls = await client.sb.from("call_records").select("notes").eq("lead_id", lead);
-  check("…nor the call notes", !calls.error && (calls.data ?? []).length === 0, JSON.stringify(calls.data));
+  // Refused outright (the column is no one's to read directly), or no rows (the calls are staff's).
+  check("…nor the call notes", Boolean(calls.error) || (calls.data ?? []).length === 0, JSON.stringify(calls.data));
   const staff = await sean.sb.from("lead_notes").select("notes").eq("lead_id", lead).maybeSingle();
   check("staff read them", /^Internal: owner is difficult.*left message/.test(staff.data?.notes ?? ""), JSON.stringify(staff));
+  const managerCalls = await sean.sb.rpc("call_notes", { p_lead_id: lead });
+  check("…and the notes on its calls, through call_notes()", !managerCalls.error && managerCalls.data.some((c) => /spoke with Daniel/.test(c.notes)), JSON.stringify(managerCalls));
+
+  section("Agents see the client notes only");
+  const agentLead = await agent.sb.from("leads").select("id, client_note").eq("id", lead).maybeSingle();
+  check("an agent reads the lead and its client notes", !agentLead.error && /Appt set with Daniel/.test(agentLead.data?.client_note ?? ""), agentLead.error?.message);
+  const agentNotes = await agent.sb.from("lead_notes").select("*").eq("lead_id", lead);
+  check("…not its internal notes", !agentNotes.error && agentNotes.data.length === 0, JSON.stringify(agentNotes.data));
+  const agentWrite = await agent.sb.from("lead_notes").upsert({ lead_id: lead, notes: "agent wrote this" }, { onConflict: "lead_id" }).select("lead_id");
+  check("…nor write them", Boolean(agentWrite.error) && !/agent wrote this/.test(sql(`select notes from public.lead_notes where lead_id = ${lead}`)), agentWrite.error?.message);
+  const agentCalls = await agent.sb.from("call_records").select("id, call_result, call_date").eq("lead_id", lead);
+  check("…still reads its calls (QA, the history)", !agentCalls.error && agentCalls.data.length > 0, agentCalls.error?.message);
+  const agentCallNotes = await agent.sb.from("call_records").select("id, notes").eq("lead_id", lead);
+  const agentStar = await agent.sb.from("call_records").select("*").eq("lead_id", lead);
+  check("…but not what was said on them, even straight through the API", Boolean(agentCallNotes.error) && (Boolean(agentStar.error) || !/spoke with Daniel/.test(JSON.stringify(agentStar.data))), JSON.stringify([agentCallNotes.error?.message, agentStar.error?.message]));
+  const agentRpc = await agent.sb.rpc("call_notes", { p_lead_id: lead });
+  check("…nor through call_notes()", !agentRpc.error && agentRpc.data.length === 0, JSON.stringify(agentRpc));
+  const qaCount = await agent.sb.from("call_records").select("id", { count: "exact", head: true });
+  check("…and counting calls still works (QA)", !qaCount.error && qaCount.count > 0, qaCount.error?.message);
+
   const deleted = Number(sql(`insert into public.leads (company_name, project_id) values (${lit(`${TAG} Gone`)}, ${DBDV}) returning id`));
   sql(`insert into public.lead_notes (lead_id, notes) values (${deleted}, 'x')`);
   sql(`delete from public.leads where id = ${deleted}`);

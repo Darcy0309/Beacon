@@ -60,7 +60,9 @@ export default function QaQueue({ items, me }) {
                 <p className="text-xs text-muted-foreground">
                   {a.contact} · <span className="tabular-nums">{a.phone}</span> · set by {a.setBy} on {a.set}
                 </p>
-                {a.notes ? <p className="mt-1 whitespace-pre-line text-xs">{a.notes}</p> : null}
+                {a.notes ? (
+                  <p className="mt-1 whitespace-pre-line text-xs"><span className="font-semibold text-muted-foreground">Client notes: </span>{a.notes}</p>
+                ) : null}
               </div>
               {own ? (
                 <span className="text-xs text-muted-foreground">Someone else reviews your appointments</span>

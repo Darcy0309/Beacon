@@ -56,7 +56,9 @@ export async function listQaCalls(params) {
 
 /**
  * Appointments set from a call and waiting for QA, oldest first. The client
- * is told about an appointment only once it passes here.
+ * is told about an appointment only once it passes here. Shown with the
+ * lead's client notes, which agents see; the call notes are for
+ * administrators and managers only.
  */
 export async function getQaQueue() {
   const supabase = await createClient();
@@ -65,8 +67,8 @@ export async function getQaQueue() {
     .select(`id, appt_date, appt_time, rep_name, appt_create_date, set_stage,
       setter:users!appointments_user_id_fkey(id, first_name, last_name, email),
       project:projects!appointments_project_id_fkey(name),
-      lead:leads(id, company_name, contact_name, phone),
-      call:call_records!appointments_call_record_id_fkey(call_result, notes)`)
+      lead:leads(id, company_name, contact_name, phone, client_note),
+      call:call_records!appointments_call_record_id_fkey(call_result)`)
     .eq("qa_status", "pending")
     .order("appt_create_date")
     .order("id");
@@ -81,7 +83,7 @@ export async function getQaQueue() {
     setterId: one(a.setter)?.id ?? null,
     setBy: shortName(one(a.setter)),
     result: one(a.call)?.call_result ?? "Appointment",
-    notes: one(a.call)?.notes ?? null,
+    notes: one(a.lead)?.client_note ?? null,
     when: `${shortDate(a.appt_date)}${a.appt_time ? ` · ${a.appt_time}` : ""}`,
     with: a.rep_name,
     set: shortDate(a.appt_create_date),

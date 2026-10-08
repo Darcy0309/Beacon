@@ -14,6 +14,7 @@ import {
 import { createLead, updateLead } from "@/features/leads/actions";
 import { fullName } from "@/lib/format";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
+import { useRole } from "@/components/layout/role-provider";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -22,6 +23,9 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * `options` carries the lookup rows (statuses, projects, managers, agencies).
  */
 export default function LeadForm({ lead, options, trigger }) {
+  // The internal notes: administrators and managers only.
+  const { role } = useRole();
+  const seesInternal = role === "admin" || role === "manager";
   const isEdit = Boolean(lead?.id);
   // Inside a row's action menu the menu owns the open state and there is no trigger.
   const [open, setOpen, inRowMenu, onCloseAutoFocus] = useDialogOpen();
@@ -219,9 +223,11 @@ export default function LeadForm({ lead, options, trigger }) {
               <StampedTextarea name="client_note" rows={3} defaultValue={dv("client_note")} maxLength={2000} aria-invalid={invalid("client_note")} />
             </Field>
 
-            <Field label="Internal notes" error={fe("internal_notes")} className="sm:col-span-2" hint="Staff only: never shown to the client">
-              <StampedTextarea name="internal_notes" rows={4} defaultValue={dv("internal_notes")} maxLength={5000} aria-invalid={invalid("internal_notes")} />
-            </Field>
+            {seesInternal ? (
+              <Field label="Internal notes" error={fe("internal_notes")} className="sm:col-span-2" hint="Administrators and managers only: never shown to agents or the client">
+                <StampedTextarea name="internal_notes" rows={4} defaultValue={dv("internal_notes")} maxLength={5000} aria-invalid={invalid("internal_notes")} />
+              </Field>
+            ) : null}
           </div>
 
           <DialogFooter>

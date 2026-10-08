@@ -167,6 +167,8 @@ export default async function LeadSheet({ params, searchParams }) {
   const xdates = ins ? XDATE_ROWS.filter(([, k]) => ins[k]) : [];
   const admin = me?.role === "admin";
   const staff = ["admin", "manager", "agent"].includes(me?.role);
+  // The lead's internal notes and its call notes: administrators and managers (the database gives an agent neither).
+  const seesInternal = ["admin", "manager"].includes(me?.role);
 
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
@@ -233,7 +235,7 @@ export default async function LeadSheet({ params, searchParams }) {
   const address = [r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean);
   const website = r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null;
   // The client notes (the client sees them) and the internal notes (staff only), counted on the tab.
-  const noteCount = [r.client_note, r.internal_notes].filter(Boolean).length;
+  const noteCount = [r.client_note, seesInternal ? r.internal_notes : null].filter(Boolean).length;
 
   return (
     <>
@@ -464,7 +466,7 @@ export default async function LeadSheet({ params, searchParams }) {
                   label: "Notes",
                   count: noteCount || null,
                   content: (
-                    <LeadNotes leadId={lead.id} clientNote={r.client_note} internalNotes={r.internal_notes} description={r.description} canEdit={staff} />
+                    <LeadNotes leadId={lead.id} clientNote={r.client_note} internalNotes={r.internal_notes} description={r.description} canEdit={staff} showInternal={seesInternal} />
                   ),
                 },
               ]}

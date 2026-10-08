@@ -158,7 +158,7 @@ export async function getLeadCounts() {
 /** Appointments, call history and the emails sent to its contact, for one lead. */
 export async function getLeadActivity(leadId) {
   const supabase = await createClient();
-  const [appts, calls, emails, reminders, deliveries] = await Promise.all([
+  const [appts, calls, emails, reminders, deliveries, callNotes] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, appt_date, appt_time, duration_min, rep_name, qa_status, confirmed_at, invalid_at, status:appointment_statuses(name), setter:users!appointments_user_id_fkey(first_name, last_name)")
@@ -166,7 +166,7 @@ export async function getLeadActivity(leadId) {
       .order("appt_date", { ascending: false }),
     supabase
       .from("call_records")
-      .select("id, call_date, call_result, notes, stage, user:users(first_name, last_name)")
+      .select("id, call_date, call_result, stage, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("call_date", { ascending: false })
       .limit(20),
@@ -189,7 +189,10 @@ export async function getLeadActivity(leadId) {
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(30),
+    // What was said on each call: administrators and managers only (call_notes() gives anyone else none).
+    supabase.rpc("call_notes", { p_lead_id: Number(leadId) }),
   ]);
+  const notesOf = new Map((callNotes.data ?? []).map((n) => [n.id, n.notes]));
 
   return {
     appointments: (appts.data ?? []).map((a) => ({
@@ -205,7 +208,7 @@ export async function getLeadActivity(leadId) {
     calls: (calls.data ?? []).map((c) => ({
       id: c.id,
       result: c.call_result ?? "Call",
-      notes: c.notes,
+      notes: notesOf.get(c.id) ?? null,
       when: timeAgo(c.call_date),
       at: c.call_date,
       by: fullName(one(c.user)) || "—",

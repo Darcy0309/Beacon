@@ -205,16 +205,22 @@ day and who is writing ("10/8/26 seanf: "; `components/shared/stamped-textarea.j
   for them when a result sends the sheet (`record_call_result(p_client_note)`)
   and the appointment form can edit them. A list's "Notes" column imports
   here.
-- **Internal notes** (`lead_notes.notes`): staff only, never shown to a
-  client: not in the email, not in the app, not through the API (the table
-  is staff-only, apart from the lead, which a client may read). The old
-  system's "notes to client" column, which carries its call history,
+- **Internal notes** (`lead_notes.notes`): administrators and account
+  managers only (`sees_internal_notes()`), never shown to agents or
+  clients: not in the email, not in the app, not through the API (the
+  table is theirs alone, apart from the lead, which others may read). The
+  old system's "notes to client" column, which carries its call history,
   imports here, and the notes written on each call are added to the end
-  (`record_call_result()`), so they stay the lead's running history. The
-  call notes (`call_records`) are staff only too.
+  (`record_call_result()`), so they stay the lead's running history.
+- **Call notes** (`call_records.notes`) likewise: agents still read the
+  calls (QA, the history), but not that column, which no one signed in
+  reads directly; administrators and managers read it through
+  `call_notes()`. A column added to call_records must be granted
+  (`grant select (<column>) on public.call_records to authenticated`).
 
 Leads also carry their **EIN** (imported from a
-list's EIN or tax ID column, typed on the lead, written as 12-3456789).
+list's EIN or tax ID column, typed on the lead, written as 12-3456789),
+shown in the lead sheet email's profile too.
 
 ## Call-back reminders
 

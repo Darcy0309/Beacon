@@ -12,7 +12,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
 
 const KINDS = {
   client: { label: "Client notes", icon: Eye, say: "The client sees these: in the lead sheet email and on the calendar.", max: 2000 },
-  internal: { label: "Internal notes", icon: Lock, say: "Staff only: never shown to the client.", max: 5000 },
+  internal: { label: "Internal notes", icon: Lock, say: "Administrators and managers only: never shown to agents or the client.", max: 5000 },
 };
 
 /** One note on the Notes tab: read, or (for staff) edited where it is. */
@@ -89,14 +89,15 @@ function Note({ leadId, kind, text, canEdit }) {
 }
 
 /**
- * The lead's Notes tab: its client notes (which the client sees) and its
- * internal notes (staff only), each edited in place, then its description.
+ * The lead's Notes tab: its client notes (which the client sees) and, for
+ * administrators and managers (`showInternal`), its internal notes, each
+ * edited in place; then its description.
  */
-export default function LeadNotes({ leadId, clientNote, internalNotes, description, canEdit }) {
+export default function LeadNotes({ leadId, clientNote, internalNotes, description, canEdit, showInternal = false }) {
   return (
     <div className="divide-y divide-[var(--panel-border)]">
       <Note leadId={leadId} kind="client" text={clientNote} canEdit={canEdit} />
-      <Note leadId={leadId} kind="internal" text={internalNotes} canEdit={canEdit} />
+      {showInternal ? <Note leadId={leadId} kind="internal" text={internalNotes} canEdit={canEdit} /> : null}
       {description ? (
         <section className="px-4 py-3">
           <h3 className="text-sm font-semibold">Description</h3>

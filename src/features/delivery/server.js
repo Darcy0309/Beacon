@@ -36,7 +36,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       decision_maker, dm_title, dm_phone, dm_mobile, dm_email,
       contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email,
       address, city, state, zip, website, fax, producer_name, list_source,
-      location, employees, autos, sales_volume, years_in_business, sic_code, estimated_annual_premium, description, client_note,
+      location, employees, autos, sales_volume, ein, years_in_business, sic_code, estimated_annual_premium, description, client_note,
       project_id, insurance:insurance_details(*),
       assigned:users!leads_assigned_user_id_fkey(first_name, last_name, email)`)
     .eq("id", leadId)
@@ -105,7 +105,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       },
       profile: [
         ["Locations", lead.location], ["Employees", lead.employees], ["Autos", lead.autos], ["Sales volume", lead.sales_volume],
-        ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
+        ["EIN", lead.ein], ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
         ["Est. premium", lead.estimated_annual_premium],
       ],
       // Only what was written for the client: the call notes stay internal.

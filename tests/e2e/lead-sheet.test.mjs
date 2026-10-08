@@ -39,9 +39,9 @@ const APPT = Number(sql(`insert into public.projects (name, company_id, project_
   values (${lit(`${TAG} Appointments`)}, ${company}, ${typeId("APPT")}, 1, ${lit(SHEET_TO)}) returning id`));
 sql(`insert into public.project_assignments (project_id, ae_user_id) values (${APPT}, ${MIKE})`);
 const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, address, city, state, zip, sic_code, location, employees,
-    sales_volume, years_in_business, project_id, assigned_user_id)
+    sales_volume, ein, years_in_business, project_id, assigned_user_id)
   values (${lit(`${TAG} A & Sons Elect`)}, 'Daniel', '602-555-0101', '12 Main St', 'Phoenix', 'AZ', '85004', '1731', '3', '14',
-    '$2.1M', '12', ${APPT}, ${MIKE}) returning id`));
+    '$2.1M', '98-7654321', '12', ${APPT}, ${MIKE}) returning id`));
 sql(`insert into public.lead_notes (lead_id, notes) values (${lead}, 'INTERNAL-SECRET owner is hard. OLD-HISTORY 9/1/26 seanf: left vm')`);
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate, agency_name, pkg_xdate) values (${lead}, '2027-03-01', 'Garry Insurance', '2027-03-01')`);
 const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT_USER}`);
@@ -83,6 +83,7 @@ try {
   check("the address is a Google Maps link", body.includes("https://www.google.com/maps/search/?api=1&query=12%20Main%20St%2C%20Phoenix%20AZ%2085004"));
   check("the SIC code with what it means", body.includes("SIC code: 1731 – Electrical Work"), body.match(/SIC code: [^\n]*/)?.[0]);
   check("Locations above Employees", /PROFILE\r?\nLocations: 3\r?\nEmployees: 14/.test(body), body.slice(body.indexOf("PROFILE"), body.indexOf("PROFILE") + 80));
+  check("the EIN, between Sales volume and Years in business", /Sales volume: \$2\.1M\r?\nEIN: 98-7654321\r?\nYears in business: 12/.test(body), body.slice(body.indexOf("PROFILE"), body.indexOf("PROFILE") + 140));
   const policy = body.slice(body.indexOf("POLICY INFORMATION")).split(/\r?\n/).slice(1, 4);
   check("the agency after the policies", JSON.stringify(policy) === JSON.stringify(["Ultimate X-Date: Mar 1, 2027", "Package: Mar 1, 2027", "Agency: Garry Insurance"]), JSON.stringify(policy));
 
@@ -139,6 +140,18 @@ try {
   check("the calendar's appointment shows what was written for them", Boolean(await until(() => client.ev(`document.querySelector('[role=dialog]')?.innerText.includes(${JSON.stringify(NOTE)})`))));
   check("…and nothing internal", !/INTERNAL-SECRET|OLD-HISTORY|INTERNAL-CALL-NOTE/.test(await client.ev("document.documentElement.outerHTML")));
 
+  section("An agent sees the client notes only");
+  const agent = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();
+  await agent.go(`/leads/${lead}`, 4000);
+  await agent.click('[role=tab][data-tab="notes"]');
+  const agentHtml = await agent.ev("document.documentElement.outerHTML");
+  check("the client notes are there", (await agent.ev(`document.querySelector('[data-note="client"]')?.innerText ?? ''`)).includes("Appt set with Daniel"));
+  check("…not the internal notes, nor what was said on the calls, anywhere in the page",
+    !(await agent.ev(`!!document.querySelector('[data-note="internal"]')`)) && !/INTERNAL-SECRET|OLD-HISTORY|INTERNAL-CALL-NOTE/.test(agentHtml));
+  await agent.click("[data-contact-card] button", "Edit");
+  check("…nor in the lead form", Boolean(await until(() => agent.ev(`!!document.querySelector('[role=dialog] input[name="ein"]')`))) && !(await agent.ev(`!!document.querySelector('[role=dialog] textarea[name="internal_notes"]')`)));
+  await agent.key("Escape");
+
   section("For staff: the Notes tab");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage();
   await admin.go(`/leads/${lead}`, 4000);
@@ -146,7 +159,7 @@ try {
   const noteText = (kind) => admin.ev(`document.querySelector('[data-note="${kind}"]')?.innerText ?? ''`);
   check("Client notes, which the client sees, with what was written for them",
     /Client notes[\s\S]*The client sees these[\s\S]*Appt set with Daniel/.test(await noteText("client")), await noteText("client"));
-  check("…Internal notes, staff only, with the old system's", /Internal notes[\s\S]*Staff only[\s\S]*INTERNAL-SECRET[\s\S]*OLD-HISTORY/.test(await noteText("internal")), await noteText("internal"));
+  check("…Internal notes, for administrators and managers, with the old system's", /Internal notes[\s\S]*Administrators and managers only[\s\S]*INTERNAL-SECRET[\s\S]*OLD-HISTORY/.test(await noteText("internal")), await noteText("internal"));
   check("…and no “Old system notes” any more", !/Old system notes/.test(await admin.ev(`document.querySelector('[data-tab-panel="notes"]').innerText`)));
   const editNote = async (kind, text) => {
     await admin.click(`[data-note="${kind}"] button`, kind === "client" ? "Edit" : "Edit");

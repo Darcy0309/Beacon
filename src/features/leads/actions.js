@@ -211,8 +211,9 @@ export async function cancelReminder(formData) {
 
 /**
  * One of a lead's two notes, edited in place on its Notes tab: the client
- * notes (on the lead, which the client sees) or the internal notes
- * (lead_notes, staff only). Staff alone may write either; the database says so.
+ * notes (on the lead, which the client sees; staff write them) or the
+ * internal notes (lead_notes: administrators and managers alone). The
+ * database says who may.
  */
 export async function saveLeadNote(prevState, formData) {
   const { values, failed } = check(formData, schemas.leadNote);
