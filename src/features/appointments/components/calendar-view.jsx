@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight,
@@ -19,6 +19,18 @@ import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
 const OpenAppointment = createContext(() => {});
+/** The appointment a notification pointed at (?a=<id>): highlighted wherever it shows. */
+const FocusedAppointment = createContext(null);
+
+/** Is this the appointment the visitor came to see? It is scrolled into view, once. */
+function useFocused(a) {
+  const focused = useContext(FocusedAppointment) === a.id;
+  const ref = useRef(null);
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focused]);
+  return [focused, ref];
+}
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -76,11 +88,12 @@ function layoutDay(events) {
  * live in the URL (?view=&d=), so every view is linkable.
  */
 export default function CalendarView(props) {
-  const { view, title, prev, next, todayHref, viewHrefs } = props;
+  const { view, title, prev, next, todayHref, viewHrefs, focusId = null } = props;
   const [selected, setSelected] = useState(null);
 
   return (
     <OpenAppointment.Provider value={setSelected}>
+    <FocusedAppointment.Provider value={focusId}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1 rounded-lg border border-[var(--panel-border)] p-1">
@@ -119,6 +132,7 @@ export default function CalendarView(props) {
       {view === "month" ? <MonthView key={`${props.year}-${props.month}`} {...props} /> : <TimeGrid {...props} />}
     </div>
     <AppointmentDialog a={selected} onClose={() => setSelected(null)} />
+    </FocusedAppointment.Provider>
     </OpenAppointment.Provider>
   );
 }
@@ -212,7 +226,7 @@ function AppointmentDialog({ a, onClose }) {
 /* --------------------------------------------------------------------------
    Day and week: an hour grid with appointments placed by start time.
    -------------------------------------------------------------------------- */
-function TimeGrid({ view, title, days, byDate, rows, today, timeZone }) {
+function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null }) {
   const [nowMin, setNowMin] = useState(null);
 
   // The "now" line, refreshed every minute, on the business's clock: "today"
@@ -331,7 +345,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone }) {
                     return (
                       <div
                         key={a.id}
-                        className="absolute px-0.5"
+                        className={cn("absolute px-0.5", a.id === focusId && "z-[5]")}
                         style={{
                           top: blockTop,
                           height: blockHeight,
@@ -371,14 +385,18 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone }) {
 /** One appointment on the time grid. Opens the detail dialog. */
 function Block({ a, dense = false, compact = false }) {
   const open = useContext(OpenAppointment);
+  const [focused, ref] = useFocused(a);
   return (
     <button
+      ref={ref}
       type="button"
       onClick={() => open(a)}
+      data-focused-appointment={focused || undefined}
       title={`${a.time} ${a.ampm} · ${a.co} · ${a.detail}`}
       className={cn(
         "flex h-full w-full min-w-0 gap-1.5 overflow-hidden rounded-md border border-[var(--panel-border)] bg-card/90 px-1.5 py-1 text-left transition-colors hover:border-primary/50 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-        compact && "h-auto"
+        compact && "h-auto",
+        focused && "appt-focus"
       )}
     >
       <span className={cn("w-[3px] shrink-0 rounded-full", a.bar)} />
@@ -415,8 +433,11 @@ function Block({ a, dense = false, compact = false }) {
 /* --------------------------------------------------------------------------
    Month: heat-mapped grid with a side panel for the selected day.
    -------------------------------------------------------------------------- */
-function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase }) {
-  const [selected, setSelected] = useState(todayDay);
+function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null }) {
+  const dayOf = (a) => Number(String(a.date).slice(8, 10));
+  // Opened from a notification: show that appointment's day.
+  const focusRow = focusId == null ? null : rows.find((a) => a.id === focusId);
+  const [selected, setSelected] = useState(focusRow ? dayOf(focusRow) : todayDay);
 
   const START = new Date(year, month, 1).getDay();
   const DAYS = new Date(year, month + 1, 0).getDate();
@@ -425,7 +446,6 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
   for (let d = 1; d <= DAYS; d++) cells.push(d);
 
   const busiest = Math.max(1, ...Object.values(byDay ?? {}));
-  const dayOf = (a) => Number(String(a.date).slice(8, 10));
   const label = (d) =>
     new Date(year, month, d).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const isoOf = (d) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
@@ -556,9 +576,11 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
 
 function ApptRow({ a }) {
   const open = useContext(OpenAppointment);
+  const [focused, ref] = useFocused(a);
   return (
-    <button type="button" onClick={() => open(a)} data-list-row
-      className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2 text-left">
+    <button ref={ref} type="button" onClick={() => open(a)} data-list-row
+      data-focused-appointment={focused || undefined}
+      className={cn("-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2 text-left", focused && "appt-focus")}>
       <span className={cn("h-9 w-[3px] shrink-0 rounded-full", a.bar)} />
       <div className="w-14 shrink-0 text-sm font-bold tabular-nums">
         {a.time}

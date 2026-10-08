@@ -4,10 +4,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { check, currentAppUser, fail, logActivity, ok, s } from "@/lib/server/action-helpers";
+import { check, currentAppUser, fail, logActivity, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { cross, safeInternalPath, schemas } from "@/lib/validate";
+import { cross, rules, safeInternalPath, schemas } from "@/lib/validate";
 
 const DISABLED_MESSAGE = "This account has been disabled. Contact an administrator.";
 
@@ -188,4 +188,23 @@ export async function signOut() {
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/login");
+}
+
+/**
+ * "Forgot your password?": email a link that signs the person in and opens
+ * My Security to set a new password. The answer is the same whether or not
+ * the address has an account, so nobody can find out who has one. Supabase
+ * Auth sends the email and limits how often.
+ */
+export async function requestPasswordReset(prevState, formData) {
+  const email = s(formData, "email")?.toLowerCase() ?? "";
+  if (!email || rules.email(email)) return fail("Enter the email you sign in with.", { email: "Enter the email you sign in with" }, { email });
+  const supabase = await createClient();
+  const origin = await requestOrigin();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/security?reset=1")}`,
+  });
+  if (error?.status === 429) return fail("Too many requests. Wait a few minutes, then try again.", null, { email });
+  if (error) console.error("[auth] password reset", error.message);
+  return ok({ email });
 }

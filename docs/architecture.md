@@ -57,7 +57,8 @@ in the database, which in a single transaction:
 - promotes a Lead to the linked appointment (Appt) project, handing it to the
   appointment manager with the fewest names and recording who developed it;
 - sets an appointment on the calendar, staged for QA (the client hears only
-  when QA passes, from the rep who set it), as a confirmation follow-up for
+  when QA passes, from the rep who set it; the notification's Open calendar
+  names it, `&a=<id>`, and the calendar highlights it), as a confirmation follow-up for
   whoever set it; recording an appointment again on a name whose
   appointment is still to come (or waiting for QA) moves that one instead
   of booking and paying a second;
@@ -194,6 +195,26 @@ a cancel button and among the calls in the call history. `pg_cron` runs
 the bell and, like any notification, on the desktop or by push. People see
 their own reminders; an administrator sees everyone's.
 
+## Morning alerts
+
+Two rules on the Alerts page send each morning at 7 on the business's clock
+(`pg_cron` runs `run_daily_alerts()` every hour, and each goes to each
+person once a day, as `alert_sends` records):
+
+- **X-date 30-day warning** (`send_xdate_warnings()`): every rep hears of the
+  names they hold whose renewal is 30 days out (the Ultimate XDate, or the
+  earliest line's), unless the name is off the list. A name nobody holds goes
+  to its project's reps. One name links to it; several make one notification,
+  how many and which, linking to the call lists.
+- **Appointment reminder** (`send_appointment_reminders()`): whoever set them
+  hears of the day's appointments and of tomorrow's not yet confirmed
+  (cancelled, no-show and invalid ones left out), linking to that day on the
+  calendar.
+
+Both go through `notify_users()`, so switching a rule off stops it and each
+send is logged; like any notification they reach the bell, the desktop and
+push. `tests/integration/daily-alerts.test.mjs` covers them.
+
 ## Coverage
 
 The lead sheet's Coverage tab shows the Ultimate XDate and the prospect's
@@ -206,7 +227,9 @@ Insurance Cos. list as it is typed (`components/shared/suggest-input.jsx`)
 and flags one that is not on it, so carriers are spelled one way. An
 administrator fills the list from a CSV of carrier names on the Insurance
 Cos. page (`importCarriers()`, which skips names already on file however
-they are written).
+they are written), or adds and edits one there by hand (`saveCarrier()`:
+its name, lines of business and states, written as two-letter codes; a name
+already on file however written is refused).
 
 ## Email to leads
 

@@ -14,13 +14,18 @@ function DialogClose(props) {
   return <DialogPrimitive.Close {...props} />;
 }
 
+/**
+ * Never taller than the screen: a form longer than the room scrolls inside
+ * the box, and its DialogFooter (Save, Cancel) stays pinned at the bottom.
+ */
 function DialogContent({ className, children, ...props }) {
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
       <DialogPrimitive.Content
+        data-dialog-content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 flex max-h-[90svh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-xl border bg-card p-5 text-card-foreground shadow-xl outline-none",
+          "fixed left-1/2 top-1/2 z-50 flex max-h-[90svh] w-[calc(100vw-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto overscroll-contain rounded-xl border bg-card p-5 text-card-foreground shadow-xl outline-none",
           className
         )}
         {...props}
@@ -41,7 +46,11 @@ function DialogHeader({ className, ...props }) {
 
 function DialogFooter({ className, ...props }) {
   return (
-    <div className={cn("flex flex-wrap items-center justify-end gap-2 pt-1", className)} {...props} />
+    <div
+      data-dialog-footer
+      className={cn("sticky bottom-0 z-10 -mx-5 -mb-5 flex shrink-0 flex-wrap items-center justify-end gap-2 bg-card px-5 pb-5 pt-1", className)}
+      {...props}
+    />
   );
 }
 

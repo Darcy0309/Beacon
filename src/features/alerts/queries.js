@@ -34,13 +34,13 @@ const DESC = {
   import_done: "When a lead import finishes: administrators, with the row counts.",
   feedback_new: "When a client submits feedback: administrators.",
   bulletin_posted: "When an announcement or alert is posted to the bulletin board: all staff.",
-  xdate_30d: "A reminder when a policy X-date falls within 30 days.",
-  appt_reminder: "A daily reminder of the day's appointments.",
+  xdate_30d: "Each morning at 7: every rep, of the names they hold whose renewal is 30 days out.",
+  appt_reminder: "Each morning at 7: whoever set them, of the day's appointments and tomorrow's still to confirm.",
 };
 
-// Rules with no job behind them yet: switching them on sends nothing until
-// the scheduled reminders are built.
-const NOT_RUNNING = new Set(["xdate_30d", "appt_reminder"]);
+// Rules with no job behind them yet (none now: the two morning ones run
+// from pg_cron, run_daily_alerts()).
+const NOT_RUNNING = new Set();
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK = 7;

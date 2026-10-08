@@ -11,6 +11,7 @@ import { listInsuranceCompanies } from "@/features/insurance/queries";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteAgency } from "@/features/insurance/actions";
 import CarrierImport from "@/features/insurance/components/carrier-import";
+import CarrierForm from "@/features/insurance/components/carrier-form";
 
 export const dynamic = "force-dynamic";
 
@@ -47,7 +48,7 @@ export default async function InsuranceCompaniesPage({ searchParams }) {
         </div>
 
         <Card>
-          <SectionHeader label="Carriers" icon={Building2} action={<CarrierImport />} />
+          <SectionHeader label="Carriers" icon={Building2} action={<div className="flex flex-wrap gap-2"><CarrierImport /><CarrierForm /></div>} />
           <FilterTable
             columns={["Carrier", "Association", "States", "Active X-dates", "Status", { label: "Action", className: "text-right" }]}
             filters={[
@@ -69,10 +70,10 @@ export default async function InsuranceCompaniesPage({ searchParams }) {
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{c.lines}</TableCell>
-                  <TableCell className="tabular-nums">{c.states}</TableCell>
+                  <TableCell className="tabular-nums">{c.territory || c.states}</TableCell>
                   <TableCell className="font-semibold tabular-nums text-primary">{c.xdates}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[c.status] ?? "slate"}>{c.status}</ToneBadge></TableCell>
-                  <TableCell className="text-right"><RowActions name={c.name} id={c.id} onDelete={deleteAgency} /></TableCell>
+                  <TableCell className="text-right"><RowActions name={c.name} id={c.id} edit={<CarrierForm carrier={c} />} onDelete={deleteAgency} /></TableCell>
                 </TableRow>
               ),
             }))}

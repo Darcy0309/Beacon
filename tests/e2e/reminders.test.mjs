@@ -94,8 +94,10 @@ try {
   await until(() => sean.ev(`!!document.querySelector('[data-notification-panel]')`));
   await sean.click("[data-notification-panel] button", `Call back: ${TAG}`);
   const opened = await until(async () => (await sean.path()).startsWith("/notifications/") && sean.path());
-  check("opening it shows the reminder", Boolean(opened) && /Ask for Henry/.test(await sean.text()), opened);
-  check("…with a link to the lead", await sean.ev(`!![...document.querySelectorAll('a')].find((a) => a.getAttribute('href') === '/leads/${lead}')`));
+  // The address changes before the page arrives.
+  const shown = await until(async () => /Ask for Henry/.test(await sean.text()), { timeout: 10000 });
+  check("opening it shows the reminder", Boolean(opened) && Boolean(shown), `${opened} ${(await sean.text()).slice(0, 300)}`);
+  check("…with a link to the lead", Boolean(await until(() => sean.ev(`!![...document.querySelectorAll('a')].find((a) => a.getAttribute('href') === '/leads/${lead}')`))));
   await sean.go(`/leads/${lead}`, 4000);
   check("the sheet no longer lists it as to come", await sean.ev(`!document.querySelector('[data-reminder="${id}"]')`));
 

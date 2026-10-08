@@ -28,6 +28,8 @@ const ACTION_LABEL = {
   "lead.reminder": "Set a call-back reminder",
   "lead.deliver": "Sent a lead to the client again",
   "carriers.import": "Imported carriers",
+  "carrier.create": "Added a carrier",
+  "carrier.update": "Updated a carrier",
   "project.create": "Created a project",
   "project.update": "Updated a project",
   "company.create": "Created a client",

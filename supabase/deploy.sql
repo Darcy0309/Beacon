@@ -6678,6 +6678,272 @@ grant select on public.leads, public.insurance_details, public.projects, public.
   public.call_records, public.call_results, public.appointments, public.users, public.app_settings
   to service_role;
 
+-- ===== supabase/migrations/20261015100000_daily_alerts.sql =====
+-- ---------------------------------------------------------------------------
+-- Lighthouse CRM — the two alert rules that had nothing behind them
+--
+--   xdate_30d      "X-date 30-day warning": each morning, every rep hears of
+--                  the names they hold whose renewal is 30 days out (one
+--                  notification: the name itself, or how many and which)
+--   appt_reminder  "Appointment reminder": each morning, whoever set them
+--                  hears of the day's appointments, and of tomorrow's still
+--                  to confirm
+--
+-- Both go through notify_users(), so switching a rule off on the Alerts page
+-- stops it and each send is logged there; and like every notification they
+-- reach the bell, the desktop and push. Sent once a day each (alert_sends),
+-- at 7 a.m. on the business's clock or the first hour after: pg_cron runs
+-- run_daily_alerts() every hour.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.alert_sends (
+  rule     text not null,
+  key      text not null,
+  sent_at  timestamptz not null default now(),
+  primary key (rule, key)
+);
+alter table public.alert_sends enable row level security;   -- no policies: the jobs alone use it
+revoke all on public.alert_sends from anon, authenticated;
+
+/** The renewal-in-30-days warnings for the business's day `p_day`. Returns how many people were told. */
+create or replace function public.send_xdate_warnings(p_day date)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  r     record;
+  n     integer := 0;
+  v_due date := p_day + 30;
+begin
+  for r in
+    with due as (
+      select l.id, l.company_name, coalesce(l.assigned_user_id, pa.ae_user_id) as rep
+        from public.leads l
+        join public.insurance_details i on i.lead_id = l.id
+        left join public.call_results cr on cr.id = l.result_id
+        -- Nobody holds it: whoever is on its project hears instead.
+        left join lateral (select a.ae_user_id from public.project_assignments a
+                            where a.project_id = l.project_id and l.assigned_user_id is null) pa on true
+       where coalesce(i.ultimate_xdate, least(i.pkg_xdate, i.wc_xdate, i.auto_xdate, i.health_xdate, i.dental_xdate,
+                                              i.vision_xdate, i.prof_liab_xdate, i.do_xdate, i.eo_xdate)) = v_due
+         and (cr.id is null or cr.viable)          -- still worth a call: not off the list
+    )
+    select rep, count(*) as total, min(id) as first_id,
+           (array_agg(company_name order by company_name))[1:5] as names
+      from due where rep is not null
+     group by rep
+  loop
+    if exists (select 1 from public.alert_sends where rule = 'xdate_30d' and key = r.rep || ':' || p_day) then
+      continue;
+    end if;
+    insert into public.alert_sends (rule, key) values ('xdate_30d', r.rep || ':' || p_day);
+    n := n + public.notify_users(
+      array[r.rep], 'lead',
+      case when r.total = 1 then 'X-date in 30 days: ' || r.names[1]
+           else r.total || ' X-dates in 30 days' end,
+      'Renewing ' || to_char(v_due, 'FMMon FMDD') ||
+        case when r.total = 1 then '' else ': ' || array_to_string(r.names, ', ') ||
+          case when r.total > 5 then ' and ' || (r.total - 5) || ' more' else '' end end,
+      case when r.total = 1 then '/leads/' || r.first_id else '/work' end,
+      'xdate_30d');
+  end loop;
+  return n;
+end $$;
+
+/** The appointment reminders for the business's day `p_day`. Returns how many people were told. */
+create or replace function public.send_appointment_reminders(p_day date)
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  r record;
+  n integer := 0;
+begin
+  for r in
+    with live as (
+      select a.user_id, a.appt_date, a.appt_time, a.confirmed_at, l.company_name
+        from public.appointments a
+        join public.leads l on l.id = a.lead_id
+        left join public.appointment_statuses s on s.id = a.status_id
+       where a.user_id is not null and a.invalid_at is null
+         and coalesce(s.name, '') not in ('Cancelled', 'No Show', 'Invalid')
+         and a.appt_date in (p_day, p_day + 1)
+    )
+    select user_id,
+           count(*) filter (where appt_date = p_day) as today,
+           count(*) filter (where appt_date = p_day + 1 and confirmed_at is null) as to_confirm,
+           array_to_string((array_agg(coalesce(appt_time || ' ', '') || company_name order by appt_time)
+                             filter (where appt_date = p_day))[1:5], ', ') as today_list,
+           array_to_string((array_agg(company_name order by company_name)
+                             filter (where appt_date = p_day + 1 and confirmed_at is null))[1:5], ', ') as confirm_list
+      from live
+     group by user_id
+  loop
+    if r.today = 0 and r.to_confirm = 0 then continue; end if;
+    if exists (select 1 from public.alert_sends where rule = 'appt_reminder' and key = r.user_id || ':' || p_day) then
+      continue;
+    end if;
+    insert into public.alert_sends (rule, key) values ('appt_reminder', r.user_id || ':' || p_day);
+    n := n + public.notify_users(
+      array[r.user_id], 'appointment',
+      concat_ws(', ',
+        case when r.today > 0 then r.today || ' appointment' || case when r.today = 1 then '' else 's' end || ' today' end,
+        case when r.to_confirm > 0 then r.to_confirm || ' to confirm for tomorrow' end),
+      concat_ws(' · ',
+        case when r.today > 0 then 'Today: ' || r.today_list end,
+        case when r.to_confirm > 0 then 'Confirm: ' || r.confirm_list end),
+      '/calendar?view=day&d=' || p_day,
+      'appt_reminder');
+  end loop;
+  return n;
+end $$;
+
+/**
+ * Every hour: from 7 a.m. on the business's clock, today's X-date warnings
+ * and appointment reminders, each to each person once (later runs that day
+ * find them sent and send nothing).
+ */
+create or replace function public.run_daily_alerts()
+returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  v_now timestamp := now() at time zone public.business_tz();
+begin
+  if extract(hour from v_now) < 7 then
+    return 0;
+  end if;
+  return public.send_xdate_warnings(v_now::date) + public.send_appointment_reminders(v_now::date);
+end $$;
+
+revoke execute on function public.send_xdate_warnings(date) from public, anon, authenticated;
+revoke execute on function public.send_appointment_reminders(date) from public, anon, authenticated;
+revoke execute on function public.run_daily_alerts() from public, anon, authenticated;
+
+create extension if not exists pg_cron;
+select cron.unschedule(jobid) from cron.job where jobname = 'daily-alerts';
+select cron.schedule('daily-alerts', '5 * * * *', 'select public.run_daily_alerts()');
+
+-- The Alerts page said these two were not sending yet; now they do.
+update public.alert_rules set channel = 'inapp' where trigger in ('xdate_30d', 'appt_reminder');
+
+-- ===== supabase/migrations/20261016100000_appointment_links.sql =====
+-- ---------------------------------------------------------------------------
+-- Lighthouse CRM — "Open calendar" points at the appointment
+--
+-- An "Appointment set" or "Appointment confirmed" notification opened the
+-- calendar on the right day; its link now also names the appointment
+-- (/calendar?view=day&d=<date>&a=<id>), and the calendar highlights it.
+-- Notifications already sent get the same, where the appointment can be told
+-- from its day and company name.
+-- ---------------------------------------------------------------------------
+
+-- New appointments: as before (20260930120000_lead_lifecycle), the link naming the one appointment.
+create or replace function public.tg_notify_appointments()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+declare
+  r record;
+  v_to bigint[];
+begin
+  for r in
+    select p.company_id,
+           min(co.name) as company,
+           count(*) as n,
+           min(a.appt_date) as first_date,
+           max(a.appt_date) as last_date,
+           array_agg(distinct p.id) filter (where p.id is not null) as project_ids,
+           array_agg(distinct l.assigned_user_id) filter (where l.assigned_user_id is not null) as reps,
+           (array_agg(l.company_name order by a.appt_date, a.id))[1] as lead_name,
+           (array_agg(a.appt_time order by a.appt_date, a.id))[1] as first_time,
+           (array_agg(a.id order by a.appt_date, a.id))[1] as first_id,
+           bool_or(coalesce(a.qa_status, 'passed') = 'passed') as client_may_know
+      from new_rows a
+      left join public.leads l     on l.id  = a.lead_id
+      left join public.projects p  on p.id  = l.project_id
+      left join public.companies co on co.id = p.company_id
+     group by p.company_id
+  loop
+    v_to := array(
+      select id from public.users where role = 'admin'
+      union
+      select pa.ae_user_id from public.project_assignments pa
+       where pa.project_id = any(r.project_ids) and pa.ae_user_id is not null
+      union
+      select u.id from public.users u
+       where r.client_may_know and u.role = 'client' and r.company_id is not null and u.company_id = r.company_id
+      union
+      select unnest(r.reps)
+    );
+    perform public.notify_users(
+      v_to, 'appointment',
+      case when r.n = 1 then 'Appointment set: ' || coalesce(r.lead_name, 'a lead')
+           else r.n || ' appointments set' || coalesce(' for ' || r.company, '') end,
+      case when r.n = 1
+           then concat_ws(' · ',
+                  to_char(r.first_date, 'Dy Mon FMDD') || coalesce(' at ' || r.first_time, ''),
+                  r.company,
+                  'set by ' || public.actor_name())
+           else concat_ws(' · ',
+                  to_char(r.first_date, 'Mon FMDD') || ' – ' || to_char(r.last_date, 'Mon FMDD'),
+                  'set by ' || public.actor_name()) end,
+      '/calendar?view=' || case when r.n = 1 then 'day' else 'month' end
+        || '&d=' || coalesce(r.first_date, current_date)::text
+        || case when r.n = 1 then '&a=' || r.first_id else '' end,
+      'appt_created');
+  end loop;
+  return null;
+end $$;
+
+-- The client's notice: as before (20261005110000_audit_fixes), the link naming the appointment.
+create or replace function public.notify_client_appointment(p_appointment bigint, p_confirmed boolean, p_first boolean default false)
+returns void
+language plpgsql security definer set search_path = public as $$
+declare
+  a record;
+  v_confirmed boolean := p_confirmed;
+begin
+  select ap.appt_date, ap.appt_time, ap.user_id, l.company_name, co.id as company_id, co.name as company
+    into a
+    from public.appointments ap
+    join public.leads l on l.id = ap.lead_id
+    left join public.projects p on p.id = l.project_id
+    left join public.companies co on co.id = p.company_id
+   where ap.id = p_appointment;
+  if a.company_id is null then return; end if;
+  if p_confirmed and p_first
+     and not exists (select 1 from public.alert_rules where trigger = 'appt_confirmed' and enabled) then
+    v_confirmed := false;
+  end if;
+  perform public.notify_users(
+    array(select u.id from public.users u where u.role = 'client' and u.company_id = a.company_id),
+    'appointment',
+    (case when v_confirmed then 'Appointment confirmed: ' else 'Appointment set: ' end) || coalesce(a.company_name, 'a lead'),
+    concat_ws(' · ', to_char(a.appt_date, 'Dy Mon FMDD') || coalesce(' at ' || a.appt_time, ''), a.company),
+    '/calendar?view=day&d=' || coalesce(a.appt_date, current_date)::text || '&a=' || p_appointment,
+    case when v_confirmed then 'appt_confirmed' else 'appt_created' end,
+    null,
+    a.user_id);
+end $$;
+revoke execute on function public.notify_client_appointment(bigint, boolean, boolean) from public, anon, authenticated;
+
+-- Notifications already sent: the appointment on that day for that company
+-- (the one at the time the notification gives, when there are two).
+update public.notifications n
+   set link = n.link || '&a=' || m.appt_id
+  from (
+    select x.id,
+           (select ap.id
+              from public.appointments ap
+              join public.leads l on l.id = ap.lead_id
+             where ap.appt_date = substring(x.link from 'd=(\d{4}-\d{2}-\d{2})$')::date
+               and l.company_name = regexp_replace(x.title, '^Appointment (set|confirmed): ', '')
+             order by (ap.appt_time is not null and position(' at ' || ap.appt_time in x.body) > 0) desc, ap.id
+             limit 1) as appt_id
+      from public.notifications x
+     where x.kind = 'appointment'
+       and x.title ~ '^Appointment (set|confirmed): '
+       and x.link ~ '^/calendar\?view=day&d=\d{4}-\d{2}-\d{2}$'
+  ) m
+ where n.id = m.id and m.appt_id is not null;
+
 -- ===== supabase/seed.sql =====
 -- =============================================================================
 -- Beacon CRM — seed data

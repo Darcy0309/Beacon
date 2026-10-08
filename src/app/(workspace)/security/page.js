@@ -22,7 +22,9 @@ export default async function SecurityPage({ searchParams }) {
 
   // A fresh invitation lands here to set a password; so does an invited
   // account that wandered elsewhere before doing so.
-  const welcome = params?.welcome === "1" || me?.status === "invited";
+  // From a "forgot your password" email: set a new one.
+  const reset = params?.reset === "1";
+  const welcome = reset || params?.welcome === "1" || me?.status === "invited";
   const mine = rows.filter((r) => r.who === me?.name).slice(0, 8);
 
   return (
@@ -31,7 +33,7 @@ export default async function SecurityPage({ searchParams }) {
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <Card accent={welcome ? "var(--neon-cyan)" : undefined}>
           <SectionHeader label={welcome ? "Set your password" : "Password"} icon={KeyRound} />
-          <PasswordForm welcome={welcome} isClient={me?.role === "client"} />
+          <PasswordForm welcome={welcome} reset={reset} isClient={me?.role === "client"} />
         </Card>
 
         <Card accent="var(--neon-emerald)">

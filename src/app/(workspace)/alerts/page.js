@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 const dot = { hot: "var(--neon-rose)", appt: "var(--neon-emerald)", survey: "var(--neon-violet)", new: "var(--muted-foreground)" };
 
 export default async function AlertsPage() {
-  const { alertRules, recentAlerts, sentLastWeek, sentPerDay, notRunning } = await getAlerts();
+  const { alertRules, recentAlerts, sentLastWeek, sentPerDay } = await getAlerts();
   const enabled = alertRules.filter((r) => r.on).length;
 
   const tiles = [
@@ -22,8 +22,7 @@ export default async function AlertsPage() {
       icon: ToggleRight, accent: "var(--neon-emerald)", series: alertRules.map((r) => (r.on ? 1 : 0)), bars: true },
     { label: "Sent, Last 7 Days", value: sentLastWeek.toLocaleString(), note: "alerts dispatched, per day",
       icon: Send, accent: "var(--neon-amber)", series: sentPerDay, bars: true },
-    // In-app delivery cannot fail on its own, so what is worth counting is the rules with nothing behind them yet.
-    { label: "Not Sending Yet", value: String(notRunning), note: "scheduled reminders still to build",
+    { label: "Sent Today", value: String(sentPerDay.at(-1) ?? 0), note: "morning reminders included",
       icon: Clock, accent: "var(--neon-violet)" },
   ];
 

@@ -160,7 +160,10 @@ reachable from Vercel. Without one, every route shows a setup screen at
 
 4. **Configure Supabase Auth**: turn off public sign-ups; set the Site URL and
    add `https://<your-domain>/auth/callback` to the Redirect URLs; and set up
-   custom SMTP, or invitation emails only reach your Supabase team members.
+   custom SMTP, or invitation and "Forgot your password?" emails only reach
+   your Supabase team members. A reset link signs the person in and opens My
+   Security to set a new password; it works only in the browser that asked
+   for it.
 
 5. **Add your production users** from the app's *Users & Access* screen,
    signed in as an admin. Each person gets an email to set their password.

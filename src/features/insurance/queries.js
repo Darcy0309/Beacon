@@ -11,7 +11,9 @@ const toCarrierView = (a, states) => ({
   initials: initialsOf(a.name || ""),
   color: colorFor(a.name || ""),
   lines: a.association ?? "—",
-  states: states[a.id]?.size ?? 0,
+  association: a.association ?? "",
+  territory: a.territory ?? "",
+  states: a.territory ? a.territory.split(/,\s*/).length : states[a.id]?.size ?? 0,
   xdates: a.leads?.[0]?.count ?? 0,
   status: (a.leads?.[0]?.count ?? 0) > 12 ? "Preferred" : "Active",
 });
@@ -39,7 +41,7 @@ export async function listInsuranceCompanies(params) {
         }),
       params
     ),
-    supabase.from("agencies").select("id, association, leads(count)"),
+    supabase.from("agencies").select("id, association, territory, leads(count)"),
     supabase.from("agency_footprint").select("*"),
   ]);
 

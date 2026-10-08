@@ -1,10 +1,9 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { signIn, verifyTwoFactor } from "@/features/auth/actions";
+import { requestPasswordReset, signIn, verifyTwoFactor } from "@/features/auth/actions";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -15,8 +14,10 @@ export default function LoginForm({ next = "/" }) {
   // The password step reports `mfa` when the account has an authenticator,
   // which swaps this form for the code step.
   const [state, formAction, pending] = useActionState(signIn, EMPTY);
+  const [forgot, setForgot] = useState(false);
 
   if (state?.mfa) return <TwoFactorStep next={next} />;
+  if (forgot) return <ForgotPassword onBack={() => setForgot(false)} />;
 
   return (
     <form
@@ -68,10 +69,59 @@ export default function LoginForm({ next = "/" }) {
       </Button>
       <button
         type="button"
-        onClick={() => toast("Password resets are handled by your administrator.")}
-        className="block w-full text-center text-xs text-white/55 transition-colors hover:text-white hover:underline"
+        onClick={() => setForgot(true)}
+        className="block w-full cursor-pointer text-center text-xs text-white/55 transition-colors hover:text-white hover:underline"
       >
         Forgot your password?
+      </button>
+    </form>
+  );
+}
+
+/**
+ * "Forgot your password?": the email to send a reset link to. The answer
+ * is the same whether or not it has an account.
+ */
+function ForgotPassword({ onBack }) {
+  const [state, formAction, pending] = useActionState(requestPasswordReset, EMPTY);
+
+  return (
+    <form action={formAction} noValidate data-forgot-password
+      className="space-y-4 rounded-2xl border border-white/12 bg-white/8 p-6 shadow-2xl backdrop-blur-xl">
+      <div>
+        <h2 className="text-sm font-semibold text-white">Reset your password</h2>
+        <p className="mt-1 text-xs text-white/60">We&apos;ll email you a link to choose a new one.</p>
+      </div>
+      {state?.ok ? (
+        <p role="status" className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+          If {state.data.email} has a Lighthouse account, a link to set a new password is on its way. It works once, for a short time;
+          open it in this browser.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          <label htmlFor="reset-email" className="text-sm font-medium text-white/80">Email</label>
+          <input
+            id="reset-email"
+            name="email"
+            type="email"
+            required
+            autoFocus
+            defaultValue={state?.values?.email ?? ""}
+            placeholder="you@company.com"
+            autoComplete="username"
+            aria-invalid={state?.fieldErrors?.email ? true : undefined}
+            className={`${field} ${state?.fieldErrors?.email ? "border-rose-400/60" : ""}`}
+          />
+          {state?.fieldErrors?.email ? <p role="alert" className="text-xs text-rose-300">{state.fieldErrors.email}</p> : null}
+          {state?.error && !state?.fieldErrors ? <p role="alert" className="text-xs text-rose-300">{state.error}</p> : null}
+        </div>
+      )}
+      {state?.ok ? null : (
+        <Button type="submit" className="w-full" disabled={pending}>{pending ? "Sending…" : "Send reset link"}</Button>
+      )}
+      <button type="button" onClick={onBack}
+        className="block w-full cursor-pointer text-center text-xs text-white/55 transition-colors hover:text-white hover:underline">
+        Back to sign in
       </button>
     </form>
   );

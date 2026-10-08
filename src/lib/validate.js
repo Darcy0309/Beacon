@@ -352,6 +352,18 @@ export const schemas = {
     ...Object.fromEntries(POLICY_LINES.flatMap((l) => [[l.date, [date]], [l.carrier, [max(120)]]])),
   },
 
+  // An insurance carrier (Insurance Cos.): its name, the lines it writes and
+  // the states it is active in ("AZ, CA, NM"; checked in the action too).
+  carrier: {
+    id: [id],
+    name: [required("Name the carrier"), max(120)],
+    association: [max(120)],
+    territory: [max(300), rules.custom((v) => {
+      const bad = String(v ?? "").split(/[,;]+/).map((x) => x.trim()).filter((x) => x && !normalizeState(x));
+      return bad.length ? `Not a US state: ${bad.slice(0, 3).join(", ")}` : null;
+    })],
+  },
+
   // A call-back reminder on a lead sheet.
   reminder: {
     lead_id: [required("Missing lead"), id],

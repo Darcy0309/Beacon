@@ -13,7 +13,9 @@
  * two people can be signed in side by side. Pages in one context are tabs.
  */
 import { spawn } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { APP_URL } from "./env.mjs";
 import { sleep, until } from "./assert.mjs";
 import { sessionCookies } from "./auth.mjs";
@@ -135,9 +137,32 @@ async function openPage(browser, port, browserContextId, { width = 1440, height 
  * without one.
  */
 export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 600), mouse = false } = {}) {
-  const args = ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", `--remote-debugging-port=${port}`];
+  // A profile of its own, removed afterwards. Left to itself, headless Chrome
+  // makes one under ~/.config/google-chrome-headless per launch and, killed
+  // rather than quit, never removes it: about 100 MB a run, until the disk fills.
+  const profile = mkdtempSync(join(tmpdir(), "lighthouse-chrome-"));
+  // Never let a profile that will not go yet fail the test.
+  const removeProfile = () => {
+    try {
+      rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch {}
+  };
+  const args = ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`];
   if (mouse) args.push("--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4");
-  const chrome = spawn(process.env.CHROME ?? "google-chrome", [...args, "about:blank"], { stdio: "ignore" });
+  // In a process group of its own, so Chrome and all its helpers stop at
+  // once, before the profile goes, and none outlives a test that crashed.
+  const chrome = spawn(process.env.CHROME ?? "google-chrome", [...args, "about:blank"], { stdio: "ignore", detached: true });
+  const stop = () => {
+    try {
+      process.kill(-chrome.pid, "SIGKILL");
+    } catch {
+      chrome.kill("SIGKILL");
+    }
+  };
+  process.once("exit", () => {
+    stop();
+    removeProfile();
+  });
   const version = await until(
     async () => {
       try {
@@ -164,7 +189,7 @@ export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 6
     },
     close() {
       browser.close();
-      chrome.kill();
+      stop();
     },
   };
 }

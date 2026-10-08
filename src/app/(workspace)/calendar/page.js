@@ -22,6 +22,8 @@ export default async function CalendarPage({ searchParams }) {
     anchor = makeIso(y, m, 1);
   }
   anchor ||= today;
+  // ?a=<appointment id>: a notification's "Open calendar" — that one is highlighted.
+  const focusId = /^\d{1,18}$/.test(sp?.a ?? "") ? Number(sp.a) : null;
 
   const href = (v, date) => `/calendar?view=${v}&d=${date}`;
   const viewHrefs = Object.fromEntries(VIEWS.map((v) => [v, href(v, anchor)]));
@@ -81,6 +83,7 @@ export default async function CalendarPage({ searchParams }) {
           todayHref={href(view, today)}
           viewHrefs={viewHrefs}
           dayHrefBase={`/calendar?view=day&d=`}
+          focusId={focusId}
         />
       </div>
     </>

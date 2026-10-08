@@ -15,7 +15,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * Set or change your own password. A newly invited person lands here from
  * their email link (`welcome`), and setting the password turns the account on.
  */
-export default function PasswordForm({ welcome = false, isClient = false }) {
+export default function PasswordForm({ welcome = false, reset = false, isClient = false }) {
   const [state, formAction, pending] = useActionState(changePassword, EMPTY);
   const formRef = useRef(null);
   const router = useRouter();
@@ -34,7 +34,11 @@ export default function PasswordForm({ welcome = false, isClient = false }) {
 
   return (
     <form ref={formRef} action={formAction} noValidate className="space-y-4 p-5">
-      {welcome ? (
+      {reset ? (
+        <p data-reset-note className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
+          Choose a new password for your account. You stay signed in.
+        </p>
+      ) : welcome ? (
         <p className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
           Welcome to Lighthouse. Choose a password to finish setting up your account.
         </p>
