@@ -79,7 +79,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
       ) : (
         <div className="px-4 py-5">
           <div className="flex items-center justify-between gap-2">
-            <SignatureLogo className="min-w-0 text-sidebar-foreground" />
+            <SignatureLogo className="h-14 min-w-0 text-sidebar-foreground" />
             {!forceExpanded && (
               <button
                 onClick={toggle}

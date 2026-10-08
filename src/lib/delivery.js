@@ -42,7 +42,7 @@ const textOf = (v) => (v != null && typeof v === "object" ? v.text : v);
 const blank = (v) => textOf(v) == null || String(textOf(v)).trim() === "";
 const A = "color:#0e7490;text-decoration:underline;";
 
-// The logo image is 266 x 103: shown at 180 wide, so it stays sharp on most screens.
+// The logo image is 1064 x 416 (public/brand, rebuilt from the business's artwork): shown at 180 wide, sharp on any screen.
 const logoHtml = (url) =>
   url ? `<img src="${esc(url)}" alt="Signature Marketing" width="180" height="70" style="display:block;border:0;outline:none;height:auto;max-width:180px;margin:0 0 14px;">` : "";
 
