@@ -36,41 +36,65 @@ export function parseDeliveryAddresses(text, linkOnly = false) {
 /** The subject, as the old system wrote it: "<result> - <company>". */
 export const deliverySubject = (result, company) => `${result} - ${company}`.slice(0, 200);
 
-const blank = (v) => v == null || String(v).trim() === "";
+// A value on the sheet: text, a link ({ text, href }), or text with links
+// under it ({ text, links: [{ label, href }], linksLabel }).
+const textOf = (v) => (v != null && typeof v === "object" ? v.text : v);
+const blank = (v) => textOf(v) == null || String(textOf(v)).trim() === "";
+const A = "color:#0e7490;text-decoration:underline;";
+
+function cellHtml(v) {
+  if (v == null || typeof v !== "object") return esc(v);
+  if (v.href) return `<a href="${esc(v.href)}" style="${A}">${esc(v.text)}</a>`;
+  const links = (v.links ?? []).map((l) => `<a href="${esc(l.href)}" style="${A}">${esc(l.label)}</a>`).join(" &middot; ");
+  return `${esc(v.text)}${links ? `<br><span style="font-size:13px;color:#6b7280;">${esc(v.linksLabel ?? "")}${v.linksLabel ? ": " : ""}${links}</span>` : ""}`;
+}
+
+function cellText(v) {
+  if (v == null || typeof v !== "object") return String(v);
+  if (v.href) return `${v.text} (${v.href})`;
+  return [v.text, ...(v.links ?? []).map((l) => `  ${v.linksLabel ? `${v.linksLabel}, ` : ""}${l.label}: ${l.href}`)].join("\n");
+}
 
 /**
  * The lead sheet, as an email (HTML with inline styles, which mail programs
- * need, and the same in plain text) and as the page a link opens.
+ * need, and the same in plain text) and as the page a link opens. It never
+ * says when the lead or appointment was entered: the client asked not to.
  *
- * `s`: { company, result, when, client, project, producer, listSource, rep,
- *   appointment: { date, time, with } | null,
+ * `s`: { company, result, client, project, producer, listSource, rep,
+ *   appointment: { date, time, with, links: [{ label, href }] } | null,
  *   people: [{ who, name, title, phone, mobile, email }],
- *   address: [lines], website, fax,
+ *   address: [lines], map: url | null, website, fax,
  *   coverage: { ultimate, agency, lines: [{ label, xdate, carrier }] },
  *   profile: [[label, value]], notes: [[label, text]] }
  */
 export function renderLeadSheet(s) {
   const sections = [];
   const rows = (pairs) => pairs.filter(([, v]) => !blank(v));
+  const appointment = s.appointment
+    ? { text: [s.appointment.date, s.appointment.time].filter(Boolean).join(" at "), links: s.appointment.links ?? [], linksLabel: "Add to calendar" }
+    : null;
+  const address = (s.address ?? []).join(", ");
 
   sections.push(["Client information", rows([
     ["Client", s.client], ["Project", s.project], ["Producer name", s.producer], ["List source", s.listSource], ["Account manager", s.rep],
   ])]);
   sections.push(["Result", rows([
-    ["Call result", s.result], ["When", s.when],
-    ...(s.appointment ? [["Appointment", [s.appointment.date, s.appointment.time].filter(Boolean).join(" at ")], ["With", s.appointment.with]] : []),
+    ["Call result", s.result],
+    ...(appointment ? [["Appointment", appointment], ["With", s.appointment.with]] : []),
   ])]);
   sections.push(["Prospect", rows([
-    ["Company", s.company], ["Address", (s.address ?? []).join(", ")], ["Website", s.website], ["Fax", s.fax],
+    ["Company", s.company], ["Address", s.map && address ? { text: address, href: s.map } : address], ["Website", s.website], ["Fax", s.fax],
   ])]);
   for (const p of s.people ?? []) {
     const pairs = rows([["Name", [p.name, p.title].filter(Boolean).join(", ")], ["Business phone", p.phone], ["Mobile", p.mobile], ["Email", p.email]]);
     if (pairs.length) sections.push([p.who, pairs]);
   }
   const lines = (s.coverage?.lines ?? []).filter((l) => !blank(l.xdate) || !blank(l.carrier));
+  // The prospect's agency after the policies, not beside the renewal date.
   sections.push(["Policy information", rows([
-    ["Ultimate X-Date", s.coverage?.ultimate], ["Agency", s.coverage?.agency],
+    ["Ultimate X-Date", s.coverage?.ultimate],
     ...lines.map((l) => [l.label, [l.xdate, l.carrier].filter(Boolean).join(" · ")]),
+    ["Agency", s.coverage?.agency],
   ])]);
   sections.push(["Profile", rows(s.profile ?? [])]);
   sections.push(["Notes", rows(s.notes ?? [])]);
@@ -83,20 +107,20 @@ export function renderLeadSheet(s) {
 <tr><td style="padding:18px 20px;border-bottom:3px solid #0891b2;">
 <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;">Lead sheet</div>
 <div style="font-size:20px;font-weight:bold;margin-top:4px;">${esc(s.company)}</div>
-<div style="font-size:14px;color:#0e7490;margin-top:2px;">${esc(s.result)}${s.when ? ` · ${esc(s.when)}` : ""}</div>
+<div style="font-size:14px;color:#0e7490;margin-top:2px;">${esc(s.result)}</div>
 </td></tr>
 ${shown.map(([title, pairs]) => `<tr><td style="padding:14px 10px 4px;">
 <div style="font-size:11px;font-weight:bold;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;padding:0 10px 6px;">${esc(title)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-${pairs.map(([k, v]) => `<tr><td style="${td}width:34%;color:#6b7280;">${esc(k)}</td><td style="${td}white-space:pre-line;">${esc(v)}</td></tr>`).join("\n")}
+${pairs.map(([k, v]) => `<tr><td style="${td}width:34%;color:#6b7280;">${esc(k)}</td><td style="${td}white-space:pre-line;">${cellHtml(v)}</td></tr>`).join("\n")}
 </table></td></tr>`).join("\n")}
 <tr><td style="padding:14px 20px;font-size:12px;color:#9ca3af;">Sent by Lighthouse CRM</td></tr>
 </table></body></html>`;
 
   const text = [
     `LEAD SHEET: ${s.company}`,
-    `${s.result}${s.when ? ` · ${s.when}` : ""}`,
-    ...shown.flatMap(([title, pairs]) => ["", title.toUpperCase(), ...pairs.map(([k, v]) => `${k}: ${v}`)]),
+    s.result,
+    ...shown.flatMap(([title, pairs]) => ["", title.toUpperCase(), ...pairs.map(([k, v]) => `${k}: ${cellText(v)}`)]),
   ].join("\n");
 
   return { html, text };

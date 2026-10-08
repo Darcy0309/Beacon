@@ -184,6 +184,27 @@ so the rep never waits for it (`deliverLead()` in
 lead sheet, where "Send to client again" sends it again (the old
 "reprocess"), for whoever works the name now or an administrator.
 
+What the sheet says, as the client asked: never when the lead or
+appointment was entered; beside the appointment, **Add to calendar** for
+Google, Outlook (Microsoft 365) and Apple (an .ics file at
+`/sheet/[token]/appointment.ics`, the lead's current appointment, its time
+on the business's clock: `lib/appointment-links.js`); the address as a
+Google Maps link; the SIC code with what it means (`sic_codes`, every
+standard 4-digit code); Locations above Employees; the prospect's agency
+after the policies. Its notes are the lead's description and **For the
+client** (`leads.client_note`), which the call result panel asks for when a
+result sends the sheet (`record_call_result(p_client_note)`) and the
+appointment form can edit; the calendar shows it on the appointment too.
+
+**Internal notes stay internal.** The call notes (`call_records`, staff
+only) and the lead's own notes (`notes_dcm`, and `notes_client`, the old
+system's notes, which carry its call history) never reach a client: not
+in the email, not in the app, not through the API: they live apart from
+the lead, in `lead_notes`, which only staff may read or write (the lead
+form saves them there, and an import puts a list's notes columns there).
+Leads also carry their **EIN** (imported from a
+list's EIN or tax ID column, typed on the lead, written as 12-3456789).
+
 ## Call-back reminders
 
 Above the call result buttons, **Remind me** sets a reminder on the name

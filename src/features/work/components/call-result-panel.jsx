@@ -42,10 +42,12 @@ function noteStamp(user, timeZone) {
  * lead's project type, and, when the name has an appointment waiting, the
  * confirmation follow-up. Choosing a result asks for what it needs (each
  * button's own description shows on hover): a Lead or an Appointment its
- * Ultimate X-Date, an appointment its date and time. Saving moves on to the
- * next name when the sheet was opened from a call list.
+ * Ultimate X-Date, an appointment its date and time; one that sends the
+ * client the lead sheet, the note written for them ("For the client",
+ * `clientNote` on file to start from). The call notes stay internal. Saving
+ * moves on to the next name when the sheet was opened from a call list.
  */
-export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, timeZone = null }) {
+export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", timeZone = null }) {
   const router = useRouter();
   const { user } = useRole();
   const [state, setState] = useState(EMPTY);
@@ -213,7 +215,14 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
               ) : null}
             </div>
 
-            <Field label="Notes" error={fe("notes")}>
+            {picked.delivers ? (
+              <Field label="For the client" error={fe("client_note")} hint="Sent to the client with the lead sheet.">
+                <Textarea name="client_note" rows={3} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
+                  placeholder="e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am" data-client-note />
+              </Field>
+            ) : null}
+
+            <Field label={picked.delivers ? "Call notes" : "Notes"} error={fe("notes")} hint={picked.delivers ? "Internal: the client never sees them." : undefined}>
               <Textarea ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")}
                 onFocus={stampNotes} />
             </Field>

@@ -132,7 +132,7 @@ export const getCallResults = cache(async function getCallResults() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("call_results")
-    .select("id, project_type, name, viable, callable, sort_last, effect, applies_to, action")
+    .select("id, project_type, name, viable, callable, sort_last, effect, applies_to, action, delivers")
     .order("project_type")
     .order("sort_order");
   if (error) throw error;

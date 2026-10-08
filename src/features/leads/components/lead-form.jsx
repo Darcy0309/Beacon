@@ -183,32 +183,43 @@ export default function LeadForm({ lead, options, trigger }) {
               </Select>
             </Field>
 
+            <Field label="Locations" error={fe("location")}>
+              <Input name="location" defaultValue={dv("location")} maxLength={60} aria-invalid={invalid("location")} />
+            </Field>
             <Field label="Employees" error={fe("employees")}>
               <Input name="employees" inputMode="numeric" defaultValue={dv("employees")} aria-invalid={invalid("employees")} />
             </Field>
+
             <Field label="Autos" error={fe("autos")}>
               <Input name="autos" inputMode="numeric" defaultValue={dv("autos")} aria-invalid={invalid("autos")} />
             </Field>
-
             <Field label="Sales volume" error={fe("sales_volume")} hint="e.g. $12.4M">
               <Input name="sales_volume" defaultValue={dv("sales_volume")} maxLength={30} aria-invalid={invalid("sales_volume")} />
             </Field>
-            <Field label="Est. annual premium" error={fe("estimated_annual_premium")}>
-              <Input name="estimated_annual_premium" defaultValue={dv("estimated_annual_premium")} maxLength={30} aria-invalid={invalid("estimated_annual_premium")} />
-            </Field>
 
-            <Field label="List source" error={fe("list_source")}>
-              <Input name="list_source" defaultValue={dv("list_source")} maxLength={80} aria-invalid={invalid("list_source")} />
+            <Field label="EIN" error={fe("ein")} hint="Federal employer ID, 9 digits">
+              <Input name="ein" inputMode="numeric" placeholder="12-3456789" defaultValue={dv("ein")} maxLength={12} aria-invalid={invalid("ein")} />
             </Field>
             <Field label="Years in business" error={fe("years_in_business")}>
               <Input name="years_in_business" inputMode="numeric" defaultValue={dv("years_in_business")} maxLength={3} aria-invalid={invalid("years_in_business")} />
+            </Field>
+
+            <Field label="Est. annual premium" error={fe("estimated_annual_premium")}>
+              <Input name="estimated_annual_premium" defaultValue={dv("estimated_annual_premium")} maxLength={30} aria-invalid={invalid("estimated_annual_premium")} />
+            </Field>
+            <Field label="List source" error={fe("list_source")}>
+              <Input name="list_source" defaultValue={dv("list_source")} maxLength={80} aria-invalid={invalid("list_source")} />
             </Field>
 
             <Field label="Description" error={fe("description")} className="sm:col-span-2">
               <Input name="description" defaultValue={dv("description")} maxLength={255} aria-invalid={invalid("description")} />
             </Field>
 
-            <Field label="Internal notes" error={fe("notes_dcm")} className="sm:col-span-2">
+            <Field label="For the client" error={fe("client_note")} className="sm:col-span-2" hint="Sent to the client with the lead sheet">
+              <Textarea name="client_note" rows={2} defaultValue={dv("client_note")} maxLength={2000} aria-invalid={invalid("client_note")} />
+            </Field>
+
+            <Field label="Internal notes" error={fe("notes_dcm")} className="sm:col-span-2" hint="Staff only: never shown to the client">
               <Textarea name="notes_dcm" rows={3} defaultValue={dv("notes_dcm")} maxLength={5000} aria-invalid={invalid("notes_dcm")} />
             </Field>
           </div>

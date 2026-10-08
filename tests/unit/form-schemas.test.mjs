@@ -12,7 +12,7 @@ import { schemas } from "../../src/lib/validate.js";
 const FORMS = {
   "src/features/leads/components/lead-form.jsx":        { schema: "lead",        extra: ["id"] },
   "src/features/projects/components/project-form.jsx":     { schema: "project",     extra: ["id"] },
-  "src/features/appointments/components/appointment-form.jsx": { schema: "appointment", extra: ["id"] },
+  "src/features/appointments/components/appointment-form.jsx": { schema: "appointment", extra: ["id", "client_note_known"] },
   "src/features/users/components/user-form.jsx":        { schema: "user",        extra: ["id"] },
   "src/features/bulletin/components/bulletin-composer.jsx":{ schema: "bulletin",    extra: [] },
   "src/features/auth/components/password-form.jsx":    { schema: "password",    extra: [] },

@@ -87,6 +87,8 @@ export const COLUMN_ALIASES = {
   sicdesc: "description", sicdescription: "description", natureofbusiness: "description",
   description: "description",
   locations: "location", numberoflocations: "location",
+  ein: "ein", fein: "ein", federalein: "ein", taxid: "ein", taxidnumber: "ein", federaltaxid: "ein",
+  federaltaxidnumber: "ein", employeridentificationnumber: "ein", employerid: "ein", federalid: "ein",
   employees: "employees", numberofemployees: "employees", employeecount: "employees",
   coveredemployees: "covered_employees",
   professionals: "professionals", numberofprofessionals: "professionals",
@@ -220,9 +222,13 @@ export function mapHeaders(headerRow) {
 }
 
 /** Every heading resolved to { table, column }, or null when unrecognised. */
+// The lead's internal notes live apart from it (lead_notes, staff only).
+const NOTE_COLUMNS = new Set(["notes_dcm", "notes_client"]);
+
 export function mapAllHeaders(headerRow) {
   return headerRow.map((h) => {
     const key = norm(h);
+    if (NOTE_COLUMNS.has(COLUMN_ALIASES[key])) return { table: "notes", column: COLUMN_ALIASES[key] };
     if (COLUMN_ALIASES[key]) return { table: "lead", column: COLUMN_ALIASES[key] };
     if (INSURANCE_ALIASES[key]) return { table: "insurance", column: INSURANCE_ALIASES[key] };
     if (APPOINTMENT_ALIASES[key]) return { table: "appointment", column: APPOINTMENT_ALIASES[key] };
@@ -265,12 +271,24 @@ export function normalizeState(value) {
 }
 
 /**
- * Turn parsed CSV rows into the three records each row can produce: the lead,
- * its insurance detail, and a booked appointment. Rows without a company name
+ * An EIN (federal employer identification number) as it is written:
+ * "12-3456789". Returns null for anything that is not nine digits; a
+ * spreadsheet that dropped the leading zero ("23456789") gets it back.
+ */
+export function normalizeEin(value) {
+  if (value == null) return null;
+  let digits = String(value).replace(/\D/g, "");
+  if (digits.length === 8) digits = `0${digits}`;
+  return digits.length === 9 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : null;
+}
+
+/**
+ * Turn parsed CSV rows into the records each row can produce: the lead, its
+ * insurance detail, a booked appointment, and its internal notes. Rows without a company name
  * are counted as errors rather than imported.
  *
  * Returns { rows, errors, headers } where headers lists the lead columns
- * recognised, and each row is { lead, insurance, appointment, status }.
+ * recognised, and each row is { lead, insurance, appointment, notes, status }.
  */
 export function rowsToImport(csvRows) {
   if (csvRows.length < 2) return { rows: [], errors: 0, headers: [] };
@@ -283,6 +301,7 @@ export function rowsToImport(csvRows) {
     const lead = {};
     const insurance = {};
     const appointment = {};
+    const notes = {};
 
     resolved.forEach((target, i) => {
       if (!target) return;
@@ -297,6 +316,7 @@ export function rowsToImport(csvRows) {
       if (parsed === null) return;
 
       if (target.table === "lead") lead[target.column] = parsed;
+      else if (target.table === "notes") notes[target.column] = parsed;
       else if (target.table === "insurance") insurance[target.column] = parsed;
       else appointment[target.column] = parsed;
     });
@@ -312,10 +332,17 @@ export function rowsToImport(csvRows) {
       if (code) lead.state = code;
       else delete lead.state;
     }
+    if (lead.ein) {
+      // Like a state: a number that is not an EIN is left out, not stored wrong.
+      const ein = normalizeEin(lead.ein);
+      if (ein) lead.ein = ein;
+      else delete lead.ein;
+    }
 
     rows.push({
       lead,
       insurance: Object.keys(insurance).length ? insurance : null,
+      notes: Object.keys(notes).length ? notes : null,
       // A time with no date is not a booking.
       appointment: appointment.appt_date ? appointment : null,
       status: statusFromCallResults(lead.call_result_dbdv, lead.call_result_appt),

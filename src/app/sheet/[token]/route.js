@@ -1,5 +1,6 @@
 import { loadLeadSheet } from "@/features/delivery/server";
 import { renderLeadSheet } from "@/lib/delivery";
+import { publicOrigin } from "@/lib/origin";
 import { readSheetToken } from "@/lib/server/sheet-link";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -26,13 +27,13 @@ const notice = (text) =>
  * A lead's sheet, from the private link in a delivery email: no sign-in,
  * the signed token in the address says which lead and until when.
  */
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const { token } = await params;
   const leadId = readSheetToken(token);
   if (!leadId) return page(404, notice("This link has expired or is not valid. Ask your Lighthouse contact to send the lead again."));
   const admin = createAdminClient();
   if (!admin) return page(503, notice("This lead sheet can't be shown right now."));
-  const loaded = await loadLeadSheet(admin, leadId);
+  const loaded = await loadLeadSheet(admin, leadId, null, { origin: publicOrigin(request.headers) });
   if (!loaded) return page(404, notice("This lead is no longer available."));
   const { html } = renderLeadSheet(loaded.sheet);
   return page(200, html.replace("<html>", '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lead sheet</title></head>'));

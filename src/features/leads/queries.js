@@ -8,8 +8,8 @@ import { createClient } from "@/lib/supabase/server";
 const leadSelect = ({ status = false } = {}) => `
   id, company_name, contact_name, contact_title, phone, email, website,
   address, city, state, zip, county, sic_code, description, list_source,
-  employees, covered_employees, autos, sales_volume, years_in_business,
-  estimated_annual_premium, notes_dcm, notes_client, lead_date, import_date,
+  location, employees, covered_employees, autos, sales_volume, ein, years_in_business,
+  estimated_annual_premium, client_note, lead_date, import_date,
   date_last_worked, created_at, decision_maker, dm_title, fax,
   contact_mobile, dm_phone, dm_mobile, dm_email,
   contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email, producer_name,
@@ -131,11 +131,20 @@ export async function listLeads(params, { projectId } = {}) {
   return { rows: rows.map(toLeadView), total };
 }
 
+/**
+ * One lead, for its sheet. Its internal notes come apart, from lead_notes,
+ * which the database lets only staff read. With what its SIC code means.
+ */
 export async function getLead(id) {
   const supabase = await createClient();
   const { data, error } = await supabase.from("leads").select(LEAD_SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
-  return data ? toLeadView(data) : null;
+  if (!data) return null;
+  const [{ data: internal }, { data: sic }] = await Promise.all([
+    supabase.from("lead_notes").select("notes_dcm, notes_client").eq("lead_id", data.id).maybeSingle(),
+    data.sic_code ? supabase.from("sic_codes").select("description").eq("code", data.sic_code).maybeSingle() : Promise.resolve({ data: null }),
+  ]);
+  return toLeadView({ ...data, notes_dcm: internal?.notes_dcm ?? null, notes_client: internal?.notes_client ?? null, sic_description: sic?.description ?? null });
 }
 
 /** Totals per status code and the number of clients with leads, for the leads page header and chips. */

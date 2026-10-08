@@ -39,9 +39,14 @@ export async function createAppointment(prevState, formData) {
     .single();
   if (error) return fail(error);
 
+  // "For the client": saved on the lead, where the lead sheet sends it from.
+  // A note the form started from the lead's own is saved as it stands, even
+  // emptied; otherwise only a note written here.
+  const note = s(formData, "client_note");
+  const noteKnown = formData.get("client_note_known") === "1";
   await supabase
     .from("leads")
-    .update({ appt_created_date: new Date().toISOString() })
+    .update({ appt_created_date: new Date().toISOString(), ...(note || noteKnown ? { client_note: note } : {}) })
     .eq("id", leadId);
 
   revalidatePath("/appointments");

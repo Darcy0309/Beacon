@@ -7,7 +7,7 @@
 // Every rule except `required` passes on an empty value, so optional fields
 // only get checked when the user actually typed something.
 
-import { normalizeState } from "./csv.js";
+import { normalizeEin, normalizeState } from "./csv.js";
 import { EMAIL_LIMITS, isMailbox } from "./email.js";
 import { PHONE_EXTENSION } from "./format.js";
 import { POLICY_LINES } from "./coverage.js";
@@ -222,14 +222,16 @@ export const schemas = {
     sic_code: [rules.pattern(/^\d{4}$/, "SIC codes are 4 digits, e.g. 6411")],
     description: [max(255)],
     list_source: [max(80)],
+    location: [max(60)],
     employees: [int({ min: 0, max: 1000000 })],
     covered_employees: [int({ min: 0, max: 1000000 })],
     autos: [int({ min: 0, max: 100000 })],
     sales_volume: [max(30)],
+    ein: [rules.custom((v) => (!v || normalizeEin(v) ? null : "An EIN is 9 digits, like 12-3456789"))],
     years_in_business: [int({ min: 0, max: 300 })],
     estimated_annual_premium: [max(30)],
     notes_dcm: [max(5000)],
-    notes_client: [max(5000)],
+    client_note: [max(2000)],
     status_id: [id],
     project_id: [id],
     agency_id: [id],
@@ -270,6 +272,7 @@ export const schemas = {
     status_id: [id],
     user_id: [id],
     rep_name: [max(80)],
+    client_note: [max(2000)],
   },
 
   user: {
@@ -300,6 +303,7 @@ export const schemas = {
     result_id: [required("Choose a call result"), id],
     project_id: [id],
     notes: [max(1000)],
+    client_note: [max(2000)],
     appt_date: [date],
     appt_time: [time12],
     duration_min: [oneOf(DURATIONS, "Choose a duration")],

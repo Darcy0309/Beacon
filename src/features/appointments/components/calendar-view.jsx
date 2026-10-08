@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight,
-  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock,
+  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText,
 } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import StatusBadge from "@/components/shared/status-badge";
@@ -143,7 +143,7 @@ const APPT_TONE = {
 };
 
 /** One row of the detail list, hidden when there is nothing to show. */
-function Detail({ icon: Icon, label, children, href, leadId, wide = false }) {
+function Detail({ icon: Icon, label, children, href, leadId, wide = false, multiline = false }) {
   if (!children || children === "—") return null;
   return (
     <div className={cn("flex items-start gap-3", wide && "sm:col-span-2")}>
@@ -152,7 +152,7 @@ function Detail({ icon: Icon, label, children, href, leadId, wide = false }) {
       </span>
       <span className="min-w-0">
         <span className="eyebrow block">{label}</span>
-        <span className="block truncate text-sm">
+        <span className={cn("block text-sm", multiline ? "whitespace-pre-line break-words" : "truncate")}>
           {href ? (
             <a href={href} data-lead-id={leadId ?? undefined} className="transition-colors hover:text-primary">{children}</a>
           ) : (
@@ -198,6 +198,7 @@ function AppointmentDialog({ a, onClose }) {
             <Detail icon={FolderKanban} label="Campaign" wide>
               {[a.client, a.project].filter(Boolean).join(" · ") || null}
             </Detail>
+            <Detail icon={MessageSquareText} label="For the client" wide multiline>{a.clientNote}</Detail>
           </div>
 
           <DialogFooter>

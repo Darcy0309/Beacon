@@ -126,10 +126,12 @@ export async function importLeadsCsv(prevState, formData) {
     // PostgREST returns the new rows in the order they were sent.
     const insuranceRows = [];
     const appointmentRows = [];
+    const noteRows = [];
     inserted.forEach((row, j) => {
       const source = chunk[j];
       if (!source) return;
       if (source.insurance) insuranceRows.push({ lead_id: row.id, ...source.insurance });
+      if (source.notes) noteRows.push({ lead_id: row.id, notes_dcm: source.notes.notes_dcm ?? null, notes_client: source.notes.notes_client ?? null });
       if (source.appointment) {
         appointmentRows.push({
           lead_id: row.id,
@@ -150,6 +152,11 @@ export async function importLeadsCsv(prevState, formData) {
       const { error: insError } = await supabase.from("insurance_details").insert(insuranceRows);
       if (insError) console.error("[import] insurance rows failed:", insError.message);
       else details += insuranceRows.length;
+    }
+    // The internal notes, apart from the lead: staff only.
+    if (noteRows.length) {
+      const { error: notesError } = await supabase.from("lead_notes").insert(noteRows);
+      if (notesError) console.error("[import] lead notes failed:", notesError.message);
     }
     if (appointmentRows.length) {
       const { error: apptError } = await supabase.from("appointments").insert(appointmentRows);

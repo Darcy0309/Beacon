@@ -22,7 +22,7 @@ const APPT_SELECT = `
   status:appointment_statuses(id, name),
   user:users!appointments_user_id_fkey(id, first_name, last_name),
   lead:leads(
-    id, company_name, contact_name, contact_title, phone, email, city, state,
+    id, company_name, contact_name, contact_title, phone, email, city, state, client_note,
     status:lead_statuses(code, name),
     project:projects!leads_project_id_fkey(id, name, company:companies(id, name))
   )
@@ -64,6 +64,8 @@ function toApptView(a) {
     statusCode: leadStatus?.code ?? "new",
     project: one(lead?.project)?.name ?? null,
     client: one(one(lead?.project)?.company)?.name ?? null,
+    // What the client is told about it, written as it was set.
+    clientNote: lead?.client_note ?? null,
     longDate: longDate(a.appt_date),
   };
 }

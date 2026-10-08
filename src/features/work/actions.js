@@ -14,6 +14,7 @@ const FIELD_FOR = [
   [/appointment date|date has passed/i, "appt_date"],
   [/appointment time|like 9:30 AM/i, "appt_time"],
   [/corrected renewal date/i, "corrected_xdate"],
+  [/note for the client/i, "client_note"],
 ];
 
 // What a Lead or an Appointment cannot be saved without: [field, what it is, what to say beside it].
@@ -64,6 +65,9 @@ export async function recordCallResult(prevState, formData) {
     p_appointment: appointment,
     p_corrected_xdate: values.corrected_xdate || null,
     p_ultimate_xdate: values.ultimate_xdate || null,
+    // What the client is told, when the result sends them the lead: given
+    // only when the panel asked for it, so an empty box clears it.
+    p_client_note: result?.delivers && formData.has("client_note") ? String(formData.get("client_note") ?? "") : null,
   });
   if (error) {
     const field = FIELD_FOR.find(([re]) => re.test(error.message))?.[1];

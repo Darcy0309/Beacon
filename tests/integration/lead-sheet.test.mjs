@@ -1,0 +1,112 @@
+/**
+ * The lead sheet as the client asked, in the database, as real signed-in
+ * users: the note for the client is written as the lead or appointment is
+ * set (and only then); the internal notes (lead_notes) cannot be read by a
+ * client even straight through the API, while staff read them; recording an appointment
+ * again at the same day and time does not say it "moved"; and every
+ * standard SIC code has its description.
+ *
+ * Runs on its own test client and removes everything it made.
+ *
+ *   npm run test:integration
+ */
+import { check, finish, section } from "../support/assert.mjs";
+import { signIn } from "../support/auth.mjs";
+import { sql, lit } from "../support/db.mjs";
+
+const TAG = `LS-TEST ${Date.now()}`;
+const all = (query) => JSON.parse(sql(`select coalesce(json_agg(t), '[]') from (${query}) t`));
+const userId = (email) => Number(sql(`select id from public.users where email=${lit(email)}`));
+const SEAN = userId("sean@beacon.test");
+const MIKE = userId("mike@beacon.test");
+const CLIENT_USER = userId("client@beacon.test");
+const RESULT = Object.fromEntries(all("select id, project_type, name from public.call_results").map((r) => [`${r.project_type}:${r.name}`, r.id]));
+
+const companyId = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Insurance`)}) returning id`));
+const typeId = (code) => sql(`select id from public.project_types where code=${lit(code)}`);
+const APPT = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
+  values (${lit(`${TAG} Appointments`)}, ${companyId}, ${typeId("APPT")}, 1) returning id`));
+const DBDV = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id, appt_project_id)
+  values (${lit(`${TAG} DBDev`)}, ${companyId}, ${typeId("DBDV")}, 1, ${APPT}) returning id`));
+sql(`insert into public.project_assignments (project_id, ae_user_id) values (${DBDV}, ${SEAN}), (${APPT}, ${MIKE})`);
+const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT_USER}`);
+sql(`update public.users set company_id=${companyId} where id=${CLIENT_USER}`);
+
+let n = 0;
+const newName = (project, rep, extra = "") => {
+  n += 1;
+  const id = Number(sql(`insert into public.leads (company_name, project_id, assigned_user_id)
+    values (${lit(`${TAG} Co ${n}`)}, ${project}, ${rep}) returning id`));
+  sql(`insert into public.lead_notes (lead_id, notes_dcm, notes_client) values (${id}, 'Internal: owner is difficult', '10/1/26 seanf: left message${extra}')`);
+  sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${id}, '2027-03-01')`);
+  return id;
+};
+const day = (offset) => sql(`select ((now() at time zone public.business_tz())::date + ${offset})::text`);
+const clientNote = (id) => sql(`select coalesce(client_note, '<none>') from public.leads where id=${id}`);
+const lastNotes = (id) => sql(`select coalesce(notes, '') from public.call_records where lead_id=${id} order by id desc limit 1`);
+
+const sean = await signIn("sean@beacon.test");
+const mike = await signIn("mike@beacon.test");
+const client = await signIn("client@beacon.test");
+const record = (who, leadId, type, name, extra = {}) =>
+  who.sb.rpc("record_call_result", { p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: "10/7/26 seanf: spoke with Daniel", ...extra });
+
+try {
+  section("For the client");
+  const lead = newName(DBDV, SEAN);
+  const promoted = await record(sean, lead, "DBDV", "Lead", { p_client_note: "  Lead set with Daniel, owner – renews 3/1  " });
+  check("setting a Lead writes the note for the client", !promoted.error && clientNote(lead) === "Lead set with Daniel, owner – renews 3/1", promoted.error?.message ?? clientNote(lead));
+  check("…the call notes stay on the call", lastNotes(lead) === "10/7/26 seanf: spoke with Daniel");
+  const appt = await record(mike, lead, "APPT", "Appointment", { p_appointment: { date: day(3), time: "10:00 AM" }, p_client_note: "Appt set with Daniel and Henry, both owners" });
+  check("setting the appointment replaces it", !appt.error && clientNote(lead) === "Appt set with Daniel and Henry, both owners", appt.error?.message ?? clientNote(lead));
+  const callback = newName(DBDV, SEAN);
+  sql(`update public.leads set client_note = 'Kept' where id = ${callback}`);
+  await record(sean, callback, "DBDV", "Viable-CallBack", { p_client_note: null });
+  check("a result that sends nothing leaves it alone", clientNote(callback) === "Kept");
+  const tooLong = await record(sean, newName(DBDV, SEAN), "DBDV", "Lead", { p_client_note: "x".repeat(2001) });
+  check("…and a note longer than 2,000 characters is refused, saying so", /note for the client/.test(tooLong.error?.message ?? ""), tooLong.error?.message);
+
+  section("Internal notes are staff only");
+  const asClient = await client.sb.from("leads").select("id, company_name, client_note").eq("id", lead).maybeSingle();
+  check("the client reads the lead and what was written for them", !asClient.error && asClient.data?.client_note === "Appt set with Daniel and Henry, both owners", asClient.error?.message);
+  const star = await client.sb.from("leads").select("*").eq("id", lead);
+  check("…and every column of it holds nothing internal", !star.error && star.data?.length === 1 && !/difficult|left message/.test(JSON.stringify(star.data)), star.error?.message);
+  const sneak = await client.sb.from("lead_notes").select("*").eq("lead_id", lead);
+  check("…not the internal notes, even straight through the API", !sneak.error && sneak.data.length === 0, JSON.stringify(sneak.data));
+  const write = await client.sb.from("lead_notes").update({ notes_dcm: "client wrote this" }).eq("lead_id", lead).select("lead_id");
+  check("…nor write them", (write.data ?? []).length === 0 && sql(`select notes_dcm from public.lead_notes where lead_id = ${lead}`) === "Internal: owner is difficult");
+  const calls = await client.sb.from("call_records").select("notes").eq("lead_id", lead);
+  check("…nor the call notes", !calls.error && (calls.data ?? []).length === 0, JSON.stringify(calls.data));
+  const staff = await sean.sb.from("lead_notes").select("notes_dcm, notes_client").eq("lead_id", lead).maybeSingle();
+  check("staff read them", staff.data?.notes_dcm === "Internal: owner is difficult" && /left message/.test(staff.data?.notes_client ?? ""), JSON.stringify(staff));
+  const deleted = Number(sql(`insert into public.leads (company_name, project_id) values (${lit(`${TAG} Gone`)}, ${DBDV}) returning id`));
+  sql(`insert into public.lead_notes (lead_id, notes_dcm) values (${deleted}, 'x')`);
+  sql(`delete from public.leads where id = ${deleted}`);
+  check("a lead's notes go with it", sql(`select count(*) from public.lead_notes where lead_id = ${deleted}`) === "0");
+
+  section("“Moved” only when it moved");
+  await record(mike, lead, "APPT", "Appointment", { p_appointment: { date: day(3), time: "10:00 AM" } });
+  check("recorded again at the same day and time, nothing is said to have moved", !/moved/.test(lastNotes(lead)), lastNotes(lead));
+  await record(mike, lead, "APPT", "Appointment", { p_appointment: { date: day(3), time: "11:00 AM" } });
+  check("…a new time is", /Appointment moved from .* 10:00 AM to .* 11:00 AM/.test(lastNotes(lead)), lastNotes(lead));
+
+  section("SIC codes");
+  check("every standard 4-digit code has its description",
+    Number(sql("select count(*) from public.sic_codes where description is not null")) >= 1005
+    && sql("select description from public.sic_codes where code='1731'") === "Electrical Work"
+    && sql("select description from public.sic_codes where code='0711'") === "Soil Preparation Services");
+} finally {
+  sql(`update public.users set company_id=${clientCompany} where id=${CLIENT_USER}`);
+  sql(`delete from public.notifications where title like ${lit(`%${TAG}%`)} or body like ${lit(`%${TAG}%`)}`);
+  const leads = `select id from public.leads where project_id in (${DBDV}, ${APPT}) or source_project_id in (${DBDV}, ${APPT})`;
+  sql(`delete from public.pay_events where lead_id in (${leads})`);
+  sql(`delete from public.lead_deliveries where lead_id in (${leads})`);
+  sql(`delete from public.appointments where lead_id in (${leads})`);
+  sql(`delete from public.call_records where lead_id in (${leads})`);
+  sql(`delete from public.leads where id in (${leads})`);
+  sql(`delete from public.project_assignments where project_id in (${DBDV}, ${APPT})`);
+  sql(`delete from public.projects where id in (${DBDV}, ${APPT})`);
+  sql(`delete from public.companies where id = ${companyId}`);
+}
+
+finish("lead sheet");

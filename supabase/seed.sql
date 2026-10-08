@@ -225,14 +225,14 @@ insert into public.leads (
   project_id, status_id, agency_id, assigned_user_id, dbdv_user_id,
   company_name, contact_name, contact_title, phone, email, city, state, zip, county,
   sic_code, description, list_source, employees, covered_employees, autos, sales_volume,
-  years_in_business, estimated_annual_premium, notes_dcm,
+  years_in_business, estimated_annual_premium,
   lead_date, import_date, date_last_worked, qa_date_dbdv
 )
 select
   p.id, s.id, a.id, ae.id, dv.id,
   v.company_name, v.contact_name, v.contact_title, v.phone, v.email,
   v.city, v.state, v.zip, v.county, v.sic, v.descr, v.list_source,
-  v.employees, v.covered, v.autos, v.volume, v.yrs, v.premium, v.notes,
+  v.employees, v.covered, v.autos, v.volume, v.yrs, v.premium,
   now() - (v.age_days || ' days')::interval,
   now() - (v.age_days + 5 || ' days')::interval,
   now() - (v.worked_days || ' days')::interval,
@@ -256,6 +256,25 @@ join public.lead_statuses s  on s.code = v.status_code
 left join public.agencies a  on a.name = v.agency_name
 left join public.users ae    on ae.email = v.ae_email
 left join public.users dv    on dv.email = v.dv_email;
+
+-- Their internal notes, which live apart from the lead (staff only).
+insert into public.lead_notes (lead_id, notes_dcm)
+select l.id, v.notes
+from (values
+  ('Garry Insurance', 'Decision maker confirmed. Wants Q3 review.'),
+  ('Rural Insurance', 'Survey scheduled, send prep packet.'),
+  ('Insurance Pro AZ', 'HOT — ultimate x-date inside 30 days. Priority.'),
+  ('Summit Benefits', 'Broker of record letter pending.'),
+  ('Heartland Wealth', 'Profile complete, awaiting client review.'),
+  ('Collier & Co.', 'Fresh import — needs first dial.'),
+  ('Bender Group', 'Phone appointment confirmed for next week.'),
+  ('Zimmermann Agency', 'HOT — asked for comparison by Friday.'),
+  ('Meridian Partners', 'Survey appt — 45 min block requested.'),
+  ('Foxline Insurance', 'X-date Jan 09 — nurture until December.'),
+  ('Cascade Logistics', 'WC x-date is the opener. Good fit.'),
+  ('Northgate Medical', 'Professional liability x-date in March.')
+) as v(company_name, notes)
+join public.leads l on l.company_name = v.company_name;
 
 -- Generated volume so list views, counts and reports look real.
 insert into public.leads (

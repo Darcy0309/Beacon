@@ -10,7 +10,8 @@ import "server-only";
 import { POLICY_LINES } from "@/lib/coverage";
 import { mailFailure, isReservedAddress, oneLine } from "@/lib/email";
 import { deliverySubject, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "@/lib/delivery";
-import { fullName } from "@/lib/format";
+import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links";
+import { fullName, sicLabel } from "@/lib/format";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { LINK_DAYS, sheetToken } from "@/lib/server/sheet-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -24,16 +25,18 @@ const longDate = (d) =>
 /**
  * Everything on a lead's sheet, read with the server's role: the lead, its
  * coverage, client and project, and the call it is being sent for (the one
- * given, else its latest call with a delivering result).
+ * given, else its latest call with a delivering result). Nothing internal:
+ * not the call notes, nor when the lead or appointment was entered. `origin`
+ * (the app's address) adds the appointment's .ics file to its calendar links.
  */
-export async function loadLeadSheet(admin, leadId, callRecordId = null) {
+export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin = null } = {}) {
   const { data: lead, error } = await admin
     .from("leads")
     .select(`id, company_name, contact_name, contact_title, phone, contact_mobile, email,
       decision_maker, dm_title, dm_phone, dm_mobile, dm_email,
       contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email,
       address, city, state, zip, website, fax, producer_name, list_source,
-      employees, autos, sales_volume, years_in_business, sic_code, estimated_annual_premium, description, notes_client,
+      location, employees, autos, sales_volume, years_in_business, sic_code, estimated_annual_premium, description, client_note,
       project_id, insurance:insurance_details(*),
       assigned:users!leads_assigned_user_id_fkey(first_name, last_name, email)`)
     .eq("id", leadId)
@@ -43,7 +46,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null) {
 
   let call = null;
   const calls = admin.from("call_records")
-    .select("id, project_id, call_result, notes, call_date, user:users(first_name, last_name, email), result:call_results(delivers)")
+    .select("id, project_id, call_result, user:users(first_name, last_name, email), result:call_results(delivers)")
     .eq("lead_id", leadId);
   if (callRecordId) {
     ({ data: call } = await calls.eq("id", callRecordId).maybeSingle());
@@ -53,21 +56,21 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null) {
   }
 
   const projectId = call?.project_id ?? lead.project_id;
-  const [{ data: project }, { data: appt }, { data: tz }] = await Promise.all([
+  const [{ data: project }, { data: appt }, { data: tz }, { data: sic }] = await Promise.all([
     projectId
       ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, company:companies(name)").eq("id", projectId).maybeSingle()
       : Promise.resolve({ data: null }),
-    admin.from("appointments").select("appt_date, appt_time, rep_name").eq("lead_id", leadId).is("invalid_at", null)
+    admin.from("appointments").select("id, appt_date, appt_time, duration_min, rep_name").eq("lead_id", leadId).is("invalid_at", null)
       .order("appt_create_date", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle(),
     admin.rpc("business_tz"),
+    lead.sic_code ? admin.from("sic_codes").select("description").eq("code", lead.sic_code).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
   const ins = one(lead.insurance) ?? {};
   const rep = one(call?.user) ?? one(lead.assigned);
-  const when = call?.call_date
-    ? new Intl.DateTimeFormat("en-US", { timeZone: tz || "America/Phoenix", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })
-        .format(new Date(call.call_date))
-    : null;
+  const address = [lead.address, [lead.city, lead.state, lead.zip].filter(Boolean).join(" ")].filter(Boolean);
+  const event = appt ? appointmentEvent(lead, appt, address, tz) : null;
+  const token = event && origin ? sheetToken(leadId) : null;
 
   return {
     project,
@@ -75,19 +78,24 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null) {
     sheet: {
       company: lead.company_name,
       result: call?.call_result ?? "Lead",
-      when,
       client: one(project?.company)?.name ?? null,
       project: project?.name ?? null,
       producer: lead.producer_name || project?.contact_name || null,
       listSource: lead.list_source,
       rep: fullName(rep) || null,
-      appointment: appt ? { date: longDate(appt.appt_date), time: appt.appt_time, with: appt.rep_name } : null,
+      appointment: appt
+        ? {
+            date: longDate(appt.appt_date), time: appt.appt_time, with: appt.rep_name,
+            links: event ? calendarLinks(event, token ? `${origin}/sheet/${token}/appointment.ics` : null) : [],
+          }
+        : null,
       people: [
         { who: "Contact", name: lead.contact_name, title: lead.contact_title, phone: lead.phone, mobile: lead.contact_mobile, email: lead.email },
         { who: "Decision maker", name: lead.decision_maker, title: lead.dm_title, phone: lead.dm_phone, mobile: lead.dm_mobile, email: lead.dm_email },
         { who: "Secondary contact", name: lead.contact2_name, title: lead.contact2_title, phone: lead.contact2_phone, mobile: lead.contact2_mobile, email: lead.contact2_email },
       ],
-      address: [lead.address, [lead.city, lead.state, lead.zip].filter(Boolean).join(" ")].filter(Boolean),
+      address,
+      map: mapLink(address.join(", ")),
       website: lead.website,
       fax: lead.fax,
       coverage: {
@@ -96,11 +104,34 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null) {
         lines: POLICY_LINES.map((l) => ({ label: l.label, xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
       },
       profile: [
-        ["Employees", lead.employees], ["Autos", lead.autos], ["Sales volume", lead.sales_volume],
-        ["Years in business", lead.years_in_business], ["SIC code", lead.sic_code], ["Est. premium", lead.estimated_annual_premium],
+        ["Locations", lead.location], ["Employees", lead.employees], ["Autos", lead.autos], ["Sales volume", lead.sales_volume],
+        ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
+        ["Est. premium", lead.estimated_annual_premium],
       ],
-      notes: [["Call notes", call?.notes], ["Description", lead.description], ["For the client", lead.notes_client]],
+      // Only what was written for the client: the call notes stay internal.
+      notes: [["Description", lead.description], ["For the client", lead.client_note]],
     },
+  };
+}
+
+/**
+ * The appointment for a calendar: its title, when (on the business's
+ * clock), where, and whom to meet. Null when its day or time cannot be read.
+ */
+export function appointmentEvent(lead, appt, address, timeZone) {
+  const span = appointmentSpan(appt.appt_date, appt.appt_time, appt.duration_min, timeZone || "America/Phoenix");
+  if (!span) return null;
+  const contact = [lead.contact_name, lead.contact_title].filter(Boolean).join(", ");
+  return {
+    ...span,
+    title: `Appointment: ${lead.company_name}`,
+    location: address.join(", ") || null,
+    details: [
+      contact ? `Contact: ${contact}` : null,
+      lead.phone ? `Phone: ${lead.phone}` : null,
+      appt.rep_name ? `With: ${appt.rep_name}` : null,
+      lead.client_note || null,
+    ].filter(Boolean).join("\n"),
   };
 }
 
@@ -116,7 +147,7 @@ export async function deliverLead({ leadId, callRecordId = null, sentBy = null, 
     return { sent: 0, failed: 0, addresses: 0, error: "The server's SUPABASE_SERVICE_ROLE_KEY is not set." };
   }
   try {
-    const loaded = await loadLeadSheet(admin, leadId, callRecordId);
+    const loaded = await loadLeadSheet(admin, leadId, callRecordId, { origin });
     if (!loaded) return { sent: 0, failed: 0, addresses: 0 };
     const { project, rep, sheet } = loaded;
     const { list } = parseDeliveryAddresses(project?.email, project?.delivery_link_only);

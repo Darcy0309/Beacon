@@ -24,7 +24,7 @@ import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { daysBetween, todayIn } from "@/lib/dates";
-import { fullName, mediumDate, shortDate, telHref } from "@/lib/format";
+import { fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -231,10 +231,13 @@ export default async function LeadSheet({ params, searchParams }) {
       : null;
   const address = [r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean);
   const website = r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null;
+  // What the client is told, then the description; the internal notes for
+  // staff alone (the database gives a client none of them).
   const notes = [
+    r.client_note ? ["For the client", r.client_note] : null,
     r.description ? ["Description", r.description] : null,
-    r.notes_dcm ? ["Ours", r.notes_dcm] : null,
-    r.notes_client ? ["Client", r.notes_client] : null,
+    staff && r.notes_dcm ? ["Internal notes", r.notes_dcm] : null,
+    staff && r.notes_client ? ["Old system notes", r.notes_client] : null,
   ].filter(Boolean);
 
   return (
@@ -299,6 +302,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 options={options}
                 leads={[{ id: lead.id, company_name: lead.co }]}
                 defaultLeadId={lead.id}
+                clientNote={r.client_note ?? ""}
                 trigger={<Button size="sm" variant="ghost" className="px-2" aria-label="Add an appointment by hand"><CalendarPlus /> Appointment</Button>}
               />
               <span className="ml-auto"><PrintButton variant="ghost" compact /></span>
@@ -412,11 +416,13 @@ export default async function LeadSheet({ params, searchParams }) {
                         ["Company", lead.co],
                         ["Phone", r.phone],
                         ["Website", website],
+                        ["Locations", r.location],
                         ["Employees", r.employees],
                         ["Autos", r.autos],
                         ["Sales volume", r.sales_volume],
+                        ["EIN", r.ein ? <span className="tabular-nums">{r.ein}</span> : null],
                         ["Years in business", r.years_in_business],
-                        ["SIC code", r.sic_code],
+                        ["SIC code", sicLabel(r.sic_code, r.sic_description)],
                         ["Est. premium", r.estimated_annual_premium],
                         ["County", r.county],
                       ]}
@@ -490,6 +496,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 followUp={followUp}
                 ultimateXdate={ins?.ultimate_xdate ?? null}
                 renewalHint={renewalHint}
+                clientNote={r.client_note ?? ""}
                 timeZone={tz}
               />
             ) : staff ? (

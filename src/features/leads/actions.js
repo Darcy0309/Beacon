@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { NOT_DELETED, check, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
-import { normalizeState } from "@/lib/csv";
+import { normalizeEin, normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
 import { POLICY_LINES } from "@/lib/coverage";
 
@@ -38,19 +38,31 @@ function leadPayload(formData) {
     sic_code: s(formData, "sic_code"),
     description: s(formData, "description"),
     list_source: s(formData, "list_source"),
+    location: s(formData, "location"),
     employees: s(formData, "employees"),
     covered_employees: s(formData, "covered_employees"),
     autos: s(formData, "autos"),
     sales_volume: s(formData, "sales_volume"),
+    // Written one way, "12-3456789", however it was typed.
+    ein: normalizeEin(s(formData, "ein")),
     years_in_business: s(formData, "years_in_business"),
     estimated_annual_premium: s(formData, "estimated_annual_premium"),
-    notes_dcm: s(formData, "notes_dcm"),
-    notes_client: s(formData, "notes_client"),
+    client_note: s(formData, "client_note"),
     status_id: n(formData, "status_id"),
     project_id: n(formData, "project_id"),
     agency_id: n(formData, "agency_id"),
     assigned_user_id: n(formData, "assigned_user_id"),
   };
+}
+
+/**
+ * The lead's internal notes, kept apart from it (lead_notes, which only
+ * staff may read): saved when the form sent them.
+ */
+async function saveInternalNotes(supabase, leadId, formData) {
+  if (!formData.has("notes_dcm")) return null;
+  const { error } = await supabase.from("lead_notes").upsert({ lead_id: leadId, notes_dcm: s(formData, "notes_dcm") }, { onConflict: "lead_id" });
+  return error;
 }
 
 export async function createLead(prevState, formData) {
@@ -71,6 +83,8 @@ export async function createLead(prevState, formData) {
     .select("id")
     .single();
   if (error) return fail(error);
+  const notesError = await saveInternalNotes(supabase, data.id, formData);
+  if (notesError) return fail(notesError);
 
   await logActivity(supabase, "lead.create", { entity: "lead", entityId: data?.id, detail: payload.company_name });
   revalidatePath("/leads");
@@ -91,6 +105,8 @@ export async function updateLead(prevState, formData) {
     .update(onlySubmitted(formData, leadPayload(formData)))
     .eq("id", id);
   if (error) return fail(error);
+  const notesError = await saveInternalNotes(supabase, id, formData);
+  if (notesError) return fail(notesError);
 
   await logActivity(supabase, "lead.update", { entity: "lead", entityId: id });
   revalidatePath("/leads");

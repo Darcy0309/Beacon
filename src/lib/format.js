@@ -113,6 +113,10 @@ export function timeRank(v) {
   return h * 60 + Number(m[2]);
 }
 
+/** An SIC code with what it means: "1731 – Electrical Work" (just the code when it is not on the list). */
+export const sicLabel = (code, description) =>
+  code ? (description ? `${code} – ${description}` : String(code)) : null;
+
 /** "Garry Insurance" -> "garry-insurance", the client's address in /clients/[slug]. */
 export const clientSlug = (name) =>
   String(name ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
