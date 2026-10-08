@@ -96,6 +96,12 @@
   --neon-violet: hsl(263 70% 56%);
   --neon-magenta: hsl(295 72% 50%);
   --neon-rose: hsl(350 75% 50%);
+
+  /* The renewals chart: one family. The brand cyan for what is still to
+     work, the logo's violet for the wins, a quiet slate for what is done. */
+  --chart-viable: hsl(190 85% 42%);
+  --chart-win: hsl(258 68% 58%);
+  --chart-done: hsl(215 18% 74%);
 }
 
 .dark {
@@ -139,6 +145,9 @@
   --neon-violet: hsl(263 85% 65%);
   --neon-magenta: hsl(295 85% 62%);
   --neon-rose: hsl(350 85% 62%);
+  --chart-viable: hsl(190 88% 48%);
+  --chart-win: hsl(258 82% 68%);
+  --chart-done: hsl(215 16% 34%);
   --logo-silver: #dfe2ea;
   --logo-navy: #6f6ae0;
   --logo-edge: rgb(0 0 0 / 0.55);

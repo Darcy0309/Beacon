@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 
 // Bottom to top in each column, and left to right in the table.
 const SEGMENTS = [
-  { key: "appointment", label: "Appointments", color: "var(--neon-emerald)" },
-  { key: "off", label: "Off the list", color: "var(--neon-rose)" },
-  { key: "viable", label: "Viable left", color: "var(--neon-cyan)" },
+  { key: "appointment", label: "Appointments", color: "var(--chart-win)" },
+  { key: "off", label: "Off the list", color: "var(--chart-done)" },
+  { key: "viable", label: "Viable left", color: "var(--chart-viable)" },
 ];
 
 const pct = (n, total) => (total ? Math.round((n / total) * 100) : 0);
@@ -72,7 +72,8 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
               {m.total ? (
                 <div
                   data-tip-anchor
-                  className="animate-grow-height flex w-full flex-col-reverse overflow-hidden rounded-t transition-[height] duration-500"
+                  // A hairline between the colours, so each reads on its own.
+                  className="animate-grow-height flex w-full flex-col-reverse gap-px overflow-hidden rounded-t-md transition-[height] duration-500"
                   style={{ height: `${(m.total / max) * 100}%`, animationDelay: `${i * 45}ms` }}
                 >
                   {SEGMENTS.map((s) =>
