@@ -17,12 +17,21 @@ import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
 import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
-import { getDailyProduction, getDashboardStats, getLeadVolume, getManagerDashboard, getReports } from "@/features/dashboard/queries";
+import {
+  getDashboardStats, getDeveloped, getLeadVolume, getManagerDashboard, getMySchedule, getProduction, getReports, getTeamProduction,
+} from "@/features/dashboard/queries";
 import DailyGoals from "@/features/dashboard/components/daily-goals";
 import DailyProductionCard from "@/features/dashboard/components/daily-production";
+import DevelopedCard from "@/features/dashboard/components/developed-card";
+import MySchedule from "@/features/dashboard/components/my-schedule";
 import PeriodSwitch from "@/features/dashboard/components/period-switch";
+import ProductionCard from "@/features/dashboard/components/production-card";
+import TeamProductionCard from "@/features/dashboard/components/team-production";
+import ViewNav from "@/features/dashboard/components/view-nav";
+import { otherParams, readView } from "@/features/dashboard/views";
 import { getPayRules } from "@/features/pay/queries";
-import { hoursLabel, TILE_PERIODS, tileRange } from "@/lib/pay";
+import { addDays, formatIso, isIsoDate, monthGrid, monthStart } from "@/lib/dates";
+import { hoursLabel, TILE_PERIODS, tileRange, VIEW_PERIODS } from "@/lib/pay";
 import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
@@ -46,6 +55,20 @@ const STATUS_COLORS = {
 };
 
 const PERIOD_KEYS = TILE_PERIODS.map(([k]) => k);
+const VIEW_KEYS = VIEW_PERIODS.map(([k]) => k);
+// Recent Leads & Appointments: a day, a week or a pay period.
+const RECENT_PERIODS = VIEW_PERIODS.filter(([k]) => k !== "month").sort((a, b) => ["day", "week", "period"].indexOf(a[0]) - ["day", "week", "period"].indexOf(b[0]));
+
+/** A card's period switch and day navigator, for the view read from the address. */
+function viewControls(sp, v, { keyParam, dateParam, options, name }) {
+  return {
+    switcher: <PeriodSwitch param={keyParam} current={v.key} params={otherParams(sp, keyParam)} options={options} />,
+    nav: (
+      <ViewNav params={otherParams(sp, dateParam)} dateParam={dateParam} anchor={v.anchor} label={v.label}
+        prev={v.prev} next={v.next} today={v.today} showsToday={v.showsToday} name={v.key === "period" ? "pay period" : v.key} />
+    ),
+  };
+}
 
 export default async function Dashboard({ searchParams }) {
   // Cached per request — the layout has usually resolved this already.
@@ -53,16 +76,18 @@ export default async function Dashboard({ searchParams }) {
   const role = me?.role ?? "client";
   const view = dashboardView(role);
   const sp = await searchParams;
+  // An account manager's dashboard is their own, below the tiles too.
+  const isManager = role === "manager" && Boolean(me?.id);
 
   const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday] = await Promise.all([
-    getRecentLeads(6),
-    getAppointments(),
-    getDashboardStats(),
+    isManager ? [] : getRecentLeads(6),
+    isManager ? { today: [], tomorrow: [] } : getAppointments(),
+    isManager ? null : getDashboardStats(),
     // Months, status mix and totals — only the client dashboard renders them.
     view.trend === "months" || view.statusMix ? getReports() : null,
     view.campaigns ? getProjects() : null,
     view.myPerformance ? getMyWorkload() : null,
-    view.trend === "weeks" ? getLeadVolume() : null,
+    view.trend === "weeks" && !isManager ? getLeadVolume() : null,
     getBusinessTimeZone(),
     getBusinessToday(),
   ]);
@@ -73,16 +98,37 @@ export default async function Dashboard({ searchParams }) {
     ap: PERIOD_KEYS.includes(sp?.ap) ? sp.ap : "period",
     ld: PERIOD_KEYS.includes(sp?.ld) ? sp.ld : "period",
   };
-  if (role === "manager" && me?.id) {
-    const rules = await getPayRules();
+  const rules = isManager || view.audience === "company" ? await getPayRules() : null;
+  if (isManager) {
     const ranges = { appts: tileRange(periods.ap, businessToday, rules.time), leads: tileRange(periods.ld, businessToday, rules.time) };
-    manager = { ranges, ...(await getManagerDashboard({ userId: me.id, today: businessToday, ranges })) };
+    // Row two: their production over the day or period chosen, and their own calendar (the month chosen).
+    const prod = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
+    const cm = typeof sp?.cm === "string" && isIsoDate(`${sp.cm}-01`) ? `${sp.cm}-01` : monthStart(businessToday);
+    const grid = monthGrid(cm);
+    // Row three: what they developed over the day, week or pay period chosen, and the team's day.
+    const recent = readView(sp, { keyParam: "rl", dateParam: "rd", keys: RECENT_PERIODS.map(([k]) => k), today: businessToday, time: rules.time });
+    const [dash, production, developed, schedule, team] = await Promise.all([
+      getManagerDashboard({ userId: me.id, today: businessToday, ranges }),
+      // A day comes with the week up to it, for the card's bars.
+      getProduction(prod.key === "day" ? { from: addDays(prod.anchor, -6), to: prod.anchor } : prod.range),
+      getDeveloped({ userId: me.id, from: recent.range.from, to: recent.range.to, timeZone: tz }),
+      getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz }),
+      getTeamProduction(businessToday),
+    ]);
+    manager = {
+      ranges, ...dash, prod, recent, cm, developed, schedule, team,
+      person: production.find((r) => r.userId === me.id) ?? null,
+    };
   }
-  // An administrator's view of the team's day.
-  const production = view.audience === "company" ? await getDailyProduction(businessToday) : null;
+  // An administrator's view of the team: a day (today to begin with) or a pay period, week or month.
+  let production = null;
+  if (view.audience === "company") {
+    const v = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
+    production = { view: v, rows: await getProduction(v.range) };
+  }
 
   // Appointments per rep ride along with the dashboard stats.
-  const reps = s.reps;
+  const reps = s?.reps ?? [];
   const months = report?.months ?? [];
   const maxMonth = Math.max(1, ...months.map((m) => Math.max(m.leads, m.appts)));
 
@@ -125,7 +171,7 @@ export default async function Dashboard({ searchParams }) {
         // One short line, as on every role's tiles: the goal rows below give the leads and appointments.
         note: `${hoursLabel(t.workedMinutes)} worked today`,
         icon: Gauge, accent: "var(--neon-amber)",
-        children: <DailyGoals today={t} accent="var(--neon-amber)" /> },
+        children: <DailyGoals today={t} accent="var(--neon-amber)" mode="tile" /> },
     ];
   } else if (view.audience === "client") {
     // What the client bought: totals and delivery quality, not weekly activity.
@@ -181,8 +227,37 @@ export default async function Dashboard({ searchParams }) {
           ))}
         </div>
 
-        {production ? <DailyProductionCard rows={production} timeZone={tz} /> : null}
+        {production ? (
+          <DailyProductionCard rows={production.rows} view={production.view} timeZone={tz}
+            {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
+        ) : null}
 
+        {manager ? (
+          <>
+            {/* Row two: their production, and their own calendar. */}
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+              <div className="flex flex-col xl:col-span-2 [&>*]:flex-1">
+                <ProductionCard person={manager.person} view={manager.prod} timeZone={tz}
+                  today={manager.today ?? { leads: 0, appts: 0, leadsGoal: null, apptsGoal: null }}
+                  {...viewControls(sp, manager.prod, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
+              </div>
+              <div className="flex flex-col xl:col-span-3 [&>*]:flex-1">
+                <MySchedule items={manager.schedule.items} awaiting={manager.schedule.awaiting} month={manager.cm}
+                  today={businessToday} params={otherParams(sp, "cm")} />
+              </div>
+            </div>
+
+            {/* Row three: what they developed, and the team's day. */}
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <DevelopedCard rows={manager.developed} view={manager.recent}
+                  {...viewControls(sp, manager.recent, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
+              </div>
+              <TeamProductionCard rows={manager.team} meId={me.id} dayLabel={formatIso(businessToday, "long")} />
+            </div>
+          </>
+        ) : (
+        <>
         {/* volume over time + today */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* The monthly chart fills its card, which grows beside a long schedule. */}
@@ -350,6 +425,8 @@ export default async function Dashboard({ searchParams }) {
             ) : null}
           </div>
         </div>
+        </>
+        )}
       </div>
     </>
   );

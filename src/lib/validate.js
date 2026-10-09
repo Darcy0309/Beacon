@@ -395,6 +395,14 @@ export const schemas = {
     appts_goal: [int({ min: 0, max: 1000 })],
   },
 
+  // An appointment or call-back reminder moved on the dashboard's calendar.
+  scheduleMove: {
+    kind: [oneOf(["appointment", "reminder"], "Only appointments and reminders move")],
+    id: [required("Missing item"), id],
+    date: [required("Choose the day"), date],
+    time: [required("Choose the time"), time12],
+  },
+
   // One pay period on the schedule (Settings): its days, pay date, and the days closed or optional.
   payPeriod: {
     id: [id],

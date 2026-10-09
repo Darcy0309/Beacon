@@ -1,9 +1,9 @@
 "use server";
 
-/** The dashboard: a manager's goals for the day. */
+/** The dashboard: a manager's goals for the day, and moving things on their calendar. */
 
 import { revalidatePath } from "next/cache";
-import { check, currentAppUser, fail, ok } from "@/lib/server/action-helpers";
+import { check, currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
@@ -30,4 +30,29 @@ export async function saveDailyGoals(prevState, formData) {
   if (error) return fail(error, null, values);
   revalidatePath("/");
   return ok({ day });
+}
+
+/**
+ * Move something on the manager's own calendar to another day and time:
+ * an appointment they set (move_appointment(): not one gone by or marked
+ * invalid) or a call-back reminder not yet gone off (move_reminder()).
+ */
+export async function moveScheduleItem(formData) {
+  const { values, failed } = check(formData, schemas.scheduleMove);
+  if (failed) return failed;
+  const supabase = await createClient();
+  const appointment = values.kind === "appointment";
+  const { data, error } = await supabase.rpc(appointment ? "move_appointment" : "move_reminder", {
+    p_id: Number(values.id), p_date: values.date, p_time: values.time,
+  });
+  if (error) return fail(error);
+  await logActivity(supabase, appointment ? "appointment.moved" : "lead.reminder", {
+    entity: appointment ? "appointment" : "reminder", entityId: Number(values.id), detail: `${values.date} ${values.time}`,
+  });
+  revalidatePath("/");
+  if (appointment) {
+    revalidatePath("/appointments");
+    revalidatePath("/calendar");
+  }
+  return ok(data);
 }

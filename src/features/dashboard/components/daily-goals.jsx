@@ -40,11 +40,16 @@ function GoalInput({ name, label, defaultValue, invalid }) {
 }
 
 /**
- * Today's goals on the Daily Production tile: set as the day starts (how
- * many leads and appointments), then tracked as the % reached. `today`:
+ * Today's goals: how many leads and appointments the manager means to
+ * develop, set as the day starts, then tracked as the % reached. `today`:
  * { leads, appts, leadsGoal, apptsGoal }.
+ *
+ *   mode "tile"   the Daily Production tile: the progress, or a link down to
+ *                 the card to set the goal
+ *   mode "card"   the Daily Production card: the goal set there (its meters
+ *                 show the progress), and changed there
  */
-export default function DailyGoals({ today, accent }) {
+export default function DailyGoals({ today, accent, mode = "card" }) {
   const hasGoal = today.leadsGoal != null || today.apptsGoal != null;
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState(saveDailyGoals, EMPTY);
@@ -60,14 +65,27 @@ export default function DailyGoals({ today, accent }) {
     }
   }, [state, router]);
 
+  if (mode === "tile") {
+    return hasGoal ? (
+      <div className="mt-2 space-y-1.5" data-daily-goals>
+        <Progress label="Leads" done={today.leads} goal={today.leadsGoal} color={accent} />
+        <Progress label="Appts" done={today.appts} goal={today.apptsGoal} color={accent} />
+      </div>
+    ) : (
+      <a href="#daily-production" className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline" data-set-goal-link>
+        <Target className="size-3.5" /> Set today&apos;s goal
+      </a>
+    );
+  }
+
   if (editing || !hasGoal) {
     return (
-      <form action={action} className="mt-2 space-y-1.5" data-daily-goals-form>
+      <form action={action} className="space-y-1.5" data-daily-goals-form>
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{hasGoal ? "Change today's goal" : "Set today's goal"}</span>
+          <span>{hasGoal ? "Change today's goal" : "Set today's goal: what you mean to develop today"}</span>
           {hasGoal ? <button type="button" onClick={() => setEditing(false)} className="hover:text-primary">Cancel</button> : null}
         </div>
-        {/* Labels inside the boxes: one row, so the tile is no taller than the others. */}
+        {/* Labels inside the boxes: one row. */}
         <div className="flex items-center gap-2">
           <GoalInput name="leads_goal" label="Leads" defaultValue={today.leadsGoal} invalid={state?.fieldErrors?.leads_goal} />
           <GoalInput name="appts_goal" label="Appts" defaultValue={today.apptsGoal} invalid={state?.fieldErrors?.appts_goal} />
@@ -78,14 +96,9 @@ export default function DailyGoals({ today, accent }) {
   }
 
   return (
-    <div className="mt-2 space-y-1.5" data-daily-goals>
-      {/* In the tile's top right corner: changing the goal takes no line of its own. */}
-      <button type="button" onClick={() => setEditing(true)} aria-label="Change today's goal" title="Change today's goal" data-change-goal
-        className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary">
-        <Pencil className="size-3.5" />
-      </button>
-      <Progress label="Leads" done={today.leads} goal={today.leadsGoal} color={accent} />
-      <Progress label="Appts" done={today.appts} goal={today.apptsGoal} color={accent} />
-    </div>
+    <button type="button" onClick={() => setEditing(true)} data-change-goal
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-primary">
+      <Pencil className="size-3" /> Change today&apos;s goal
+    </button>
   );
 }

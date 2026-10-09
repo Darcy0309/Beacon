@@ -248,3 +248,29 @@ export function tileRange(key, today, time = {}) {
   const p = payPeriod(today, time, 0);
   return { key: "period", from: p.from, to: p.to, label: "this pay period" };
 }
+
+/** What the Daily Production card can show: one day, or a period around it. */
+export const VIEW_PERIODS = [
+  ["day", "Day"],
+  ["period", "Pay"],
+  ["week", "Week"],
+  ["month", "Month"],
+];
+
+/**
+ * The days a view counts, around `anchor` (any day in them): the day
+ * itself, or its pay period, week or month as tileRange() has them.
+ * Returns { key, from, to }.
+ */
+export function viewRange(key, anchor, time = {}) {
+  if (key === "day") return { key, from: anchor, to: anchor };
+  const { from, to, key: k } = tileRange(key, anchor, time);
+  return { key: k, from, to };
+}
+
+/** A day in the view before (`dir` -1) or after (+1) `range`, to show next. */
+export function stepView(range, dir) {
+  if (range.key === "week") return addDays(range.from, 7 * dir);
+  if (range.key === "month") return addMonths(range.from, dir);
+  return dir < 0 ? addDays(range.from, -1) : addDays(range.to, 1);
+}

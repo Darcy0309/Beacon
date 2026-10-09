@@ -18,25 +18,44 @@ function AgainstGoal({ done, goal }) {
   );
 }
 
+/** Minutes past midnight on the business's clock. */
+function minuteOfDay(iso, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(new Date(iso));
+  const get = (t) => Number(parts.find((p) => p.type === t)?.value ?? 0);
+  return get("hour") * 60 + get("minute");
+}
+const clockOf = (m) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")} ${m < 720 ? "AM" : "PM"}`;
+
 /**
- * Today across the team, for an administrator: each account manager (and
- * any agent who worked) — when they started using Lighthouse, their calls,
- * the leads and appointments they developed against the goals they set, and
- * the hours worked so far. `rows`: getDailyProduction().
+ * The team's production for an administrator: each account manager (and
+ * any agent who worked) on a day or over a pay period, week or month —
+ * when they started using Lighthouse (on average, over a period), their
+ * calls, the leads and appointments they developed against the goals they
+ * set, and the hours worked. `rows`: getProduction(); `view`: readView().
  */
-export default function DailyProductionCard({ rows, timeZone }) {
-  const time = (iso) =>
-    iso ? new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "2-digit" }).format(new Date(iso)) : null;
+export default function DailyProductionCard({ rows, view, switcher, nav, timeZone }) {
+  const isDay = view.key === "day";
+  const isToday = isDay && view.anchor === view.today;
+  const started = (r) => {
+    if (!r.starts.length) return null;
+    const m = isDay ? minuteOfDay(r.starts[0], timeZone) : Math.round(r.starts.reduce((n, s) => n + minuteOfDay(s, timeZone), 0) / r.starts.length);
+    return clockOf(m);
+  };
   const total = (key) => rows.reduce((n, r) => n + r[key], 0);
+  const cols = isDay ? 6 : 7;
   return (
     <Card data-daily-production>
-      <SectionHeader label="Daily Production" icon={Gauge} href="/reports/pay" action="Pay & Hours" />
+      <SectionHeader wrap label="Daily Production" icon={Gauge} action={switcher} />
+      <div className="flex items-center justify-between gap-2 px-5 py-2">
+        <span className="text-xs text-muted-foreground">{isDay ? "Each manager's day" : "Each manager over the period"}</span>
+        {nav}
+      </div>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Manager</TableHead>
-              <TableHead>Started</TableHead>
+              {isDay ? <TableHead>Started</TableHead> : <><TableHead className="text-right">Days worked</TableHead><TableHead>Usual start</TableHead></>}
               <TableHead className="text-right">Calls</TableHead>
               <TableHead className="text-right">Leads</TableHead>
               <TableHead className="text-right">Appointments</TableHead>
@@ -50,7 +69,14 @@ export default function DailyProductionCard({ rows, timeZone }) {
                   <Link href={`/reports/pay?user=${r.userId}`} className="hover:text-primary">{r.name}</Link>
                   {r.role === "agent" ? <span className="ml-1.5 text-xs text-muted-foreground">agent</span> : null}
                 </TableCell>
-                <TableCell className="tabular-nums">{time(r.startedAt) ?? <span className="text-muted-foreground">Not yet</span>}</TableCell>
+                {isDay ? (
+                  <TableCell className="tabular-nums">{started(r) ?? <span className="text-muted-foreground">{isToday ? "Not yet" : "—"}</span>}</TableCell>
+                ) : (
+                  <>
+                    <TableCell className="text-right tabular-nums">{r.daysWorked}</TableCell>
+                    <TableCell className="tabular-nums">{started(r) ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                  </>
+                )}
                 <TableCell className="text-right tabular-nums">{r.calls}</TableCell>
                 <TableCell className="text-right"><AgainstGoal done={r.leads} goal={r.leadsGoal} /></TableCell>
                 <TableCell className="text-right"><AgainstGoal done={r.appts} goal={r.apptsGoal} /></TableCell>
@@ -59,14 +85,14 @@ export default function DailyProductionCard({ rows, timeZone }) {
             ))}
             {rows.length ? (
               <TableRow className="font-semibold hover:bg-transparent">
-                <TableCell colSpan={2} className="text-xs uppercase tracking-[0.1em] text-muted-foreground">Team today</TableCell>
+                <TableCell colSpan={cols - 4} className="text-xs uppercase tracking-[0.1em] text-muted-foreground">{isToday ? "Team today" : "Team"}</TableCell>
                 <TableCell className="text-right tabular-nums">{total("calls")}</TableCell>
                 <TableCell className="text-right tabular-nums">{total("leads")}</TableCell>
                 <TableCell className="text-right tabular-nums">{total("appts")}</TableCell>
                 <TableCell className="text-right tabular-nums">{hoursLabel(total("workedMinutes"))}</TableCell>
               </TableRow>
             ) : (
-              <TableRow><TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No account managers yet.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={cols} className="py-6 text-center text-muted-foreground">No account managers yet.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

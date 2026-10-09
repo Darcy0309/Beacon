@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for pay: the rates an administrator picks from, pay periods, hours, and production totals. */
-import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, tileRange, workDays } from "../../src/lib/pay.js";
+import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, stepView, tileRange, viewRange, workDays } from "../../src/lib/pay.js";
 import { generateTempPassword } from "../../src/lib/temp-password.js";
 import { CSV_COLUMNS, groupProduction, totalOf, totalRow } from "../../src/features/reports/production.js";
 
@@ -114,6 +114,14 @@ eq("a tile's week runs Monday to Sunday", tileRange("week", "2026-10-08"), { key
 eq("…a Sunday is the end of its week", tileRange("week", "2026-10-11").from, "2026-10-05");
 eq("a tile's month is the calendar month", tileRange("month", "2026-10-08"), { key: "month", from: "2026-10-01", to: "2026-10-31", label: "this month" });
 eq("the pay period by default, following the schedule", tileRange("anything", "2026-10-08", custom), { key: "period", from: "2026-09-30", to: "2026-10-13", label: "this pay period" });
+
+// --- the Daily Production card's views: a day, or the period around it ---------------
+eq("a day is just that day", viewRange("day", "2026-10-08"), { key: "day", from: "2026-10-08", to: "2026-10-08" });
+eq("…the week, pay period or month around a chosen day", [viewRange("week", "2026-09-17").from, viewRange("month", "2026-09-17").to, viewRange("period", "2026-10-20", custom).from], ["2026-09-14", "2026-09-30", "2026-10-14"]);
+eq("stepping back and on: a day", [stepView(viewRange("day", "2026-10-01"), -1), stepView(viewRange("day", "2026-10-31"), 1)], ["2026-09-30", "2026-11-01"]);
+eq("…a week", stepView(viewRange("week", "2026-10-08"), -1), "2026-09-28");
+eq("…a month, from the 31st too", stepView(viewRange("month", "2026-10-31"), -1), "2026-09-01");
+eq("…a pay period, into the one before or after", [stepView(viewRange("period", "2026-10-08", custom), -1), stepView(viewRange("period", "2026-10-08", custom), 1)], ["2026-09-29", "2026-10-14"]);
 
 // --- temporary passwords -----------------------------------------------------------
 const temps = Array.from({ length: 200 }, () => generateTempPassword());
