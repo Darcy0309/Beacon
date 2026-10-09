@@ -28,6 +28,17 @@ function Progress({ label, done, goal, color }) {
   );
 }
 
+/** A number box with its label inside, on the left. */
+function GoalInput({ name, label, defaultValue, invalid }) {
+  return (
+    <label className="relative min-w-0 flex-1">
+      <span className="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[0.68rem] text-muted-foreground">{label}</span>
+      <Input name={name} type="number" inputMode="numeric" min="0" max="1000" defaultValue={defaultValue ?? ""}
+        className="h-8 pl-10 pr-1 tabular-nums" aria-invalid={Boolean(invalid)} />
+    </label>
+  );
+}
+
 /**
  * Today's goals on the Daily Production tile: set as the day starts (how
  * many leads and appointments), then tracked as the % reached. `today`:
@@ -56,17 +67,10 @@ export default function DailyGoals({ today, accent }) {
           <span>{hasGoal ? "Change today's goal" : "Set today's goal"}</span>
           {hasGoal ? <button type="button" onClick={() => setEditing(false)} className="hover:text-primary">Cancel</button> : null}
         </div>
-        <div className="flex items-end gap-2">
-          <label className="min-w-0 flex-1 text-[0.68rem] text-muted-foreground">
-            Leads
-            <Input name="leads_goal" type="number" inputMode="numeric" min="0" max="1000" defaultValue={today.leadsGoal ?? ""}
-              className="mt-0.5 h-8" aria-invalid={Boolean(state?.fieldErrors?.leads_goal)} />
-          </label>
-          <label className="min-w-0 flex-1 text-[0.68rem] text-muted-foreground">
-            Appointments
-            <Input name="appts_goal" type="number" inputMode="numeric" min="0" max="1000" defaultValue={today.apptsGoal ?? ""}
-              className="mt-0.5 h-8" aria-invalid={Boolean(state?.fieldErrors?.appts_goal)} />
-          </label>
+        {/* Labels inside the boxes: one row, so the tile is no taller than the others. */}
+        <div className="flex items-center gap-2">
+          <GoalInput name="leads_goal" label="Leads" defaultValue={today.leadsGoal} invalid={state?.fieldErrors?.leads_goal} />
+          <GoalInput name="appts_goal" label="Appts" defaultValue={today.apptsGoal} invalid={state?.fieldErrors?.appts_goal} />
           <Button type="submit" size="sm" className="h-8" disabled={pending}><Target /> {pending ? "…" : "Set"}</Button>
         </div>
       </form>

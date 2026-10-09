@@ -72,9 +72,10 @@ export default function StatTile({
         </div>
         {/* The action (a period switch) shares the note's line: tiles keep their figures level and stay short. */}
         {note || action ? (
-          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-            {note ? <div className="text-xs text-muted-foreground">{note}</div> : <span />}
-            {action}
+          // With an action, one line of text high whatever the note says, so the switch never moves and the tile is no taller.
+          <div className={cn("mt-1 flex items-center justify-between gap-2", action ? "h-4" : "flex-wrap")}>
+            {note ? <div className="min-w-0 truncate text-xs text-muted-foreground">{note}</div> : <span />}
+            {action ? <span className="flex shrink-0">{action}</span> : null}
           </div>
         ) : null}
         {children}

@@ -102,10 +102,11 @@ export default async function Dashboard({ searchParams }) {
     const t = manager.today ?? { leads: 0, appts: 0, workedMinutes: 0, calls: 0, leadsGoal: null, apptsGoal: null };
     const p = manager.projects;
     tiles = [
-      { label: "Appointments", value: String(manager.appts.total), note: `Developed ${manager.ranges.appts.label}`,
+      // The switch beside the note shows the period, so the note stays short and the switch stays put.
+      { label: "Appointments", value: String(manager.appts.total), note: "Developed",
         icon: CalendarCheck, accent: "var(--neon-emerald)", series: manager.appts.series, bars: true,
         action: <PeriodSwitch param="ap" current={periods.ap} params={{ ld: periods.ld }} /> },
-      { label: "Leads", value: String(manager.leads.total), note: `Developed ${manager.ranges.leads.label}`,
+      { label: "Leads", value: String(manager.leads.total), note: "Developed",
         icon: Target, accent: "var(--neon-cyan)", series: manager.leads.series, bars: true,
         action: <PeriodSwitch param="ld" current={periods.ld} params={{ ap: periods.ap }} /> },
       { label: "Active Projects", value: String(p.total),

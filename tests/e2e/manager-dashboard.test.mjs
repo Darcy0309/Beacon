@@ -51,15 +51,20 @@ try {
   check("four tiles of their own: Appointments, Leads, Active Projects, Daily Production",
     JSON.stringify(labels) === JSON.stringify(["Appointments", "Leads", "Active Projects", "Daily Production"]), JSON.stringify(labels));
   check("…no Total Leads or Conversion Rate", !/Total Leads|Conversion Rate/i.test(await sean.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent).join(' ')`)));
-  check("Appointments and Leads count this pay period by default", /Developed this pay period/.test(await tile(sean, "Appointments")) && /Developed this pay period/.test(await tile(sean, "Leads")));
+  const chosen = (param) => sean.ev(`document.querySelector('[data-period-switch="${param}"] [aria-current]')?.textContent.trim() ?? null`);
+  check("Appointments and Leads count this pay period by default", (await chosen("ap")) === "Pay" && (await chosen("ld")) === "Pay" && /Developed/.test(await tile(sean, "Leads")));
   await sean.click('[data-period-switch="ap"] a', "Week");
   check("…a tile can count the week instead, the other keeping its own",
-    Boolean(await until(async () => /Developed this week/.test((await tile(sean, "Appointments")) ?? ""))) && /Developed this pay period/.test(await tile(sean, "Leads")), await tile(sean, "Appointments"));
+    Boolean(await until(async () => (await chosen("ap")) === "Week")) && (await chosen("ld")) === "Pay", await chosen("ap"));
   await sean.click('[data-period-switch="ld"] a', "Month");
-  check("…or the month", Boolean(await until(async () => /Developed this month/.test((await tile(sean, "Leads")) ?? ""))) && /Developed this week/.test(await tile(sean, "Appointments")));
+  check("…or the month", Boolean(await until(async () => (await chosen("ld")) === "Month")) && (await chosen("ap")) === "Week");
+  const switchTop = (param) => sean.ev(`Math.round(document.querySelector('[data-period-switch="${param}"]').getBoundingClientRect().top)`);
+  check("…the switch stays in the same place whatever the period", (await switchTop("ap")) === (await switchTop("ld")), `${await switchTop("ap")} vs ${await switchTop("ld")}`);
   check("Active Projects: how many, by kind, and the change in 30 days", /\d+ Lead · \d+ Appointment/.test(await tile(sean, "Active Projects")) && /in the last 30 days/.test(await tile(sean, "Active Projects")), await tile(sean, "Active Projects"));
   check("Daily Production: hours worked today, and before a goal is set, a place to set it",
     /worked today/.test(await tile(sean, "Daily Production")) && /Set today's goal/.test(await tile(sean, "Daily Production")), await tile(sean, "Daily Production"));
+  const tileHeight = (page) => page.ev(`Math.round(document.querySelector('[data-panel]').getBoundingClientRect().height)`);
+  const seanHeight = await tileHeight(sean); // the tallest it gets: the goal form showing
   await sean.fill('[data-daily-goals-form] input[name="leads_goal"]', "4");
   await sean.fill('[data-daily-goals-form] input[name="appts_goal"]', "2");
   await sean.click("[data-daily-goals-form] button[type=submit]");
@@ -72,6 +77,7 @@ try {
   const row = await admin.ev(`document.querySelector('[data-production-row="${SEAN}"]')?.innerText.replace(/\\s+/g, ' ') ?? null`);
   check("Daily Production lists each manager: started, calls, leads and appointments against goal, hours", Boolean(row) && /Sean/.test(row) && /\/ 4/.test(row) && /\/ 2/.test(row), row);
   check("…the admin's own tiles are unchanged", /Total Leads/i.test(await admin.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent).join(' ')`)));
+  check("…and the manager's tiles are as tall as theirs", seanHeight === (await tileHeight(admin)), `${seanHeight} vs ${await tileHeight(admin)}`);
 
   section("Creating an account with a temporary password");
   await admin.go("/users", 4000);
