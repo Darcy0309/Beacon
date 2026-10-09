@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UserPlus, Pencil } from "lucide-react";
+import { UserPlus, Pencil, Wand2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, formHelpers } from "@/components/ui/field";
@@ -14,6 +14,7 @@ import { saveUser } from "@/features/users/actions";
 import { ROLES } from "@/lib/nav";
 import { PAY_MODELS, usd } from "@/lib/pay";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
+import { generateTempPassword } from "@/lib/temp-password";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -29,10 +30,18 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
   // and pay shows only for the people who are paid (account managers and agents).
   const [role, setRole] = useState(user?.role ?? "agent");
   const [payModel, setPayModel] = useState(pay?.model ?? "commission");
+  // A new account: an emailed invitation, or a temporary password given to them.
+  const [access, setAccess] = useState("invite");
+  const [temp, setTemp] = useState("");
 
   useEffect(() => {
     if (state?.ok) {
-      toast.success(isEdit ? "User updated" : `Invitation sent to ${state.data?.email ?? "them"}`);
+      toast.success(
+        isEdit ? "User updated"
+          : state.data?.temporary ? `Account created for ${state.data.email}. Give them their temporary password.`
+          : `Invitation sent to ${state.data?.email ?? "them"}`,
+        state.data?.emailed ? { description: state.data.emailed } : undefined
+      );
       setOpen(false);
       router.refresh();
     } else if (state?.error && !state?.fieldErrors) {
@@ -63,17 +72,17 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
       {inRowMenu ? null : (
         <DialogTrigger asChild>
           {trigger ?? (
-            <Button size="sm">{isEdit ? <Pencil /> : <UserPlus />} {isEdit ? "Edit" : "Invite user"}</Button>
+            <Button size="sm">{isEdit ? <Pencil /> : <UserPlus />} {isEdit ? "Edit" : "Add user"}</Button>
           )}
         </DialogTrigger>
       )}
       <DialogContent onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit user" : "Invite user"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit user" : "Add user"}</DialogTitle>
           <DialogDescription>
             {isEdit
               ? "Changing the role or client account takes effect on their next request. Disabled accounts cannot sign in or read anything."
-              : "They receive an email with a link to set their password. The account is active once they have."}
+              : "Email them an invitation link, or give them a temporary password. Either way they choose their own password when they first sign in."}
           </DialogDescription>
         </DialogHeader>
 
@@ -92,6 +101,42 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               <Input name="email" type="email" inputMode="email" required defaultValue={dv("email")} maxLength={120} aria-invalid={invalid("email")} />
             </Field>
 
+            {!isEdit ? (
+              <fieldset className="space-y-2 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-access>
+                <legend className="px-1 text-xs font-medium text-muted-foreground">How they get in</legend>
+                <input type="hidden" name="access" value={access} />
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="How they get in">
+                  {[["invite", "Email an invitation link"], ["password", "Set a temporary password"]].map(([key, label]) => (
+                    <button key={key} type="button" role="radio" aria-checked={access === key} data-access-choice={key}
+                      onClick={() => { setAccess(key); if (key === "password" && !temp) setTemp(generateTempPassword()); }}
+                      className={access === key
+                        ? "rounded-md border border-primary bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary"
+                        : "rounded-md border border-[var(--panel-border)] px-3 py-1.5 text-xs text-muted-foreground hover:border-primary/40 hover:text-foreground"}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {access === "password" ? (
+                  <>
+                    <Field label="Temporary password" required error={fe("temp_password")}
+                      hint="Give it to them by phone or text, not email. They choose their own when they first sign in.">
+                      <div className="flex gap-2">
+                        <Input name="temp_password" value={temp} onChange={(e) => setTemp(e.target.value)} maxLength={72} autoComplete="off"
+                          spellCheck={false} className="font-mono" aria-invalid={invalid("temp_password")} />
+                        <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setTemp(generateTempPassword())} aria-label="Generate a password"><Wand2 /></Button>
+                        <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" aria-label="Copy the password"
+                          onClick={() => navigator.clipboard?.writeText(temp).then(() => toast.success("Copied"), () => {})}><Copy /></Button>
+                      </div>
+                    </Field>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="send_link" defaultChecked className="size-4 accent-[var(--primary)]" />
+                      Email them a sign-in link (without the password)
+                    </label>
+                  </>
+                ) : null}
+              </fieldset>
+            ) : null}
+
             <Field label="Role" required error={fe("role")}>
               <Select name="role" defaultValue={dv("role", "agent")} onChange={(e) => setRole(e.target.value)} aria-invalid={invalid("role")}>
                 {Object.entries(ROLES).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
@@ -108,7 +153,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               ) : (
                 <>
                   <input type="hidden" name="status" value="invited" />
-                  <Input value="Invited — until they set a password" disabled />
+                  <Input value="Invited until they sign in" disabled />
                 </>
               )}
             </Field>
@@ -133,6 +178,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               </Select>
             </Field>
 
+
             {paid ? (
               <>
                 <Field label="Pay" error={fe("pay_model")} className="sm:col-span-2"
@@ -154,7 +200,9 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" disabled={pending}>{pending ? (isEdit ? "Saving…" : "Sending…") : isEdit ? "Save changes" : "Send invitation"}</Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? (isEdit ? "Saving…" : "Working…") : isEdit ? "Save changes" : access === "password" ? "Create account" : "Send invitation"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

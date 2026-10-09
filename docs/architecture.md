@@ -102,6 +102,27 @@ every result against the sheet.
   else's rows, and only an administrator sets rates (`set_project_rates()`).
   A chargeback is marked by `pay_events.is_chargeback`, so one at a $0 rate
   still counts.
+- **Dashboards.** An account manager's four tiles are their own
+  (`getManagerDashboard()`): the appointments and leads they developed
+  (counted as the production report counts them) over the pay period, or
+  the week or month chosen on the tile (`?ap=`, `?ld=`; `tileRange()`); the
+  active projects they are on, by kind, with the change in 30 days
+  (`project_assignment_log`, written by a trigger on `project_assignments`);
+  and today's production against the goals they set as the day starts
+  (`daily_goals`). An administrator's dashboard adds **Daily Production**:
+  `daily_production(day)` for every manager (and any agent who worked) —
+  when they started using Lighthouse, calls, leads and appointments against
+  goal, hours worked.
+- **Accounts.** An administrator adds someone with an emailed invitation
+  link, or with a temporary password they give them (by phone or text; the
+  email, if sent, carries only the sign-in link). Either way the account
+  stays "invited" until they choose their own password. "Set temporary
+  password" in a user's row does the same for an existing account
+  (`users.must_change_password`: the workspace sends them to My Security
+  until they have; `clear_temporary_password()` lifts it). Passwords are
+  never readable, by anyone: Supabase keeps a one-way hash. Each person
+  edits their own name and phones under My Profile; the database refuses
+  them their role, status, client account and sign-in email.
 - **Days** are counted in the business's time zone, `business_tz()`: the
   `business_timezone` row of `app_settings` (`{"name": "America/Chicago"}`),
   or America/Phoenix when there is none.

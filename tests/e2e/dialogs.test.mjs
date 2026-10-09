@@ -15,7 +15,7 @@ const SEAN = sql("select first_name || ' ' || last_name from public.users where 
 
 const FORMS = [
   { name: "Edit user", path: "/users", open: (p) => p.pointer(`button[aria-label="Actions for ${SEAN}"]`).then(() => sleep(300)).then(() => p.menuItem("Edit")) },
-  { name: "Invite user", path: "/users", open: (p) => p.click("button", "Invite user") },
+  { name: "Add user", path: "/users", open: (p) => p.click("button", "Add user") },
   { name: "New project", path: "/projects", open: (p) => p.click("button", "New project") },
   { name: "New lead", path: "/leads", open: (p) => p.click("button", "New lead") },
   { name: "New appointment", path: "/appointments", open: (p) => p.click("button", "New appointment") },

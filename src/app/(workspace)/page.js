@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import {
-  Target, CalendarCheck, Users, Percent,
+  Target, CalendarCheck, Users, Percent, FolderOpen, Gauge,
   Activity, CalendarClock, ListChecks, Radio, FolderKanban, PieChart, CheckCheck, UserCheck,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
@@ -17,7 +17,12 @@ import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
 import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
-import { getDashboardStats, getLeadVolume, getReports } from "@/features/dashboard/queries";
+import { getDailyProduction, getDashboardStats, getLeadVolume, getManagerDashboard, getReports } from "@/features/dashboard/queries";
+import DailyGoals from "@/features/dashboard/components/daily-goals";
+import DailyProductionCard from "@/features/dashboard/components/daily-production";
+import PeriodSwitch from "@/features/dashboard/components/period-switch";
+import { getPayRules } from "@/features/pay/queries";
+import { hoursLabel, TILE_PERIODS, tileRange } from "@/lib/pay";
 import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
@@ -40,11 +45,14 @@ const STATUS_COLORS = {
   New: "var(--neon-blue)",
 };
 
-export default async function Dashboard() {
+const PERIOD_KEYS = TILE_PERIODS.map(([k]) => k);
+
+export default async function Dashboard({ searchParams }) {
   // Cached per request — the layout has usually resolved this already.
   const me = await getCurrentUser();
   const role = me?.role ?? "client";
   const view = dashboardView(role);
+  const sp = await searchParams;
 
   const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday] = await Promise.all([
     getRecentLeads(6),
@@ -58,6 +66,20 @@ export default async function Dashboard() {
     getBusinessTimeZone(),
     getBusinessToday(),
   ]);
+
+  // An account manager's own four tiles, each counted over the period chosen on it (the pay period by default).
+  let manager = null;
+  const periods = {
+    ap: PERIOD_KEYS.includes(sp?.ap) ? sp.ap : "period",
+    ld: PERIOD_KEYS.includes(sp?.ld) ? sp.ld : "period",
+  };
+  if (role === "manager" && me?.id) {
+    const rules = await getPayRules();
+    const ranges = { appts: tileRange(periods.ap, businessToday, rules.time), leads: tileRange(periods.ld, businessToday, rules.time) };
+    manager = { ranges, ...(await getManagerDashboard({ userId: me.id, today: businessToday, ranges })) };
+  }
+  // An administrator's view of the team's day.
+  const production = view.audience === "company" ? await getDailyProduction(businessToday) : null;
 
   // Appointments per rep ride along with the dashboard stats.
   const reps = s.reps;
@@ -75,7 +97,35 @@ export default async function Dashboard() {
   const maxCampaign = Math.max(1, ...campaigns.map((p) => p.leads));
 
   let tiles;
-  if (view.audience === "client") {
+  if (manager) {
+    // Everything here is the signed-in manager's own.
+    const t = manager.today ?? { leads: 0, appts: 0, workedMinutes: 0, calls: 0, leadsGoal: null, apptsGoal: null };
+    const p = manager.projects;
+    tiles = [
+      { label: "Appointments", value: String(manager.appts.total), note: `Developed ${manager.ranges.appts.label}`,
+        icon: CalendarCheck, accent: "var(--neon-emerald)", series: manager.appts.series, bars: true,
+        action: <PeriodSwitch param="ap" current={periods.ap} params={{ ld: periods.ld }} /> },
+      { label: "Leads", value: String(manager.leads.total), note: `Developed ${manager.ranges.leads.label}`,
+        icon: Target, accent: "var(--neon-cyan)", series: manager.leads.series, bars: true,
+        action: <PeriodSwitch param="ld" current={periods.ld} params={{ ap: periods.ap }} /> },
+      { label: "Active Projects", value: String(p.total),
+        note: `${p.lead} Lead · ${p.appt} Appointment`,
+        icon: FolderOpen, accent: "var(--neon-violet)",
+        children: (
+          <div className="mt-2 text-xs" data-project-change>
+            <span className={p.net > 0 ? "text-emerald-400" : p.net < 0 ? "text-destructive" : "text-muted-foreground"}>
+              {p.net > 0 ? "+" : ""}{p.net} project{Math.abs(p.net) === 1 ? "" : "s"}
+              {p.pct != null && p.net ? ` (${p.pct > 0 ? "+" : ""}${p.pct}%)` : ""}
+            </span>
+            <span className="text-muted-foreground"> in the last 30 days</span>
+          </div>
+        ) },
+      { label: "Daily Production", value: `${t.leads + t.appts}`,
+        note: `${t.leads} lead${t.leads === 1 ? "" : "s"} · ${t.appts} appointment${t.appts === 1 ? "" : "s"} today · ${hoursLabel(t.workedMinutes)} worked`,
+        icon: Gauge, accent: "var(--neon-amber)",
+        children: <DailyGoals today={t} accent="var(--neon-amber)" /> },
+    ];
+  } else if (view.audience === "client") {
     // What the client bought: totals and delivery quality, not weekly activity.
     tiles = [
       { label: "Leads Delivered", value: (report?.leads ?? 0).toLocaleString(),
@@ -128,6 +178,8 @@ export default async function Dashboard() {
               style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
+
+        {production ? <DailyProductionCard rows={production} timeZone={tz} /> : null}
 
         {/* volume over time + today */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

@@ -224,3 +224,27 @@ export function readPayPeriod(sp, today, time) {
   const paid = range.payDate ? ` · paid ${formatIso(range.payDate, "short")}` : "";
   return { period: key, ...range, label: `${label} · ${formatRange(range.from, range.to)}${paid}`, error: null };
 }
+
+/** The periods a dashboard figure can be counted over, in the order they are offered. */
+export const TILE_PERIODS = [
+  ["period", "Pay period"],
+  ["week", "Week"],
+  ["month", "Month"],
+];
+
+/**
+ * The days a dashboard figure counts (the business's `today`): this pay
+ * period (the default, following the pay rules and any custom schedule), this
+ * week (Monday to Sunday) or this month. Returns { key, from, to, label }.
+ */
+export function tileRange(key, today, time = {}) {
+  if (key === "week") {
+    const from = addDays(today, -((weekdayOf(today) + 6) % 7));
+    return { key, from, to: addDays(from, 6), label: "this week" };
+  }
+  if (key === "month") {
+    return { key, from: monthStart(today), to: monthEnd(today), label: "this month" };
+  }
+  const p = payPeriod(today, time, 0);
+  return { key: "period", from: p.from, to: p.to, label: "this pay period" };
+}

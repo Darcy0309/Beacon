@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /** Unit tests for pay: the rates an administrator picks from, pay periods, hours, and production totals. */
-import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, workDays } from "../../src/lib/pay.js";
+import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, tileRange, workDays } from "../../src/lib/pay.js";
+import { generateTempPassword } from "../../src/lib/temp-password.js";
 import { CSV_COLUMNS, groupProduction, totalOf, totalRow } from "../../src/features/reports/production.js";
 
 let failures = 0;
@@ -107,6 +108,19 @@ const label = readPayPeriod({}, "2026-10-08", custom).label;
 check("this pay period is named with its pay date", /This pay period · Sep 30 – Oct 13, 2026 · paid Oct 15/.test(label), label);
 const picked = readPayPeriod({ period: "custom", from: "2026-10-14", to: "2026-10-28" }, "2026-10-08", custom);
 check("a period picked from the schedule is called a pay period, with its pay date", /^Pay period · Oct 14 – Oct 28, 2026 · paid Oct 30$/.test(picked.label) && picked.payDate === "2026-10-30", picked.label);
+
+// --- the dashboard tiles' periods -----------------------------------------------
+eq("a tile's week runs Monday to Sunday", tileRange("week", "2026-10-08"), { key: "week", from: "2026-10-05", to: "2026-10-11", label: "this week" });
+eq("…a Sunday is the end of its week", tileRange("week", "2026-10-11").from, "2026-10-05");
+eq("a tile's month is the calendar month", tileRange("month", "2026-10-08"), { key: "month", from: "2026-10-01", to: "2026-10-31", label: "this month" });
+eq("the pay period by default, following the schedule", tileRange("anything", "2026-10-08", custom), { key: "period", from: "2026-09-30", to: "2026-10-13", label: "this pay period" });
+
+// --- temporary passwords -----------------------------------------------------------
+const temps = Array.from({ length: 200 }, () => generateTempPassword());
+check("a temporary password: three groups of four, easy to read out", temps.every((t) => /^[A-HJ-NP-Za-km-z2-9]{4}-[A-HJ-NP-Za-km-z2-9]{4}-[A-HJ-NP-Za-km-z2-9]{4}$/.test(t)), temps.find((t) => !/^[A-Za-z2-9-]{14}$/.test(t)));
+check("…long enough for the password rule (10+), with no 0, O, 1, l or I", temps.every((t) => t.length >= 10 && !/[0O1lI]/.test(t)));
+check("…a capital and a digit in it", temps.every((t) => /[A-Z]/.test(t) && /\d/.test(t)));
+check("…and a different one each time", new Set(temps).size === temps.length);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`);

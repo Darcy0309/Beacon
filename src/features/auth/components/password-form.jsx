@@ -15,7 +15,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * Set or change your own password. A newly invited person lands here from
  * their email link (`welcome`), and setting the password turns the account on.
  */
-export default function PasswordForm({ welcome = false, reset = false, isClient = false }) {
+export default function PasswordForm({ welcome = false, reset = false, temporary = false, isClient = false }) {
   const [state, formAction, pending] = useActionState(changePassword, EMPTY);
   const formRef = useRef(null);
   const router = useRouter();
@@ -37,6 +37,10 @@ export default function PasswordForm({ welcome = false, reset = false, isClient 
       {reset ? (
         <p data-reset-note className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
           Choose a new password for your account. You stay signed in.
+        </p>
+      ) : temporary ? (
+        <p data-temporary-note className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">
+          You signed in with a temporary password from your administrator. Choose your own to continue.
         </p>
       ) : welcome ? (
         <p className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-3 text-sm">

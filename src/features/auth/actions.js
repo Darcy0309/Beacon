@@ -105,6 +105,8 @@ export async function changePassword(prevState, formData) {
   }
 
   const { data: activated } = await supabase.rpc("activate_invited_account");
+  // A temporary password an administrator gave them is replaced now.
+  await supabase.rpc("clear_temporary_password");
   const me = await currentAppUser(supabase);
   await logActivity(supabase, "password.change", { userId: me?.id });
   // Admins hear about it (never for admins, at most once per quarter hour). The
@@ -207,4 +209,27 @@ export async function requestPasswordReset(prevState, formData) {
   if (error?.status === 429) return fail("Too many requests. Wait a few minutes, then try again.", null, { email });
   if (error) console.error("[auth] password reset", error.message);
   return ok({ email });
+}
+
+/**
+ * Your own contact details (My Security): name, phone and mobile. Your
+ * sign-in email, role and client account stay an administrator's to change
+ * (the database refuses anything else).
+ */
+export async function updateMyProfile(prevState, formData) {
+  const { values, failed } = check(formData, schemas.profile);
+  if (failed) return failed;
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("You are signed out.");
+  const { data, error } = await supabase
+    .from("users")
+    .update({ first_name: s(formData, "first_name"), last_name: s(formData, "last_name"), phone: s(formData, "phone"), mobile: s(formData, "mobile") })
+    .eq("id", me.id)
+    .select("id");
+  if (error) return fail(error, null, values);
+  if (!data?.length) return fail("Your details could not be saved. Sign in again and try once more.", null, values);
+  await logActivity(supabase, "profile.update", { entity: "user", entityId: me.id });
+  revalidatePath("/security");
+  return ok({ id: me.id });
 }

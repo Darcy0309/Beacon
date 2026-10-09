@@ -289,6 +289,25 @@ export const schemas = {
     // How an account manager or agent is paid. The hourly range is the one in Settings, checked by the database.
     pay_model: [oneOf(PAY_MODEL_KEYS, "Choose how they are paid")],
     hourly_rate: [num({ min: 0, max: 1000 })],
+    // A new account: an emailed invitation link, or a temporary password the administrator gives them.
+    access: [oneOf(["invite", "password"])],
+    temp_password: [rules.custom((v) => (v && (String(v).length < 10 || String(v).length > 72) ? "A temporary password is 10 to 72 characters" : null))],
+    send_link: [],
+  },
+
+  // A new temporary password for an existing account (Users, row menu).
+  tempPassword: {
+    id: [required("Missing user"), id],
+    temp_password: [required("Enter a temporary password"), rules.min(10), max(72)],
+    send_link: [],
+  },
+
+  // Each person's own contact details (My Security).
+  profile: {
+    first_name: [required("Enter your first name"), max(40)],
+    last_name: [max(40)],
+    phone: [phone],
+    mobile: [phone],
   },
 
   bulletin: {
@@ -368,6 +387,12 @@ export const schemas = {
       const bad = String(v ?? "").split(/[,;]+/).map((x) => x.trim()).filter((x) => x && !normalizeState(x));
       return bad.length ? `Not a US state: ${bad.slice(0, 3).join(", ")}` : null;
     })],
+  },
+
+  // The leads and appointments a manager means to develop today.
+  dailyGoals: {
+    leads_goal: [int({ min: 0, max: 1000 })],
+    appts_goal: [int({ min: 0, max: 1000 })],
   },
 
   // One pay period on the schedule (Settings): its days, pay date, and the days closed or optional.

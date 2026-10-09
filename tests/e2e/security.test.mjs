@@ -101,7 +101,7 @@ sql("delete from public.users where email like 'newrep.%@beacon.test'");
 try {
   // Invite
   await page.go("/users");
-  check("Invite button present", await page.click("button", "Invite user"));
+  check("Add user button present", await page.click("button", "Add user"));
   await sleep(800);
   await page.fill('input[name="first_name"]', "Nova");
   await page.fill('input[name="last_name"]', "Reyes");

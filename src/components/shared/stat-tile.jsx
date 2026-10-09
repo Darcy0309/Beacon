@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
  * Metric tile: accent edge, icon chip, wide-tracked label, large figure, and a
  * sparkline bleeding to the bottom edge in the tile's accent hue. The figure
  * counts up and the sparkline rises from zero as the tile appears.
- * Pass `trace` to add the animated streak that laps the border.
+ * Pass `trace` to add the animated streak that laps the border. `action`
+ * sits under the note (a period switch); `children` after it.
  */
 export default function StatTile({
   label,
@@ -18,6 +19,8 @@ export default function StatTile({
   series,
   bars = false,
   trace = false,
+  action,
+  children,
   className,
   style,
 }) {
@@ -68,6 +71,9 @@ export default function StatTile({
           <CountUp value={value} />
         </div>
         {note ? <div className="mt-1 text-xs text-muted-foreground">{note}</div> : null}
+        {/* Under the note, so tiles with and without one keep their figures level. */}
+        {action ? <div className="mt-2">{action}</div> : null}
+        {children}
       </div>
 
       {/* Pinned to the foot of the tile: tiles in a row stretch to the tallest,

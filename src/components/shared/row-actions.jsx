@@ -27,13 +27,17 @@ const DEFAULT_WARNING = "This cannot be undone. Records that referred to it will
  *   warning           — what the delete confirmation says will happen
  *   onResetTwoFactor  — a server action taking FormData with `id`
  *   onResendInvite    — a server action taking FormData with `id`
+ *   forms             — more dialogs, each opened by its own item, as `edit`
+ *                       is: [{ key, label, icon, element }], `icon` an element
+ *                       (<KeyRound />): a server page cannot pass a component
  */
 export default function RowActions({
-  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, onResetTwoFactor, onResendInvite,
+  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, onResetTwoFactor, onResendInvite, forms = [],
 }) {
   const router = useRouter();
   const triggerRef = useRef(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(null); // the key of the open extra form
   const [confirm, setConfirm] = useState(null); // 'delete' | 'reset' | null
   const [pending, startTransition] = useTransition();
 
@@ -59,7 +63,7 @@ export default function RowActions({
       }
     });
 
-  const hasMenu = href || edit || onDelete || onResetTwoFactor || onResendInvite;
+  const hasMenu = href || edit || onDelete || onResetTwoFactor || onResendInvite || forms.length;
   if (!hasMenu) return null;
 
   return (
@@ -90,6 +94,9 @@ export default function RowActions({
               <MailPlus /> Resend invitation
             </DropdownMenuItem>
           ) : null}
+          {forms.map((f) => (
+            <DropdownMenuItem key={f.key} onSelect={() => setFormOpen(f.key)}>{f.icon ?? null} {f.label}</DropdownMenuItem>
+          ))}
           {onResetTwoFactor ? (
             <DropdownMenuItem onSelect={() => setConfirm("reset")}><KeyRound /> Reset two-factor</DropdownMenuItem>
           ) : null}
@@ -107,6 +114,11 @@ export default function RowActions({
           {edit}
         </RowEditContext.Provider>
       ) : null}
+      {forms.map((f) => (
+        <RowEditContext.Provider key={f.key} value={{ open: formOpen === f.key, setOpen: (o) => setFormOpen(o ? f.key : null), returnFocus }}>
+          {f.element}
+        </RowEditContext.Provider>
+      ))}
 
       <Dialog open={confirm !== null} onOpenChange={(o) => !o && !pending && setConfirm(null)}>
         <DialogContent className="max-w-md" onCloseAutoFocus={returnFocus}>

@@ -9,6 +9,9 @@
 import { revalidatePath } from "next/cache";
 import { NOT_DELETED, check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
+import { mailServer, sendMail } from "@/lib/server/mail";
+import { mailFailure } from "@/lib/email";
+import { fullName } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { cross, formValues, schemas } from "@/lib/validate";
 
@@ -138,6 +141,21 @@ export async function saveUser(prevState, formData) {
     return back("An account with that email already exists.", { email: "Already in use" });
   }
 
+  // Or made at once with a temporary password the administrator gives them
+  // (by phone or text, never in the email); they set their own at first sign-in.
+  if (s(formData, "access") === "password") {
+    const password = String(formData.get("temp_password") ?? "");
+    if (password.length < 10) return back("Give them a temporary password of at least 10 characters.", { temp_password: "At least 10 characters" });
+    const made = await createWithPassword(supabase, payload.email, password, payload, existing);
+    if (made.error) return back(made.error);
+    const payFailed = await savePay(supabase, made.id, payload.role, formData, values);
+    if (payFailed) return { ...payFailed, error: `Account created, but their pay was not saved: ${payFailed.error}` };
+    const emailed = formData.get("send_link") ? await sendSignInLink(supabase, me, payload) : null;
+    await logActivity(supabase, "user.create", { entity: "user", entityId: made.id, detail: payload.email });
+    revalidatePath("/users");
+    return ok({ email: payload.email, temporary: true, emailed });
+  }
+
   const sent = await sendInvitation(supabase, payload.email, payload, existing);
   if (sent.error) return back(sent.error);
   const payFailed = await savePay(supabase, sent.id, payload.role, formData, values);
@@ -185,6 +203,108 @@ async function sendInvitation(supabase, email, details, existing) {
     return { error: error.message };
   }
   return { id: saved.id };
+}
+
+/**
+ * A sign-in with a password the administrator chose, for a new person (or
+ * one whose invitation is still pending, or an old directory row with no
+ * sign-in): the account is "invited" with a temporary password, so the
+ * first sign-in takes them to set their own, as an invitation link does.
+ */
+async function createWithPassword(supabase, email, password, details, existing) {
+  const admin = createAdminClient();
+  if (!admin) return { error: ADMIN_UNAVAILABLE };
+  let authId = existing?.auth_id ?? null;
+  if (authId) {
+    const { error } = await admin.auth.admin.updateUserById(authId, { password, email_confirm: true });
+    if (error) return { error: error.message };
+  } else {
+    const { data, error } = await admin.auth.admin.createUser({
+      email, password, email_confirm: true,
+      user_metadata: { first_name: details.first_name ?? null, last_name: details.last_name ?? null },
+    });
+    if (error) return { error: /already/i.test(error.message) ? "That email already has a sign-in." : error.message };
+    authId = data.user.id;
+  }
+  const row = { ...details, email, status: "invited", auth_id: authId, must_change_password: true };
+  const { data: saved, error } = existing
+    ? await supabase.from("users").update(row).eq("id", existing.id).select("id").single()
+    : await supabase.from("users").insert(row).select("id").single();
+  if (error) {
+    if (!existing?.auth_id) await admin.auth.admin.deleteUser(authId).catch(() => {});
+    return { error: error.message };
+  }
+  return { id: saved.id };
+}
+
+/**
+ * Tell someone their account is ready: where to sign in, and that the
+ * temporary password comes from their administrator. Never the password
+ * itself. Returns a sentence for the administrator: sent, or why not.
+ */
+async function sendSignInLink(supabase, me, person) {
+  if (!mailServer()) return "No email was sent: the mail service is not set up. Share the sign-in address with them.";
+  const { data: settings } = await supabase.from("app_settings").select("key, value").in("key", ["mail", "organization"]);
+  const setting = (k) => settings?.find((x) => x.key === k)?.value ?? {};
+  const from = setting("mail").from;
+  if (!from) return "No email was sent: set the From address in Settings › Email. Share the sign-in address with them.";
+  const origin = await requestOrigin();
+  const org = setting("organization").name || "Signature Marketing";
+  const who = fullName(me) || org;
+  const hi = person.first_name ? `Hi ${person.first_name},` : "Hi,";
+  const url = `${origin}/login`;
+  const text = `${hi}\n\n${who} has set up your Lighthouse account.\n\nSign in at ${url} with this email address (${person.email}) and the temporary password ${who} gives you. You will then choose your own password${person.role === "client" ? "" : ", set up two-factor sign-in"} and can update your contact details under My Security.\n\n${org}`;
+  const esc = (v) => String(v).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111827;line-height:1.5">
+<p>${esc(hi)}</p><p>${esc(who)} has set up your Lighthouse account.</p>
+<p><a href="${esc(url)}" style="display:inline-block;background:#0891b2;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px">Sign in to Lighthouse</a></p>
+<p>Use this email address (${esc(person.email)}) and the temporary password ${esc(who)} gives you. You will then choose your own password${person.role === "client" ? "" : ", set up two-factor sign-in"} and can update your contact details under My Security.</p>
+<p style="color:#6b7280;font-size:13px">${esc(org)}</p></div>`;
+  try {
+    await sendMail({ from: { name: org, address: from }, to: person.email, subject: "Your Lighthouse account", text, html });
+    return `A sign-in link was emailed to ${person.email}.`;
+  } catch (err) {
+    return `The sign-in email was not sent: ${mailFailure(err)}`;
+  }
+}
+
+/**
+ * "Set temporary password" from a user's row: a new password the
+ * administrator gives them (by phone or text), which they replace with their
+ * own at their next sign-in. Passwords are never stored readable, so this,
+ * not looking one up, is how someone who is stuck gets back in.
+ */
+export async function setTemporaryPassword(prevState, formData) {
+  const { values, failed } = check(formData, schemas.tempPassword);
+  if (failed) return failed;
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!activeAdmin(me)) return fail("Only administrators can set a temporary password.");
+  const id = Number(values.id);
+  if (id === me.id) return fail("Change your own password under My Security.");
+
+  const { data: target } = await supabase.from("users").select("id, auth_id, status, email, first_name, last_name, role").eq("id", id).maybeSingle();
+  if (!target) return fail("That user no longer exists.");
+  if (target.status === "disabled") return fail("This account is disabled. Enable it first.");
+  const password = String(formData.get("temp_password"));
+
+  if (!target.auth_id) {
+    // An old directory row, never signed in: give it a sign-in with this password.
+    const made = await createWithPassword(supabase, target.email, password, { first_name: target.first_name, last_name: target.last_name }, target);
+    if (made.error) return fail(made.error, null, values);
+  } else {
+    const admin = createAdminClient();
+    if (!admin) return fail(ADMIN_UNAVAILABLE);
+    const { error } = await admin.auth.admin.updateUserById(target.auth_id, { password });
+    if (error) return fail(/weak|short/i.test(error.message) ? "Choose a stronger temporary password." : error.message, { temp_password: error.message }, values);
+    const { error: flagError } = await supabase.from("users").update({ must_change_password: true }).eq("id", id);
+    if (flagError) return fail(flagError, null, values);
+  }
+
+  const emailed = formData.get("send_link") ? await sendSignInLink(supabase, me, target) : null;
+  await logActivity(supabase, "user.temp_password", { entity: "user", entityId: id, detail: target.email });
+  revalidatePath("/users");
+  return ok({ email: target.email, emailed });
 }
 
 /** "Resend invitation" from the row menu: for anyone who has not set a password yet. */

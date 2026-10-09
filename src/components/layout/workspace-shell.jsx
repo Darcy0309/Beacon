@@ -25,12 +25,16 @@ export default function WorkspaceShell({ children }) {
   const { role, user } = useRole();
 
   const invited = user?.status === "invited";
+  // A temporary password an administrator gave them: their own comes first.
+  const temporary = !invited && Boolean(user?.must_change_password);
 
   // An invited account has no role until it sets a password, so nothing else
-  // would show it anything. Take it to the password form first.
+  // would show it anything. Take it to the password form first; likewise
+  // someone signed in with a temporary password.
   useEffect(() => {
     if (invited && path !== "/security") router.replace("/security?welcome=1");
-  }, [invited, path, router]);
+    else if (temporary && path !== "/security") router.replace("/security?temporary=1");
+  }, [invited, temporary, path, router]);
 
   // The database already refuses a disabled account everything. This just
   // says so, with a way out, instead of a workspace full of empty tables.

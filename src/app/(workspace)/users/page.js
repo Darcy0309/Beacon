@@ -3,6 +3,8 @@ import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import RowActions from "@/components/shared/row-actions";
 import UserForm from "@/features/users/components/user-form";
+import TempPasswordForm from "@/features/users/components/temp-password-form";
+import { getCurrentUser } from "@/lib/server/session";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import { Button } from "@/components/ui/button";
@@ -26,8 +28,8 @@ const statusTone = { Active: "emerald", Invited: "amber", Disabled: "slate" };
 
 export default async function UsersPage({ searchParams }) {
   const params = readListParams(await searchParams, ["role", "status", "mfa"]);
-  const [{ rows, total }, users, options, payProfiles, payRules] = await Promise.all([
-    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(),
+  const [{ rows, total }, users, options, payProfiles, payRules, me] = await Promise.all([
+    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(), getCurrentUser(),
   ]);
   const hourly = payRules.rates.hourly;
 
@@ -63,7 +65,7 @@ export default async function UsersPage({ searchParams }) {
           <SectionHeader
             label="Users"
             icon={Users}
-            action={<UserForm options={options} hourly={hourly} trigger={<Button size="sm"><UserPlus /> Invite user</Button>} />}
+            action={<UserForm options={options} hourly={hourly} trigger={<Button size="sm"><UserPlus /> Add user</Button>} />}
           />
           <FilterTable
             columns={["User", "Role", "Two-Factor", "Last login", "Status", { label: "Action", className: "text-right" }]}
@@ -108,6 +110,7 @@ export default async function UsersPage({ searchParams }) {
                       edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} pay={payProfiles.get(u.id)} hourly={hourly} />}
                       onResetTwoFactor={u.mfa ? resetUserTwoFactor : undefined}
                       onResendInvite={awaitingInvite(u.raw) ? resendInvitation : undefined}
+                      forms={u.id === me?.id || u.status === "disabled" ? [] : [{ key: "temp", label: "Set temporary password", icon: <KeyRound />, element: <TempPasswordForm user={{ id: u.id, name: u.name }} /> }]}
                       onDelete={deleteUser}
                       warning="Their sign-in and inbox are removed. Leads, appointments and other work they touched stay, but no longer name them. To keep them on record, set them to Disabled instead."
                     />
