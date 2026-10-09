@@ -12,6 +12,8 @@ import { rolesForPath } from "@/lib/nav";
 import { signOut } from "@/features/auth/actions";
 import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import ActivityTracker from "@/features/pay/components/activity-tracker";
+import IdleGuard from "@/features/auth/components/idle-guard";
+import { idleLimitFor } from "@/lib/idle";
 
 /**
  * The chrome around every workspace page: sidebar, access checks, and the
@@ -48,10 +50,13 @@ export default function WorkspaceShell({ children }) {
 
   // Time worked counts for the people paid by it: account managers and agents.
   const tracked = (role === "manager" || role === "agent") && user?.status === "active";
+  // Signed out after 30 minutes without activity: everyone but administrators.
+  const guarded = Boolean(user) && idleLimitFor(role) != null;
 
   return (
     <div className="flex min-h-svh">
       {tracked ? <ActivityTracker /> : null}
+      {guarded ? <IdleGuard /> : null}
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
         {denied ? <NoAccess /> : children}

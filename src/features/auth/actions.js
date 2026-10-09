@@ -3,7 +3,9 @@
 /** Signing in and out, two-factor, and changing your password. */
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { IDLE_COOKIE } from "@/lib/idle";
 import { check, currentAppUser, fail, logActivity, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -188,8 +190,24 @@ export async function signOut() {
   const supabase = await createClient();
   await logActivity(supabase, "sign_out");
   await supabase.auth.signOut();
+  (await cookies()).delete(IDLE_COOKIE);
   revalidatePath("/", "layout");
   redirect("/login");
+}
+
+/**
+ * Signed out after 30 minutes without activity (IdleGuard): this browser's
+ * session only, not the person's others. The sign-in page says why, and
+ * brings them back to `next` (where they were) once they sign in again.
+ */
+export async function signOutIdle(next = "/") {
+  const supabase = await createClient();
+  await logActivity(supabase, "sign_out.idle");
+  await supabase.auth.signOut({ scope: "local" });
+  (await cookies()).delete(IDLE_COOKIE);
+  revalidatePath("/", "layout");
+  const back = safeInternalPath(next, "/");
+  redirect(`/login?error=idle${back !== "/" ? `&next=${encodeURIComponent(back)}` : ""}`);
 }
 
 /**

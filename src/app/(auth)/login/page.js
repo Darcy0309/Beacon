@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 const NOTICES = {
   link: "That sign-in link has expired or was already used. Ask an administrator for a new invitation.",
   disabled: "This account has been disabled. Contact an administrator.",
+  idle: "You were signed out after 30 minutes without activity, to keep your account safe. Sign in to carry on.",
 };
 
 export default async function LoginPage({ searchParams }) {

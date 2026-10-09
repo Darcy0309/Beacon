@@ -81,11 +81,19 @@ export async function getCallList(projectId, { page = 1, perPage = 50, q = "", r
   }));
   return { rows, total: Number(data?.[0]?.total ?? 0) };
 }
-/** The caller's filter for a project's call list ({} when none). */
+/**
+ * The caller's filter for a project's call list, if they set it today (the
+ * business's day): each morning the list starts again in full, as
+ * call_list() has it. {} when none.
+ */
 export async function getCallListFilter(projectId) {
   const supabase = await createClient();
-  const { data } = await supabase.from("call_list_filters").select("criteria").eq("project_id", Number(projectId)).maybeSingle();
-  return cleanCriteria(data?.criteria);
+  const [{ data }, tz] = await Promise.all([
+    supabase.from("call_list_filters").select("criteria, updated_at").eq("project_id", Number(projectId)).maybeSingle(),
+    getBusinessTimeZone(),
+  ]);
+  if (!data || todayIn(tz, new Date(data.updated_at)) !== todayIn(tz)) return {};
+  return cleanCriteria(data.criteria);
 }
 
 /**

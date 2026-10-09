@@ -214,6 +214,10 @@ export default function CallListFilters({ projectId, criteria, options, matching
                 <Filter className="size-3" /> {a.text}
               </span>
             )) : <span className="text-xs text-muted-foreground">No filter: every name left to call.</span>}
+            {/* Kept through the day (a lunch break, a restart); the list starts in full each morning. */}
+            <span className="w-full text-[0.66rem] text-muted-foreground" data-filter-lasts>
+              {applied.length ? "Kept for today; your list starts in full again tomorrow morning." : "A filter you apply is kept for the rest of today."}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             {applied.length || Object.keys(clean).length ? (

@@ -79,6 +79,14 @@ try {
   check("the next name (Start calling, Skip, after a result) comes from the filtered list", next.data?.length === 1 && label(next.data[0].id) === "Dec Mesa");
   const all = await sean.sb.rpc("call_list", { p_project_id: project, p_limit: 50, p_filtered: false });
   check("…and without it, every name left", Number(all.data?.[0]?.total) === NAMES.length);
+  // As if it were set yesterday (the stamp is the database's own, so set it past that).
+  sql(`alter table public.call_list_filters disable trigger call_list_filters_touch`);
+  sql(`update public.call_list_filters set updated_at = now() - interval '1 day' where user_id = ${SEAN} and project_id = ${project}`);
+  sql(`alter table public.call_list_filters enable trigger call_list_filters_touch`);
+  const nextDay = await sean.sb.rpc("call_list", { p_project_id: project, p_limit: 50 });
+  check("a filter set yesterday is set aside: each morning the list starts in full", Number(nextDay.data?.[0]?.total) === NAMES.length, nextDay.data?.[0]?.total);
+  await listWith({ renewal: { from: "12-01", to: "12-31" } });
+  check("…applied again, it holds for the rest of the day", (await listWith({ renewal: { from: "12-01", to: "12-31" } })) === names("Dec Mesa"));
   const theirs = await mike.sb.from("call_list_filters").select("criteria").eq("user_id", SEAN);
   check("a manager's filter is their own", !theirs.error && theirs.data.length === 0, JSON.stringify(theirs.data));
   const forge = await mike.sb.from("call_list_filters").insert({ user_id: SEAN, project_id: project, criteria: {} });

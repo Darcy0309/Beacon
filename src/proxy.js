@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_ID_HEADER, supabaseConfigProblem } from "@/lib/supabase/config";
 import { supabaseFetch } from "@/lib/supabase/fetch";
+import { IDLE_COOKIE, idleExpired, sessionIdOf } from "@/lib/idle";
 
 // Open without a session: signing in, the browser's push worker (fetched again
 // by the browser on its own), and push delivery, which the database calls
@@ -104,6 +105,26 @@ export async function proxy(request) {
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+
+  // Left too long without activity (a manager's or client's session, see
+  // lib/idle.js): the browser normally signs them out at 30 minutes; this
+  // catches a laptop closed or a browser reopened later. Only this session ends.
+  const idle = request.cookies.get(IDLE_COOKIE)?.value;
+  if (user && idle) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (idleExpired(idle, sessionIdOf(session?.access_token))) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      url.searchParams.set("error", "idle");
+      if (!isPublic && !pathname.startsWith("/api/")) url.searchParams.set("next", pathname);
+      const response = NextResponse.redirect(url);
+      refreshed.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+      response.cookies.delete(IDLE_COOKIE);
+      return response;
+    }
   }
 
   if (user && !needsCode && (pathname === "/login" || pathname === "/setup")) {
