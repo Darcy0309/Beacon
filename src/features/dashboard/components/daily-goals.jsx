@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Target } from "lucide-react";
+import { Pencil, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveDailyGoals } from "@/features/dashboard/actions";
@@ -11,23 +11,19 @@ import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
-/** "3 / 5 · 60%" with a bar, or how many so far when there is no goal. */
+/** One line: what, a slim bar, "3 / 5 60%" (or how many so far with no goal). */
 function Progress({ label, done, goal, color }) {
   const pct = goal ? Math.min(100, Math.round((done / goal) * 100)) : null;
   return (
-    <div data-goal={label.toLowerCase()}>
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">{label}</span>
-        <span className="font-semibold tabular-nums">
-          {done}{goal ? ` / ${goal}` : ""}
-          {pct != null ? <span className={cn("ml-1.5", pct >= 100 ? "text-emerald-400" : "text-muted-foreground")}>{pct}%</span> : null}
-        </span>
+    <div data-goal={label.toLowerCase()} className="flex items-center gap-2 text-xs">
+      <span className="w-12 shrink-0 text-muted-foreground">{label}</span>
+      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+        {goal ? <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct}%`, background: color }} /> : null}
       </div>
-      {goal ? (
-        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct}%`, background: color }} />
-        </div>
-      ) : null}
+      <span className="shrink-0 font-semibold tabular-nums">
+        {done}{goal ? ` / ${goal}` : ""}
+        {pct != null ? <span className={cn("ml-1", pct >= 100 ? "text-emerald-400" : "text-muted-foreground")}>{pct}%</span> : null}
+      </span>
     </div>
   );
 }
@@ -55,8 +51,11 @@ export default function DailyGoals({ today, accent }) {
 
   if (editing || !hasGoal) {
     return (
-      <form action={action} className="mt-3 space-y-2" data-daily-goals-form>
-        <div className="text-xs text-muted-foreground">{hasGoal ? "Change today's goal" : "Set today's goal"}</div>
+      <form action={action} className="mt-2 space-y-1.5" data-daily-goals-form>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{hasGoal ? "Change today's goal" : "Set today's goal"}</span>
+          {hasGoal ? <button type="button" onClick={() => setEditing(false)} className="hover:text-primary">Cancel</button> : null}
+        </div>
         <div className="flex items-end gap-2">
           <label className="min-w-0 flex-1 text-[0.68rem] text-muted-foreground">
             Leads
@@ -70,20 +69,19 @@ export default function DailyGoals({ today, accent }) {
           </label>
           <Button type="submit" size="sm" className="h-8" disabled={pending}><Target /> {pending ? "…" : "Set"}</Button>
         </div>
-        {hasGoal ? (
-          <button type="button" onClick={() => setEditing(false)} className="text-[0.68rem] text-muted-foreground hover:text-primary">Cancel</button>
-        ) : null}
       </form>
     );
   }
 
   return (
-    <div className="mt-3 space-y-2" data-daily-goals>
-      <Progress label="Leads" done={today.leads} goal={today.leadsGoal} color={accent} />
-      <Progress label="Appointments" done={today.appts} goal={today.apptsGoal} color={accent} />
-      <button type="button" onClick={() => setEditing(true)} className="text-[0.68rem] text-muted-foreground transition-colors hover:text-primary" data-change-goal>
-        Change today&apos;s goal
+    <div className="mt-2 space-y-1.5" data-daily-goals>
+      {/* In the tile's top right corner: changing the goal takes no line of its own. */}
+      <button type="button" onClick={() => setEditing(true)} aria-label="Change today's goal" title="Change today's goal" data-change-goal
+        className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary">
+        <Pencil className="size-3.5" />
       </button>
+      <Progress label="Leads" done={today.leads} goal={today.leadsGoal} color={accent} />
+      <Progress label="Appts" done={today.appts} goal={today.apptsGoal} color={accent} />
     </div>
   );
 }

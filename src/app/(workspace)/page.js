@@ -121,7 +121,8 @@ export default async function Dashboard({ searchParams }) {
           </div>
         ) },
       { label: "Daily Production", value: `${t.leads + t.appts}`,
-        note: `${t.leads} lead${t.leads === 1 ? "" : "s"} · ${t.appts} appointment${t.appts === 1 ? "" : "s"} today · ${hoursLabel(t.workedMinutes)} worked`,
+        // One short line, as on every role's tiles: the goal rows below give the leads and appointments.
+        note: `${hoursLabel(t.workedMinutes)} worked today`,
         icon: Gauge, accent: "var(--neon-amber)",
         children: <DailyGoals today={t} accent="var(--neon-amber)" /> },
     ];

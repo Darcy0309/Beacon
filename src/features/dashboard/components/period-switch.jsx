@@ -13,7 +13,8 @@ export default function PeriodSwitch({ param, current, params = {} }) {
     return `/?${q.toString()}`;
   };
   return (
-    <span className="inline-flex rounded-md border border-[var(--panel-border)] bg-background/40 p-0.5" data-period-switch={param}>
+    // No taller than the line of text it sits on, so the tile is as tall as every other.
+    <span className="-my-0.5 inline-flex rounded-md border border-[var(--panel-border)] bg-background/40 p-px" data-period-switch={param}>
       {TILE_PERIODS.map(([key, label]) => (
         <Link
           key={key}
@@ -21,7 +22,7 @@ export default function PeriodSwitch({ param, current, params = {} }) {
           scroll={false}
           aria-current={current === key ? "true" : undefined}
           className={cn(
-            "rounded px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-[0.08em] transition-colors",
+            "rounded px-1.5 text-[0.6rem] font-semibold uppercase leading-4 tracking-[0.08em] transition-colors",
             current === key ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
           )}
         >

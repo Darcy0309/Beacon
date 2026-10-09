@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * sparkline bleeding to the bottom edge in the tile's accent hue. The figure
  * counts up and the sparkline rises from zero as the tile appears.
  * Pass `trace` to add the animated streak that laps the border. `action`
- * sits under the note (a period switch); `children` after it.
+ * shares the note's line (a period switch); `children` after it.
  */
 export default function StatTile({
   label,
@@ -70,9 +70,13 @@ export default function StatTile({
         <div className="mt-3 stat-value" style={{ color: accent }}>
           <CountUp value={value} />
         </div>
-        {note ? <div className="mt-1 text-xs text-muted-foreground">{note}</div> : null}
-        {/* Under the note, so tiles with and without one keep their figures level. */}
-        {action ? <div className="mt-2">{action}</div> : null}
+        {/* The action (a period switch) shares the note's line: tiles keep their figures level and stay short. */}
+        {note || action ? (
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+            {note ? <div className="text-xs text-muted-foreground">{note}</div> : <span />}
+            {action}
+          </div>
+        ) : null}
         {children}
       </div>
 

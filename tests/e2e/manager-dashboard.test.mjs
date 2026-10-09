@@ -58,12 +58,13 @@ try {
   await sean.click('[data-period-switch="ld"] a', "Month");
   check("…or the month", Boolean(await until(async () => /Developed this month/.test((await tile(sean, "Leads")) ?? ""))) && /Developed this week/.test(await tile(sean, "Appointments")));
   check("Active Projects: how many, by kind, and the change in 30 days", /\d+ Lead · \d+ Appointment/.test(await tile(sean, "Active Projects")) && /in the last 30 days/.test(await tile(sean, "Active Projects")), await tile(sean, "Active Projects"));
-  check("Daily Production: today's leads and appointments and hours worked", /lead.*appointment.*today.*worked/s.test(await tile(sean, "Daily Production")), await tile(sean, "Daily Production"));
+  check("Daily Production: hours worked today, and before a goal is set, a place to set it",
+    /worked today/.test(await tile(sean, "Daily Production")) && /Set today's goal/.test(await tile(sean, "Daily Production")), await tile(sean, "Daily Production"));
   await sean.fill('[data-daily-goals-form] input[name="leads_goal"]', "4");
   await sean.fill('[data-daily-goals-form] input[name="appts_goal"]', "2");
   await sean.click("[data-daily-goals-form] button[type=submit]");
   check("…the manager sets the day's goal as they start", Boolean(await until(() => sql(`select leads_goal || '/' || appts_goal from public.daily_goals where user_id = ${SEAN} and day = ${lit(today)}`) === "4/2")));
-  check("…and the tile tracks the % reached", Boolean(await until(async () => /Leads\s*\d+ \/ 4\s*\d+%/.test((await tile(sean, "Daily Production")) ?? ""))), await tile(sean, "Daily Production"));
+  check("…and the tile tracks the % reached, leads and appointments", Boolean(await until(async () => /Leads\s*\d+ \/ 4\s*\d+%[\s\S]*Appts\s*\d+ \/ 2\s*\d+%/.test((await tile(sean, "Daily Production")) ?? ""))), await tile(sean, "Daily Production"));
 
   section("An administrator sees every manager's day");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 950 });
