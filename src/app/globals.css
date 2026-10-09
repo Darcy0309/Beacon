@@ -566,6 +566,52 @@ option {
   50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--primary) 35%, transparent), 0 0 30px 0 var(--primary); }
 }
 
+/* The dashboard calendar while an appointment or reminder is dragged: what is
+   moving follows the pointer as a solid card, the days it can go to breathe,
+   the one under the pointer lifts and glows, and the day it lands on ripples. */
+.drag-ghost {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+  padding: 8px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 12px;
+  box-shadow: 0 10px 28px -8px color-mix(in srgb, var(--primary) 60%, transparent);
+}
+.drag-ghost-label {
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.drag-ghost-title { overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.drop-target { animation: drop-breathe 1.3s ease-in-out infinite; }
+@keyframes drop-breathe {
+  0%, 100% { border-color: color-mix(in srgb, var(--primary) 25%, transparent); }
+  50%      { border-color: color-mix(in srgb, var(--primary) 75%, transparent); }
+}
+.drop-over {
+  transform: scale(1.1);
+  border-color: var(--primary) !important;
+  background: color-mix(in srgb, var(--primary) 26%, transparent) !important;
+  box-shadow: 0 0 0 2px var(--primary), 0 0 20px -2px var(--primary);
+  animation: none;
+  z-index: 1;
+}
+.drop-landed { animation: drop-landed 0.8s ease-out 2; }
+@keyframes drop-landed {
+  from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--neon-emerald) 75%, transparent); }
+  to   { box-shadow: 0 0 0 12px transparent; }
+}
+
 /* Sign out: on hover the arrow streams out of the door. Two copies run half a
    beat apart; the delays start the first one where it rests (0, fully shown). */
 .signout-arrow-trail { opacity: 0; }
@@ -610,6 +656,7 @@ option {
   .nav-loading.is-pending { animation: none; background-size: 100% 100%; }
   .animate-grow-height, .animate-grow-width, .animate-rise,
   .animate-badge-shake, .animate-bell-ring, .animate-popover-in, .appt-focus,
+  .drop-target, .drop-landed,
   .signout-button .signout-arrow {
     animation: none !important;
   }

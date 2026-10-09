@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlarmClock, BellRing, CalendarCheck, CalendarClock, ChevronLeft, ChevronRight, GripVertical, MoveRight } from "lucide-react";
+import { AlarmClock, BellRing, CalendarCheck, CalendarClock, ChevronLeft, ChevronRight, GripVertical, Loader2, Move, MoveRight } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import SectionHeader from "@/components/shared/section-header";
 import DatePicker from "@/components/shared/date-picker";
@@ -34,6 +34,26 @@ const BADGE = {
   info: "border-violet-400/40 text-violet-400",
   muted: "border-slate-400/30 text-muted-foreground",
 };
+
+/**
+ * What follows the pointer while an item is dragged: a solid card saying
+ * what is moving, in place of the browser's faint copy of the row. Built
+ * from text nodes (titles are data), and gone once the browser has its image.
+ */
+function dragCard(event, item) {
+  const card = document.createElement("div");
+  card.className = "drag-ghost";
+  const label = document.createElement("span");
+  label.className = "drag-ghost-label";
+  label.textContent = `Moving ${item.kind === "reminder" ? "reminder" : "appointment"}`;
+  const title = document.createElement("span");
+  title.className = "drag-ghost-title";
+  title.textContent = `${item.time} · ${item.title}`;
+  card.append(label, title);
+  document.body.append(card);
+  event.dataTransfer.setDragImage(card, 18, 18);
+  setTimeout(() => card.remove(), 0);
+}
 
 /** Move an item to another day, and time (what it had, unless chosen). */
 function MoveDialog({ item, onClose, onMoved }) {
@@ -105,18 +125,35 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
   const [dragging, setDragging] = useState(null);
   const [over, setOver] = useState(null);
   const [moving, setMoving] = useState(null);
-  const [busy, startBusy] = useTransition();
+  // Moved, waiting for the server: shown on its new day at once, with a spinner.
+  const [moved, setMoved] = useState(null);
+  // The day something just landed on, rippling.
+  const [landed, setLanded] = useState(null);
+  const [, startBusy] = useTransition();
 
   // Another month: its first day, or today when it is this month.
   useEffect(() => {
     setSelected((s) => (grid.includes(s) ? s : sameMonth(today, month) ? today : month));
   }, [grid, month, today]);
 
+  // The server's answer arrives with fresh items: the move is done.
+  useEffect(() => setMoved(null), [items]);
+  useEffect(() => {
+    if (!landed) return;
+    const t = setTimeout(() => setLanded(null), 1700);
+    return () => clearTimeout(t);
+  }, [landed]);
+
+  const shown = useMemo(
+    () => items.map((it) => (it.key === moved?.key ? { ...it, day: moved.day, time: moved.time, pending: true } : it)),
+    [items, moved]
+  );
   const byDay = useMemo(() => {
     const m = new Map();
-    for (const it of items) m.set(it.day, [...(m.get(it.day) ?? []), it]);
+    for (const it of shown) m.set(it.day, [...(m.get(it.day) ?? []), it]);
     return m;
-  }, [items]);
+  }, [shown]);
+  const dragged = dragging ? items.find((it) => it.key === dragging) : null;
   const list = byDay.get(selected) ?? [];
 
   const move = async (item, day, time) => {
@@ -125,12 +162,16 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
     f.set("id", String(item.id));
     f.set("date", day);
     f.set("time", time);
+    setMoved({ key: item.key, day, time });
+    setSelected(day);
     const result = await moveScheduleItem(f);
     if (result.ok) {
       toast.success(`Moved to ${formatIso(day, "long")} at ${time}`);
-      setSelected(day);
+      setLanded(day);
       router.refresh();
     } else {
+      setMoved(null);
+      setSelected(item.day);
       toast.error(result.error);
     }
     return result;
@@ -155,9 +196,21 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
             {awaiting} awaiting confirmation
           </span>
         ) : null} />
-      <div className={cn("grid flex-1 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]", busy && "opacity-70")}>
+      <div className="grid flex-1 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* The month */}
-        <div className="border-b border-[var(--panel-border)] p-4 sm:border-r sm:border-b-0">
+        <div className="relative border-b border-[var(--panel-border)] p-4 sm:border-r sm:border-b-0">
+          {dragged ? (
+            // While dragging: what is moving, and where it would go.
+            <div data-drag-banner role="status"
+              className="animate-pop-in pointer-events-none absolute inset-x-3 top-2.5 z-10 flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-lg">
+              <Move className="size-3.5 shrink-0" />
+              <span className="truncate">
+                {over
+                  ? <>Move to <strong>{formatIso(over, "long")}</strong> at {dragged.clock}</>
+                  : <>Drop <strong>{dragged.title}</strong> on a day to move it</>}
+              </span>
+            </div>
+          ) : null}
           <div className="mb-2 flex items-center justify-between">
             <Link href={monthHref(addMonths(month, -1))} scroll={false} aria-label="Previous month"
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -174,7 +227,7 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
             {grid.map((day) => {
               const here = byDay.get(day) ?? [];
               const inMonth = sameMonth(day, month);
-              const canDrop = dragging && day >= today;
+              const canDrop = Boolean(dragging) && day >= today && day !== dragged?.day;
               return (
                 <button
                   key={day}
@@ -187,19 +240,23 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
                   aria-pressed={day === selected}
                   aria-label={`${formatIso(day, "long")}: ${here.length ? `${here.length} item${here.length === 1 ? "" : "s"}` : "nothing"}`}
                   className={cn(
-                    "flex h-11 flex-col items-center justify-start rounded-md border pt-1 text-xs tabular-nums transition-colors",
+                    "flex h-11 flex-col items-center justify-start rounded-md border pt-1 text-xs tabular-nums transition-[colors,transform,box-shadow] duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
                     day === selected ? "border-primary bg-primary/15 font-semibold text-primary"
                       : day === today ? "border-primary/50 text-primary"
                       : "border-transparent hover:bg-muted",
                     !inMonth && day !== selected && "text-muted-foreground/50",
-                    dragging && day < today && "opacity-40",
-                    over === day && "border-dashed border-primary bg-primary/20"
+                    dragging && !canDrop && "cursor-not-allowed opacity-30",
+                    canDrop && over !== day && "drop-target border-dashed",
+                    over === day && "drop-over",
+                    landed === day && "drop-landed"
                   )}
                 >
                   {Number(day.slice(8))}
-                  {here.length ? (
-                    <span className="mt-1 flex gap-0.5">
+                  {over === day ? (
+                    <span className="pointer-events-none mt-0.5 text-[0.5rem] font-bold uppercase tracking-[0.1em] text-primary">Drop</span>
+                  ) : here.length ? (
+                    <span className="pointer-events-none mt-1 flex gap-0.5">
                       {here.slice(0, 3).map((it) => <span key={it.key} className="size-1.5 rounded-full" style={{ background: KINDS[kindOf(it)].color }} />)}
                       {here.length > 3 ? <span className="text-[0.5rem] leading-[0.375rem]">+</span> : null}
                     </span>
@@ -229,10 +286,22 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
                 <li
                   key={it.key}
                   data-schedule-item={it.key}
-                  draggable={it.movable}
-                  onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", it.key); setDragging(it.key); }}
+                  draggable={it.movable && !it.pending}
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", it.key);
+                    dragCard(e, it);
+                    setDragging(it.key);
+                  }}
                   onDragEnd={() => { setDragging(null); setOver(null); }}
-                  className={cn("group flex items-start gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60", it.movable && "cursor-grab active:cursor-grabbing", dragging === it.key && "opacity-50")}
+                  data-dragging={dragging === it.key || undefined}
+                  className={cn(
+                    "group flex items-start gap-2.5 rounded-lg border border-transparent px-2 py-2 transition-colors hover:bg-muted/60",
+                    it.movable && !it.pending && "cursor-grab active:cursor-grabbing",
+                    // Where it was picked up from: an outline left behind.
+                    dragging === it.key && "border-dashed border-primary/60 bg-primary/5 opacity-50",
+                    it.pending && "border-primary/40 bg-primary/5"
+                  )}
                 >
                   <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md" style={{ background: `color-mix(in srgb, ${k.color} 14%, transparent)`, color: k.color }}>
                     <Icon className="size-3.5" />
@@ -247,7 +316,11 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
                     <div className="truncate text-xs text-muted-foreground">{it.detail}</div>
                     {it.badge ? <span className={cn("mt-1 inline-block rounded-full border px-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.08em]", BADGE[it.tone] ?? BADGE.muted)}>{it.badge}</span> : null}
                   </div>
-                  {it.movable ? (
+                  {it.pending ? (
+                    <span className="flex shrink-0 items-center gap-1 text-[0.62rem] font-semibold text-primary" data-moving>
+                      <Loader2 className="size-3.5 animate-spin" /> Moving…
+                    </span>
+                  ) : it.movable ? (
                     <span className="flex shrink-0 items-center gap-0.5">
                       <button type="button" onClick={() => setMoving(it)} aria-label={`Move ${it.title}`} title="Move to another day or time" data-move={it.key}
                         className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-primary">

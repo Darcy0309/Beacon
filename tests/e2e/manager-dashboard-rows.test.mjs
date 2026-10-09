@@ -110,13 +110,25 @@ try {
     return true;
   })()`);
   await sleep(150);
+  check("while dragging: a banner says what is moving, the row picked up is outlined, the days it can go to are marked",
+    /Drop .*on a day to move it/.test((await card("[data-drag-banner]")) ?? "")
+      && Boolean(await sean.ev(`!!document.querySelector('[data-schedule-item="a${appt}"][data-dragging]')`))
+      && Boolean(await sean.ev(`document.querySelector('[data-my-schedule] [data-day="${dayB}"]').classList.contains('drop-target')`))
+      && Boolean(await sean.ev(`document.querySelector('[data-my-schedule] [data-day="${inDays(-1)}"]')?.classList.contains('cursor-not-allowed') ?? true`)),
+    await card("[data-drag-banner]"));
+  await sean.ev(`document.querySelector('[data-my-schedule] [data-day="${dayB}"]').dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: new DataTransfer() }))`);
+  await sleep(100);
+  check("…the day under the pointer lights up, and the banner names it",
+    Boolean(await sean.ev(`document.querySelector('[data-my-schedule] [data-day="${dayB}"]').classList.contains('drop-over')`))
+      && /Move to .* at 9:30 AM/.test((await card("[data-drag-banner]")) ?? ""), await card("[data-drag-banner]"));
   await sean.ev(`(() => {
     const dt = new DataTransfer();
     const day = document.querySelector('[data-my-schedule] [data-day="${dayB}"]');
-    day.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: dt }));
     day.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
     return true;
   })()`);
+  check("…and once dropped it is on its new day at once, the banner gone",
+    Boolean(await until(async () => ((await card(`[data-schedule-day="${dayB}"]`)) ?? "").includes(`${TAG} Plumbing`) && !(await sean.ev(`!!document.querySelector('[data-drag-banner]')`)), { timeout: 3000 })));
   check("an appointment dragged onto another day moves there, at its time",
     Boolean(await until(() => sql(`select appt_date || ' ' || appt_time from public.appointments where id = ${appt}`) === `${dayB} 9:30 AM`, { timeout: 8000 })),
     sql(`select appt_date || ' ' || appt_time from public.appointments where id = ${appt}`));
