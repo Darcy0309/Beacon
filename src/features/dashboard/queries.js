@@ -117,21 +117,24 @@ const toProduction = (r) => ({
  * counts nobody else's for them): the leads and appointments they developed
  * over each tile's period (as the production report counts them, with a
  * day-by-day series), the active projects they are on by kind and how that
- * changed in 30 days, and today's production with their goals.
+ * changed in 30 days, their calls over the last week, and today's
+ * production with their goals.
  * `ranges`: { leads, appts }, each { from, to } (lib/pay tileRange()).
  */
 export async function getManagerDashboard({ userId, today, ranges }) {
   const supabase = await createClient();
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
   const report = (r) => supabase.rpc("production_report", { p_from: r.from, p_to: r.to, p_project_id: null, p_user_id: userId });
-  const [leads, appts, assigned, log, day] = await Promise.all([
+  const week = { from: addDays(today, -6), to: today };
+  const [leads, appts, calls, assigned, log, day] = await Promise.all([
     report(ranges.leads),
     report(ranges.appts),
+    report(week),
     supabase.from("project_assignments").select("project:projects!inner(id, status:project_statuses(name), type:project_types(code))").eq("ae_user_id", userId),
     supabase.from("project_assignment_log").select("change").eq("user_id", userId).gte("at", since),
     supabase.rpc("daily_production", { p_day: today }),
   ]);
-  for (const r of [leads, appts, assigned, day]) if (r.error) throw r.error;
+  for (const r of [leads, appts, calls, assigned, day]) if (r.error) throw r.error;
 
   const tally = (rows, key, range) => {
     const byDay = new Map();
@@ -155,6 +158,8 @@ export async function getManagerDashboard({ userId, today, ranges }) {
   return {
     leads: tally(leads.data, "leads", ranges.leads),
     appts: tally(appts.data, "appointments", ranges.appts),
+    // Calls Today's sparkline: the last seven days.
+    calls: tally(calls.data, "calls", week),
     projects: { total: active.size, lead, appt, net, pct: before > 0 ? Math.round((net / before) * 100) : null },
     today: mine ? toProduction(mine) : null,
   };
@@ -279,9 +284,10 @@ export async function getDeveloped({ userId, from, to, timeZone }) {
  * reminders they set, and the notifications administrators sent them.
  * Returns { items, awaiting }: each item { key, kind, id, day, time, clock,
  * minutes, title, detail, badge, tone, href, movable }, and how many of the
- * appointments they set, still to come, wait for confirmation.
+ * appointments they set, still to come, wait for confirmation. `owner`:
+ * false when an administrator is looking at someone else's.
  */
-export async function getMySchedule({ userId, from, to, today, timeZone }) {
+export async function getMySchedule({ userId, from, to, today, timeZone, owner = true }) {
   const supabase = await createClient();
   const [lo, hi] = around({ from, to });
   const [appts, reminders, messages, awaiting] = await Promise.all([
@@ -356,7 +362,8 @@ export async function getMySchedule({ userId, from, to, today, timeZone }) {
       badge: r.sent_at ? "Reminded" : null, tone: "muted",
       href: lead?.id ? `/leads/${lead.id}` : null,
       leadId: lead?.id ?? null,
-      movable: !r.sent_at,
+      // Only its owner moves a reminder (an administrator looking on does not).
+      movable: !r.sent_at && owner,
     });
   }
   for (const n of messages.data ?? []) {
@@ -375,4 +382,11 @@ export async function getMySchedule({ userId, from, to, today, timeZone }) {
   }
   items.sort((a, b) => a.day.localeCompare(b.day) || a.minutes - b.minutes || a.key.localeCompare(b.key));
   return { items, awaiting: awaiting.count ?? 0 };
+}
+
+/** An active account manager, for an administrator opening their dashboard; null for anyone else. */
+export async function getManagerUser(id) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("users").select("id, first_name, last_name, role, status").eq("id", id).maybeSingle();
+  return data?.role === "manager" && data.status === "active" ? data : null;
 }

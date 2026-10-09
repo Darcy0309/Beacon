@@ -83,8 +83,9 @@ function DayBars({ days, from, to, mark, caption }) {
  *   view      readView(): the period and its days
  *   today     their day so far, for the goal form
  *   switcher  the period switch; nav  the day navigator
+ *   readOnly  an administrator looking at a manager's: the goal is theirs to set
  */
-export default function ProductionCard({ person, view, today, switcher, nav, timeZone }) {
+export default function ProductionCard({ person, view, today, switcher, nav, timeZone, readOnly = false }) {
   const all = person ?? { leads: 0, appts: 0, calls: 0, workedMinutes: 0, leadsGoal: null, apptsGoal: null, daysWorked: 0, starts: [], days: [] };
   const isDay = view.key === "day";
   // A day: its own figures, out of the week loaded with it.
@@ -111,7 +112,7 @@ export default function ProductionCard({ person, view, today, switcher, nav, tim
       </div>
       {isToday ? (
         <div className="px-5 pb-4">
-          <DailyGoals today={today} mode="card" />
+          <DailyGoals today={today} readOnly={readOnly} />
         </div>
       ) : null}
       {isDay

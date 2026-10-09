@@ -1,5 +1,5 @@
 import Link from "@/components/shared/intent-link";
-import { Gauge } from "lucide-react";
+import { Gauge, Wallet } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,8 +32,9 @@ const clockOf = (m) => `${((Math.floor(m / 60) + 11) % 12) + 1}:${String(m % 60)
  * when they started using Lighthouse (on average, over a period), their
  * calls, the leads and appointments they developed against the goals they
  * set, and the hours worked. `rows`: getProduction(); `view`: readView().
+ * A manager's name opens their dashboard as they see it; `picker` does too.
  */
-export default function DailyProductionCard({ rows, view, switcher, nav, timeZone }) {
+export default function DailyProductionCard({ rows, view, switcher, nav, picker, timeZone }) {
   const isDay = view.key === "day";
   const isToday = isDay && view.anchor === view.today;
   const started = (r) => {
@@ -46,8 +47,8 @@ export default function DailyProductionCard({ rows, view, switcher, nav, timeZon
   return (
     <Card data-daily-production>
       <SectionHeader wrap label="Daily Production" icon={Gauge} action={switcher} />
-      <div className="flex items-center justify-between gap-2 px-5 py-2">
-        <span className="text-xs text-muted-foreground">{isDay ? "Each manager's day" : "Each manager over the period"}</span>
+      <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2">
+        {picker ?? <span className="text-xs text-muted-foreground">{isDay ? "Each manager's day" : "Each manager over the period"}</span>}
         {nav}
       </div>
       <div className="overflow-x-auto">
@@ -66,8 +67,14 @@ export default function DailyProductionCard({ rows, view, switcher, nav, timeZon
             {rows.map((r) => (
               <TableRow key={r.userId} data-production-row={r.userId}>
                 <TableCell className="font-medium">
-                  <Link href={`/reports/pay?user=${r.userId}`} className="hover:text-primary">{r.name}</Link>
+                  {r.role === "manager" ? (
+                    <Link href={`/?view=${r.userId}`} className="hover:text-primary" title="Open their dashboard, as they see it" data-open-dashboard={r.userId}>{r.name}</Link>
+                  ) : r.name}
                   {r.role === "agent" ? <span className="ml-1.5 text-xs text-muted-foreground">agent</span> : null}
+                  <Link href={`/reports/pay?user=${r.userId}`} aria-label={`${r.name}'s pay and hours`} title="Pay & Hours"
+                    className="ml-1.5 inline-flex align-middle text-muted-foreground transition-colors hover:text-primary">
+                    <Wallet className="size-3.5" />
+                  </Link>
                 </TableCell>
                 {isDay ? (
                   <TableCell className="tabular-nums">{started(r) ?? <span className="text-muted-foreground">{isToday ? "Not yet" : "—"}</span>}</TableCell>

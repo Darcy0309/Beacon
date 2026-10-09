@@ -48,8 +48,8 @@ try {
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 950 });
   await sean.go("/", 4000);
   const labels = await sean.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent.trim()).slice(0, 4)`);
-  check("four tiles of their own: Appointments, Leads, Active Projects, Daily Production",
-    JSON.stringify(labels) === JSON.stringify(["Appointments", "Leads", "Active Projects", "Daily Production"]), JSON.stringify(labels));
+  check("four tiles of their own: Appointments, Leads, Active Projects, Calls Today",
+    JSON.stringify(labels) === JSON.stringify(["Appointments", "Leads", "Active Projects", "Calls Today"]), JSON.stringify(labels));
   check("…no Total Leads or Conversion Rate", !/Total Leads|Conversion Rate/i.test(await sean.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent).join(' ')`)));
   const chosen = (param) => sean.ev(`document.querySelector('[data-period-switch="${param}"] [aria-current]')?.textContent.trim() ?? null`);
   check("Appointments and Leads count this pay period by default", (await chosen("ap")) === "Pay" && (await chosen("ld")) === "Pay" && /Developed/.test(await tile(sean, "Leads")));
@@ -61,15 +61,16 @@ try {
   const switchTop = (param) => sean.ev(`Math.round(document.querySelector('[data-period-switch="${param}"]').getBoundingClientRect().top)`);
   check("…the switch stays in the same place whatever the period", (await switchTop("ap")) === (await switchTop("ld")), `${await switchTop("ap")} vs ${await switchTop("ld")}`);
   check("Active Projects: how many, by kind, and the change in 30 days", /\d+ Lead · \d+ Appointment/.test(await tile(sean, "Active Projects")) && /in the last 30 days/.test(await tile(sean, "Active Projects")), await tile(sean, "Active Projects"));
-  check("Daily Production: hours worked today, and before a goal is set, a place to set it",
-    /worked today/.test(await tile(sean, "Daily Production")) && /Set today's goal/.test(await tile(sean, "Daily Production")), await tile(sean, "Daily Production"));
+  check("Calls Today: the calls made, and when the day started", /Calls Today\s*\d+/i.test(await tile(sean, "Calls Today")) && /Started|Not started yet/.test(await tile(sean, "Calls Today")), await tile(sean, "Calls Today"));
+  const production = () => sean.ev(`document.querySelector('[data-production-card]')?.innerText ?? ''`);
+  check("Daily Production (row two): before a goal is set, a place to set it", /Set today's goal/.test(await production()), await production());
   const tileHeight = (page) => page.ev(`Math.round(document.querySelector('[data-panel]').getBoundingClientRect().height)`);
-  const seanHeight = await tileHeight(sean); // the tallest it gets: the goal form showing
+  const seanHeight = await tileHeight(sean);
   await sean.fill('[data-daily-goals-form] input[name="leads_goal"]', "4");
   await sean.fill('[data-daily-goals-form] input[name="appts_goal"]', "2");
   await sean.click("[data-daily-goals-form] button[type=submit]");
   check("…the manager sets the day's goal as they start", Boolean(await until(() => sql(`select leads_goal || '/' || appts_goal from public.daily_goals where user_id = ${SEAN} and day = ${lit(today)}`) === "4/2")));
-  check("…and the tile tracks the % reached, leads and appointments", Boolean(await until(async () => /Leads\s*\d+ \/ 4\s*\d+%[\s\S]*Appts\s*\d+ \/ 2\s*\d+%/.test((await tile(sean, "Daily Production")) ?? ""))), await tile(sean, "Daily Production"));
+  check("…and the card tracks the % reached, leads and appointments", Boolean(await until(async () => /of 4 · \d+%[\s\S]*of 2 · \d+%/.test(await production()))), await production());
 
   section("An administrator sees every manager's day");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 950 });

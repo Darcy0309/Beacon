@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import {
-  Target, CalendarCheck, Users, Percent, FolderOpen, Gauge,
+  Target, CalendarCheck, Users, Percent, FolderOpen, PhoneCall, Eye,
   Activity, CalendarClock, ListChecks, Radio, FolderKanban, PieChart, CheckCheck, UserCheck,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
@@ -12,15 +12,16 @@ import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
 import TipLayer from "@/components/shared/tip-layer";
+import ParamSelect from "@/components/shared/param-select";
 import { monthBarTips } from "@/lib/chart-tips";
 import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
 import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
 import {
-  getDashboardStats, getDeveloped, getLeadVolume, getManagerDashboard, getMySchedule, getProduction, getReports, getTeamProduction,
+  getDashboardStats, getDeveloped, getLeadVolume, getManagerDashboard, getManagerUser, getMySchedule, getProduction, getReports,
+  getTeamProduction,
 } from "@/features/dashboard/queries";
-import DailyGoals from "@/features/dashboard/components/daily-goals";
 import DailyProductionCard from "@/features/dashboard/components/daily-production";
 import DevelopedCard from "@/features/dashboard/components/developed-card";
 import MySchedule from "@/features/dashboard/components/my-schedule";
@@ -74,10 +75,17 @@ export default async function Dashboard({ searchParams }) {
   // Cached per request — the layout has usually resolved this already.
   const me = await getCurrentUser();
   const role = me?.role ?? "client";
-  const view = dashboardView(role);
   const sp = await searchParams;
-  // An account manager's dashboard is their own, below the tiles too.
-  const isManager = role === "manager" && Boolean(me?.id);
+  // Whose account manager's dashboard this is: their own, or (?view=) the
+  // one an administrator opened to see it as that manager does.
+  let subject = null;
+  if (role === "manager" && me?.id) subject = { id: me.id, first_name: me.first_name, last_name: me.last_name, own: true };
+  else if (role === "admin" && /^\d+$/.test(sp?.view ?? "")) {
+    const u = await getManagerUser(Number(sp.view));
+    if (u) subject = { ...u, own: false };
+  }
+  const isManager = Boolean(subject);
+  const view = dashboardView(isManager ? "manager" : role);
 
   const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday] = await Promise.all([
     isManager ? [] : getRecentLeads(6),
@@ -108,16 +116,16 @@ export default async function Dashboard({ searchParams }) {
     // Row three: what they developed over the day, week or pay period chosen, and the team's day.
     const recent = readView(sp, { keyParam: "rl", dateParam: "rd", keys: RECENT_PERIODS.map(([k]) => k), today: businessToday, time: rules.time });
     const [dash, production, developed, schedule, team] = await Promise.all([
-      getManagerDashboard({ userId: me.id, today: businessToday, ranges }),
+      getManagerDashboard({ userId: subject.id, today: businessToday, ranges }),
       // A day comes with the week up to it, for the card's bars.
       getProduction(prod.key === "day" ? { from: addDays(prod.anchor, -6), to: prod.anchor } : prod.range),
-      getDeveloped({ userId: me.id, from: recent.range.from, to: recent.range.to, timeZone: tz }),
-      getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz }),
+      getDeveloped({ userId: subject.id, from: recent.range.from, to: recent.range.to, timeZone: tz }),
+      getMySchedule({ userId: subject.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: subject.own }),
       getTeamProduction(businessToday),
     ]);
     manager = {
       ranges, ...dash, prod, recent, cm, developed, schedule, team,
-      person: production.find((r) => r.userId === me.id) ?? null,
+      person: production.find((r) => r.userId === subject.id) ?? null,
     };
   }
   // An administrator's view of the team: a day (today to begin with) or a pay period, week or month.
@@ -144,17 +152,20 @@ export default async function Dashboard({ searchParams }) {
 
   let tiles;
   if (manager) {
-    // Everything here is the signed-in manager's own.
-    const t = manager.today ?? { leads: 0, appts: 0, workedMinutes: 0, calls: 0, leadsGoal: null, apptsGoal: null };
+    // Everything here is the manager's own.
+    const t = manager.today ?? { leads: 0, appts: 0, workedMinutes: 0, calls: 0, leadsGoal: null, apptsGoal: null, startedAt: null };
+    const started = t.startedAt
+      ? new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", minute: "2-digit" }).format(new Date(t.startedAt))
+      : null;
     const p = manager.projects;
     tiles = [
       // The switch beside the note shows the period, so the note stays short and the switch stays put.
       { label: "Appointments", value: String(manager.appts.total), note: "Developed",
         icon: CalendarCheck, accent: "var(--neon-emerald)", series: manager.appts.series, bars: true,
-        action: <PeriodSwitch param="ap" current={periods.ap} params={{ ld: periods.ld }} /> },
+        action: <PeriodSwitch param="ap" current={periods.ap} params={otherParams(sp, "ap")} /> },
       { label: "Leads", value: String(manager.leads.total), note: "Developed",
         icon: Target, accent: "var(--neon-cyan)", series: manager.leads.series, bars: true,
-        action: <PeriodSwitch param="ld" current={periods.ld} params={{ ap: periods.ap }} /> },
+        action: <PeriodSwitch param="ld" current={periods.ld} params={otherParams(sp, "ld")} /> },
       { label: "Active Projects", value: String(p.total),
         note: `${p.lead} Lead · ${p.appt} Appointment`,
         icon: FolderOpen, accent: "var(--neon-violet)",
@@ -167,11 +178,10 @@ export default async function Dashboard({ searchParams }) {
             <span className="text-muted-foreground"> in the last 30 days</span>
           </div>
         ) },
-      { label: "Daily Production", value: `${t.leads + t.appts}`,
-        // One short line, as on every role's tiles: the goal rows below give the leads and appointments.
-        note: `${hoursLabel(t.workedMinutes)} worked today`,
-        icon: Gauge, accent: "var(--neon-amber)",
-        children: <DailyGoals today={t} accent="var(--neon-amber)" mode="tile" /> },
+      // Daily Production has the second row to itself.
+      { label: "Calls Today", value: String(t.calls),
+        note: started ? `Started ${started} · ${hoursLabel(t.workedMinutes)} worked` : "Not started yet today",
+        icon: PhoneCall, accent: "var(--neon-amber)", series: manager.calls.series, bars: true },
     ];
   } else if (view.audience === "client") {
     // What the client bought: totals and delivery quality, not weekly activity.
@@ -219,6 +229,22 @@ export default async function Dashboard({ searchParams }) {
         sub={`${today} · ${greeting}${me?.first_name ? `, ${me.first_name}` : ""}`}
       />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
+        {subject && !subject.own ? (
+          // An administrator looking at a manager's dashboard, exactly as that manager sees it.
+          <div data-viewing-as={subject.id}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/40 bg-primary/8 px-4 py-2.5 text-sm">
+            <span className="flex items-center gap-2">
+              <Eye className="size-4 text-primary" />
+              <span>Viewing <strong>{[subject.first_name, subject.last_name].filter(Boolean).join(" ")}</strong>&apos;s dashboard, as they see it</span>
+            </span>
+            <span className="flex flex-wrap items-center gap-3">
+              <ParamSelect name="view" label="Manager" placeholder="My dashboard" value={String(subject.id)}
+                options={manager.team.map((r) => ({ value: r.userId, label: r.name }))} />
+              <Link href="/" className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Back to my dashboard</Link>
+            </span>
+          </div>
+        ) : null}
+
         {/* metric tiles */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {tiles.map((t, i) => (
@@ -229,6 +255,11 @@ export default async function Dashboard({ searchParams }) {
 
         {production ? (
           <DailyProductionCard rows={production.rows} view={production.view} timeZone={tz}
+            picker={
+              // Any manager's dashboard, as they see it.
+              <ParamSelect name="view" label="Open a manager's dashboard" placeholder="Choose a manager" value=""
+                options={production.rows.filter((r) => r.role === "manager").map((r) => ({ value: r.userId, label: r.name }))} />
+            }
             {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
         ) : null}
 
@@ -237,7 +268,7 @@ export default async function Dashboard({ searchParams }) {
             {/* Row two: their production, and their own calendar. */}
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
               <div className="flex flex-col xl:col-span-2 [&>*]:flex-1">
-                <ProductionCard person={manager.person} view={manager.prod} timeZone={tz}
+                <ProductionCard person={manager.person} view={manager.prod} timeZone={tz} readOnly={!subject.own}
                   today={manager.today ?? { leads: 0, appts: 0, leadsGoal: null, apptsGoal: null }}
                   {...viewControls(sp, manager.prod, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
               </div>
@@ -253,7 +284,7 @@ export default async function Dashboard({ searchParams }) {
                 <DevelopedCard rows={manager.developed} view={manager.recent}
                   {...viewControls(sp, manager.recent, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
               </div>
-              <TeamProductionCard rows={manager.team} meId={me.id} dayLabel={formatIso(businessToday, "long")} />
+              <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long")} />
             </div>
           </>
         ) : (
@@ -309,7 +340,9 @@ export default async function Dashboard({ searchParams }) {
                 <p className="py-8 text-center text-sm text-muted-foreground">Nothing scheduled today.</p>
               )}
               {appointments.today.map((a) => (
-                <div key={a.id} data-list-row className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2">
+                // Opens the appointment on the calendar, highlighted.
+                <Link key={a.id} href={`/calendar?view=day&d=${a.date}&a=${a.id}`} data-list-row data-schedule-link={a.id}
+                  className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60">
                   <span className={`h-9 w-[3px] rounded-full ${a.bar}`} />
                   <div className="w-14 shrink-0 text-sm font-bold tabular-nums">
                     {a.time}
@@ -328,7 +361,7 @@ export default async function Dashboard({ searchParams }) {
                       {a.repI}
                     </span>
                   ) : null}
-                </div>
+                </Link>
               ))}
             </div>
           </Card>

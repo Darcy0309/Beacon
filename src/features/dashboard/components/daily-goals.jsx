@@ -7,26 +7,8 @@ import { Pencil, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveDailyGoals } from "@/features/dashboard/actions";
-import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
-
-/** One line: what, a slim bar, "3 / 5 60%" (or how many so far with no goal). */
-function Progress({ label, done, goal, color }) {
-  const pct = goal ? Math.min(100, Math.round((done / goal) * 100)) : null;
-  return (
-    <div data-goal={label.toLowerCase()} className="flex items-center gap-2 text-xs">
-      <span className="w-12 shrink-0 text-muted-foreground">{label}</span>
-      <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-        {goal ? <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${pct}%`, background: color }} /> : null}
-      </div>
-      <span className="shrink-0 font-semibold tabular-nums">
-        {done}{goal ? ` / ${goal}` : ""}
-        {pct != null ? <span className={cn("ml-1", pct >= 100 ? "text-emerald-400" : "text-muted-foreground")}>{pct}%</span> : null}
-      </span>
-    </div>
-  );
-}
 
 /** A number box with its label inside, on the left. */
 function GoalInput({ name, label, defaultValue, invalid }) {
@@ -40,16 +22,12 @@ function GoalInput({ name, label, defaultValue, invalid }) {
 }
 
 /**
- * Today's goals: how many leads and appointments the manager means to
- * develop, set as the day starts, then tracked as the % reached. `today`:
- * { leads, appts, leadsGoal, apptsGoal }.
- *
- *   mode "tile"   the Daily Production tile: the progress, or a link down to
- *                 the card to set the goal
- *   mode "card"   the Daily Production card: the goal set there (its meters
- *                 show the progress), and changed there
+ * Today's goals on the Daily Production card: how many leads and
+ * appointments the manager means to develop, set as the day starts (the
+ * card's meters track the % reached), and changed there. `today`:
+ * { leadsGoal, apptsGoal }. `readOnly`: an administrator looking on.
  */
-export default function DailyGoals({ today, accent, mode = "card" }) {
+export default function DailyGoals({ today, readOnly = false }) {
   const hasGoal = today.leadsGoal != null || today.apptsGoal != null;
   const [editing, setEditing] = useState(false);
   const [state, action, pending] = useActionState(saveDailyGoals, EMPTY);
@@ -65,17 +43,8 @@ export default function DailyGoals({ today, accent, mode = "card" }) {
     }
   }, [state, router]);
 
-  if (mode === "tile") {
-    return hasGoal ? (
-      <div className="mt-2 space-y-1.5" data-daily-goals>
-        <Progress label="Leads" done={today.leads} goal={today.leadsGoal} color={accent} />
-        <Progress label="Appts" done={today.appts} goal={today.apptsGoal} color={accent} />
-      </div>
-    ) : (
-      <a href="#daily-production" className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline" data-set-goal-link>
-        <Target className="size-3.5" /> Set today&apos;s goal
-      </a>
-    );
+  if (readOnly) {
+    return hasGoal ? null : <p className="text-xs text-muted-foreground" data-no-goal>No goal set for today yet.</p>;
   }
 
   if (editing || !hasGoal) {

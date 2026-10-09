@@ -70,7 +70,6 @@ try {
   const prod = await until(() => card("[data-production-card]"));
   check("the day so far: leads and appointments, hours worked, calls, start time", /So far today/.test(prod ?? "") && /LEADS\s*1/i.test(prod) && /APPOINTMENTS\s*1/i.test(prod) && /Hours worked/i.test(prod) && /Calls/i.test(prod) && /Started/i.test(prod), prod);
   check("…no Lead Volume chart for a manager", !/Lead Volume/i.test(await sean.text()));
-  check("the tile above leads down to setting the goal", Boolean(await sean.ev(`!!document.querySelector('[data-panel] [data-set-goal-link]')`)));
   await sean.fill('[data-production-card] input[name="leads_goal"]', "4");
   await sean.fill('[data-production-card] input[name="appts_goal"]', "2");
   await sean.click("[data-production-card] [data-daily-goals-form] button[type=submit]");
@@ -159,6 +158,20 @@ try {
   check("every manager over the month: days worked, usual start, calls, leads, appointments, hours", /Days worked/i.test(table ?? "") && /Usual start/i.test(table) && /Sean/.test(table), table);
   await admin.click('[data-period-switch="dp"] a', "Day");
   check("…or a day: when each started", Boolean(await until(async () => /Started/i.test((await admin.ev(`document.querySelector('[data-daily-production]')?.innerText`)) ?? ""))));
+  check("…and the admin's own Today's Schedule opens each appointment", await admin.ev(`[...document.querySelectorAll('[data-schedule-link]')].every((a) => a.tagName === 'A' && a.getAttribute('href').startsWith('/calendar?'))`));
+
+  section("An administrator opens a manager's dashboard, as they see it");
+  await admin.click(`[data-open-dashboard="${SEAN}"]`);
+  check("the manager's name opens it", Boolean(await until(async () => (await admin.url()).includes(`view=${SEAN}`) && (await admin.ev(`!!document.querySelector('[data-viewing-as="${SEAN}"]')`)))), await admin.url());
+  const asSean = await until(() => admin.ev(`document.body.innerText`).then((t) => (/Daily Team Production/i.test(t) ? t : null)));
+  check("…their tiles and rows: Calls Today, Daily Production, their calendar, what they developed, the team's day",
+    /Calls Today/i.test(asSean) && /Daily Production/i.test(asSean) && /Recent Leads & Appointments/i.test(asSean) && Boolean(await admin.ev(`!!document.querySelector('[data-my-schedule]')`)) && !/Appointments by Rep/i.test(asSean), asSean?.slice(0, 400));
+  check("…their goal is theirs to set: no form for the administrator", !(await admin.ev(`!!document.querySelector('[data-daily-goals-form]')`)));
+  check("…what they developed today is there", (await admin.ev(`document.querySelector('[data-developed]')?.innerText ?? ''`)).includes(`${TAG} Plumbing`));
+  await admin.click('[data-period-switch="rl"] a', "Week");
+  check("…and choosing a period keeps to their dashboard", Boolean(await until(async () => (await admin.url()).includes(`view=${SEAN}`) && (await admin.url()).includes("rl=week"))), await admin.url());
+  await admin.click("[data-viewing-as] a", "Back to my dashboard");
+  check("back to the administrator's own", Boolean(await until(async () => !(await admin.ev(`!!document.querySelector('[data-viewing-as]')`)) && (await admin.ev(`!!document.querySelector('[data-daily-production]')`)))));
 } finally {
   browser.close();
   sql(`delete from public.daily_goals where user_id = ${SEAN} and day = ${lit(today)}`);

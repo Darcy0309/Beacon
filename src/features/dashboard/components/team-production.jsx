@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * active account manager, started or not, with the leads and appointments
  * they have developed today, most first. `rows`: getTeamProduction().
  */
-export default function TeamProductionCard({ rows, meId, dayLabel }) {
+export default function TeamProductionCard({ rows, meId, dayLabel, meLabel = "you" }) {
   const most = Math.max(1, ...rows.map((r) => r.leads + r.appts));
   const total = (key) => rows.reduce((n, r) => n + r[key], 0);
   return (
@@ -32,7 +32,7 @@ export default function TeamProductionCard({ rows, meId, dayLabel }) {
                 {initialsOf(r.name)}
               </span>
               <span className="relative min-w-0 flex-1 truncate text-sm font-medium">
-                {r.name}{me ? <span className="ml-1.5 text-xs font-normal text-primary">you</span> : null}
+                {r.name}{me && meLabel ? <span className="ml-1.5 text-xs font-normal text-primary">{meLabel}</span> : null}
               </span>
               <span className={cn("relative w-10 text-right text-sm font-semibold tabular-nums", !r.leads && "text-muted-foreground")} style={r.leads ? { color: "var(--neon-cyan)" } : undefined}>{r.leads}</span>
               <span className={cn("relative w-10 text-right text-sm font-semibold tabular-nums", !r.appts && "text-muted-foreground")} style={r.appts ? { color: "var(--neon-emerald)" } : undefined}>{r.appts}</span>
