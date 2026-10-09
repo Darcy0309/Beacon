@@ -1,9 +1,12 @@
 /**
  * The Coverage tab as the client asked: "Ultimate XDate" and "Agency" on
- * top, then the policy lines (Package, Workers comp, Auto, Group health,
- * Personal lines) as Policy line → X-Date → Carrier; editing them from the
- * lead sheet, the carrier suggested as it is typed from the Insurance Cos.
- * list; and that list filled from a CSV of carrier names.
+ * top, then the policy lines (Liability / Package, Workers comp, Auto, Group
+ * health, Personal lines) as Policy line → X-Date → Carrier; editing them
+ * from the lead sheet, the carrier suggested as it is typed from the
+ * Insurance Cos. list; the Ultimate X-Date and the liability carrier applied
+ * to liability, workers comp and auto at once, and the years with the
+ * agency (the 9/24 lead record page); and that list filled from a CSV of
+ * carrier names.
  *
  * Runs on its own test client and removes everything it made.
  *
@@ -57,8 +60,8 @@ try {
       lines: [...p.querySelectorAll('[data-policy-line]')].map((r) => [...r.cells].map((c) => c.innerText.trim())) }; })()`);
   check("“Ultimate XDate” and “Agency” on top", tab.rows[0] === "Ultimate XDate" && tab.rows[1] === "Agency", JSON.stringify(tab.rows));
   check("the policy lines read Policy line → X-Date → Carrier", JSON.stringify(tab.head.map((h) => h.toUpperCase())) === JSON.stringify(["POLICY LINE", "X-DATE", "CARRIER"]), JSON.stringify(tab.head));
-  check("Package, Workers comp, Auto, Group health and Personal lines are always listed",
-    JSON.stringify(tab.lines.map((l) => l[0])) === JSON.stringify(["Package", "Workers comp", "Auto", "Group health", "Personal lines"]), JSON.stringify(tab.lines));
+  check("Liability / Package, Workers comp, Auto, Group health and Personal lines are always listed",
+    JSON.stringify(tab.lines.map((l) => l[0])) === JSON.stringify(["Liability / Package", "Workers comp", "Auto", "Group health", "Personal lines"]), JSON.stringify(tab.lines));
   check("…each with its X-date, then its carrier", JSON.stringify(tab.lines[1]) === JSON.stringify(["Workers comp", "Dec 20, 2027", "Amtrust Ins Co Of Ks Inc"]), JSON.stringify(tab.lines[1]));
   await shot(sean, "coverage-tab");
 
@@ -87,6 +90,30 @@ try {
   await sean.click('[role=tab][data-tab="coverage"]');
   const after = await until(() => sean.ev(`[...document.querySelectorAll('[data-policy-line="personal"] td')].map((c) => c.innerText.trim())`).then((r) => r[2] === CARRIERS[0] && r));
   check("the tab shows it", JSON.stringify(after) === JSON.stringify(["Personal lines", "Mar 1, 2027", CARRIERS[0]]), JSON.stringify(after));
+
+  section("Apply to all, and years with the agency");
+  await sean.mouseClick("[data-edit-coverage]");
+  await until(() => sean.ev(`!!document.querySelector('[role=dialog] [data-apply-date]')`));
+  await sean.fill('[role=dialog] input[aria-label="Ultimate XDate"]', "01/01/2028");
+  await sean.ev("document.activeElement.blur()");
+  await until(() => sean.ev(`document.querySelector('[role=dialog] input[name="ultimate_xdate"]')?.value === "2028-01-01"`));
+  await sean.click("[role=dialog] [data-apply-date]");
+  const dates = await until(() => sean.ev(`["pkg_xdate", "wc_xdate", "auto_xdate", "health_xdate"].map((n) => document.querySelector('[role=dialog] input[name="' + n + '"]')?.value)`)
+    .then((d) => d[0] === "2028-01-01" && d));
+  check("Apply date: the Ultimate X-Date fills liability, workers comp and auto (and nothing else)", JSON.stringify(dates) === JSON.stringify(["2028-01-01", "2028-01-01", "2028-01-01", ""]), JSON.stringify(dates));
+  await sean.fill('[role=dialog] [data-suggest="pkg_carrier"] input', CARRIERS[2]);
+  await sean.click("[role=dialog] [data-apply-carrier]");
+  const carriers = await sean.ev(`["pkg_carrier", "wc_carrier", "auto_carrier"].map((n) => document.querySelector('[role=dialog] [data-suggest="' + n + '"] input').value)`);
+  check("Apply carrier: the liability carrier fills workers comp and auto", carriers.every((c) => c === CARRIERS[2]), JSON.stringify(carriers));
+  await sean.fill('[role=dialog] input[name="agency_years"]', "6");
+  await sean.click("[role=dialog] button[type=submit]");
+  const applied = await until(() => { const c = coverage(); return c.agency_years === 6 && c; });
+  check("…saved: the dates, the carriers and the years with the agency",
+    applied && ["pkg_xdate", "wc_xdate", "auto_xdate"].every((k) => applied[k] === "2028-01-01") && ["pkg_carrier", "wc_carrier", "auto_carrier"].every((k) => applied[k] === CARRIERS[2]),
+    JSON.stringify(applied));
+  await sean.click('[role=tab][data-tab="coverage"]');
+  check("the tab shows how long they have been with the agency",
+    Boolean(await until(async () => /Fipps & Co Insurance · 6 years with them/.test(await sean.ev(`document.querySelector('[data-tab-panel="coverage"]')?.innerText ?? ''`)))));
 
   section("Who edits it");
   const tyler = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();

@@ -14,10 +14,16 @@ import { cn } from "@/lib/utils";
  * collecting spellings. Submits as an ordinary input called `name`.
  *
  * The list opens under the field, in the page's flow, so a dialog's
- * scrolling never cuts it off.
+ * scrolling never cuts it off. `value`/`onChange` to control it (a value
+ * filled in from elsewhere); `defaultValue` otherwise.
  */
-export default function SuggestInput({ name, defaultValue = "", options, placeholder, invalid, id, "aria-label": ariaLabel, className }) {
-  const [value, setValue] = useState(defaultValue ?? "");
+export default function SuggestInput({ name, value: controlled, defaultValue = "", onChange, options, placeholder, invalid, id, "aria-label": ariaLabel, className }) {
+  const [own, setOwn] = useState(defaultValue ?? "");
+  const value = controlled !== undefined ? controlled ?? "" : own;
+  const setValue = (v) => {
+    if (controlled === undefined) setOwn(v);
+    onChange?.(v);
+  };
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();

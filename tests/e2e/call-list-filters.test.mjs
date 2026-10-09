@@ -26,9 +26,11 @@ const mikeDb = await signIn("mike@beacon.test");
 const totalNow = async () => Number((await mikeDb.sb.rpc("call_list", { p_project_id: PROJECT, p_limit: 1 })).data?.[0]?.total ?? 0);
 const everyone = await totalNow();
 // The month with the most names renewing, so the test has something to find.
-const month = Number(sql(`select extract(month from public.lead_renewal_date(l.id))::int from public.leads l join public.call_results r on r.id = l.result_id
-  where l.project_id = ${PROJECT} and l.assigned_user_id = ${MIKE} and r.viable and r.callable and public.lead_renewal_date(l.id) is not null
-  group by 1 order by count(*) desc limit 1`));
+const month = Number(sql(`select extract(month from d)::int from public.leads l join public.call_results r on r.id = l.result_id,
+  unnest(public.lead_xdates(l.id)) d
+  where l.project_id = ${PROJECT} and l.assigned_user_id = ${MIKE} and r.viable and r.callable
+  group by 1 order by count(distinct l.id) desc limit 1`));
+const renewsInMonth = (leadId) => sql(`select exists (select 1 from unnest(public.lead_xdates(${leadId})) d where extract(month from d) = ${month})`) === "t";
 
 const browser = await launchBrowser();
 try {
@@ -43,15 +45,16 @@ try {
   const inMonth = await until(async () => { const n = await totalNow(); return n && n < everyone ? n : null; });
   check("one click on a month and Apply: only names renewing that month, any year",
     Boolean(inMonth) && Boolean(await until(async () => (await count()).includes(`${inMonth} of ${everyone} names match`))), await count());
-  const renewals = await page.ev(`[...document.querySelectorAll('tbody tr')].map((r) => r.children[5]?.textContent.trim()).filter(Boolean)`);
+  const renewals = await page.ev(`[...document.querySelectorAll('tbody tr')].map((r) => r.children[5]?.innerText.trim()).filter(Boolean)`);
   const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][month - 1];
-  check("…the list shows them, each renewing that month", renewals.length > 0 && renewals.every((r) => r.startsWith(mon)), JSON.stringify(renewals.slice(0, 5)));
+  check("…the list shows them, each with the X-date that renews that month, and its line",
+    renewals.length > 0 && renewals.every((r) => r.startsWith(mon) && /\n./.test(r)), JSON.stringify(renewals.slice(0, 5)));
   check("…the count says how many of all", /of \d+ match your filter/i.test(await page.text()));
 
   const first = await page.ev(`document.querySelector('a[href*="?project="]')?.getAttribute('href') ?? null`);
   await page.click("a", "Start calling");
   const leadId = await until(async () => (await page.path()).match(/^\/leads\/(\d+)/)?.[1]);
-  check("Start calling opens the first matching name", Boolean(leadId) && Number(sql(`select extract(month from public.lead_renewal_date(${leadId}))`)) === month && first?.includes(`/leads/${leadId}`),
+  check("Start calling opens the first matching name", Boolean(leadId) && renewsInMonth(leadId) && first?.includes(`/leads/${leadId}`),
     `${leadId} ${first}`);
 
   section("More criteria, included or excluded");
@@ -67,7 +70,8 @@ try {
   const without = await until(async () => { const n = await totalNow(); return n !== inMonth ? n : null; });
   const expected = Number(sql(`select count(*) from public.leads l join public.call_results r on r.id = l.result_id
     where l.project_id = ${PROJECT} and l.assigned_user_id = ${MIKE} and r.viable and r.callable
-      and extract(month from public.lead_renewal_date(l.id)) = ${month} and coalesce(btrim(l.sic_code), '') <> ${lit(sic)}`));
+      and exists (select 1 from unnest(public.lead_xdates(l.id)) d where extract(month from d) = ${month})
+      and coalesce(btrim(l.sic_code), '') <> ${lit(sic)}`));
   check("an industry excluded: that month's names in any other industry", without === expected && Boolean(await until(async () => (await count()).includes(`${expected} of ${everyone}`))),
     `${without} vs ${expected}; ${await count()}`);
   check("…and the filter is spelled out, the exclusion as Not", /Renews .+ – /.test(await page.ev(`document.querySelector('[data-applied-filters]').innerText`))

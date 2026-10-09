@@ -85,7 +85,7 @@ try {
   check("Locations above Employees", /PROFILE\r?\nLocations: 3\r?\nEmployees: 14/.test(body), body.slice(body.indexOf("PROFILE"), body.indexOf("PROFILE") + 80));
   check("the EIN, between Sales volume and Years in business", /Sales volume: \$2\.1M\r?\nEIN: 98-7654321\r?\nYears in business: 12/.test(body), body.slice(body.indexOf("PROFILE"), body.indexOf("PROFILE") + 140));
   const policy = body.slice(body.indexOf("POLICY INFORMATION")).split(/\r?\n/).slice(1, 4);
-  check("the agency after the policies", JSON.stringify(policy) === JSON.stringify(["Ultimate X-Date: Mar 1, 2027", "Package: Mar 1, 2027", "Agency: Garry Insurance"]), JSON.stringify(policy));
+  check("the agency after the policies", JSON.stringify(policy) === JSON.stringify(["Ultimate X-Date: Mar 1, 2027", "Liability / Package: Mar 1, 2027", "Agency: Garry Insurance"]), JSON.stringify(policy));
 
   section("Add to calendar › Apple");
   const ics = body.match(/https?:\/\/[^\s"<>]+\/appointment\.ics/)?.[0];

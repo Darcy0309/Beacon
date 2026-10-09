@@ -158,7 +158,11 @@ export async function saveCoverage(prevState, formData) {
   if (notAllowed) return fail(notAllowed, null, values);
   if (!allowed) return fail("This name is not on your call list, so you can't change its coverage.", null, values);
 
-  const payload = { ultimate_xdate: values.ultimate_xdate || null, agency_name: values.agency_name || null };
+  const payload = {
+    ultimate_xdate: values.ultimate_xdate || null,
+    agency_name: values.agency_name || null,
+    agency_years: values.agency_years === "" || values.agency_years == null ? null : Number.parseInt(values.agency_years, 10),
+  };
   for (const line of POLICY_LINES) {
     payload[line.date] = values[line.date] || null;
     payload[line.carrier] = values[line.carrier] || null;

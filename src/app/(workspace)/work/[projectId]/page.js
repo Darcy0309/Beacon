@@ -147,9 +147,12 @@ export default async function CallListPage({ params, searchParams }) {
                   <TableCell className="tabular-nums text-muted-foreground">{r.position}</TableCell>
                   <TableCell><Link href={sheet(r.id)} className="font-medium transition-colors hover:text-primary">{r.company}</Link></TableCell>
                   <TableCell>{r.contact}</TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">{r.phone}</TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{r.phone}</TableCell>
                   <TableCell className="text-muted-foreground">{r.place}</TableCell>
-                  <TableCell className="tabular-nums">{r.renewal}</TableCell>
+                  <TableCell className="tabular-nums" data-renewal>
+                    {r.renewal}
+                    {r.renewalLine ? <div className="whitespace-nowrap text-xs text-muted-foreground">{r.renewalLine}</div> : null}
+                  </TableCell>
                   <TableCell>{r.last ? <ToneBadge tone="slate">{r.result}</ToneBadge> : r.result}</TableCell>
                   <TableCell className="text-muted-foreground">{r.lastCalled}</TableCell>
                   {admin ? <TableCell className="text-right tabular-nums">{r.weight}</TableCell> : null}

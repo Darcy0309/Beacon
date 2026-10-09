@@ -117,6 +117,7 @@ export const COLUMN_ALIASES = {
 /** Columns that belong on the lead's insurance_details row. */
 export const INSURANCE_ALIASES = {
   agencyname: "agency_name", agency: "agency_name", currentcarrier: "agency_name",
+  yearswithagency: "agency_years", agencyyears: "agency_years", yearsatagency: "agency_years", yearswithcarrier: "agency_years",
   ultimatexdate: "ultimate_xdate", ultimatexdte: "ultimate_xdate", xdate: "ultimate_xdate",
   pkgxdate: "pkg_xdate", packagexdate: "pkg_xdate",
   pkgcarrier: "pkg_carrier", packagecarrier: "pkg_carrier",
@@ -147,6 +148,12 @@ const DATE_COLUMNS = new Set([
   "dental_xdate", "vision_xdate", "prof_liab_xdate", "do_xdate", "eo_xdate",
   "homeowner_xdate", "personal_auto_xdate",
 ]);
+
+/** "5", "5 years", "12 yrs" -> a whole number of years (0-150), or null. */
+export function parseYears(value) {
+  const m = /^\s*(\d{1,3})(\s*(years?|yrs?)\.?)?\s*$/i.exec(String(value ?? ""));
+  return m && Number(m[1]) <= 150 ? Number(m[1]) : null;
+}
 
 /**
  * Parse the US-style dates these exports carry (8/17/2026, 08-17-2026) and
@@ -314,7 +321,9 @@ export function rowsToImport(csvRows) {
         ? parseDate(value)
         : target.column === "appt_time"
           ? parseTime(value)
-          : value;
+          : target.column === "agency_years"
+            ? parseYears(value)
+            : value;
       if (parsed === null) return;
 
       if (target.table === "lead") lead[target.column] = parsed;

@@ -126,7 +126,7 @@ const TD = "px-3 py-2 align-top";
 // The X-date rows on a lead sheet: every line the renewal date can come from.
 const XDATE_ROWS = [
   ["Ultimate", "ultimate_xdate", "agency_name"],
-  ["Package", "pkg_xdate", "pkg_carrier"],
+  ["Liability / Package", "pkg_xdate", "pkg_carrier"],
   ["Workers comp", "wc_xdate", "wc_carrier"],
   ["Auto", "auto_xdate", "auto_carrier"],
   ["Health", "health_xdate", "health_carrier"],
@@ -226,6 +226,7 @@ export default async function LeadSheet({ params, searchParams }) {
   const coverage = Object.fromEntries([
     ["ultimate_xdate", ins?.ultimate_xdate ?? ""],
     ["agency_name", ins?.agency_name ?? ""],
+    ["agency_years", ins?.agency_years ?? ""],
     ...POLICY_LINES.flatMap((l) => [[l.date, ins?.[l.date] ?? ""], [l.carrier, ins?.[l.carrier] ?? ""]]),
   ]);
 
@@ -451,7 +452,9 @@ export default async function LeadSheet({ params, searchParams }) {
                       <Rows
                         rows={[
                           ["Ultimate XDate", ins?.ultimate_xdate ? <span className="font-semibold tabular-nums text-primary">{mediumDate(ins.ultimate_xdate)}</span> : null],
-                          ["Agency", ins?.agency_name ?? r.agency?.name],
+                          ["Agency", (ins?.agency_name ?? r.agency?.name)
+                            ? `${ins?.agency_name ?? r.agency?.name}${ins?.agency_years != null ? ` · ${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"} with them` : ""}`
+                            : null],
                           ...(r.original_xdate
                             ? [["Original renewal", <span key="o"><span className="tabular-nums">{mediumDate(r.original_xdate)}</span><span className="text-muted-foreground"> · corrected on a call</span></span>]]
                             : []),

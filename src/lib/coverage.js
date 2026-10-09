@@ -7,7 +7,8 @@
  * client asked; the rest show once they have something.
  */
 export const POLICY_LINES = [
-  { key: "pkg", label: "Package", date: "pkg_xdate", carrier: "pkg_carrier", always: true },
+  // The client's "Liability" X-date: the package (general liability) policy.
+  { key: "pkg", label: "Liability / Package", date: "pkg_xdate", carrier: "pkg_carrier", always: true },
   { key: "wc", label: "Workers comp", date: "wc_xdate", carrier: "wc_carrier", always: true },
   { key: "auto", label: "Auto", date: "auto_xdate", carrier: "auto_carrier", always: true },
   { key: "health", label: "Group health", date: "health_xdate", carrier: "health_carrier", always: true },

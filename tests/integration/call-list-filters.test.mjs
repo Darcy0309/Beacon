@@ -41,6 +41,9 @@ for (const [name, city, zip, county, sic, renewal, carrier, year, dev, result] o
   if (renewal || carrier) sql(`insert into public.insurance_details (lead_id, ultimate_xdate, wc_carrier) values (${id}, ${renewal ? lit(renewal) : "null"}, ${carrier ? lit(carrier) : "null"})`);
 }
 const label = (id) => Object.entries(ids).find(([, v]) => v === id)?.[0];
+// Feb Phoenix's workers comp renews in December (its Ultimate X-Date is Feb 1); two names came from one list.
+sql(`update public.insurance_details set wc_xdate = '2026-12-10' where lead_id = ${ids["Feb Phoenix"]}`);
+sql(`update public.leads set list_source = 'IPA-Maricopa-Cold_2026' where id in (${ids["Nov Phoenix"]}, ${ids["No renewal"]})`);
 
 const listWith = async (criteria) => {
   const up = await sean.sb.from("call_list_filters").upsert({ user_id: SEAN, project_id: project, criteria }, { onConflict: "user_id,project_id" });
@@ -53,11 +56,20 @@ const names = (...n) => [...n].sort().join(" | ");
 
 try {
   section("A window of the year, any year");
-  check("Nov 1 – Jan 31 runs over the new year", (await listWith({ renewal: { from: "11-01", to: "01-31" } })) === names("Nov Phoenix", "Dec Mesa", "Jan Tucson"),
+  check("Nov 1 – Jan 31 runs over the new year, on any policy line", (await listWith({ renewal: { from: "11-01", to: "01-31" } })) === names("Nov Phoenix", "Dec Mesa", "Jan Tucson", "Feb Phoenix"),
     await listWith({ renewal: { from: "11-01", to: "01-31" } }));
-  check("…one month at a time", (await listWith({ renewal: { from: "12-01", to: "12-31" } })) === names("Dec Mesa"));
-  check("…excluded: everything else, a name with no renewal date too",
-    (await listWith({ renewal: { from: "11-01", to: "01-31", exclude: true } })) === names("Feb Phoenix", "No renewal"));
+  check("…one month at a time: December, by the Ultimate X-Date or a line (Feb Phoenix's workers comp)",
+    (await listWith({ renewal: { from: "12-01", to: "12-31" } })) === names("Dec Mesa", "Feb Phoenix"), await listWith({ renewal: { from: "12-01", to: "12-31" } }));
+  {
+    await listWith({ renewal: { from: "12-01", to: "12-31" } });
+    const { data } = await sean.sb.rpc("call_list", { p_project_id: project, p_limit: 50 });
+    const m = data?.find((r) => label(r.id) === "Feb Phoenix")?.renewal_match;
+    check("…and each says which X-date put it in the window", m?.line === "wc" && m?.date === "2026-12-10", JSON.stringify(m));
+  }
+  check("…or on one line only: workers comp in December", (await listWith({ renewal: { from: "12-01", to: "12-31", line: "wc" } })) === names("Feb Phoenix"));
+  check("…or the Ultimate X-Date only", (await listWith({ renewal: { from: "12-01", to: "12-31", line: "ultimate" } })) === names("Dec Mesa"));
+  check("…excluded: no X-date in the window, a name with none at all too",
+    (await listWith({ renewal: { from: "11-01", to: "01-31", exclude: true } })) === names("No renewal"));
 
   section("Place, industry, carrier, who and when");
   check("city, whatever its spacing or case", (await listWith({ city: { values: ["phoenix"] } })) === names("Nov Phoenix", "Feb Phoenix"));
@@ -70,13 +82,15 @@ try {
   check("year developed", (await listWith({ year: { values: ["2025"] } })) === names("Nov Phoenix", "Feb Phoenix"));
   check("developed by", (await listWith({ developer: { values: [String(MIKE)] } })) === names("Nov Phoenix", "Jan Tucson"));
   check("call result", (await listWith({ result: { values: [String(leftMessage)] } })) === names("Jan Tucson"));
+  check("the list a name came from (a lead manager's cold lists)", (await listWith({ source: { values: ["ipa-maricopa-cold_2026"] } })) === names("Nov Phoenix", "No renewal"));
   check("all together: Nov – Jan, in Maricopa, not The Hartford",
-    (await listWith({ renewal: { from: "11-01", to: "01-31" }, county: { values: ["maricopa"] }, carrier: { values: ["the hartford"], exclude: true } })) === names("Dec Mesa"));
+    (await listWith({ renewal: { from: "11-01", to: "01-31" }, county: { values: ["maricopa"] }, carrier: { values: ["the hartford"], exclude: true } })) === names("Dec Mesa", "Feb Phoenix"));
 
   section("The list follows it everywhere");
   await listWith({ renewal: { from: "12-01", to: "12-31" } });
   const next = await sean.sb.rpc("call_list", { p_project_id: project, p_limit: 2 });
-  check("the next name (Start calling, Skip, after a result) comes from the filtered list", next.data?.length === 1 && label(next.data[0].id) === "Dec Mesa");
+  check("the next name (Start calling, Skip, after a result) comes from the filtered list",
+    Number(next.data?.[0]?.total) === 2 && next.data.every((r) => ["Dec Mesa", "Feb Phoenix"].includes(label(r.id))), JSON.stringify(next.data?.map((r) => label(r.id))));
   const all = await sean.sb.rpc("call_list", { p_project_id: project, p_limit: 50, p_filtered: false });
   check("…and without it, every name left", Number(all.data?.[0]?.total) === NAMES.length);
   // As if it were set yesterday (the stamp is the database's own, so set it past that).
@@ -86,7 +100,7 @@ try {
   const nextDay = await sean.sb.rpc("call_list", { p_project_id: project, p_limit: 50 });
   check("a filter set yesterday is set aside: each morning the list starts in full", Number(nextDay.data?.[0]?.total) === NAMES.length, nextDay.data?.[0]?.total);
   await listWith({ renewal: { from: "12-01", to: "12-31" } });
-  check("…applied again, it holds for the rest of the day", (await listWith({ renewal: { from: "12-01", to: "12-31" } })) === names("Dec Mesa"));
+  check("…applied again, it holds for the rest of the day", (await listWith({ renewal: { from: "12-01", to: "12-31" } })) === names("Dec Mesa", "Feb Phoenix"));
   const theirs = await mike.sb.from("call_list_filters").select("criteria").eq("user_id", SEAN);
   check("a manager's filter is their own", !theirs.error && theirs.data.length === 0, JSON.stringify(theirs.data));
   const forge = await mike.sb.from("call_list_filters").insert({ user_id: SEAN, project_id: project, criteria: {} });
@@ -98,7 +112,8 @@ try {
   check("the values on the list, with how many names have each, as written", !error && count("city", "phoenix") === 2
     && o.city.find((x) => x.value === "phoenix")?.label === "Phoenix" && count("zip", "85201") === 1
     && count("carrier", "the hartford") === 2 && count("year", "2026") === 3 && count("developer", String(MIKE)) === 2
-    && o.sic.some((x) => x.value === "1711" && /Plumbing/.test(x.label)), error?.message ?? JSON.stringify(o));
+    && o.sic.some((x) => x.value === "1711" && /Plumbing/.test(x.label))
+    && o.source?.some((x) => x.label === "IPA-Maricopa-Cold_2026" && x.count === 2), error?.message ?? JSON.stringify(o));
 } finally {
   sql(`delete from public.call_list_filters where project_id = ${project}`);
   sql(`delete from public.insurance_details where lead_id in (select id from public.leads where project_id = ${project})`);

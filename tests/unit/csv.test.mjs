@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the CSV lead importer. */
-import { parseCsv, rowsToLeads, mapHeaders, normalizeState } from "../../src/lib/csv.js";
+import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, normalizeState, parseYears } from "../../src/lib/csv.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -98,6 +98,14 @@ eq("empty input", parseCsv(""), []);
   const cols = mapHeaders(["Company", "Phone", "Mobile Phone", "Cell", "Email", "Decision Maker", "DM Phone", "DM Cell", "Decision Maker Email"]);
   check("mobile, DM phone, DM mobile and DM email headings land in their own columns",
     JSON.stringify(cols) === JSON.stringify(["company_name", "phone", "contact_mobile", "contact_mobile", "email", "decision_maker", "dm_phone", "dm_mobile", "dm_email"]), JSON.stringify(cols));
+}
+
+// --- years with the agency ------------------------------------------------------
+check("years with the agency read as a whole number, or not at all",
+  JSON.stringify(["5", "5 years", "12 yrs", "abc", "200"].map(parseYears)) === JSON.stringify([5, 5, 12, null, null]));
+{
+  const { rows } = rowsToImport([["Company", "Agency", "Years With Agency"], ["Acme Plumbing", "Garry Insurance", "6 years"]]);
+  check("…and imported onto the name's coverage", rows[0]?.insurance?.agency_years === 6, JSON.stringify(rows[0]?.insurance));
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");

@@ -374,6 +374,7 @@ export const schemas = {
     lead_id: [required("Missing lead"), id],
     ultimate_xdate: [date],
     agency_name: [max(120)],
+    agency_years: [int({ min: 0, max: 150 })],
     ...Object.fromEntries(POLICY_LINES.flatMap((l) => [[l.date, [date]], [l.carrier, [max(120)]]])),
   },
 

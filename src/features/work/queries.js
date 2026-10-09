@@ -11,7 +11,7 @@ import { shortDate, timeAgo } from "@/lib/format";
 import { getBusinessTimeZone } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
 import { createClient } from "@/lib/supabase/server";
-import { cleanCriteria } from "@/lib/call-list-filter";
+import { RENEWAL_LINES, cleanCriteria } from "@/lib/call-list-filter";
 
 const TYPE_LABEL = { DBDV: "Database development", APPT: "Appointment setting" };
 
@@ -77,7 +77,11 @@ export async function getCallList(projectId, { page = 1, perPage = 50, q = "", r
     weight: r.call_weight,
     last: Boolean(r.sort_last),
     lastCalled: r.date_last_worked ? timeAgo(r.date_last_worked) : "Not called yet",
-    renewal: r.renewal_date ? shortDate(r.renewal_date) : "—",
+    // With a renewal filter, the X-date that matched it, and its line; else the name's renewal date.
+    renewal: r.renewal_match?.date ? shortDate(r.renewal_match.date) : r.renewal_date ? shortDate(r.renewal_date) : "—",
+    renewalLine: r.renewal_match?.line
+      ? (r.renewal_match.line === "ultimate" ? "Ultimate X-Date" : RENEWAL_LINES.find((l) => l.key === r.renewal_match.line)?.label ?? null)
+      : null,
   }));
   return { rows, total: Number(data?.[0]?.total ?? 0) };
 }

@@ -1,17 +1,26 @@
 /**
  * A call list's filter (see supabase/migrations/…_call_list_filters.sql):
- * a window of the year the name renews in, and lists of values to include
- * or exclude. Pure functions, shared by the page, the form and the action.
+ * a window of the year the name renews in (on any of its X-dates, or one
+ * policy line's), and lists of values to include or exclude. Pure
+ * functions, shared by the page, the form and the action.
  *
- *   { renewal: { from: "11-01", to: "01-31", exclude },
+ *   { renewal: { from: "11-01", to: "01-31", line?: "wc", exclude },
  *     city: { values: ["phoenix"], exclude }, … }
  */
+
+import { POLICY_LINES } from "./coverage.js";
 
 export const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 // February counts its 29th, so a leap year's renewals are never left out.
 export const MONTH_DAYS = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** The criteria offered besides the renewal window, in the order shown. */
+/** Which X-date a renewal window looks at: any of them (none chosen), the Ultimate, or one line's. */
+export const RENEWAL_LINES = [
+  { key: "ultimate", label: "Ultimate X-Date" },
+  ...POLICY_LINES.map((l) => ({ key: l.key, label: l.label })),
+];
+
 export const FILTER_FIELDS = [
   { key: "city", label: "City", not: "Not city" },
   { key: "zip", label: "ZIP code", not: "Not ZIP code" },
@@ -21,6 +30,7 @@ export const FILTER_FIELDS = [
   { key: "year", label: "Year developed", not: "Not developed in" },
   { key: "developer", label: "Developed by", not: "Not developed by" },
   { key: "result", label: "Call result", not: "Not call result" },
+  { key: "source", label: "List source", not: "Not list source" },
 ];
 
 const pad = (n) => String(n).padStart(2, "0");
@@ -57,6 +67,7 @@ export function cleanCriteria(raw) {
   const c = raw && typeof raw === "object" ? raw : {};
   if (isMonthDay(c.renewal?.from) && isMonthDay(c.renewal?.to)) {
     out.renewal = { from: c.renewal.from, to: c.renewal.to, exclude: c.renewal.exclude === true };
+    if (RENEWAL_LINES.some((l) => l.key === c.renewal.line)) out.renewal.line = c.renewal.line;
   }
   for (const { key } of FILTER_FIELDS) {
     const values = Array.isArray(c[key]?.values)
@@ -78,7 +89,8 @@ export function describeCriteria(c, options = {}) {
   const clean = cleanCriteria(c);
   const out = [];
   if (clean.renewal) {
-    const span = `${monthDayLabel(clean.renewal.from)} – ${monthDayLabel(clean.renewal.to)}`;
+    const line = RENEWAL_LINES.find((l) => l.key === clean.renewal.line);
+    const span = `${monthDayLabel(clean.renewal.from)} – ${monthDayLabel(clean.renewal.to)}${line ? ` (${line.label})` : ""}`;
     out.push({ key: "renewal", text: clean.renewal.exclude ? `Not renewing ${span}` : `Renews ${span}`, exclude: clean.renewal.exclude });
   }
   for (const { key, label, not } of FILTER_FIELDS) {

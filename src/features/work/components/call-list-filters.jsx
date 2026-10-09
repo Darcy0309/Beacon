@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, cleanCriteria, describeCriteria, monthDay, monthWindow,
+  FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, RENEWAL_LINES, cleanCriteria, describeCriteria, monthDay, monthWindow,
 } from "@/lib/call-list-filter";
 import { cn } from "@/lib/utils";
 import { saveCallListFilter } from "@/features/work/actions";
@@ -168,13 +168,19 @@ export default function CallListFilters({ projectId, criteria, options, matching
             <span className="text-muted-foreground">and</span>
             <MonthDayPick label="To" value={renewal.to ?? null} onChange={(to) => setRenewal({ to })} />
             <span className="text-xs text-muted-foreground">
-              {(renewal.from ? 1 : 0) + (renewal.to ? 1 : 0) === 1 ? "choose both days" : "any year"}
+              {(renewal.from ? 1 : 0) + (renewal.to ? 1 : 0) === 1 ? "choose both days" : "any year, on"}
             </span>
+            {/* Any of the name's X-dates, or one policy line's. */}
+            <Select aria-label="Which renewal date" value={renewal.line ?? ""} className="h-8 w-auto" data-renewal-line
+              onChange={(e) => setRenewal({ line: e.target.value || undefined })}>
+              <option value="">any policy line</option>
+              {RENEWAL_LINES.map((l) => <option key={l.key} value={l.key}>{l.key === "ultimate" ? "the Ultimate X-Date" : `${l.label} only`}</option>)}
+            </Select>
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="Renews in the month of">
             {MONTH_NAMES.map((m, i) => (
               <button key={m} type="button" data-month={i + 1} aria-pressed={pickedMonth(i + 1)}
-                onClick={() => setDraft({ ...draft, renewal: { ...monthWindow(i + 1), exclude: renewal.exclude === true } })}
+                onClick={() => setDraft({ ...draft, renewal: { ...monthWindow(i + 1), line: renewal.line, exclude: renewal.exclude === true } })}
                 className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors",
                   pickedMonth(i + 1) ? "border-primary bg-primary/15 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40 hover:text-foreground")}>
                 {m}

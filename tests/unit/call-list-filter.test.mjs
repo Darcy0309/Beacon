@@ -44,6 +44,11 @@ is("the filter in words, with labels",
     { city: [{ value: "phoenix", label: "Phoenix" }, { value: "mesa", label: "Mesa" }], carrier: [{ value: "the hartford", label: "The Hartford" }] }
   ).map((d) => d.text),
   ["Renews Nov 1 – Jan 31", "City: Phoenix, Mesa", "Not carrier: The Hartford"]);
+is("a window on one policy line keeps it, and says so",
+  [cleanCriteria({ renewal: { from: "12-01", to: "12-31", line: "wc" } }).renewal.line, describeCriteria({ renewal: { from: "12-01", to: "12-31", line: "wc" } })[0].text],
+  ["wc", "Renews Dec 1 – Dec 31 (Workers comp)"]);
+is("…a line that is not one means any line", cleanCriteria({ renewal: { from: "12-01", to: "12-31", line: "boats" } }).renewal.line, undefined);
+is("the list a name came from, included or not", describeCriteria({ source: { values: ["ipa-maricopa"], exclude: true } }, { source: [{ value: "ipa-maricopa", label: "IPA-Maricopa" }] })[0].text, "Not list source: IPA-Maricopa");
 is("…a long list shortened", describeCriteria({ zip: { values: ["85001", "85002", "85003", "85004", "85005"] } })[0].text, "ZIP code: 85001, 85002, 85003 +2");
 
 if (failures) {

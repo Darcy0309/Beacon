@@ -102,7 +102,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       fax: lead.fax,
       coverage: {
         ultimate: longDate(ins.ultimate_xdate),
-        agency: ins.agency_name,
+        agency: ins.agency_name && ins.agency_years != null ? `${ins.agency_name} (${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"})` : ins.agency_name,
         lines: POLICY_LINES.map((l) => ({ label: l.label, xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
       },
       profile: [

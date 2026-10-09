@@ -10,8 +10,8 @@ const check = (label, cond, detail = "") => {
 };
 
 const always = POLICY_LINES.filter((l) => l.always).map((l) => l.label);
-check("the lines always listed: Package, Workers comp, Auto, Group health, Personal lines",
-  JSON.stringify(always) === JSON.stringify(["Package", "Workers comp", "Auto", "Group health", "Personal lines"]), JSON.stringify(always));
+check("the lines always listed: Liability / Package, Workers comp, Auto, Group health, Personal lines",
+  JSON.stringify(always) === JSON.stringify(["Liability / Package", "Workers comp", "Auto", "Group health", "Personal lines"]), JSON.stringify(always));
 
 const CARRIERS = ["Travelers", "The Hartford", "Hartford Steam Boiler", "Amtrust Ins Co Of Ks Inc", "AmTrust North America", "Cincinnati Insurance", "State Farm", "Farmers Insurance"];
 check("typed letters suggest names starting with them first", JSON.stringify(suggestCarriers(CARRIERS, "har")) === JSON.stringify(["Hartford Steam Boiler", "The Hartford"]), JSON.stringify(suggestCarriers(CARRIERS, "har")));
