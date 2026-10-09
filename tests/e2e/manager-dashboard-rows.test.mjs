@@ -45,7 +45,8 @@ const company = Number(sql(`insert into public.companies (name) values (${lit(`$
 const project = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
   values (${lit(`${TAG} DBDev`)}, ${company}, (select id from public.project_types where code='DBDV'), 1) returning id`));
 const lead = Number(sql(`insert into public.leads (project_id, company_name, contact_name, phone) values (${project}, ${lit(`${TAG} Plumbing`)}, 'Dana Cole', '(602) 555-0177') returning id`));
-const lead2 = Number(sql(`insert into public.leads (project_id, company_name, phone) values (${project}, ${lit(`${TAG} Roofing`)}, '(480) 555-0199') returning id`));
+const lead2 = Number(sql(`insert into public.leads (project_id, company_name, phone, result_id) values (${project}, ${lit(`${TAG} Roofing`)}, '(480) 555-0199',
+  (select id from public.call_results where project_type = 'DBDV' and name = 'Viable-Left Message')) returning id`));
 const hot = sql("select id from public.call_results where project_type = 'DBDV' and name = 'Lead-Hot Lead'");
 const phoneAppt = sql("select id from public.call_results where project_type = 'DBDV' and name = 'Appointment-Phone'");
 const call1 = Number(sql(`insert into public.call_records (lead_id, project_id, user_id, call_date, result_id) values (${lead}, ${project}, ${SEAN}, now(), ${hot}) returning id`));
@@ -97,6 +98,8 @@ try {
     return t && t.includes(`${TAG} Plumbing`) && t.includes(`${TAG} Roofing`) ? t : null;
   });
   check("a day clicked: the appointment they set, awaiting confirmation, and their reminder", Boolean(list) && /Awaiting confirmation/i.test(list) && /Call back/.test(list), list ?? (await card("[data-my-schedule]")));
+  check("…the reminder with the name's last call result, the reason for the call back",
+    /Viable-Left Message/i.test((await sean.ev(`document.querySelector('[data-schedule-item="r${rem}"] [data-call-result]')?.textContent ?? ''`)) ?? ""));
   await sean.click(`[data-my-schedule] [data-day="${today}"]`);
   check("…and today, what an administrator sent them", Boolean(await until(async () => ((await card(`[data-schedule-day="${today}"]`)) ?? "").includes(`${TAG} team meeting`))), await card(`[data-schedule-day="${today}"]`));
 

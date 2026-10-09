@@ -283,7 +283,8 @@ export async function getDeveloped({ userId, from, to, timeZone }) {
  * appointments they set (and whether each is confirmed yet), the call-back
  * reminders they set, and the notifications administrators sent them.
  * Returns { items, awaiting }: each item { key, kind, id, day, time, clock,
- * minutes, title, detail, badge, tone, href, movable }, and how many of the
+ * minutes, title, detail, badge, tone, href, movable; a reminder's name's
+ * last call `result` }, and how many of the
  * appointments they set, still to come, wait for confirmation. `owner`:
  * false when an administrator is looking at someone else's.
  */
@@ -304,7 +305,8 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       .limit(1000),
     supabase
       .from("reminders")
-      .select("id, remind_at, note, sent_at, lead:leads(id, company_name, contact_name)")
+      // With the name's last call result: why the call back (a viable name, an X-date to follow up…).
+      .select("id, remind_at, note, sent_at, lead:leads(id, company_name, contact_name, result:call_results(name))")
       .eq("user_id", userId)
       .gte("remind_at", lo)
       .lt("remind_at", hi)
@@ -360,6 +362,7 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       title: `Call back: ${lead?.company_name ?? "a lead"}`,
       detail: [r.note, lead?.contact_name].filter(Boolean).join(" · ") || "Call-back reminder",
       badge: r.sent_at ? "Reminded" : null, tone: "muted",
+      result: one(lead?.result)?.name ?? null,
       href: lead?.id ? `/leads/${lead.id}` : null,
       leadId: lead?.id ?? null,
       // Only its owner moves a reminder (an administrator looking on does not).

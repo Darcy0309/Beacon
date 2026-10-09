@@ -314,7 +314,17 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
                       ) : <span className="truncate text-sm font-medium">{it.title}</span>}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">{it.detail}</div>
-                    {it.badge ? <span className={cn("mt-1 inline-block rounded-full border px-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.08em]", BADGE[it.tone] ?? BADGE.muted)}>{it.badge}</span> : null}
+                    {it.result || it.badge ? (
+                      <span className="mt-1 flex flex-wrap gap-1">
+                        {/* A reminder: the name's last call result, so the call back has its reason. */}
+                        {it.result ? (
+                          <span data-call-result title="Last call result" className="inline-block rounded-full border border-sky-400/40 px-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.08em] text-sky-500">
+                            {it.result}
+                          </span>
+                        ) : null}
+                        {it.badge ? <span className={cn("inline-block rounded-full border px-1.5 text-[0.58rem] font-semibold uppercase tracking-[0.08em]", BADGE[it.tone] ?? BADGE.muted)}>{it.badge}</span> : null}
+                      </span>
+                    ) : null}
                   </div>
                   {it.pending ? (
                     <span className="flex shrink-0 items-center gap-1 text-[0.62rem] font-semibold text-primary" data-moving>
