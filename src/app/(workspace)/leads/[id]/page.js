@@ -493,6 +493,25 @@ export default async function LeadSheet({ params, searchParams }) {
                 upcoming={activity.reminders.filter((m) => !m.sent && m.userId === me?.id).map((m) => ({ id: m.id, when: stamp(m.remindAt), note: m.note }))}
               />
             ) : null}
+            {staff && r.projectType && r.stage !== (r.projectType === "APPT" ? "appt" : "dbdev") ? (
+              // The name and its project disagree (the project's type was changed after the name was
+              // loaded): say so, rather than offering the other stage's results without a word.
+              <Card data-stage-mismatch className="border-amber-400/50 bg-amber-400/5 p-4 text-sm">
+                <p className="font-semibold text-amber-500">This name is at the {STAGE[r.stage]?.toLowerCase()} stage</p>
+                <p className="mt-1 text-muted-foreground">
+                  But its project{r.project?.name ? <>, <strong className="text-foreground">{r.project.name}</strong>,</> : null} is set
+                  to {STAGE[r.projectType === "APPT" ? "appt" : "dbdev"]?.toLowerCase()}, so that project type&apos;s results show below.
+                  {admin
+                    ? <> If the project is {r.stage === "dbdev" ? "a database development" : "an appointment setting"} project, change its Type; its names then show the right results.</>
+                    : " An administrator can correct the project's type."}
+                </p>
+                {admin && r.project?.id ? (
+                  <Link href={`/projects/${r.project.id}`} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                    Open the project <ArrowRight className="size-3" />
+                  </Link>
+                ) : null}
+              </Card>
+            ) : null}
             {canRecord ? (
               <CallResultPanel
                 leadId={lead.id}

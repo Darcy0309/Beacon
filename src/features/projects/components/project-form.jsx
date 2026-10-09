@@ -51,6 +51,10 @@ export default function ProjectForm({ project, options, trigger }) {
   const [companyId, setCompanyId] = useState(String(dv("company_id") ?? ""));
   const [typeId, setTypeId] = useState(String(dv("project_type_id") ?? ""));
   const isDbdev = projectTypes.find((t) => String(t.id) === typeId)?.code === "DBDV";
+  // Changing an existing project's type moves its names to that type's stage.
+  const names = Number(Array.isArray(project?.leads) ? project.leads[0]?.count : project?.leads) || 0;
+  const retyped = isEdit && typeId && String(record?.project_type_id ?? "") !== typeId;
+  const newType = projectTypes.find((t) => String(t.id) === typeId);
   const apptProjects = projects.filter((p) => p.type === "APPT" && String(p.company_id ?? "") === companyId && p.id !== project?.id);
 
   return (
@@ -87,6 +91,12 @@ export default function ProjectForm({ project, options, trigger }) {
                 {projectTypes.map((t) => <option key={t.id} value={t.id}>{t.description}</option>)}
               </Select>
             </Field>
+            {retyped ? (
+              <p role="note" data-retype-warning className="rounded-md border border-amber-400/50 bg-amber-400/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400 sm:col-span-2">
+                {names ? `This project's ${names.toLocaleString()} name${names === 1 ? "" : "s"}` : "Its names"} move to the {newType?.description?.toLowerCase() ?? "new"} stage
+                and are called with its results. A result from the other list starts again at {newType?.code === "APPT" ? "Lead-No Contact" : "Viable-CallBack"}.
+              </p>
+            ) : null}
 
             {isDbdev ? (
               <Field
