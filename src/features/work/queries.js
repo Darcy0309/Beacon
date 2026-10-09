@@ -11,6 +11,7 @@ import { shortDate, timeAgo } from "@/lib/format";
 import { getBusinessTimeZone } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
 import { createClient } from "@/lib/supabase/server";
+import { cleanCriteria } from "@/lib/call-list-filter";
 
 const TYPE_LABEL = { DBDV: "Database development", APPT: "Appointment setting" };
 
@@ -53,7 +54,7 @@ export async function getWorkProject(id) {
 }
 
 /** One page of a rep's call list, in the order they should call it. */
-export async function getCallList(projectId, { page = 1, perPage = 50, q = "", rep = null } = {}) {
+export async function getCallList(projectId, { page = 1, perPage = 50, q = "", rep = null, filtered = true } = {}) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("call_list", {
     p_project_id: Number(projectId),
@@ -61,6 +62,8 @@ export async function getCallList(projectId, { page = 1, perPage = 50, q = "", r
     p_limit: perPage,
     p_offset: (page - 1) * perPage,
     p_search: q || null,
+    // Through the caller's filter for the project, unless asked not to.
+    p_filtered: filtered,
   });
   if (error) throw error;
   const rows = (data ?? []).map((r, i) => ({
@@ -78,6 +81,25 @@ export async function getCallList(projectId, { page = 1, perPage = 50, q = "", r
   }));
   return { rows, total: Number(data?.[0]?.total ?? 0) };
 }
+/** The caller's filter for a project's call list ({} when none). */
+export async function getCallListFilter(projectId) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("call_list_filters").select("criteria").eq("project_id", Number(projectId)).maybeSingle();
+  return cleanCriteria(data?.criteria);
+}
+
+/**
+ * What a call list's filter offers: among the rep's names still to call,
+ * each city, ZIP, county, industry, carrier, year developed, developer and
+ * call result, as { value, label, count }.
+ */
+export async function getCallListOptions(projectId, rep = null) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("call_list_options", { p_project_id: Number(projectId), p_rep: rep });
+  if (error) throw error;
+  return data ?? {};
+}
+
 /**
  * The first name on a rep's list that is not in `except` (the name on screen
  * and any skipped on the way to it). Skipping writes nothing, so the list's

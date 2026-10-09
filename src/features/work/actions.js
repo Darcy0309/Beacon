@@ -3,7 +3,9 @@
 /** Recording call results from the lead sheet. */
 
 import { after } from "next/server";
-import { check, currentAppUser, fail, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
+import { revalidatePath } from "next/cache";
+import { check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
+import { cleanCriteria } from "@/lib/call-list-filter";
 import { deliverLead } from "@/features/delivery/server";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
@@ -95,4 +97,31 @@ export async function recordCallResult(prevState, formData) {
   // visit, and revalidating would re-render the sheet being viewed at once.
   // The panel refreshes or moves on to the next name itself.
   return ok({ ...data, next, listId });
+}
+
+/**
+ * Keep the caller's filter for a project's call list (`criteria`, JSON):
+ * the list, Start calling, Skip and the next name after a result all follow
+ * it. An empty filter clears it.
+ */
+export async function saveCallListFilter(formData) {
+  const projectId = idFrom(formData, "project_id");
+  if (!projectId) return fail("Missing project.");
+  let criteria;
+  try {
+    criteria = cleanCriteria(JSON.parse(String(formData.get("criteria") ?? "{}")));
+  } catch {
+    return fail("That filter could not be read.");
+  }
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me || !["admin", "manager", "agent"].includes(me.role)) return fail("Only staff have call lists.");
+  const { error } = Object.keys(criteria).length
+    ? await supabase.from("call_list_filters").upsert(
+        { user_id: me.id, project_id: projectId, criteria, updated_at: new Date().toISOString() },
+        { onConflict: "user_id,project_id" })
+    : await supabase.from("call_list_filters").delete().eq("user_id", me.id).eq("project_id", projectId);
+  if (error) return fail(error);
+  revalidatePath(`/work/${projectId}`);
+  return ok({ criteria });
 }
