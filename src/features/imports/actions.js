@@ -75,6 +75,7 @@ export async function importLeadsCsv(prevState, formData) {
     .maybeSingle();
 
   const now = new Date().toISOString();
+  const unknownResults = new Map();
   let errors = skipped;
   let imported = 0;
   let details = 0;
@@ -89,7 +90,10 @@ export async function importLeadsCsv(prevState, formData) {
     const payload = chunk.map(({ lead, status }) => {
       let target = projectId;
       let stageType = projectType;
-      let result = resultFor(projectType, projectType === "DBDV" ? lead.call_result_dbdv : lead.call_result_appt);
+      const said = projectType === "DBDV" ? lead.call_result_dbdv : lead.call_result_appt;
+      let result = resultFor(projectType, said);
+      // A result the system does not know: the name starts at the stage's first; the import says which.
+      if (said && !result) unknownResults.set(said.trim(), (unknownResults.get(said.trim()) ?? 0) + 1);
       let source = null;
       // A name the old system had already made a lead or an appointment
       // starts on the linked appointment project, like a promotion.
@@ -195,5 +199,6 @@ export async function importLeadsCsv(prevState, formData) {
   revalidatePath("/leads");
   revalidatePath("/work", "layout");
   revalidatePath("/");
-  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 });
+  const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
+  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1, unknown });
 }

@@ -169,6 +169,27 @@ const DATE_COLUMNS = new Set([
   "homeowner_xdate", "personal_auto_xdate",
 ]);
 
+// What old lists put in a field that has nothing in it: read as blank.
+const PLACEHOLDERS = new Set(["n/a", "na", "n.a.", "none", "null", "nil", "unknown", "unk", "tbd", "-", "--", "---", ".", "?", "x",
+  "no", "no site", "no website", "no web site", "nosite", "no web", "no email", "no e-mail", "noemail", "no email address",
+  "not available", "not listed", "none listed", "no info", "same", "n\\a"]);
+const EMAIL_COLUMNS = new Set(["email", "dm_email", "contact2_email"]);
+const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[a-z]{2,}$/i;
+const WEBSITE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
+
+/**
+ * A text value as it should be kept, or null for nothing: a placeholder
+ * ("n/a", "no site", "none") is blank; an email field keeps the first
+ * address that is one; a website field keeps what is a web address.
+ */
+export function cleanValue(column, value) {
+  const v = String(value ?? "").trim();
+  if (!v || PLACEHOLDERS.has(v.toLowerCase())) return null;
+  if (EMAIL_COLUMNS.has(column)) return v.split(/[\s,;]+/).find((x) => EMAIL.test(x)) ?? null;
+  if (column === "website") return WEBSITE.test(v.replace(/^www\./i, "www.")) ? v : null;
+  return v;
+}
+
 /** "5", "5 years", "12 yrs" -> a whole number of years (0-150), or null. */
 export function parseYears(value) {
   const m = /^\s*(\d{1,3})(\s*(years?|yrs?)\.?)?\s*$/i.exec(String(value ?? ""));
@@ -343,7 +364,7 @@ export function rowsToImport(csvRows) {
           ? parseTime(value)
           : target.column === "agency_years"
             ? parseYears(value)
-            : value;
+            : cleanValue(target.column, value);
       if (parsed === null) return;
 
       if (target.table === "lead") lead[target.column] = parsed;

@@ -33,8 +33,16 @@ export default function CsvImport({ projects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned } = state.data ?? {};
+      const { imported, errors, total, assigned, unknown = [] } = state.data ?? {};
       toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}${assigned ? ` · shared across ${assigned} account managers` : ""}`);
+      // Old call results not recognised: those names start at the project's first result.
+      if (unknown.length) {
+        const n = unknown.reduce((sum, u) => sum + u.n, 0);
+        toast.warning(`${n} row${n === 1 ? "" : "s"} had a call result the system doesn't recognise, so ${n === 1 ? "it starts as a new name" : "they start as new names"}`, {
+          description: unknown.slice(0, 6).map((u) => `“${u.text}” (${u.n})`).join(", ") + (unknown.length > 6 ? ", …" : ""),
+          duration: 20000,
+        });
+      }
       formRef.current?.reset();
       setFileName("");
       router.refresh();

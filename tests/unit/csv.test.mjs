@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the CSV lead importer. */
-import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, TEMPLATE_HEADERS } from "../../src/lib/csv.js";
+import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, TEMPLATE_HEADERS, cleanValue } from "../../src/lib/csv.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -114,6 +114,18 @@ check("years with the agency read as a whole number, or not at all",
   const missing = TEMPLATE_HEADERS.filter((h, i) => !read[i]);
   const cols = read.filter(Boolean).map((t) => t.column);
   check("every heading in the template is one the import reads, none twice", !missing.length && new Set(cols).size === cols.length, JSON.stringify(missing));
+}
+
+// --- what old lists put in empty fields ----------------------------------------------
+check("“n/a”, “none”, “no site” and the like are read as blank",
+  ["n/a", "N/A", "none", "No Site", "no email", "-", "unknown"].every((v) => cleanValue("website", v) === null && cleanValue("phone", v) === null));
+check("a website is kept when it is a web address", JSON.stringify(["www.acme.com", "acme.com/about", "http://acme.co", "see notes"].map((v) => cleanValue("website", v)))
+  === JSON.stringify(["www.acme.com", "acme.com/about", "http://acme.co", null]));
+check("an email field keeps the first real address", JSON.stringify(["bob@acme.com; sue@acme.com", "bob at acme", "Sue@Acme.com"].map((v) => cleanValue("dm_email", v)))
+  === JSON.stringify(["bob@acme.com", null, "Sue@Acme.com"]));
+{
+  const { rows } = rowsToImport([["Company", "Website", "Email", "City"], ["Acme Plumbing", "no site", "n/a", "Mesa"]]);
+  check("…and an imported row leaves them empty", rows[0]?.lead?.website === undefined && rows[0]?.lead?.email === undefined && rows[0]?.lead?.city === "Mesa", JSON.stringify(rows[0]?.lead));
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
