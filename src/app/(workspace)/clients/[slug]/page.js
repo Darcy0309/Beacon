@@ -8,6 +8,7 @@ import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { clientSlug } from "@/lib/format";
 import { getClientBySlug } from "@/features/clients/queries";
+import ClientForm from "@/features/clients/components/client-form";
 import { getProjects } from "@/features/projects/queries";
 
 export const dynamic = "force-dynamic";
@@ -61,7 +62,10 @@ export default async function ClientProfile({ params }) {
                   <p className="text-sm text-muted-foreground">{c.city}</p>
                 </div>
               </div>
-              <ToneBadge tone={c.status === "Active" ? "emerald" : "slate"}>{c.status}</ToneBadge>
+              <div className="flex items-center gap-2">
+                <ToneBadge tone={c.status === "Active" ? "emerald" : "slate"}>{c.status}</ToneBadge>
+                <ClientForm client={c.raw} />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 pt-5 sm:grid-cols-3">
               <Field label="Account manager">{c.manager}</Field>

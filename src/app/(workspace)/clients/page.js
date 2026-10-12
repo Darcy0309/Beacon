@@ -7,6 +7,7 @@ import MetricBar from "@/components/shared/metric-bar";
 import { Card } from "@/components/ui/card";
 import { clientSlug } from "@/lib/format";
 import { getClients } from "@/features/clients/queries";
+import ClientForm from "@/features/clients/components/client-form";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function ClientsPage() {
         </div>
 
         <Card>
-          <SectionHeader label="Client Accounts" icon={Building2} />
+          <SectionHeader label="Client Accounts" icon={Building2} action={<ClientForm />} />
           <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
             {clients.map((c, i) => {
               const accent = ACCENTS[i % ACCENTS.length];
@@ -94,7 +95,7 @@ export default async function ClientsPage() {
               );
             })}
             {clients.length === 0 && (
-              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">No client accounts yet.</p>
+              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">No client accounts yet. Add the first with New client.</p>
             )}
           </div>
         </Card>

@@ -43,6 +43,8 @@ export async function getClients() {
     email: c.email ?? "—",
     phone: c.phone ?? "—",
     status: c.status === "active" ? "Active" : "Inactive",
+    // As saved, for the edit form.
+    raw: c,
   }));
 }
 

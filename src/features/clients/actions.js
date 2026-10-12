@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
 export async function saveCompany(prevState, formData) {
-  const { failed } = check(formData, schemas.company);
+  const { values, failed } = check(formData, schemas.company);
   if (failed) return failed;
 
   const supabase = await createClient();
@@ -24,17 +24,21 @@ export async function saveCompany(prevState, formData) {
     state: s(formData, "state"),
     zip: s(formData, "zip"),
     website: s(formData, "website"),
-    sic_code: s(formData, "sic_code"),
     status: s(formData, "status") || "active",
   };
+  // A state as its two letters ("az" -> "AZ").
+  if (payload.state) payload.state = payload.state.toUpperCase();
   const { error } = id
     ? await supabase.from("companies").update(payload).eq("id", id)
     : await supabase.from("companies").insert(payload);
-  if (error) return fail(error);
+  if (error) return fail(error, null, values);
 
-  await logActivity(supabase, id ? "company.update" : "company.create", { entity: "company", entityId: id ?? null });
-  revalidatePath("/clients");
-  return ok();
+  await logActivity(supabase, id ? "company.update" : "company.create", { entity: "company", entityId: id ?? null, detail: payload.name });
+  // New clients are offered on Projects and Users & Access too.
+  revalidatePath("/clients", "layout");
+  revalidatePath("/projects");
+  revalidatePath("/users");
+  return ok({ name: payload.name });
 }
 
 export async function deleteCompany(formData) {
