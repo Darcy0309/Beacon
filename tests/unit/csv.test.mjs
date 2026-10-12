@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the CSV lead importer. */
-import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, normalizeState, parseYears } from "../../src/lib/csv.js";
+import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, TEMPLATE_HEADERS } from "../../src/lib/csv.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -106,6 +106,14 @@ check("years with the agency read as a whole number, or not at all",
 {
   const { rows } = rowsToImport([["Company", "Agency", "Years With Agency"], ["Acme Plumbing", "Garry Insurance", "6 years"]]);
   check("…and imported onto the name's coverage", rows[0]?.insurance?.agency_years === 6, JSON.stringify(rows[0]?.insurance));
+}
+
+// --- the import template ------------------------------------------------------------
+{
+  const read = mapAllHeaders(TEMPLATE_HEADERS);
+  const missing = TEMPLATE_HEADERS.filter((h, i) => !read[i]);
+  const cols = read.filter(Boolean).map((t) => t.column);
+  check("every heading in the template is one the import reads, none twice", !missing.length && new Set(cols).size === cols.length, JSON.stringify(missing));
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");

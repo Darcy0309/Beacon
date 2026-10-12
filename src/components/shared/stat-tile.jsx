@@ -74,7 +74,7 @@ export default function StatTile({
         {note || action ? (
           // With an action, one line of text high whatever the note says, so the switch never moves and the tile is no taller.
           <div className={cn("mt-1 flex items-center justify-between gap-2", action ? "h-4" : "flex-wrap")}>
-            {note ? <div className="min-w-0 truncate text-xs text-muted-foreground">{note}</div> : <span />}
+            {note ? <div className={cn("min-w-0 text-xs text-muted-foreground", action && "truncate")}>{note}</div> : <span />}
             {action ? <span className="flex shrink-0">{action}</span> : null}
           </div>
         ) : null}

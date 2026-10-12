@@ -3,13 +3,17 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { UploadCloud } from "lucide-react";
+import { Download, UploadCloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, Select } from "@/components/ui/field";
 import { importLeadsCsv } from "@/features/imports/actions";
 import { cn } from "@/lib/utils";
+import { TEMPLATE_HEADERS } from "@/lib/csv";
+
+// The template: every column the import reads, as a CSV of headings only.
+const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(`${TEMPLATE_HEADERS.join(",")}\r\n`)}`;
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -70,6 +74,17 @@ export default function CsvImport({ projects = [] }) {
   return (
     <Card>
       <CardContent className="p-5">
+        {/* How a file is read: by its headings, in any order and in common spellings; the template has them all. */}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--panel-border)] bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-import-help>
+          <span>
+            Columns are read by their headings, in any order (“Company”, “Company Name” and “COMPANY” all work). Only Company is required;
+            columns not used are left blank.
+          </span>
+          <a href={TEMPLATE_HREF} download="lighthouse-import-template.csv" data-import-template
+            className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary hover:underline">
+            <Download className="size-3.5" /> Download template
+          </a>
+        </div>
         <form ref={formRef} action={formAction} noValidate className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Project" required error={state?.fieldErrors?.project_id}>

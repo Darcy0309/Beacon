@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
-import { listProjects, getProjectStats } from "@/features/projects/queries";
+import { listProjects, getProjectStats, getOfficeOptions } from "@/features/projects/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
@@ -21,7 +21,8 @@ const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Complet
 
 export default async function ProjectsPage({ searchParams }) {
   const params = readListParams(await searchParams, ["status", "type", "client"]);
-  const [{ rows, total }, projects, options] = await Promise.all([listProjects(params), getProjectStats(), getLookups()]);
+  const [{ rows, total }, projects, lookups, offices] = await Promise.all([listProjects(params), getProjectStats(), getLookups(), getOfficeOptions()]);
+  const options = { ...lookups, ...offices };
 
   // Tiles describe every project; the table shows one page of them.
   const active = projects.filter((p) => p.status === "Active").length;

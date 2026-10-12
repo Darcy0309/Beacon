@@ -3,7 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil } from "lucide-react";
+import { Building2, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +34,7 @@ export default function ProjectForm({ project, options, trigger }) {
     }
   }, [state, isEdit, router, setOpen]);
 
-  const { companies = [], projectTypes = [], projectStatuses = [], projects = [] } = options ?? {};
+  const { companies = [], projectTypes = [], projectStatuses = [], projects = [], clientOffices = {}, timezones = [] } = options ?? {};
   const record = project
     ? {
         ...project,
@@ -56,6 +56,17 @@ export default function ProjectForm({ project, options, trigger }) {
   const retyped = isEdit && typeId && String(record?.project_type_id ?? "") !== typeId;
   const newType = projectTypes.find((t) => String(t.id) === typeId);
   const apptProjects = projects.filter((p) => p.type === "APPT" && String(p.company_id ?? "") === companyId && p.id !== project?.id);
+
+  // The project's office, held here so "use the client's details" can fill it in.
+  const OFFICE = ["contact_name", "contact_title", "phone", "address", "city", "state", "zip", "timezone_id"];
+  const startOffice = () => Object.fromEntries(OFFICE.map((k) => [k, String(dv(k) ?? "")]));
+  const [office, setOffice] = useState(startOffice);
+  useEffect(() => {
+    if (open) setOffice(startOffice());
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const clientOffice = clientOffices[companyId];
+  const useClient = () => setOffice(Object.fromEntries(OFFICE.map((k) => [k, String(clientOffice?.[k] ?? "")])));
+  const setO = (k) => (e) => setOffice((o) => ({ ...o, [k]: e.target.value }));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -113,6 +124,49 @@ export default function ProjectForm({ project, options, trigger }) {
             ) : (
               <input type="hidden" name="appt_project_id" value="" />
             )}
+
+            {/* Where this project's agent and office are: a client with offices in several states runs a project from each. */}
+            <fieldset className="rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-project-office-form>
+              <legend className="flex items-center gap-1.5 px-1 text-xs font-semibold"><Building2 className="size-3.5 text-primary" /> Office for this project</legend>
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span>The agent and office this project calls for. The same as the client&apos;s, or its own.</span>
+                <button type="button" onClick={useClient} disabled={!clientOffice} data-use-client-office
+                  className="font-semibold text-primary hover:underline disabled:pointer-events-none disabled:opacity-40">
+                  Use the client&apos;s details
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Agent / producer name" error={fe("contact_name")}>
+                  <Input name="contact_name" value={office.contact_name} onChange={setO("contact_name")} maxLength={80} aria-invalid={invalid("contact_name")} />
+                </Field>
+                <Field label="Title" error={fe("contact_title")}>
+                  <Input name="contact_title" value={office.contact_title} onChange={setO("contact_title")} maxLength={60} aria-invalid={invalid("contact_title")} />
+                </Field>
+                <Field label="Phone" error={fe("phone")}>
+                  <Input name="phone" type="tel" value={office.phone} onChange={setO("phone")} aria-invalid={invalid("phone")} placeholder="(602) 555-0100" />
+                </Field>
+                <Field label="Time zone" error={fe("timezone_id")}>
+                  <Select name="timezone_id" value={office.timezone_id} onChange={setO("timezone_id")} aria-invalid={invalid("timezone_id")}>
+                    <option value="">—</option>
+                    {timezones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+                  </Select>
+                </Field>
+                <Field label="Address" error={fe("address")} className="sm:col-span-2">
+                  <Input name="address" value={office.address} onChange={setO("address")} maxLength={120} aria-invalid={invalid("address")} />
+                </Field>
+                <div className="grid grid-cols-[1fr_5rem_7rem] gap-3 sm:col-span-2">
+                  <Field label="City" error={fe("city")}>
+                    <Input name="city" value={office.city} onChange={setO("city")} maxLength={60} aria-invalid={invalid("city")} />
+                  </Field>
+                  <Field label="State" error={fe("state")}>
+                    <Input name="state" value={office.state} onChange={setO("state")} maxLength={2} placeholder="AZ" aria-invalid={invalid("state")} />
+                  </Field>
+                  <Field label="ZIP" error={fe("zip")}>
+                    <Input name="zip" value={office.zip} onChange={setO("zip")} maxLength={10} aria-invalid={invalid("zip")} />
+                  </Field>
+                </div>
+              </div>
+            </fieldset>
 
             <Field label="Status" error={fe("status_id")}>
               <Select name="status_id" defaultValue={dv("status_id")} aria-invalid={invalid("status_id")}>

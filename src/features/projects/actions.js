@@ -28,14 +28,25 @@ export async function saveProject(prevState, formData) {
     email: s(formData, "email"),
     // A checkbox sends nothing when unticked; the hidden "off" before it always does.
     delivery_link_only: formData.getAll("delivery_link_only").includes("on"),
+    // Its office: the agent (producer), phone, address and time zone.
+    contact_name: s(formData, "contact_name"),
+    contact_title: s(formData, "contact_title"),
+    phone: s(formData, "phone"),
+    address: s(formData, "address"),
+    city: s(formData, "city"),
+    state: s(formData, "state")?.toUpperCase() ?? null,
+    zip: s(formData, "zip"),
+    timezone_id: n(formData, "timezone_id"),
   };
   const { error } = id
     ? await supabase.from("projects").update(onlySubmitted(formData, payload)).eq("id", id)
     : await supabase.from("projects").insert(payload);
-  if (error) return fail(error);
+  if (error) return fail(error, null, formValues(formData, Object.keys(schemas.project)));
 
   await logActivity(supabase, id ? "project.update" : "project.create", { entity: "project", entityId: id ?? null });
-  revalidatePath("/projects");
+  // A project's office shows on its page, its call lists and its lead sheets.
+  revalidatePath("/projects", "layout");
+  revalidatePath("/work", "layout");
   return ok();
 }
 

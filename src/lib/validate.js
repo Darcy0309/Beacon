@@ -257,6 +257,15 @@ export const schemas = {
       return bad.length ? `Not an email address: ${bad.slice(0, 3).join(", ")}` : null;
     })],
     delivery_link_only: [oneOf(["off", "on"])],
+    // The project's office (an agent and office of the client's, in its own state).
+    contact_name: [max(80)],
+    contact_title: [max(60)],
+    phone: [phone],
+    address: [max(120)],
+    city: [max(60)],
+    state: [stateCode],
+    zip: [zip],
+    timezone_id: [id],
   },
 
   /** USD paid per lead, appointment and confirmation on a project. */

@@ -114,6 +114,26 @@ export const COLUMN_ALIASES = {
   notesclient: "internal_notes", notestoclient: "internal_notes", internalnotes: "internal_notes",
 };
 
+/**
+ * The headings of the import template, in the order of a lead sheet: one of
+ * the names each column is read by (any other spelling in COLUMN_ALIASES or
+ * INSURANCE_ALIASES works too; columns may come in any order, and any left
+ * out are simply blank). Company is the only one required.
+ */
+export const TEMPLATE_HEADERS = [
+  "Company", "Contact", "Contact Title", "Phone", "Mobile Phone", "Email", "Fax", "Website",
+  "Decision Maker", "DM Title", "DM Phone", "DM Cell", "DM Email",
+  "Address", "City", "State", "Zip", "County", "Territory",
+  "SIC Code", "Employees", "Autos", "Sales Volume", "Locations", "EIN", "Years In Business", "Estimated Annual Premium",
+  "Producer Name", "List Source",
+  "Ultimate XDate", "Package XDate", "Package Carrier", "Work Comp XDate", "Work Comp Carrier",
+  "Auto XDate", "Auto Carrier", "Health XDate", "Health Carrier", "Dental XDate", "Dental Provider",
+  "Vision XDate", "Vision Provider", "Prof Liab XDate", "Prof Liab Carrier", "DO XDate", "DO Carrier",
+  "EO XDate", "EO Carrier", "Agency Name", "Years With Agency",
+  "Call Result DBDV", "Call Result Appt", "Appointment Date", "Appointment Time",
+  "Notes", "Internal Notes",
+];
+
 /** Columns that belong on the lead's insurance_details row. */
 export const INSURANCE_ALIASES = {
   agencyname: "agency_name", agency: "agency_name", currentcarrier: "agency_name",

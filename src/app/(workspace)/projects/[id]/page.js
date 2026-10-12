@@ -16,7 +16,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { clientSlug } from "@/lib/format";
 import { pageInfo, readListParams } from "@/lib/paging";
 import { listLeads } from "@/features/leads/queries";
-import { getProject, getProjectOverview, getProjectTeam } from "@/features/projects/queries";
+import { getProject, getProjectOverview, getProjectTeam, getOfficeOptions } from "@/features/projects/queries";
 import { getXdatesByMonth } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
@@ -49,7 +49,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getProjectOverview(id),
     getProjectTeam(id),
     listLeads(list, { projectId: id }),
-    getLookups(),
+    getLookups().then(async (l) => ({ ...l, ...(await getOfficeOptions()) })),
     canManage ? getAssignableStaff() : [],
     getXdatesByMonth({ projectId: Number(id) }),
     getBusinessToday(),
@@ -109,6 +109,14 @@ export default async function ProjectDetail({ params, searchParams }) {
             {p.description ? <p className="mt-4 text-sm text-muted-foreground">{p.description}</p> : null}
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {p.startDate !== "—" || p.endDate !== "—" ? <span>{p.startDate} — {p.endDate}</span> : null}
+              {raw.contact_name || raw.city || raw.phone ? (
+                // This project's office: its agent, where it is and its time zone (the client's, or its own).
+                <span data-project-office>
+                  Office: {[raw.contact_name && `${raw.contact_name}${raw.contact_title ? `, ${raw.contact_title}` : ""}`, raw.phone,
+                    [raw.address, raw.city, [raw.state, raw.zip].filter(Boolean).join(" ")].filter(Boolean).join(", "),
+                    options.timezones?.find((z) => z.id === raw.timezone_id)?.name].filter(Boolean).join(" · ")}
+                </span>
+              ) : null}
               {apptProject ? (
                 <span>Promotes leads to <Link href={`/projects/${apptProject.id}`} className="text-primary hover:underline">{apptProject.name}</Link></span>
               ) : null}

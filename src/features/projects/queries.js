@@ -160,3 +160,18 @@ export async function getProjectRates() {
     confirmation: Number(p.confirmation_rate ?? 0),
   }));
 }
+
+/**
+ * What a project's office is filled in from: each client's own details
+ * (contact, phone, address, time zone), and the time zones to choose from.
+ */
+export async function getOfficeOptions() {
+  const supabase = await createClient();
+  const [clients, zones] = await Promise.all([
+    supabase.from("companies").select("id, contact_name, contact_title, phone, address, city, state, zip, timezone_id"),
+    supabase.from("timezones").select("id, name").order("id"),
+  ]);
+  if (clients.error) throw clients.error;
+  if (zones.error) throw zones.error;
+  return { clientOffices: Object.fromEntries((clients.data ?? []).map((c) => [c.id, c])), timezones: zones.data ?? [] };
+}
