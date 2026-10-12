@@ -7,6 +7,7 @@ import { parseCsv, rowsToImport } from "@/lib/csv";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
+import { sicCode, sicKey } from "@/lib/sic";
 
 const MAX_CSV_BYTES = 5 * 1024 * 1024;
 
@@ -73,6 +74,40 @@ export async function importLeadsCsv(prevState, formData) {
     .select("id")
     .eq("name", "Scheduled")
     .maybeSingle();
+
+  // SIC: a code and a description in separate columns, either one missing. A
+  // description finds its code in the SIC list; a code with a description
+  // the list does not have yet is added to it.
+  if (parsed.some(({ lead }) => lead.sic_description)) {
+    const byCode = new Map();
+    const byDesc = new Map();
+    for (let from = 0; ; from += 1000) {
+      const { data } = await supabase.from("sic_codes").select("code, description").order("code").range(from, from + 999);
+      for (const r of data ?? []) {
+        byCode.set(r.code, r.description);
+        if (r.description && !byDesc.has(sicKey(r.description))) byDesc.set(sicKey(r.description), r.code);
+      }
+      if ((data ?? []).length < 1000) break;
+    }
+    const fresh = new Map();
+    for (const { lead } of parsed) {
+      if (lead.sic_code) lead.sic_code = sicCode(lead.sic_code);
+      const desc = lead.sic_description;
+      delete lead.sic_description;
+      if (!desc) continue;
+      if (lead.sic_code) {
+        if (!byCode.has(lead.sic_code) && !fresh.has(lead.sic_code)) fresh.set(lead.sic_code, desc);
+      } else {
+        const code = byDesc.get(sicKey(desc));
+        if (code) lead.sic_code = code;
+        // No code for it: keep the description on the lead rather than lose it.
+        else lead.description ??= desc;
+      }
+    }
+    if (fresh.size) {
+      await supabase.from("sic_codes").upsert([...fresh].map(([code, description]) => ({ code, description })), { onConflict: "code", ignoreDuplicates: true });
+    }
+  }
 
   const now = new Date().toISOString();
   const unknownResults = new Map();

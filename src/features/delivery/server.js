@@ -63,7 +63,10 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
     admin.from("appointments").select("id, appt_date, appt_time, duration_min, rep_name").eq("lead_id", leadId).is("invalid_at", null)
       .order("appt_create_date", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle(),
     admin.rpc("business_tz"),
-    lead.sic_code ? admin.from("sic_codes").select("description").eq("code", lead.sic_code).maybeSingle() : Promise.resolve({ data: null }),
+    lead.sic_code
+      ? admin.from("sic_codes").select("code, description").in("code", [lead.sic_code, String(lead.sic_code).slice(0, 4)])
+          .then(({ data: rows }) => ({ data: rows?.find((r) => r.code === lead.sic_code) ?? rows?.[0] ?? null }))
+      : Promise.resolve({ data: null }),
   ]);
 
   const ins = one(lead.insurance) ?? {};

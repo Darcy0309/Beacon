@@ -142,7 +142,11 @@ export async function getLead(id) {
   if (!data) return null;
   const [{ data: internal }, { data: sic }] = await Promise.all([
     supabase.from("lead_notes").select("notes").eq("lead_id", data.id).maybeSingle(),
-    data.sic_code ? supabase.from("sic_codes").select("description").eq("code", data.sic_code).maybeSingle() : Promise.resolve({ data: null }),
+    // The code's own description, or its four-digit code's (1521-99 -> 1521).
+    data.sic_code
+      ? supabase.from("sic_codes").select("code, description").in("code", [data.sic_code, String(data.sic_code).slice(0, 4)])
+          .then(({ data: rows }) => ({ data: rows?.find((r) => r.code === data.sic_code) ?? rows?.[0] ?? null }))
+      : Promise.resolve({ data: null }),
   ]);
   return toLeadView({ ...data, internal_notes: internal?.notes ?? null, sic_description: sic?.description ?? null });
 }

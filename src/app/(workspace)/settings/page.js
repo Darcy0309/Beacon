@@ -6,11 +6,17 @@ import PaySchedule from "@/features/pay/components/pay-schedule";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getPayRules } from "@/features/pay/queries";
 import { mailServerInfo } from "@/lib/server/mail";
+import SicCodesCard from "@/features/sic/components/sic-codes-card";
+import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [{ settings }, payRules, today] = await Promise.all([getSettings(), getPayRules(), getBusinessToday()]);
+  const supabase = await createClient();
+  const [{ settings }, payRules, today, sic] = await Promise.all([
+    getSettings(), getPayRules(), getBusinessToday(),
+    supabase.from("sic_codes").select("code", { count: "exact", head: true }),
+  ]);
 
   return (
     <>
@@ -19,6 +25,7 @@ export default async function SettingsPage() {
         <SettingsForm settings={settings} mailServer={mailServerInfo()} />
         <PayRulesForm rules={payRules} />
         <PaySchedule periods={payRules.time.schedule} today={today} editable />
+        <SicCodesCard count={sic.count ?? 0} />
       </div>
     </>
   );

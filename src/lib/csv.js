@@ -84,7 +84,9 @@ export const COLUMN_ALIASES = {
 
   // --- firmographics --------------------------------------------------
   sic: "sic_code", siccode: "sic_code",
-  sicdesc: "description", sicdescription: "description", natureofbusiness: "description",
+  // The SIC description fills in a missing code (or adds the pair to the SIC list) on import.
+  sicdesc: "sic_description", sicdescription: "sic_description", siccodedescription: "sic_description",
+  natureofbusiness: "description",
   description: "description",
   locations: "location", numberoflocations: "location",
   ein: "ein", fein: "ein", federalein: "ein", taxid: "ein", taxidnumber: "ein", federaltaxid: "ein",
@@ -124,7 +126,7 @@ export const TEMPLATE_HEADERS = [
   "Company", "Contact", "Contact Title", "Phone", "Mobile Phone", "Email", "Fax", "Website",
   "Decision Maker", "DM Title", "DM Phone", "DM Cell", "DM Email",
   "Address", "City", "State", "Zip", "County", "Territory",
-  "SIC Code", "Employees", "Autos", "Sales Volume", "Locations", "EIN", "Years In Business", "Estimated Annual Premium",
+  "SIC Code", "SIC Description", "Employees", "Autos", "Sales Volume", "Locations", "EIN", "Years In Business", "Estimated Annual Premium",
   "Producer Name", "List Source",
   "Ultimate XDate", "Package XDate", "Package Carrier", "Work Comp XDate", "Work Comp Carrier",
   "Auto XDate", "Auto Carrier", "Health XDate", "Health Carrier", "Dental XDate", "Dental Provider",
