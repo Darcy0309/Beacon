@@ -500,7 +500,7 @@ export const cross = {
   user(values, errors) {
     // Client-portal users are scoped to a company by RLS; without one they see nothing.
     if (!errors.company_id && values.role === "client" && !values.company_id) {
-      errors.company_id = "Client users must belong to a client account";
+      errors.company_id = "Choose the client this person belongs to (add the client on the Clients page first)";
     }
     // Hybrid pay compares the hourly pay with the commission, so it needs a rate.
     if (!errors.hourly_rate && values.pay_model === "hybrid" && str(values.hourly_rate) === "") {

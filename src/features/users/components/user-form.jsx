@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import Link from "@/components/shared/intent-link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { UserPlus, Pencil, Wand2, Copy } from "lucide-react";
@@ -170,12 +171,21 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               required={role === "client"}
               error={fe("company_id")}
               className="sm:col-span-2"
-              hint={role === "client" ? "Client users only see this account's projects." : "Leave blank for internal staff."}
+              hint={role === "client"
+                ? (companies.length ? "Client users only see this account's projects." : null)
+                : "Leave blank for internal staff."}
             >
               <Select name="company_id" defaultValue={dv("company_id")} aria-invalid={invalid("company_id")}>
-                <option value="">Internal staff — no client</option>
+                <option value="">{role === "client" ? "Choose the client…" : "Internal staff — no client"}</option>
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
+              {/* A client user belongs to a client: with none yet, say where to add one first. */}
+              {role === "client" && !companies.length ? (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400" data-no-clients>
+                  No clients yet. Add the client on the <Link href="/clients" className="font-semibold underline">Clients</Link> page first,
+                  then add their users here.
+                </p>
+              ) : null}
             </Field>
 
 
