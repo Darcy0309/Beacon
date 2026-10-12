@@ -56,3 +56,27 @@ export async function moveScheduleItem(formData) {
   }
   return ok(data);
 }
+
+/**
+ * An administrator sets a month's production goals: leads, appointments,
+ * and the rates per hour aimed for. Empty clears one.
+ */
+export async function saveProductionGoal(prevState, formData) {
+  const { values, failed } = check(formData, schemas.productionGoal);
+  if (failed) return failed;
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only an administrator sets the production goals.");
+  const whole = (v) => (v === "" || v == null ? null : Number.parseInt(String(v), 10));
+  const rate = (v) => (v === "" || v == null ? null : Number(v));
+  const { error } = await supabase.from("production_goals").upsert({
+    month: `${values.month.slice(0, 8)}01`,
+    leads_goal: whole(values.leads_goal), appts_goal: whole(values.appts_goal),
+    leads_per_hour: rate(values.leads_per_hour), appts_per_hour: rate(values.appts_per_hour),
+    updated_by: me.id, updated_at: new Date().toISOString(),
+  }, { onConflict: "month" });
+  if (error) return fail(error, null, values);
+  await logActivity(supabase, "production.goal", { detail: values.month.slice(0, 7) });
+  revalidatePath("/");
+  return ok({ month: values.month });
+}

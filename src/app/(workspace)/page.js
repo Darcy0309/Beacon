@@ -18,9 +18,11 @@ import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
 import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
+import ProductionChart from "@/features/dashboard/components/production-chart";
+import { chartRange } from "@/lib/production-chart";
 import {
-  getDashboardStats, getDeveloped, getLeadVolume, getManagerDashboard, getManagerUser, getMySchedule, getProduction, getReports,
-  getTeamProduction,
+  getDashboardStats, getDeveloped, getLeadVolume, getManagerDashboard, getManagerUser, getMySchedule, getProduction, getProductionChart,
+  getProductionChartOptions, getProductionGoals, getReports, getTeamProduction,
 } from "@/features/dashboard/queries";
 import DailyProductionCard from "@/features/dashboard/components/daily-production";
 import DevelopedCard from "@/features/dashboard/components/developed-card";
@@ -95,7 +97,8 @@ export default async function Dashboard({ searchParams }) {
     view.trend === "months" || view.statusMix ? getReports() : null,
     view.campaigns ? getProjects() : null,
     view.myPerformance ? getMyWorkload() : null,
-    view.trend === "weeks" && !isManager ? getLeadVolume() : null,
+    // Administrators have the production chart instead (below).
+    view.trend === "weeks" && !isManager && view.audience !== "company" ? getLeadVolume() : null,
     getBusinessTimeZone(),
     getBusinessToday(),
   ]);
@@ -133,6 +136,21 @@ export default async function Dashboard({ searchParams }) {
   if (view.audience === "company") {
     const v = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
     production = { view: v, rows: await getProduction(v.range) };
+  }
+
+  // The administrator's chart of what the team developed: a day (by the hour) to two years, everyone or one manager or project.
+  let chart = null;
+  if (view.audience === "company") {
+    const range = chartRange(typeof sp?.pr === "string" ? sp.pr : "1D", businessToday, { from: sp?.pf, to: sp?.pt });
+    const id = (v) => (typeof v === "string" && /^\d{1,18}$/.test(v) ? Number(v) : null);
+    const selected = { user: id(sp?.pu), project: id(sp?.pp) };
+    const [data, goals, options] = await Promise.all([
+      getProductionChart({ from: range.from, to: range.to, ...selected }),
+      // The months shown, and a year either way for setting goals ahead.
+      getProductionGoals(addDays(range.from < businessToday ? range.from : businessToday, -366), addDays(businessToday, 366)),
+      getProductionChartOptions(),
+    ]);
+    chart = { data, range, goals, options, selected };
   }
 
   // Appointments per rep ride along with the dashboard stats.
@@ -292,6 +310,12 @@ export default async function Dashboard({ searchParams }) {
         {/* volume over time + today */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* The monthly chart fills its card, which grows beside a long schedule. */}
+          {chart ? (
+            <div className="flex flex-col lg:col-span-2 [&>*]:flex-1">
+              <ProductionChart data={chart.data} range={chart.range} goals={chart.goals} options={chart.options}
+                selected={chart.selected} params={otherParams(sp)} today={businessToday} />
+            </div>
+          ) : (
           <Card className={view.trend === "weeks" ? "lg:col-span-2" : "flex flex-col lg:col-span-2"}>
             {view.trend === "weeks" ? (
               <LeadVolumeChart days={volume} fallback={s.weeks} today={businessToday} />
@@ -332,6 +356,7 @@ export default async function Dashboard({ searchParams }) {
               </>
             )}
           </Card>
+          )}
 
           <Card>
             <SectionHeader label="Today's Schedule" icon={CalendarClock} href="/appointments" action="All" />

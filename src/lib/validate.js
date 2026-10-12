@@ -396,6 +396,15 @@ export const schemas = {
     appts_goal: [int({ min: 0, max: 1000 })],
   },
 
+  // A month's production goals (the administrator's chart).
+  productionGoal: {
+    month: [required("Choose the month"), date],
+    leads_goal: [int({ min: 0, max: 1000000 })],
+    appts_goal: [int({ min: 0, max: 1000000 })],
+    leads_per_hour: [num({ min: 0, max: 100 })],
+    appts_per_hour: [num({ min: 0, max: 100 })],
+  },
+
   // An appointment or call-back reminder moved on the dashboard's calendar.
   scheduleMove: {
     kind: [oneOf(["appointment", "reminder"], "Only appointments and reminders move")],

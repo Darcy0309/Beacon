@@ -13,7 +13,8 @@ import { launchBrowser } from "../support/browser.mjs";
 const SHOTS = process.env.SHOTS;
 const browser = await launchBrowser();
 const shot = (page, name) => (SHOTS ? page.screenshot(`${SHOTS}/${name}.png`) : null);
-const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage();
+// Lead Volume is on an agent's dashboard (administrators have the production chart: production-chart.test.mjs).
+const admin = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();
 
 const CHART = "svg[aria-label^='New leads per']";
 const heading = (page) => page.ev(`[...document.querySelectorAll('.eyebrow')].find((e) => /Lead Volume/i.test(e.textContent))?.textContent ?? ''`);
@@ -128,7 +129,7 @@ try {
   check("client keeps the six-month delivery bars", /Delivered/i.test(await client.text()) && (await client.ev(`document.querySelectorAll('.animate-grow-height').length`)) > 0);
   const clientGap = await gapUnderMonths(client);
   check("…filling their card, with no empty band under the months", clientGap !== null && clientGap <= 24, `${clientGap}px`);
-  const phone = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 390, height: 844 });
+  const phone = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go("/", 4500);
   const overflow = await phone.ev("document.documentElement.scrollWidth - document.documentElement.clientWidth");
   check("no sideways scrolling on a phone", overflow <= 0, `overflow ${overflow}px`);

@@ -393,3 +393,43 @@ export async function getManagerUser(id) {
   const { data } = await supabase.from("users").select("id, first_name, last_name, role, status").eq("id", id).maybeSingle();
   return data?.role === "manager" && data.status === "active" ? data : null;
 }
+
+/**
+ * The administrator's production chart: per day (and per hour for one
+ * day) the leads and appointments developed and the minutes worked on lead
+ * and on appointment projects; everyone's, one person's or one project's.
+ */
+export async function getProductionChart({ from, to, user = null, project = null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("production_chart", { p_from: from, p_to: to, p_user: user, p_project: project });
+  if (error) throw error;
+  return { days: data?.days ?? [], hours: data?.hours ?? [] };
+}
+
+/** The monthly production goals for the months from `from` to `to`, by month ("2026-10-01"). */
+export async function getProductionGoals(from, to) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("production_goals").select("*")
+    .gte("month", `${from.slice(0, 8)}01`).lte("month", `${to.slice(0, 8)}01`);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((g) => [g.month, {
+    leads: g.leads_goal, appts: g.appts_goal,
+    leadsPerHour: g.leads_per_hour != null ? Number(g.leads_per_hour) : null,
+    apptsPerHour: g.appts_per_hour != null ? Number(g.appts_per_hour) : null,
+  }]));
+}
+
+/** Who and which projects the production chart can be narrowed to: account managers and agents, and every project. */
+export async function getProductionChartOptions() {
+  const supabase = await createClient();
+  const [people, projects] = await Promise.all([
+    supabase.from("users").select("id, first_name, last_name, email, role").in("role", ["manager", "agent"]).eq("status", "active").order("first_name"),
+    supabase.from("projects").select("id, name").order("name"),
+  ]);
+  if (people.error) throw people.error;
+  if (projects.error) throw projects.error;
+  return {
+    people: (people.data ?? []).map((u) => ({ value: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email })),
+    projects: (projects.data ?? []).map((p) => ({ value: p.id, label: p.name })),
+  };
+}
