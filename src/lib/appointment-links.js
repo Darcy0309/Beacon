@@ -39,20 +39,47 @@ export function appointmentSpan(date, time, durationMin, timeZone) {
 const stamp = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 
 /**
+ * The longest a calendar's link may be. The event's notes travel in the
+ * link itself, and one too long is refused on the way (Outlook's passes
+ * through Microsoft's sign-in inside another address, so it gets less).
+ * The .ics file has no such limit.
+ */
+const LINK_MAX = { google: 4000, outlook: 2000 };
+const CUT = "\n… (the rest is on the lead sheet)";
+
+// The link `build` makes of the notes, which are cut short (at the end of a line where one is near) until it fits in `max`.
+function fitted(build, details, max) {
+  const text = String(details ?? "");
+  if (build(text).length <= max) return build(text);
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (build(text.slice(0, mid) + CUT).length <= max) lo = mid;
+    else hi = mid - 1;
+  }
+  let kept = text.slice(0, lo);
+  const line = kept.lastIndexOf("\n");
+  if (line > 0 && line > kept.length - 120) kept = kept.slice(0, line);
+  return build(kept.trimEnd() + CUT);
+}
+
+/**
  * Links that open the appointment in Google Calendar and Outlook (Microsoft
  * 365) ready to save, and the .ics file (Apple Calendar, Outlook on a
- * desktop) at `icsUrl` when there is one.
+ * desktop) at `icsUrl` when there is one. The links carry as much of the
+ * notes as fits (LINK_MAX); the file carries them all.
  * `event`: { title, start, end, location, details }.
  */
 export function calendarLinks(event, icsUrl = null) {
   const q = (params) => new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
-  const google = `https://calendar.google.com/calendar/render?${q({
-    action: "TEMPLATE", text: event.title, dates: `${stamp(event.start)}/${stamp(event.end)}`, details: event.details, location: event.location,
-  })}`;
-  const outlook = `https://outlook.office.com/calendar/0/deeplink/compose?${q({
+  const google = fitted((details) => `https://calendar.google.com/calendar/render?${q({
+    action: "TEMPLATE", text: event.title, dates: `${stamp(event.start)}/${stamp(event.end)}`, details, location: event.location,
+  })}`, event.details, LINK_MAX.google);
+  const outlook = fitted((body) => `https://outlook.office.com/calendar/0/deeplink/compose?${q({
     path: "/calendar/action/compose", rru: "addevent", subject: event.title,
-    startdt: event.start.toISOString(), enddt: event.end.toISOString(), body: event.details, location: event.location,
-  })}`;
+    startdt: event.start.toISOString(), enddt: event.end.toISOString(), body, location: event.location,
+  })}`, event.details, LINK_MAX.outlook);
   return [
     { label: "Google", href: google },
     { label: "Outlook", href: outlook },

@@ -9,7 +9,7 @@
 import "server-only";
 import { POLICY_LINES } from "@/lib/coverage";
 import { mailFailure, isReservedAddress, oneLine } from "@/lib/email";
-import { deliverySubject, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "@/lib/delivery";
+import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "@/lib/delivery";
 import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links";
 import { fullName, sicLabel } from "@/lib/format";
 import { mailServer, sendMail } from "@/lib/server/mail";
@@ -28,6 +28,8 @@ const longDate = (d) =>
  * given, else its latest call with a delivering result). Nothing internal:
  * not the call notes, nor when the lead or appointment was entered. `origin`
  * (the app's address) adds the appointment's .ics file to its calendar links.
+ * Also returns the appointment as a calendar `event` (null without one it
+ * can time), the whole sheet as its notes, and its `appointmentId`.
  */
 export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin = null } = {}) {
   const { data: lead, error } = await admin
@@ -72,72 +74,58 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   const ins = one(lead.insurance) ?? {};
   const rep = one(call?.user) ?? one(lead.assigned);
   const address = [lead.address, [lead.city, lead.state, lead.zip].filter(Boolean).join(" ")].filter(Boolean);
-  const event = appt ? appointmentEvent(lead, appt, address, tz) : null;
-  const token = event && origin ? sheetToken(leadId) : null;
 
-  return {
-    project,
-    rep,
-    sheet: {
-      company: lead.company_name,
-      result: call?.call_result ?? "Lead",
-      // The business's logo, from the app's own address (an email cannot carry the app's drawn one).
-      logo: origin ? `${origin}/brand/signature-marketing.png` : null,
-      client: one(project?.company)?.name ?? null,
-      project: project?.name ?? null,
-      producer: lead.producer_name || project?.contact_name || null,
-      listSource: lead.list_source,
-      rep: fullName(rep) || null,
-      appointment: appt
-        ? {
-            date: longDate(appt.appt_date), time: appt.appt_time, with: appt.rep_name,
-            links: event ? calendarLinks(event, token ? `${origin}/sheet/${token}/appointment.ics` : null) : [],
-          }
-        : null,
-      people: [
-        { who: "Contact", name: lead.contact_name, title: lead.contact_title, phone: lead.phone, mobile: lead.contact_mobile, email: lead.email },
-        { who: "Decision maker", name: lead.decision_maker, title: lead.dm_title, phone: lead.dm_phone, mobile: lead.dm_mobile, email: lead.dm_email },
-        { who: "Secondary contact", name: lead.contact2_name, title: lead.contact2_title, phone: lead.contact2_phone, mobile: lead.contact2_mobile, email: lead.contact2_email },
-      ],
-      address,
-      map: mapLink(address.join(", ")),
-      website: lead.website,
-      fax: lead.fax,
-      coverage: {
-        ultimate: longDate(ins.ultimate_xdate),
-        agency: ins.agency_name && ins.agency_years != null ? `${ins.agency_name} (${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"})` : ins.agency_name,
-        lines: POLICY_LINES.map((l) => ({ label: l.label, xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
-      },
-      profile: [
-        ["Locations", lead.location], ["Employees", lead.employees], ["Autos", lead.autos], ["Sales volume", lead.sales_volume],
-        ["EIN", lead.ein], ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
-        ["Est. premium", lead.estimated_annual_premium],
-      ],
-      // Only what was written for the client: the call notes stay internal.
-      notes: [["Client notes", lead.client_note], ["Description", lead.description]],
+  const sheet = {
+    company: lead.company_name,
+    result: call?.call_result ?? "Lead",
+    // The business's logo, from the app's own address (an email cannot carry the app's drawn one).
+    logo: origin ? `${origin}/brand/signature-marketing.png` : null,
+    client: one(project?.company)?.name ?? null,
+    project: project?.name ?? null,
+    producer: lead.producer_name || project?.contact_name || null,
+    listSource: lead.list_source,
+    rep: fullName(rep) || null,
+    appointment: appt ? { date: longDate(appt.appt_date), time: appt.appt_time, with: appt.rep_name, links: [] } : null,
+    people: [
+      { who: "Contact", name: lead.contact_name, title: lead.contact_title, phone: lead.phone, mobile: lead.contact_mobile, email: lead.email },
+      { who: "Decision maker", name: lead.decision_maker, title: lead.dm_title, phone: lead.dm_phone, mobile: lead.dm_mobile, email: lead.dm_email },
+      { who: "Secondary contact", name: lead.contact2_name, title: lead.contact2_title, phone: lead.contact2_phone, mobile: lead.contact2_mobile, email: lead.contact2_email },
+    ],
+    address,
+    map: mapLink(address.join(", ")),
+    website: lead.website,
+    fax: lead.fax,
+    coverage: {
+      ultimate: longDate(ins.ultimate_xdate),
+      agency: ins.agency_name && ins.agency_years != null ? `${ins.agency_name} (${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"})` : ins.agency_name,
+      lines: POLICY_LINES.map((l) => ({ label: l.label, xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
     },
+    profile: [
+      ["Locations", lead.location], ["Employees", lead.employees], ["Autos", lead.autos], ["Sales volume", lead.sales_volume],
+      ["EIN", lead.ein], ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
+      ["Est. premium", lead.estimated_annual_premium],
+    ],
+    // Only what was written for the client: the call notes stay internal.
+    notes: [["Client notes", lead.client_note], ["Description", lead.description]],
   };
+
+  // The calendar event carries the whole sheet as its notes, not only whom to meet and where.
+  const event = appt ? appointmentEvent(lead.company_name, appt, address, tz, leadSheetNotes(sheet)) : null;
+  const token = event && origin ? sheetToken(leadId) : null;
+  if (event) sheet.appointment.links = calendarLinks(event, token ? `${origin}/sheet/${token}/appointment.ics` : null);
+
+  return { project, rep, sheet, event, appointmentId: appt?.id ?? null };
 }
 
 /**
  * The appointment for a calendar: its title, when (on the business's
- * clock), where, and whom to meet. Null when its day or time cannot be read.
+ * clock), where, and `details` for its notes. Null when its day or time
+ * cannot be read.
  */
-export function appointmentEvent(lead, appt, address, timeZone) {
+export function appointmentEvent(company, appt, address, timeZone, details) {
   const span = appointmentSpan(appt.appt_date, appt.appt_time, appt.duration_min, timeZone || "America/Phoenix");
   if (!span) return null;
-  const contact = [lead.contact_name, lead.contact_title].filter(Boolean).join(", ");
-  return {
-    ...span,
-    title: `Appointment: ${lead.company_name}`,
-    location: address.join(", ") || null,
-    details: [
-      contact ? `Contact: ${contact}` : null,
-      lead.phone ? `Phone: ${lead.phone}` : null,
-      appt.rep_name ? `With: ${appt.rep_name}` : null,
-      lead.client_note || null,
-    ].filter(Boolean).join("\n"),
-  };
+  return { ...span, title: `Appointment: ${company}`, location: address.join(", ") || null, details: details || null };
 }
 
 /**

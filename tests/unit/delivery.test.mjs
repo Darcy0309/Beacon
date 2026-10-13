@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for lead delivery: a project's delivery addresses, and the lead sheet emailed. */
-import { deliverySubject, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "../../src/lib/delivery.js";
+import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "../../src/lib/delivery.js";
 import { schemas, validate } from "../../src/lib/validate.js";
 
 let failures = 0;
@@ -56,6 +56,16 @@ check("…and nothing breaks without one", !renderLeadSheet({ ...sheet, logo: nu
 check("anything typed on a lead is shown, never run, in the email", html.includes("Calvary &lt;Baptist&gt; &amp; Co") && !html.includes("<script>") && html.includes("&lt;script&gt;"));
 const link = renderLeadLink(sheet, "https://lighthouse.example/sheet/abc.def", 90);
 check("a link-only email has the link and how long it works, not the sheet", link.html.includes('href="https://lighthouse.example/sheet/abc.def"') && /90 days/.test(link.text) && !link.text.includes("310-829-2481"));
+
+// The appointment's calendar event carries the whole sheet as its notes.
+const notes = leadSheetNotes(sheet);
+check("a calendar event's notes are the whole sheet: every section, in the sheet's order",
+  JSON.stringify(notes.split("\n\n").map((b) => b.split("\n")[0])) === JSON.stringify(["CLIENT INFORMATION", "RESULT", "PROSPECT", "CONTACT", "POLICY INFORMATION", "PROFILE", "NOTES"]), notes);
+check("…with the rows the email has", ["Project: CapitalIns-Churches", "Call result: Appointment-Phone", "With: Jacob", "Name: Pasty, Admin", "Business phone: 310-829-2481",
+  "Email: office@calvary.org", "Package: Dec 23, 2026", "Agency: Garry Insurance", "Employees: 12", "Client notes: <script>alert(1)</script>"].every((l) => notes.split("\n").includes(l)), notes);
+check("…an address and a website as their text alone", notes.includes("Address: 1502 20th St, Santa Monica CA 90404\n") && notes.includes("Website: calvarysantamonica.org") && !/https?:\/\//.test(notes), notes);
+check("…without the appointment's own row and its links, or an empty row", !/Appointment:|Add to calendar|Autos|Decision maker|DECISION MAKER/.test(notes), notes);
+check("a sheet with no appointment still reads whole", leadSheetNotes({ ...sheet, appointment: null }).includes("RESULT\nCall result: Appointment-Phone\n\nPROSPECT"));
 
 console.log(failures ? `\n${failures} delivery check(s) failed.\n` : "\nAll delivery checks passed.\n");
 process.exit(failures ? 1 : 0);

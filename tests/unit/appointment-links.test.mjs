@@ -33,6 +33,22 @@ check("Outlook: the same, in Microsoft 365", links[1].label === "Outlook" && out
   && outlook.searchParams.get("startdt") === "2026-10-09T17:00:00.000Z" && outlook.searchParams.get("subject") === event.title, links[1].href);
 check("Apple: the .ics file, when there is one", links[2]?.label === "Apple" && links[2].href.endsWith("/appointment.ics") && calendarLinks(event).length === 2);
 
+// A whole lead sheet as the notes: the links carry what fits, the file all of it.
+const sheetNotes = Array.from({ length: 80 }, (_, i) => `Row ${i + 1}: 16827 E Parkview Ave, Fountain Hills AZ 85268 · Sean, Owner`).join("\n");
+const long = calendarLinks({ ...event, details: sheetNotes }, "https://crm.example/sheet/t.k/appointment.ics");
+const kept = (href, param) => new URL(href).searchParams.get(param);
+check("short notes go into the links whole", google.searchParams.get("details") === event.details && outlook.searchParams.get("body") === event.details);
+check("long notes: Google's link stays within 4,000 characters, Outlook's within 2,000", long[0].href.length <= 4000 && long[1].href.length <= 2000 && long[0].href.length > 3800 && long[1].href.length > 1800,
+  `${long[0].href.length} ${long[1].href.length}`);
+check("…cut at the end of a line, saying the rest is on the lead sheet",
+  [kept(long[0].href, "details"), kept(long[1].href, "body")].every((t) => t.endsWith("Sean, Owner\n… (the rest is on the lead sheet)") && sheetNotes.startsWith(t.slice(0, t.lastIndexOf("\n")))),
+  kept(long[1].href, "body").slice(-120));
+check("…the title, the time and the place are kept", kept(long[1].href, "subject") === event.title && kept(long[1].href, "location") === event.location && kept(long[0].href, "dates") === "20261009T170000Z/20261009T173000Z");
+const one = calendarLinks({ ...event, details: "x".repeat(9000) });
+check("…one long line is cut where it must be", one[1].href.length <= 2000 && one[1].href.length > 1950 && kept(one[1].href, "body").endsWith("… (the rest is on the lead sheet)"), `${one[1].href.length}`);
+const longIcs = appointmentIcs({ ...event, details: sheetNotes }, "appointment-8@lighthouse-crm").replace(/\r\n /g, "");
+check("the .ics keeps every row", longIcs.includes("Row 1: 16827 E Parkview Ave\\, Fountain Hills") && longIcs.includes("\\nRow 80: 16827 E Parkview Ave") && !longIcs.includes("the rest is on"));
+
 const ics = appointmentIcs(event, "appointment-7@lighthouse-crm");
 check("the .ics: one event, its times in UTC, lines ending CRLF",
   ics.startsWith("BEGIN:VCALENDAR\r\n") && ics.includes("DTSTART:20261009T170000Z\r\n") && ics.includes("DTEND:20261009T173000Z\r\n") && ics.endsWith("END:VCALENDAR\r\n") && !/[^\r]\n/.test(ics));

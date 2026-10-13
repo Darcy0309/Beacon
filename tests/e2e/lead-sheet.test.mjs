@@ -97,6 +97,15 @@ try {
   check("the .ics opens without signing in, a calendar file", got?.status === 200 && /text\/calendar/.test(got.headers.get("content-type") ?? ""), `${got?.status}`);
   check("…at 10:00 AM on the business's clock, for 30 minutes", file.includes(`DTSTART:${at(span.start)}`) && file.includes(`DTEND:${at(span.end)}`), file);
   check("…with the address and the note for the client, not the internal ones", file.includes("LOCATION:12 Main St\\, Phoenix AZ 85004") && file.includes("Appt set with Daniel and Henry") && !/INTERNAL|OLD-HISTORY/.test(file));
+  // The event's notes, as a calendar shows them.
+  const notes = (file.match(/^DESCRIPTION:(.*)$/m)?.[1] ?? "").replace(/\\n/g, "\n").replace(/\\([,;\\])/g, "$1");
+  check("…and the whole sheet as its notes: every section of the email", ["CLIENT INFORMATION", "RESULT", "PROSPECT", "CONTACT", "POLICY INFORMATION", "PROFILE", "NOTES"].every((t) => notes.split("\n").includes(t)), notes);
+  check("…its rows too: the project, whom it is with, the contact, the policies, the profile",
+    [`Project: ${TAG} Appointments`, "With: Jacob Termini", "Name: Daniel", "Business phone: 602-555-0101", "Address: 12 Main St, Phoenix AZ 85004", "Liability / Package: Mar 1, 2027", "Agency: Garry Insurance",
+      "Employees: 14", "EIN: 98-7654321", "SIC code: 1731 – Electrical Work", `Client notes: ${NOTE}`].every((l) => notes.split("\n").includes(l)), notes);
+  const linkNotes = (re, param) => { const href = body.match(re)?.[0]; return href ? new URL(href).searchParams.get(param) ?? "" : ""; };
+  check("Google's and Outlook's links carry the sheet too", [linkNotes(/https:\/\/calendar\.google\.com\/calendar\/render\?[^\s"<>]+/, "details"), linkNotes(/https:\/\/outlook\.office\.com\/calendar\/[^\s"<>]+/, "body")]
+    .every((t) => t.includes("PROSPECT\nCompany: ") && t.includes("Business phone: 602-555-0101") && !/INTERNAL|OLD-HISTORY/.test(t)));
   check("a made-up link gets no calendar file", (await fetch(`${APP_URL}/sheet/AAAA.BBBB/appointment.ics`)).status === 404);
 
   section("Moving it: the notes keep a trail");

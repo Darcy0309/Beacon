@@ -72,33 +72,22 @@ function cellText(v) {
   return [v.text, ...(v.links ?? []).map((l) => `  ${v.linksLabel ? `${v.linksLabel}, ` : ""}${l.label}: ${l.href}`)].join("\n");
 }
 
-/**
- * The lead sheet, as an email (HTML with inline styles, which mail programs
- * need, and the same in plain text) and as the page a link opens. It never
- * says when the lead or appointment was entered: the client asked not to.
- *
- * `s`: { company, result, client, project, producer, listSource, rep,
- *   appointment: { date, time, with, links: [{ label, href }] } | null,
- *   people: [{ who, name, title, phone, mobile, email }],
- *   address: [lines], map: url | null, website, fax,
- *   coverage: { ultimate, agency, lines: [{ label, xdate, carrier }] },
- *   profile: [[label, value]], notes: [[label, text]],
- *   logo: url | null }   (the business's logo, at the top as on its old sheets)
- */
-export function renderLeadSheet(s) {
+// The sheet's sections in order, each with the rows that have something in
+// them. `forCalendar`: without the appointment's own row (its time and
+// "Add to calendar"), which the calendar event already is.
+function sheetSections(s, { forCalendar = false } = {}) {
   const sections = [];
   const rows = (pairs) => pairs.filter(([, v]) => !blank(v));
   const appointment = s.appointment
     ? { text: [s.appointment.date, s.appointment.time].filter(Boolean).join(" at "), links: s.appointment.links ?? [], linksLabel: "Add to calendar" }
     : null;
   const address = (s.address ?? []).join(", ");
-
   sections.push(["Client information", rows([
     ["Client", s.client], ["Project", s.project], ["Producer name", s.producer], ["List source", s.listSource], ["Account manager", s.rep],
   ])]);
   sections.push(["Result", rows([
     ["Call result", s.result],
-    ...(appointment ? [["Appointment", appointment], ["With", s.appointment.with]] : []),
+    ...(appointment ? [...(forCalendar ? [] : [["Appointment", appointment]]), ["With", s.appointment.with]] : []),
   ])]);
   sections.push(["Prospect", rows([
     ["Company", s.company], ["Address", s.map && address ? { text: address, href: s.map } : address], ["Website", siteLink(s.website)], ["Fax", s.fax],
@@ -117,7 +106,24 @@ export function renderLeadSheet(s) {
   sections.push(["Profile", rows(s.profile ?? [])]);
   sections.push(["Notes", rows(s.notes ?? [])]);
 
-  const shown = sections.filter(([, pairs]) => pairs.length);
+  return sections.filter(([, pairs]) => pairs.length);
+}
+
+/**
+ * The lead sheet, as an email (HTML with inline styles, which mail programs
+ * need, and the same in plain text) and as the page a link opens. It never
+ * says when the lead or appointment was entered: the client asked not to.
+ *
+ * `s`: { company, result, client, project, producer, listSource, rep,
+ *   appointment: { date, time, with, links: [{ label, href }] } | null,
+ *   people: [{ who, name, title, phone, mobile, email }],
+ *   address: [lines], map: url | null, website, fax,
+ *   coverage: { ultimate, agency, lines: [{ label, xdate, carrier }] },
+ *   profile: [[label, value]], notes: [[label, text]],
+ *   logo: url | null }   (the business's logo, at the top as on its old sheets)
+ */
+export function renderLeadSheet(s) {
+  const shown = sheetSections(s);
 
   const td = "padding:6px 10px;border-top:1px solid #e5e7eb;font-size:14px;vertical-align:top;";
   const html = `<!doctype html><html><body style="margin:0;padding:24px;background:#f5f7fa;font-family:Arial,Helvetica,sans-serif;color:#111827;">
@@ -142,6 +148,17 @@ ${pairs.map(([k, v]) => `<tr><td style="${td}width:34%;color:#6b7280;">${esc(k)}
   ].join("\n");
 
   return { html, text };
+}
+
+/**
+ * The whole sheet as the notes of its appointment's calendar event: the
+ * same sections and rows as the email, in plain text (an address or a
+ * website as its text alone).
+ */
+export function leadSheetNotes(s) {
+  return sheetSections(s, { forCalendar: true })
+    .map(([title, pairs]) => [title.toUpperCase(), ...pairs.map(([k, v]) => `${k}: ${textOf(v)}`)].join("\n"))
+    .join("\n\n");
 }
 
 /** The email for an address that gets a link instead of the sheet. */
