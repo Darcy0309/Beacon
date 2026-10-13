@@ -45,7 +45,23 @@ const ACTION_LABEL = {
   "user.update": "Updated a user",
   "user.email": "Changed a user's sign-in email",
   "leads.import": "Imported leads",
+  "sign_out.idle": "Signed out after 30 minutes idle",
+  "sic.import": "Loaded SIC codes",
+  "project.rates": "Set a project's pay rates",
+  "project.rep_add": "Added a rep to a project",
+  "project.rep_remove": "Took a rep off a project",
+  "project.redistribute": "Shared a project's names evenly",
+  "appointment.qa_pass": "Passed an appointment in QA",
+  "appointment.qa_fail": "Failed an appointment in QA",
+  "appointment.moved": "Moved an appointment",
+  "calendar.block": "Blocked out time on a calendar",
+  "calendar.unblock": "Took blocked time off a calendar",
+  "production.goal": "Set production goals",
+  "settings.pay": "Changed the pay rules",
 };
+
+/** An action in words: its label, or its code read as words ("project.rates" -> "Project rates") until it has one. */
+const actionLabel = (a) => ACTION_LABEL[a] ?? String(a ?? "").replace(/[._]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 /** How active each account has been — the activity_summary() SQL function. */
 export async function getActivitySummary() {
@@ -98,7 +114,7 @@ export async function listActivity(params) {
         initials: initialsOf(name),
         color: colorFor(name),
         role: ROLE_LABEL[u?.role] ?? u?.role ?? "—",
-        action: ACTION_LABEL[r.action] ?? r.action,
+        action: actionLabel(r.action),
         actionKey: r.action,
         detail: r.detail ?? "",
         entity: r.entity ?? "",
@@ -116,5 +132,5 @@ export async function getActivityActions() {
   const supabase = await createClient();
   const { data } = await supabase.from("activity_log").select("action");
   const seen = [...new Set((data ?? []).map((r) => r.action))].sort();
-  return seen.map((a) => ({ value: a, label: ACTION_LABEL[a] ?? a }));
+  return seen.map((a) => ({ value: a, label: actionLabel(a) }));
 }

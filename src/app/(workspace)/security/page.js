@@ -4,7 +4,6 @@ import SectionHeader from "@/components/shared/section-header";
 import TwoFactorSetup from "@/features/auth/components/two-factor-setup";
 import PasswordForm from "@/features/auth/components/password-form";
 import ProfileForm from "@/features/auth/components/profile-form";
-import ToneBadge from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { listActivity } from "@/features/activity/queries";
 import { getMyTwoFactor } from "@/features/auth/queries";
@@ -33,7 +32,9 @@ export default async function SecurityPage({ searchParams }) {
   return (
     <>
       <Topbar title="My Security" sub={me?.email ?? "Your sign-in settings"} />
-      <div className="flex-1 space-y-4 p-4 sm:p-6">
+      {/* The forms keep a width a form reads well at; what was done lately runs beside them. */}
+      <div className="grid flex-1 grid-cols-1 content-start items-start gap-4 p-4 sm:p-6 xl:grid-cols-3">
+        <div className="space-y-4 xl:col-span-2">
         <Card accent={welcome ? "var(--neon-cyan)" : undefined}>
           <SectionHeader label={welcome ? "Set your password" : "Password"} icon={KeyRound} />
           <PasswordForm welcome={welcome} reset={reset} temporary={temporary || (me?.status === "invited" && Boolean(me?.must_change_password))} isClient={me?.role === "client"} />
@@ -52,6 +53,8 @@ export default async function SecurityPage({ searchParams }) {
           <TwoFactorSetup enabled={twoFactor.enabled} factors={twoFactor.factors} />
         </Card>
 
+        </div>
+
         <Card>
           <SectionHeader label="Your Recent Activity" icon={History} />
           <div className="p-2">
@@ -59,12 +62,12 @@ export default async function SecurityPage({ searchParams }) {
               <p className="py-8 text-center text-sm text-muted-foreground">Nothing recorded yet.</p>
             ) : (
               mine.map((r) => (
-                <div key={r.id} data-list-row className="flex items-center gap-3 rounded-lg px-3 py-2">
-                  <ToneBadge tone={r.actionKey === "sign_in" ? "cyan" : r.actionKey.startsWith("mfa") ? "emerald" : "slate"}>
-                    {r.action}
-                  </ToneBadge>
-                  <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{r.detail}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{r.when}</span>
+                <div key={r.id} data-list-row className="rounded-lg px-3 py-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className={`min-w-0 truncate text-sm font-medium ${r.actionKey === "sign_in" ? "text-primary" : r.actionKey.startsWith("mfa") ? "text-emerald-500" : ""}`}>{r.action}</span>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{r.when}</span>
+                  </div>
+                  {r.detail ? <div className="truncate text-xs text-muted-foreground" title={r.detail}>{r.detail}</div> : null}
                 </div>
               ))
             )}

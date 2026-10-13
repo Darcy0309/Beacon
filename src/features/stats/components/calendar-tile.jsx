@@ -17,8 +17,9 @@ const DOW = ["S", "M", "T", "W", "T", "F", "S"];
  *   days    { "2026-10-14": 2 }, for the months from `first` to `last`
  *   blocked { "2026-10-22": "day" | "part" }: days with time blocked out
  *   query   "client=5" or "project=12", for the links to the full calendar
+ *   compact as tall as the stat tiles beside it: shorter weeks, the month beside the heading
  */
-export default function CalendarTile({ label, note, days, blocked = {}, today, first, last, query, accent = "var(--neon-amber)", className, style }) {
+export default function CalendarTile({ label, note, days, blocked = {}, today, first, last, query, accent = "var(--neon-amber)", compact = false, className, style }) {
   const [month, setMonth] = useState(monthStart(today));
   const grid = monthGrid(month);
   const inMonth = Object.entries(days).filter(([d]) => sameMonth(d, month)).reduce((sum, [, c]) => sum + c, 0);
@@ -44,7 +45,7 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
           </Link>
         </div>
 
-        <div className="mt-2 flex items-center justify-between">
+        <div className={cn("flex items-center justify-between", compact ? "mt-1" : "mt-2")}>
           <button type="button" className={step} disabled={!canPrev} onClick={() => setMonth(addMonths(month, -1))} aria-label="Previous month"><ChevronLeft className="size-3.5" /></button>
           <span className="text-xs font-semibold" data-tile-month>
             {formatIso(month, "month")}
@@ -56,7 +57,7 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
         <div className="mt-1 grid grid-cols-7 gap-px text-center" aria-hidden>
           {DOW.map((d, i) => <div key={i} className="text-[0.55rem] font-bold uppercase text-muted-foreground">{d}</div>)}
         </div>
-        <div className="grid flex-1 grid-cols-7 gap-px text-center [grid-auto-rows:minmax(1.25rem,1fr)]" role="grid" aria-label={formatIso(month, "month")}>
+        <div className={cn("grid flex-1 grid-cols-7 gap-px text-center", compact ? "[grid-auto-rows:minmax(1.05rem,1fr)]" : "[grid-auto-rows:minmax(1.25rem,1fr)]")} role="grid" aria-label={formatIso(month, "month")}>
           {grid.map((day) => {
             const count = days[day] ?? 0;
             const dim = !sameMonth(day, month);
@@ -68,7 +69,7 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
                   ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 35%, transparent) 0 2px, transparent 2px 5px)" }
                   : { boxShadow: "inset 0 -2px 0 var(--neon-amber)" }) : undefined}
                 className={cn(
-                  "relative flex min-h-5 items-center justify-center rounded text-[0.65rem] tabular-nums transition-colors hover:bg-muted",
+                  "relative flex items-center justify-center rounded text-[0.65rem] tabular-nums transition-colors hover:bg-muted",
                   dim && "text-muted-foreground/40",
                   count && !dim && "bg-primary/20 font-bold text-primary hover:bg-primary/30",
                   day === today && "ring-1 ring-primary"

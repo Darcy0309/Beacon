@@ -36,7 +36,7 @@ export default async function AlertsPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <SectionHeader label="Alert Rules" icon={BellRing} />
             <div className="divide-y divide-[var(--panel-border)]">

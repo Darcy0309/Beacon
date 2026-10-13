@@ -96,7 +96,7 @@ export default async function ClientProfile({ params }) {
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
           <CalendarTile label="Client Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`client=${c.id}`}
-            note="Every project's appointments together; shaded days are blocked out." className="animate-pop-in" style={{ animationDelay: "180ms" }} />
+            compact className="animate-pop-in" style={{ animationDelay: "180ms" }} />
         </div>
 
         <Card>

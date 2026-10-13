@@ -27,7 +27,7 @@ export default async function ClientsPage() {
   const tiles = [
     { label: "Active Accounts", value: String(active), note: `${clients.length} total`,
       icon: Building2, accent: "var(--neon-cyan)", series: clients.map((c) => c.leads), bars: true },
-    { label: "Leads on Book", value: totalLeads.toLocaleString(), note: "across all accounts",
+    { label: "Names on Book", value: totalLeads.toLocaleString(), note: "across all accounts",
       icon: Target, accent: "var(--neon-emerald)", series: clients.map((c) => c.leads) },
     { label: "Appointments", value: totalAppts.toLocaleString(), note: "set to date",
       icon: CalendarCheck, accent: "var(--neon-amber)", series: clients.map((c) => c.appts) },
@@ -81,7 +81,7 @@ export default async function ClientsPage() {
                       </div>
 
                       <div className="mt-4 space-y-2 border-t border-[var(--panel-border)] pt-4">
-                        <MetricBar label="Active leads" value={c.leads} max={maxLeads} color={accent} />
+                        <MetricBar label="Names" value={c.leads} max={maxLeads} color={accent} />
                         <MetricBar label="Appointments" value={c.appts} max={Math.max(1, c.leads)} color="var(--neon-emerald)" />
                       </div>
 

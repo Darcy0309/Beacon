@@ -119,15 +119,13 @@ export default async function ExplorePage({ searchParams }) {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Breakdown label="Leads by Client" icon={Users} rows={byClient} empty="No leads match." />
+        {/* Packed into columns, each card as long as its own rows: a short list is never stretched to a long one's height. */}
+        <div className="gap-4 space-y-4 lg:columns-3 [&>*]:break-inside-avoid">
           <Breakdown label="By Renewal Month" icon={CalendarClock} rows={byMonth} shown={12} empty="No renewal dates on these leads." />
-          <Breakdown label="By State" icon={Map} rows={byState} empty="No leads match." />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Breakdown label="By Industry" icon={Building2} rows={byIndustry} empty="No leads match." />
+          <Breakdown label="Leads by Client" icon={Users} rows={byClient} empty="No leads match." />
           <Breakdown label="By Status" icon={PieChart} rows={byStatus} empty="No leads match." />
+          <Breakdown label="By State" icon={Map} rows={byState} empty="No leads match." />
+          <Breakdown label="By Industry" icon={Building2} rows={byIndustry} empty="No leads match." />
         </div>
 
         <Card>
