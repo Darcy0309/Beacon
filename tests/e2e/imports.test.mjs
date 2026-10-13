@@ -89,6 +89,13 @@ try {
   const bigSaid = await admin.waitToast(new RegExp(`Imported ${BIG_ROWS} of ${BIG_ROWS}`), 90000);
   check("it imports", new RegExp(`Imported ${BIG_ROWS} of ${BIG_ROWS}`).test(bigSaid ?? ""), bigSaid);
   check("…every row of it", leadCount() === 4 + BIG_ROWS, leadCount());
+  // New names are called in id order: the file's order has to survive the chunks.
+  const order = sql(`select string_agg(split_part(company_name, ' Book ', 2), ',' order by id) from public.leads
+    where project_id = ${project} and company_name like ${lit(`${TAG} Book %`)}`);
+  check("…in the file's order, across chunks", order === Array.from({ length: BIG_ROWS }, (_, i) => i).join(","), order.slice(0, 80));
+  const bookNotes = Number(sql(`select count(*) from public.lead_notes n join public.leads l on l.id = n.lead_id
+    where l.project_id = ${project} and l.company_name like ${lit(`${TAG} Book %`)}`));
+  check("…with every row's notes, all in before the import says it is done", bookNotes === BIG_ROWS, bookNotes);
 
   section("An upload the server never answers");
   const leadsBefore = leadCount();

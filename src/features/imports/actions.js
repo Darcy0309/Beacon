@@ -10,6 +10,9 @@ import { schemas } from "@/lib/validate";
 import { sicCode, sicKey } from "@/lib/sic";
 
 const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
+// Leads per insert: each one is a round trip, and each is one statement the
+// database must finish inside its time limit.
+const IMPORT_CHUNK = 500;
 
 export async function importLeadsCsv(prevState, formData) {
   const { failed } = check(formData, schemas.csvImport);
@@ -45,35 +48,38 @@ export async function importLeadsCsv(prevState, formData) {
   }
 
   const supabase = await createClient();
-  const me = await currentAppUser(supabase);
 
-  const { data: project } = await supabase
-    .from("projects")
-    .select("id, appt_project_id, type:project_types(code)")
-    .eq("id", projectId)
-    .maybeSingle();
+  // Everything the import looks up, asked for at once rather than one after another.
+  // The sheet's call-result columns place each name in the lifecycle. Old
+  // and new result names both work (call_results.aliases holds the old ones).
+  const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }] = await Promise.all([
+    currentAppUser(supabase),
+    supabase.from("projects").select("id, appt_project_id, type:project_types(code)").eq("id", projectId).maybeSingle(),
+    supabase.from("lead_statuses").select("id, code"),
+    supabase.from("call_results").select("id, project_type, name, aliases, viable, effect, status_code"),
+    supabase.from("appointment_statuses").select("id").eq("name", "Scheduled").maybeSingle(),
+  ]);
   if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
   const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
 
-  // The sheet's call-result columns place each name in the lifecycle. Old
-  // and new result names both work (call_results.aliases holds the old ones).
-  const [{ data: statusRows }, { data: resultRows }] = await Promise.all([
-    supabase.from("lead_statuses").select("id, code"),
-    supabase.from("call_results").select("id, project_type, name, aliases, viable, effect, status_code"),
-  ]);
   const statusId = Object.fromEntries((statusRows ?? []).map((r) => [r.code, r.id]));
+  // Every name and old name of every result, indexed once, so each row's
+  // lookup is one step rather than a pass over the list. The first result to
+  // claim a spelling keeps it, as a search through the list would find it.
+  const resultIndex = new Map();
+  for (const r of resultRows ?? []) {
+    for (const spelling of [r.name.toLowerCase(), ...(r.aliases ?? [])]) {
+      const key = `${r.project_type}|${spelling}`;
+      if (!resultIndex.has(key)) resultIndex.set(key, r);
+    }
+  }
   const resultFor = (type, text) => {
     const t = String(text ?? "").trim().toLowerCase();
-    if (!t) return null;
-    return (resultRows ?? []).find((r) => r.project_type === type && (r.name.toLowerCase() === t || (r.aliases ?? []).includes(t))) ?? null;
+    return t ? resultIndex.get(`${type}|${t}`) ?? null : null;
   };
   const byName = (type, name) => (resultRows ?? []).find((r) => r.project_type === type && r.name === name);
-
-  const { data: apptStatus } = await supabase
-    .from("appointment_statuses")
-    .select("id")
-    .eq("name", "Scheduled")
-    .maybeSingle();
+  // A new name's first result on each stage, found once rather than per row.
+  const firstResult = { DBDV: byName("DBDV", "Viable-CallBack"), APPT: byName("APPT", "Lead-No Contact") };
 
   // SIC: a code and a description in separate columns, either one missing. A
   // description finds its code in the SIC list; a code with a description
@@ -81,13 +87,16 @@ export async function importLeadsCsv(prevState, formData) {
   if (parsed.some(({ lead }) => lead.sic_description)) {
     const byCode = new Map();
     const byDesc = new Map();
-    for (let from = 0; ; from += 1000) {
-      const { data } = await supabase.from("sic_codes").select("code, description").order("code").range(from, from + 999);
+    // A request returns at most 1000 codes: the first page says how many
+    // there are, and the rest are asked for together.
+    const page = (from, opts) => supabase.from("sic_codes").select("code, description", opts).order("code").range(from, from + 999);
+    const first = await page(0, { count: "exact" });
+    const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil((first.count ?? 0) / 1000) - 1) }, (_, k) => page((k + 1) * 1000)));
+    for (const { data } of [first, ...rest]) {
       for (const r of data ?? []) {
         byCode.set(r.code, r.description);
         if (r.description && !byDesc.has(sicKey(r.description))) byDesc.set(sicKey(r.description), r.code);
       }
-      if ((data ?? []).length < 1000) break;
     }
     const fresh = new Map();
     for (const { lead } of parsed) {
@@ -115,13 +124,25 @@ export async function importLeadsCsv(prevState, formData) {
   let imported = 0;
   let details = 0;
   let appointments = 0;
+  const childInserts = [];
+
+  // A chunk's insurance, notes or appointments: how many went in.
+  const insertChildren = async (table, list) => {
+    if (!list.length) return 0;
+    const { error: childError } = await supabase.from(table).insert(list);
+    if (childError) console.error(`[import] ${table} rows failed:`, childError.message);
+    return childError ? 0 : list.length;
+  };
 
   // Insert in chunks so a large list does not blow the request limit. Each
   // chunk returns its new ids, which the insurance and appointment rows hang
   // off — so a lead's X-dates arrive with it rather than in a second pass
-  // that could half-finish.
-  for (let i = 0; i < parsed.length; i += 250) {
-    const chunk = parsed.slice(i, i + 250);
+  // that could half-finish. The leads go in one chunk after another, in the
+  // file's order: new names are called in id order, so that is the order the
+  // list is called in. A chunk's other rows go in while the next chunk's
+  // leads do, rather than holding them up.
+  for (let i = 0; i < parsed.length; i += IMPORT_CHUNK) {
+    const chunk = parsed.slice(i, i + IMPORT_CHUNK);
     const payload = chunk.map(({ lead, status }) => {
       let target = projectId;
       let stageType = projectType;
@@ -140,7 +161,7 @@ export async function importLeadsCsv(prevState, formData) {
           ?? byName("APPT", result.effect === "appointment" ? result.name : "Lead-No Contact");
       }
       // New names start on the client's first result: Viable-CallBack (DBDev) or Lead-No Contact (Appt).
-      result ??= byName(stageType, stageType === "DBDV" ? "Viable-CallBack" : "Lead-No Contact");
+      result ??= firstResult[stageType];
       return {
         ...lead,
         project_id: target,
@@ -187,43 +208,41 @@ export async function importLeadsCsv(prevState, formData) {
       }
     });
 
-    if (insuranceRows.length) {
-      const { error: insError } = await supabase.from("insurance_details").insert(insuranceRows);
-      if (insError) console.error("[import] insurance rows failed:", insError.message);
-      else details += insuranceRows.length;
-    }
-    // The internal notes, apart from the lead: staff only.
-    if (noteRows.length) {
-      const { error: notesError } = await supabase.from("lead_notes").insert(noteRows);
-      if (notesError) console.error("[import] lead notes failed:", notesError.message);
-    }
-    if (appointmentRows.length) {
-      const { error: apptError } = await supabase.from("appointments").insert(appointmentRows);
-      if (apptError) console.error("[import] appointment rows failed:", apptError.message);
-      else appointments += appointmentRows.length;
-    }
+    childInserts.push(Promise.all([
+      insertChildren("insurance_details", insuranceRows),
+      // The internal notes, apart from the lead: staff only.
+      insertChildren("lead_notes", noteRows),
+      insertChildren("appointments", appointmentRows),
+    ]));
+  }
+  // All in before the names are shared out, as the appointments' notices go to whoever holds a name then.
+  for (const [ins, , appts] of await Promise.all(childInserts)) {
+    details += ins;
+    appointments += appts;
   }
 
   if (imported === 0) return fail("No rows could be imported from that file.");
 
-  // Share the new names out across each project's account managers.
-  let assigned = 0;
-  for (const id of new Set([projectId, project.appt_project_id].filter(Boolean))) {
-    const { data: split, error: splitError } = await supabase.rpc("distribute_project_names", { p_project_id: id });
-    if (splitError) console.error("[import] distribution failed:", splitError.message);
-    else if (id === projectId) assigned = split?.reps ?? 0;
-  }
-
-  const { error: batchError } = await supabase.from("import_batches").insert({
-    file_name: file.name,
-    source: listSource,
-    project_id: projectId,
-    row_count: rows.length - 1,
-    imported_count: imported,
-    error_count: errors,
-    status: imported > 0 ? "completed" : "failed",
-    imported_by: me?.id ?? null,
-  });
+  // Share the new names out across each project's account managers (each
+  // project on its own, so both at once), and record the batch meanwhile.
+  const [splits, { error: batchError }] = await Promise.all([
+    Promise.all([...new Set([projectId, project.appt_project_id].filter(Boolean))].map(async (id) => {
+      const { data: split, error: splitError } = await supabase.rpc("distribute_project_names", { p_project_id: id });
+      if (splitError) console.error("[import] distribution failed:", splitError.message);
+      return { id, reps: splitError ? 0 : split?.reps ?? 0 };
+    })),
+    supabase.from("import_batches").insert({
+      file_name: file.name,
+      source: listSource,
+      project_id: projectId,
+      row_count: rows.length - 1,
+      imported_count: imported,
+      error_count: errors,
+      status: imported > 0 ? "completed" : "failed",
+      imported_by: me?.id ?? null,
+    }),
+  ]);
+  const assigned = splits.find((s) => s.id === projectId)?.reps ?? 0;
   if (batchError) return fail(batchError);
 
   await logActivity(supabase, "leads.import", {
