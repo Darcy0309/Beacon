@@ -10,7 +10,7 @@ import { clientSlug, mediumDate } from "@/lib/format";
 import { getClientBySlug } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
 import { getProjects } from "@/features/projects/queries";
-import { getAppointmentDays, getLeadStats } from "@/features/stats/queries";
+import { getAppointmentDays, getBlockedDays, getLeadStats } from "@/features/stats/queries";
 import CalendarTile from "@/features/stats/components/calendar-tile";
 import ConversionLines from "@/features/stats/components/conversion-lines";
 import { addMonths, monthEnd, monthStart } from "@/lib/dates";
@@ -39,9 +39,10 @@ export default async function ClientProfile({ params }) {
   const delivery = `leads-${slug}@signaturemktg.net`;
   // The client calendar: every project's appointments together, last month to three months on.
   const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
-  const [stats, days] = await Promise.all([
+  const [stats, days, blocked] = await Promise.all([
     getLeadStats({ companyId: c.id }),
     getAppointmentDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
+    getBlockedDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
   ]);
   const s = stats.total;
   const of = (p) => stats.byProject[p.id] ?? shapeStats(null);
@@ -94,8 +95,8 @@ export default async function ClientProfile({ params }) {
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
-          <CalendarTile label="Client Calendar" days={days} today={today} first={calendar.first} last={calendar.last} query={`client=${c.id}`}
-            note="Every project's appointments together." className="animate-pop-in" style={{ animationDelay: "180ms" }} />
+          <CalendarTile label="Client Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`client=${c.id}`}
+            note="Every project's appointments together; shaded days are blocked out." className="animate-pop-in" style={{ animationDelay: "180ms" }} />
         </div>
 
         <Card>

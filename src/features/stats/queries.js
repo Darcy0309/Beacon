@@ -2,6 +2,7 @@
 
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { addDays } from "@/lib/dates";
 import { shapeStats } from "@/lib/lead-stats";
 
 /**
@@ -53,6 +54,22 @@ export async function getCalendarScope({ clientId = null, projectId = null }) {
     return { ids: (ps ?? []).map((p) => p.id), label: `${c.name}: all projects`, shared: null };
   }
   return null;
+}
+
+/** The days from `from` to `to` with time blocked out on these projects' calendars: { "2026-10-22": "day" | "part" }. */
+export async function getBlockedDays({ projectIds, from, to }) {
+  if (!projectIds?.length) return {};
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("calendar_blocks").select("starts_on, ends_on, start_time")
+    .in("project_id", projectIds).lte("starts_on", to).gte("ends_on", from).limit(2000);
+  if (error) throw error;
+  const days = {};
+  for (const b of data ?? []) {
+    for (let d = b.starts_on < from ? from : b.starts_on; d <= b.ends_on && d <= to; d = addDays(d, 1)) {
+      days[d] = b.start_time ? days[d] ?? "part" : "day";
+    }
+  }
+  return days;
 }
 
 /** How many appointments (not invalid) each day from `from` to `to` has on these projects: { "2026-10-14": 2 }. */

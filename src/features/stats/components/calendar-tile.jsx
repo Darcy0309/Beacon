@@ -15,9 +15,10 @@ const DOW = ["S", "M", "T", "W", "T", "F", "S"];
  * kept to this client or project.
  *
  *   days    { "2026-10-14": 2 }, for the months from `first` to `last`
+ *   blocked { "2026-10-22": "day" | "part" }: days with time blocked out
  *   query   "client=5" or "project=12", for the links to the full calendar
  */
-export default function CalendarTile({ label, note, days, today, first, last, query, accent = "var(--neon-amber)", className, style }) {
+export default function CalendarTile({ label, note, days, blocked = {}, today, first, last, query, accent = "var(--neon-amber)", className, style }) {
   const [month, setMonth] = useState(monthStart(today));
   const grid = monthGrid(month);
   const inMonth = Object.entries(days).filter(([d]) => sameMonth(d, month)).reduce((sum, [, c]) => sum + c, 0);
@@ -58,8 +59,12 @@ export default function CalendarTile({ label, note, days, today, first, last, qu
             const count = days[day] ?? 0;
             const dim = !sameMonth(day, month);
             return (
-              <Link key={day} href={`/calendar?${query}&view=day&d=${day}`} prefetch={false} data-tile-day={day} data-count={count || undefined}
-                title={`${formatIso(day, "long")}: ${count ? `${count} appointment${count === 1 ? "" : "s"}` : "no appointments"}`}
+              <Link key={day} href={`/calendar?${query}&view=day&d=${day}`} prefetch={false} data-tile-day={day} data-count={count || undefined} data-blocked={blocked[day] || undefined}
+                title={`${formatIso(day, "long")}: ${count ? `${count} appointment${count === 1 ? "" : "s"}` : "no appointments"}${blocked[day] ? (blocked[day] === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
+                // Blocked out: shaded for the whole day, underlined for part of it.
+                style={blocked[day] && !dim ? (blocked[day] === "day"
+                  ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 35%, transparent) 0 2px, transparent 2px 5px)" }
+                  : { boxShadow: "inset 0 -2px 0 var(--neon-amber)" }) : undefined}
                 className={cn(
                   "relative flex h-5 items-center justify-center rounded text-[0.65rem] tabular-nums transition-colors hover:bg-muted",
                   dim && "text-muted-foreground/40",

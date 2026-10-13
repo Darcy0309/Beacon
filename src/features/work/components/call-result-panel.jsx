@@ -15,6 +15,7 @@ import { Field, Select, formHelpers } from "@/components/ui/field";
 import { recordCallResult } from "@/features/work/actions";
 import { APPOINTMENT_TIMES, DURATIONS } from "@/lib/validate";
 import { cn } from "@/lib/utils";
+import SlotWarning, { useSlotControl } from "@/features/calendar/components/slot-warning";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -35,7 +36,9 @@ const GROUPS = [
  * `clientNote` on file to start from). The call notes stay internal. Saving
  * moves on to the next name when the sheet was opened from a call list.
  */
-export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null }) {
+export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null, calendarProjectId = null }) {
+  // The slot being chosen for an appointment is told to the warning under it (taken, or blocked out, on the project's calendar).
+  const [slotControl, tellSlot] = useSlotControl();
   const router = useRouter();
   const [state, setState] = useState(EMPTY);
   const [pending, startTransition] = useTransition();
@@ -174,19 +177,20 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
                   {/* Full width: the panel is narrow, and the date reads in words. Set from a call, so today or later. */}
                   <Field label="Date" required error={fe("appt_date")} className="col-span-2">
                     <DatePicker name="appt_date" required defaultValue={dv("appt_date", currentAppt?.date ?? "")} invalid={invalid("appt_date")} aria-label="Appointment date"
-                      min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future />
+                      min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future onChange={(date) => tellSlot({ date })} />
                   </Field>
                   <Field label="Time" required error={fe("appt_time")}>
-                    <Select name="appt_time" defaultValue={dv("appt_time", currentAppt?.time ?? "")} aria-invalid={invalid("appt_time")}>
+                    <Select name="appt_time" defaultValue={dv("appt_time", currentAppt?.time ?? "")} aria-invalid={invalid("appt_time")} onChange={(e) => tellSlot({ time: e.target.value })}>
                       <option value="">Choose a time</option>
                       {APPOINTMENT_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </Select>
                   </Field>
                   <Field label="Duration" error={fe("duration_min")}>
-                    <Select name="duration_min" defaultValue={String(dv("duration_min", String(currentAppt?.duration ?? 30)))} aria-invalid={invalid("duration_min")}>
+                    <Select name="duration_min" defaultValue={String(dv("duration_min", String(currentAppt?.duration ?? 30)))} aria-invalid={invalid("duration_min")} onChange={(e) => tellSlot({ duration: Number(e.target.value) })}>
                       {DURATIONS.map((d) => <option key={d} value={d}>{d} minutes</option>)}
                     </Select>
                   </Field>
+                  <SlotWarning projectId={calendarProjectId} control={slotControl} initial={currentAppt} exceptId={currentAppt?.id ?? null} className="col-span-2" />
                   <Field label="Meeting with" hint="The client's producer" error={fe("rep_name")}>
                     <Input name="rep_name" maxLength={80} defaultValue={dv("rep_name", currentAppt?.repName ?? "")} aria-invalid={invalid("rep_name")} />
                   </Field>

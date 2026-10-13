@@ -1,10 +1,14 @@
 import Topbar from "@/components/layout/topbar";
 import CalendarView from "@/features/appointments/components/calendar-view";
 import { getCalendarMonth, getCalendarRange } from "@/features/appointments/queries";
-import { addDays, addMonths, formatIso, formatRange, isIsoDate, makeIso, monthStart, weekdayOf } from "@/lib/dates";
+import { addDays, addMonths, formatIso, formatRange, isIsoDate, makeIso, monthGrid, monthStart, weekdayOf } from "@/lib/dates";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import Link from "@/components/shared/intent-link";
 import { getCalendarScope } from "@/features/stats/queries";
+import ParamSelect from "@/components/shared/param-select";
+import ProjectCalendar from "@/features/calendar/components/project-calendar";
+import { getCalendarProjects, getProjectCalendar } from "@/features/calendar/queries";
+import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +38,14 @@ export default async function CalendarPage({ searchParams }) {
   const projectIds = scope?.ids ?? null;
 
   const href = (v, date) => `/calendar?${only}view=${v}&d=${date}`;
+
+  // One project's calendar, with its blocked time, to look at and to block time out on: the one
+  // chosen, or the only one there is (a client with a single project).
+  const [me, calendars] = await Promise.all([getCurrentUser(), getCalendarProjects()]);
+  const openId = id(sp?.project) ? projectIds?.[0] : calendars.length === 1 ? calendars[0].value : null;
+  const projectCalendar = openId
+    ? await getProjectCalendar({ projectId: openId, from: monthGrid(monthStart(today))[0], to: monthGrid(addMonths(monthStart(today), 2))[41] })
+    : null;
   const viewHrefs = Object.fromEntries(VIEWS.map((v) => [v, href(v, anchor)]));
   const year = Number(anchor.slice(0, 4));
   const month = Number(anchor.slice(5, 7)) - 1;
@@ -81,6 +93,16 @@ export default async function CalendarPage({ searchParams }) {
             </span>
             <Link href={`/calendar?view=${view}&d=${anchor}`} className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Show every calendar</Link>
           </div>
+        ) : null}
+        {calendars.length ? (
+          <div className="flex flex-wrap items-center gap-3" data-calendar-picker>
+            <ParamSelect name="project" label="Project calendar" placeholder="Every calendar" value={id(sp?.project) ? String(openId ?? "") : ""} options={calendars} clears={["client", "a"]} />
+            {!projectCalendar ? <span className="text-xs text-muted-foreground">Choose a project to see its calendar and block out time.</span> : null}
+          </div>
+        ) : null}
+        {projectCalendar ? (
+          <ProjectCalendar projectId={projectCalendar.projectId} initial={projectCalendar} today={today}
+            leadLinks={["admin", "manager", "agent"].includes(me?.role)} title="Project Calendar & Blocked Time" className="max-w-3xl" />
         ) : null}
         <CalendarView
           view={view}

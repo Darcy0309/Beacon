@@ -17,6 +17,7 @@ import DatePicker from "@/components/shared/date-picker";
 import { DURATIONS, APPOINTMENT_TIMES } from "@/lib/validate";
 import { fullName } from "@/lib/format";
 import { todayIso } from "@/lib/dates";
+import SlotWarning, { useSlotControl } from "@/features/calendar/components/slot-warning";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -27,7 +28,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * lead's note on file, starts it when the lead is known (and saving it
  * empty clears it); for a lead picked here, only a note written is saved.
  */
-export default function AppointmentForm({ appointment, options, leads = [], defaultLeadId, clientNote, trigger }) {
+export default function AppointmentForm({ appointment, options, leads = [], defaultLeadId, clientNote, trigger, calendarProjectId = null }) {
   const isEdit = Boolean(appointment?.id);
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -52,6 +53,8 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
   const { fe, invalid, dv } = formHelpers(state, record);
 
   const lockedLead = defaultLeadId ? leads.find((l) => String(l.id) === String(defaultLeadId)) : null;
+  // The slot chosen is told to the warning under it, where the project's calendar is known.
+  const [slotControl, tellSlot] = useSlotControl();
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -84,19 +87,23 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
 
             <Field label="Date" required error={fe("appt_date")}>
               <DatePicker name="appt_date" required defaultValue={dv("appt_date")} invalid={invalid("appt_date")} aria-label="Appointment date"
-                presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future />
+                presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future onChange={(date) => tellSlot({ date })} />
             </Field>
             <Field label="Time" required error={fe("appt_time")}>
-              <Select name="appt_time" required defaultValue={dv("appt_time")} aria-invalid={invalid("appt_time")}>
+              <Select name="appt_time" required defaultValue={dv("appt_time")} aria-invalid={invalid("appt_time")} onChange={(e) => tellSlot({ time: e.target.value })}>
                 {APPOINTMENT_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
             </Field>
 
             <Field label="Duration" error={fe("duration_min")}>
-              <Select name="duration_min" defaultValue={String(dv("duration_min", "30"))} aria-invalid={invalid("duration_min")}>
+              <Select name="duration_min" defaultValue={String(dv("duration_min", "30"))} aria-invalid={invalid("duration_min")} onChange={(e) => tellSlot({ duration: Number(e.target.value) })}>
                 {DURATIONS.map((d) => <option key={d} value={d}>{d} minutes</option>)}
               </Select>
             </Field>
+            {open && calendarProjectId ? (
+              <SlotWarning projectId={calendarProjectId} control={slotControl} exceptId={appointment?.id ?? null} className="sm:col-span-2"
+                initial={{ date: record.appt_date, time: record.appt_time, duration: record.duration_min }} />
+            ) : null}
             <Field label="Status" error={fe("status_id")}>
               <Select name="status_id" defaultValue={dv("status_id")} aria-invalid={invalid("status_id")}>
                 <option value="">—</option>

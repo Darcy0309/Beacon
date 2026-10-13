@@ -13,6 +13,8 @@ import EmailLead from "@/features/email/components/email-lead";
 import CoverageForm from "@/features/leads/components/coverage-form";
 import LeadNotes from "@/features/leads/components/lead-notes";
 import ReminderCard from "@/features/leads/components/reminder-card";
+import ProjectCalendar from "@/features/calendar/components/project-calendar";
+import { getProjectCalendar } from "@/features/calendar/queries";
 import ResendButton from "@/features/delivery/components/resend-button";
 import { getCarrierNames } from "@/features/insurance/queries";
 import { POLICY_LINES } from "@/lib/coverage";
@@ -24,7 +26,7 @@ import { getCallResults, getNextOnList, getOpenAppointment, getWorkProject } fro
 import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
-import { daysBetween, todayIn } from "@/lib/dates";
+import { addMonths, daysBetween, monthGrid, monthStart, todayIn } from "@/lib/dates";
 import { fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -192,10 +194,15 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  // The project's calendar, at hand while on the phone: this month and the two after (others are read as they are opened).
+  const calendar = staff && r.project?.id
+    ? await getProjectCalendar({ projectId: r.project.id, from: monthGrid(monthStart(today))[0], to: monthGrid(addMonths(monthStart(today), 2))[41] })
+    : null;
   // The appointment an Appointment result would move (record_call_result's rule: still to come or
   // waiting for QA, never one that failed it): the panel starts from its day and time.
   const movable = openAppt && openAppt.qa_status !== "failed" && (openAppt.qa_status === "pending" || String(openAppt.appt_date) >= today)
     ? {
+        id: openAppt.id,
         date: String(openAppt.appt_date).slice(0, 10),
         time: openAppt.appt_time ?? "",
         duration: openAppt.duration_min ?? 30,
@@ -312,6 +319,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 leads={[{ id: lead.id, company_name: lead.co }]}
                 defaultLeadId={lead.id}
                 clientNote={r.client_note ?? ""}
+                calendarProjectId={calendar?.projectId ?? null}
                 trigger={<Button size="sm" variant="ghost" className="px-2" aria-label="Add an appointment by hand"><CalendarPlus /> Appointment</Button>}
               />
               <span className="ml-auto"><PrintButton variant="ghost" compact /></span>
@@ -488,7 +496,8 @@ export default async function LeadSheet({ params, searchParams }) {
           </Card>
 
           {/* Right: a call-back reminder, then the call result buttons. */}
-          <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1">
+          {/* Pinned beside the sheet; with the calendar under it, it scrolls on its own on a short screen. */}
+          <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1">
             {canRecord ? (
               <ReminderCard
                 leadId={lead.id}
@@ -527,12 +536,14 @@ export default async function LeadSheet({ params, searchParams }) {
                 clientNote={r.client_note ?? ""}
                 currentAppt={movable}
                 timeZone={tz}
+                calendarProjectId={calendar?.projectId ?? null}
               />
             ) : staff ? (
               <Card className="p-5 text-sm text-muted-foreground">
                 Results on this name are recorded by {lead.rep === "Unassigned" ? "the reps on its project." : /\.$/.test(lead.rep) ? lead.rep : `${lead.rep}.`}
               </Card>
             ) : null}
+            {calendar ? <ProjectCalendar projectId={r.project.id} initial={calendar} today={today} leadLinks /> : null}
           </div>
         </div>
 

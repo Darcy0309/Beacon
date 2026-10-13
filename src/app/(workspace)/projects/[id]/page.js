@@ -22,7 +22,7 @@ import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getPayRules } from "@/features/pay/queries";
-import { getAppointmentDays, getCalendarScope, getLeadStats, getResultBreakdown } from "@/features/stats/queries";
+import { getAppointmentDays, getBlockedDays, getCalendarScope, getLeadStats, getResultBreakdown } from "@/features/stats/queries";
 import CalendarTile from "@/features/stats/components/calendar-tile";
 import ConversionLines from "@/features/stats/components/conversion-lines";
 import ResultBreakdown from "@/features/stats/components/result-breakdown";
@@ -67,7 +67,10 @@ export default async function ProjectDetail({ params, searchParams }) {
   // project shares the one of the appointment project it promotes to).
   const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
   const [{ total: s }, results, scope] = await Promise.all([getLeadStats({ projectId: p.id }), getResultBreakdown(p.id), getCalendarScope({ projectId: p.id })]);
-  const days = await getAppointmentDays({ projectIds: scope?.ids ?? [p.id], from: calendar.first, to: calendar.last });
+  const [days, blocked] = await Promise.all([
+    getAppointmentDays({ projectIds: scope?.ids ?? [p.id], from: calendar.first, to: calendar.last }),
+    getBlockedDays({ projectIds: scope?.ids ?? [p.id], from: calendar.first, to: calendar.last }),
+  ]);
   const dbdev = p.type === "DBDV";
 
   const raw = p.raw ?? {};
@@ -157,7 +160,7 @@ export default async function ProjectDetail({ params, searchParams }) {
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
-          <CalendarTile label="Project Calendar" days={days} today={today} first={calendar.first} last={calendar.last} query={`project=${p.id}`}
+          <CalendarTile label="Project Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`project=${p.id}`}
             note={scope?.shared ? `Shared with ${scope.label}, where this project's appointments go.` : "Only this project's appointments."}
             className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
         </div>

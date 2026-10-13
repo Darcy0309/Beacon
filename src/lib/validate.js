@@ -405,6 +405,16 @@ export const schemas = {
     appts_goal: [int({ min: 0, max: 1000 })],
   },
 
+  // Time blocked out on a project's calendar: days, and a time of day unless all day.
+  calendarBlock: {
+    project_id: [required("Missing project"), id],
+    starts_on: [required("Choose the day"), date],
+    ends_on: [date],
+    start_time: [time12],
+    end_time: [time12],
+    note: [max(200)],
+  },
+
   // A month's production goals (the administrator's chart).
   productionGoal: {
     month: [required("Choose the month"), date],
