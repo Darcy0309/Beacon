@@ -3,13 +3,13 @@
 /** CSV lead import (the legacy Imports module). */
 
 import { revalidatePath } from "next/cache";
-import { parseCsv, rowsToImport } from "@/lib/csv";
+import { MAX_IMPORT_MB, parseCsv, rowsToImport } from "@/lib/csv";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 import { sicCode, sicKey } from "@/lib/sic";
 
-const MAX_CSV_BYTES = 5 * 1024 * 1024;
+const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
 
 export async function importLeadsCsv(prevState, formData) {
   const { failed } = check(formData, schemas.csvImport);
@@ -23,7 +23,7 @@ export async function importLeadsCsv(prevState, formData) {
     return fail("Only .csv files can be imported.", { file: "Must be a .csv file" });
   }
   if (file.size > MAX_CSV_BYTES) {
-    return fail("That file is larger than 5 MB.", { file: "Files must be 5 MB or smaller" });
+    return fail(`That file is larger than ${MAX_IMPORT_MB} MB.`, { file: `Files must be ${MAX_IMPORT_MB} MB or smaller` });
   }
 
   const projectId = n(formData, "project_id");

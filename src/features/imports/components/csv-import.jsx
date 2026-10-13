@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Download, UploadCloud } from "lucide-react";
@@ -10,13 +10,33 @@ import { Input } from "@/components/ui/input";
 import { Field, Select } from "@/components/ui/field";
 import { importLeadsCsv } from "@/features/imports/actions";
 import { cn } from "@/lib/utils";
-import { TEMPLATE_HEADERS } from "@/lib/csv";
+import { MAX_IMPORT_MB, TEMPLATE_HEADERS } from "@/lib/csv";
 
 // The template: every column the import reads, as a CSV of headings only.
 const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(`${TEMPLATE_HEADERS.join(",")}\r\n`)}`;
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = MAX_IMPORT_MB * 1024 * 1024;
+
+/**
+ * The import, made to always answer. An upload the server never returns a
+ * result for (refused by the host, or cut off by a timeout on a long list)
+ * throws instead, and a throw goes to the error screen, which reloads the
+ * page: the form empties and nothing is said, as happened with the
+ * Capital-Maricopa list.
+ */
+async function runImport(prevState, formData) {
+  try {
+    return await importLeadsCsv(prevState, formData);
+  } catch (e) {
+    console.error("[import]", e);
+    return {
+      ...EMPTY,
+      error: "The import did not finish: the server stopped answering. Some names may already be on the project, so check its leads before importing this file again.",
+      values: { project_id: formData.get("project_id"), list_source: formData.get("list_source") },
+    };
+  }
+}
 
 /**
  * Import a lead list into a project. The names land on that project's call
@@ -24,7 +44,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
  * columns (old or new names) decide where in the lifecycle it starts.
  */
 export default function CsvImport({ projects = [] }) {
-  const [state, formAction, pending] = useActionState(importLeadsCsv, EMPTY);
+  const [state, formAction, pending] = useActionState(runImport, EMPTY);
   const [fileName, setFileName] = useState("");
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef(null);
@@ -59,10 +79,19 @@ export default function CsvImport({ projects = [] }) {
       return false;
     }
     if (file.size > MAX_BYTES) {
-      toast.error("That file is larger than 5 MB.");
+      toast.error(`That file is larger than ${MAX_IMPORT_MB} MB.`);
       return false;
     }
     return true;
+  }
+
+  // Submitted by hand rather than through action={…}: React empties a form
+  // after its action, which on a failed import dropped the chosen file while
+  // the box still named it. A successful import resets the form above.
+  function onSubmit(e) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    startTransition(() => formAction(formData));
   }
 
   function onDrop(e) {
@@ -93,7 +122,7 @@ export default function CsvImport({ projects = [] }) {
             <Download className="size-3.5" /> Download template
           </a>
         </div>
-        <form ref={formRef} action={formAction} noValidate className="space-y-4">
+        <form ref={formRef} onSubmit={onSubmit} noValidate className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Project" required error={state?.fieldErrors?.project_id}>
               <Select name="project_id" required defaultValue={state?.values?.project_id ?? ""} aria-invalid={state?.fieldErrors?.project_id ? true : undefined}>
@@ -131,7 +160,7 @@ export default function CsvImport({ projects = [] }) {
                   ? <span className="text-destructive">{state.fieldErrors.file}</span>
                   : fileName
                     ? "Ready to import · columns like Company, Contact, Phone, City, State"
-                    : "or browse to upload · .csv up to 5 MB"}
+                    : `or browse to upload · .csv up to ${MAX_IMPORT_MB} MB`}
               </div>
             </div>
             <input

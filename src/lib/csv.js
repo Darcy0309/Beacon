@@ -136,6 +136,14 @@ export const TEMPLATE_HEADERS = [
   "Notes", "Internal Notes",
 ];
 
+/**
+ * The largest lead list the importer takes, in MB. The file goes to the
+ * server in one request: Vercel refuses a request body over 4.5 MB before the
+ * app sees it, and next.config.mjs raises the server-action limit (1 MB by
+ * default) to match. This leaves room under both for the form's own bytes.
+ */
+export const MAX_IMPORT_MB = 4;
+
 /** Columns that belong on the lead's insurance_details row. */
 export const INSURANCE_ALIASES = {
   agencyname: "agency_name", agency: "agency_name", currentcarrier: "agency_name",

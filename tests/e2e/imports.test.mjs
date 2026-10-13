@@ -5,11 +5,15 @@
  * and the like in a field are left blank, and only real web and email
  * addresses are kept.
  *
+ * A whole book of business is megabytes, not kilobytes (Capital-Maricopa,
+ * Oct 2026: 2.6 MB, refused by the 1 MB action limit), and an upload the
+ * server never answers is said, not lost to the error screen.
+ *
  * Removes everything it made.
  *
  *   node tests/e2e/imports.test.mjs
  */
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { check, finish, section, until } from "../support/assert.mjs";
@@ -32,15 +36,28 @@ writeFileSync(file, [
 const sic = (name) => sql(`select coalesce(sic_code, '') || '|' || coalesce(description, '') from public.leads where company_name = ${lit(`${TAG} ${name}`)}`);
 const row = (name) => sql(`select coalesce(l.website, '') || '|' || coalesce(l.email, '') || '|' || r.name from public.leads l join public.call_results r on r.id = l.result_id
   where l.company_name = ${lit(`${TAG} ${name}`)}`);
+const leadCount = () => Number(sql(`select count(*) from public.leads where project_id = ${project}`));
+
+// Over the 1 MB a server action takes by default: long notes, as an old book has.
+const BIG_ROWS = 600;
+const bigFile = path.join(path.dirname(file), "book.csv");
+const note = "Spoke with the owner, call back after the renewal; wants a quote on the package. ".repeat(30);
+writeFileSync(bigFile, ["Company,Phone,Call Result DBDV,Internal Notes",
+  ...Array.from({ length: BIG_ROWS }, (_, i) => `"${TAG} Book ${i}",602-555-${String(i).padStart(4, "0")},Viable-No Contact,"${note}"`)].join("\n"));
+
+/** Open the import form on the test project with `csv` chosen. */
+async function chooseFile(page, csv) {
+  await page.go("/imports", 4000);
+  await page.fill('select[name="project_id"]', String(project));
+  const { root } = await page.send("DOM.getDocument");
+  const { nodeId } = await page.send("DOM.querySelector", { nodeId: root.nodeId, selector: 'input[name="file"]' });
+  await page.send("DOM.setFileInputFiles", { nodeId, files: [csv] });
+}
 
 const browser = await launchBrowser();
 try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1280, height: 900 });
-  await admin.go("/imports", 4000);
-  await admin.fill('select[name="project_id"]', String(project));
-  const { root } = await admin.send("DOM.getDocument");
-  const { nodeId } = await admin.send("DOM.querySelector", { nodeId: root.nodeId, selector: 'input[name="file"]' });
-  await admin.send("DOM.setFileInputFiles", { nodeId, files: [file] });
+  await chooseFile(admin, file);
   await admin.click("button[type=submit]", "Import leads");
   const said = await admin.waitToast(/Imported 4 of 4/, 15000);
 
@@ -63,6 +80,35 @@ try {
   check("a code and description the list does not have are added to it",
     sic("Gamma").startsWith(`${NEW_SIC}|`) && sql(`select description from public.sic_codes where code = ${lit(NEW_SIC)}`) === `${TAG} widgets`, sic("Gamma"));
   check("a description with no code to match is kept on the lead", sic("Delta") === "|Nothing like any SIC", sic("Delta"));
+
+  section("A list over 1 MB");
+  const size = statSync(bigFile).size;
+  check("the test file is over 1 MB", size > 1024 * 1024, `${size} bytes`);
+  await chooseFile(admin, bigFile);
+  await admin.click("button[type=submit]", "Import leads");
+  const bigSaid = await admin.waitToast(new RegExp(`Imported ${BIG_ROWS} of ${BIG_ROWS}`), 90000);
+  check("it imports", new RegExp(`Imported ${BIG_ROWS} of ${BIG_ROWS}`).test(bigSaid ?? ""), bigSaid);
+  check("…every row of it", leadCount() === 4 + BIG_ROWS, leadCount());
+
+  section("An upload the server never answers");
+  const leadsBefore = leadCount();
+  await chooseFile(admin, file);
+  // A gateway timeout or a host's size refusal: not a result, an HTML error page.
+  await admin.ev(`(() => { const real = window.fetch;
+    window.fetch = (input, init) => init?.method === 'POST' && new Headers(init.headers).has('next-action')
+      ? Promise.resolve(new Response('<html>Gateway Timeout</html>', { status: 504, headers: { 'content-type': 'text/html' } }))
+      : real(input, init); return true; })()`);
+  await admin.click("button[type=submit]", "Import leads");
+  const failed = await admin.waitToast(/did not finish/i, 10000);
+  check("the import says it did not finish", /did not finish/i.test(failed ?? ""), failed);
+  // The error screen reloads the page by itself, and React empties a form
+  // after its action: either way the chosen file would be gone.
+  const form = await admin.ev(`(() => { const f = document.querySelector('input[name="file"]')?.closest('form');
+    return { button: [...(f?.querySelectorAll('button') ?? [])].some((b) => b.textContent.trim() === 'Import leads'),
+      files: f?.querySelector('input[name="file"]').files.length ?? 0, project: f?.querySelector('select[name="project_id"]').value }; })()`);
+  check("…and the form stays, with the file and project still chosen to try again",
+    form.button && form.files === 1 && form.project === String(project), JSON.stringify(form));
+  check("nothing was added", leadCount() === leadsBefore, leadCount());
 
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);
