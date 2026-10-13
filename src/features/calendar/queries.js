@@ -7,6 +7,21 @@ import { minutesOf } from "@/lib/project-calendar";
 import { one } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
+const BLOCK_COLUMNS = "id, starts_on, ends_on, start_time, end_time, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)";
+
+// A block as the calendar shows it; `project`: the calendar it is on, when several are shown together.
+function shapeBlock(b) {
+  const by = one(b.by);
+  return {
+    id: b.id, startsOn: b.starts_on, endsOn: b.ends_on, start: b.start_time ? minutesOf(b.start_time) : null,
+    end: b.end_time ? minutesOf(b.end_time) : null, note: b.note,
+    // Busy on someone's own calendar (connected to this one): no more is known of it than when.
+    synced: b.feed_id != null,
+    by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || null : null, byClient: by?.role === "client",
+    ...(b.project ? { project: one(b.project)?.name ?? null } : {}),
+  };
+}
+
 /**
  * What a project's calendar has from `from` to `to`: its appointments (not
  * the invalid ones) and blocked time. A DB dev project's calendar is the
@@ -24,7 +39,7 @@ export async function getProjectCalendar({ projectId, from, to }) {
       .select("id, appt_date, appt_time, duration_min, confirmed_at, lead:leads(id, company_name)")
       .eq("project_id", calendarId).is("invalid_at", null).gte("appt_date", from).lte("appt_date", to).limit(2000),
     supabase.from("calendar_blocks")
-      .select("id, starts_on, ends_on, start_time, end_time, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)")
+      .select(BLOCK_COLUMNS)
       .eq("project_id", calendarId).lte("starts_on", to).gte("ends_on", from).limit(2000),
   ]);
   if (!project.data) return null;
@@ -41,17 +56,25 @@ export async function getProjectCalendar({ projectId, from, to }) {
       id: a.id, date: a.appt_date, time: a.appt_time, duration: a.duration_min ?? 30, confirmed: Boolean(a.confirmed_at),
       company: one(a.lead)?.company_name ?? null, leadId: one(a.lead)?.id ?? null,
     })),
-    blocks: (blocks.data ?? []).map((b) => {
-      const by = one(b.by);
-      return {
-        id: b.id, startsOn: b.starts_on, endsOn: b.ends_on, start: b.start_time ? minutesOf(b.start_time) : null,
-        end: b.end_time ? minutesOf(b.end_time) : null, note: b.note,
-        // Busy on someone's own calendar (connected to this one): no more is known of it than when.
-        synced: b.feed_id != null,
-        by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || null : null, byClient: by?.role === "client",
-      };
-    }),
+    blocks: (blocks.data ?? []).map(shapeBlock),
   };
+}
+
+/**
+ * The time blocked out from `from` to `to` on several project calendars
+ * shown together (a client's: all of its projects'), each block with the
+ * project whose calendar it is on. Row Level Security decides which.
+ */
+export async function getBlocksAcross({ projectIds, from, to }) {
+  if (!projectIds?.length) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("calendar_blocks")
+    .select(`${BLOCK_COLUMNS}, project_id, project:projects(name)`)
+    .in("project_id", projectIds).lte("starts_on", to).gte("ends_on", from).order("starts_on").limit(2000);
+  if (error) throw error;
+  // Personal calendars connected to any of them are read again when they have gone stale, as on one calendar.
+  after(() => Promise.all(projectIds.slice(0, 12).map((id) => refreshStaleFeeds(id).catch((err) => console.error("[calendar sync]", err?.message ?? err)))));
+  return (data ?? []).map(shapeBlock);
 }
 
 /**

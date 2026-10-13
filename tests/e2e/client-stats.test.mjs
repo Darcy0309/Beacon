@@ -36,6 +36,16 @@ sent("Appointment", "Appointment-Invalid");
 sql(`insert into public.appointments (lead_id, project_id, set_project_id, appt_date, appt_time, status_id)
   values (${booked}, ${APPT}, ${DBDV}, ${lit(today)}, '10:00 AM', (select id from public.appointment_statuses where name='Scheduled'))`);
 
+// Time blocked out: today on the appointment project's calendar, entered on the DB dev project (which shares it);
+// and all month on another client's project, which this client's calendar must not show.
+sql(`insert into public.calendar_blocks (project_id, starts_on, ends_on, note) values (${DBDV}, ${lit(today)}, ${lit(today)}, 'Office closed')`);
+const otherCompany = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Other Agency`)}) returning id`));
+const OTHER = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Other Appts`)}, ${otherCompany}, ${type("APPT")}, 1) returning id`));
+sql(`insert into public.calendar_blocks (project_id, starts_on, ends_on, note) values (${OTHER}, date_trunc('month', ${lit(today)}::date)::date, (date_trunc('month', ${lit(today)}::date) + interval '1 month - 1 day')::date, 'Not theirs')`);
+
+const CLIENT_USER = Number(sql("select id from public.users where email='client@beacon.test'"));
+const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT_USER}`);
+
 const slug = NAME.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 const browser = await launchBrowser();
 const tile = (page, label) => page.ev(`[...document.querySelectorAll('[data-panel]')].find((p) => p.querySelector('.stat-label')?.textContent.trim().toLowerCase() === ${JSON.stringify(label.toLowerCase())})?.innerText.replace(/\\s+/g, ' ') ?? null`);
@@ -62,6 +72,30 @@ try {
     Boolean(await until(async () => (await admin.url()).includes(`client=${company}`) && /all projects/.test((await admin.ev(`document.querySelector('[data-calendar-scope]')?.innerText`)) ?? ""))), await admin.url());
   check("…with its appointment, and no other client's", await admin.ev(`document.body.innerText.includes(${JSON.stringify(`${TAG} sent Appointment`)})`) && /1 appointment(?!s)/.test(await admin.ev(`document.querySelector('header, [data-topbar]')?.innerText ?? document.body.innerText`)));
 
+  section("The client's calendar, opened in full");
+  check("the tile marks the day blocked out", (await admin.go(`/clients/${slug}`, 5000), Boolean(await until(() => admin.ev(`document.querySelector('[data-calendar-tile] [data-tile-day="${today}"]')?.dataset.blocked === 'day'`)))));
+  await admin.click("[data-calendar-tile] [data-open-calendar]");
+  const blockedCells = () => admin.ev(`[...document.querySelectorAll('button[data-blocked]')].map((b) => b.dataset.blocked + ':' + b.querySelector('span span')?.textContent.trim())`);
+  check("“Open” shows the month with the same day blocked out, and no other client's",
+    Boolean(await until(async () => (await admin.url()).includes(`client=${company}`) && JSON.stringify(await blockedCells()) === JSON.stringify([`day:${Number(today.slice(8))}`]))), JSON.stringify(await blockedCells()));
+  const bar = (await admin.ev(`document.querySelector('[data-blocked-time]')?.innerText.replace(/\\s+/g, ' ') ?? ''`)) ?? "";
+  check("…the block listed with its project, the one whose calendar it is on", bar.includes("All day · Office closed") && bar.includes(`${TAG} Appts`) && !bar.includes("Not theirs"), bar);
+  check("…to look at: a project is chosen to add or take one off", /Choose a project to block out time/.test(bar)
+    && (await admin.ev(`document.querySelectorAll('[data-blocked-time] [data-remove-block], [data-blocked-time] [data-block-out]').length`)) === 0);
+  await admin.go(`/calendar?view=month&d=${today}`, 4000);
+  check("every client's calendars together show no blocked time: a project or client is chosen for that", (await blockedCells()).length === 0 && !(await admin.ev(`!!document.querySelector('[data-blocked-time]')`)));
+
+  section("A client with more than one calendar");
+  // Their own calendars together are their client calendar: its blocked time shows without choosing one.
+  sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Appts West`)}, ${company}, ${type("APPT")}, 1)`);
+  sql(`update public.users set company_id = ${company} where id = ${CLIENT_USER}`);
+  const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1440, height: 1000 });
+  await client.go(`/calendar?view=month&d=${today}`, 5000);
+  const theirs = await until(() => client.ev(`[...document.querySelectorAll('button[data-blocked]')].map((b) => b.dataset.blocked + ':' + b.querySelector('span span')?.textContent.trim())`).then((l) => l.length && l));
+  check("the month shades the day blocked out on either", JSON.stringify(theirs) === JSON.stringify([`day:${Number(today.slice(8))}`]), JSON.stringify(theirs));
+  check("…and lists it with its project", ((await client.ev(`document.querySelector('[data-blocked-time]')?.innerText`)) ?? "").includes(`${TAG} Appts`));
+  client.close();
+
   section("A DB dev project's page");
   await admin.go(`/projects/${DBDV}`, 5000);
   const dl = await until(() => admin.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent.trim())`).then((l) => l.length >= 6 && l));
@@ -85,8 +119,9 @@ try {
 } finally {
   browser.close();
   sql(`delete from public.leads where company_name like ${lit(`${TAG}%`)}`);
-  sql(`delete from public.projects where id in (${DBDV}, ${APPT})`);
-  sql(`delete from public.companies where id = ${company}`);
+  sql(`update public.users set company_id = ${clientCompany} where id = ${CLIENT_USER}`);
+  sql(`delete from public.projects where id in (${DBDV}, ${APPT}, ${OTHER}) or name = ${lit(`${TAG} Appts West`)}`);
+  sql(`delete from public.companies where id in (${company}, ${otherCompany})`);
 }
 
 finish("client stats (browser)");

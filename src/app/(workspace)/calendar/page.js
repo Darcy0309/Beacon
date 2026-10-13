@@ -9,7 +9,8 @@ import ParamSelect from "@/components/shared/param-select";
 import BlockedTime from "@/features/calendar/components/blocked-time";
 import { dayMarks } from "@/lib/project-calendar";
 import CalendarSync from "@/features/calendar/components/calendar-sync";
-import { getCalendarProjects, getMyCalendarFeed, getProjectCalendar } from "@/features/calendar/queries";
+import { getBlocksAcross, getCalendarProjects, getMyCalendarFeed, getProjectCalendar } from "@/features/calendar/queries";
+import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +50,14 @@ export default async function CalendarPage({ searchParams }) {
   const [projectCalendar, myFeed] = openId
     ? await Promise.all([getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }), getMyCalendarFeed(openId)])
     : [null, null];
-  const upcoming = (projectCalendar?.blocks ?? []).filter((b) => b.endsOn >= today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
-  const blockedDays = projectCalendar
-    ? Object.fromEntries(Object.entries(dayMarks({ blocks: projectCalendar.blocks }, projectCalendar.from, projectCalendar.to)).map(([d, m]) => [d, m.blocked]))
+  // Several calendars together (a client's projects; for a client, every one of their own): the
+  // time blocked out on any of them shows too, each block with its project.
+  const togetherIds = openId ? null : scope ? projectIds : (await getCurrentUser())?.role === "client" ? calendars.map((c) => c.value) : null;
+  const together = togetherIds?.length ? await getBlocksAcross({ projectIds: togetherIds, from: monthGrid(shown.from)[0], to: shown.to }) : null;
+  const blocks = projectCalendar?.blocks ?? together;
+  const upcoming = (blocks ?? []).filter((b) => b.endsOn >= today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  const blockedDays = blocks
+    ? Object.fromEntries(Object.entries(dayMarks({ blocks }, monthGrid(shown.from)[0], shown.to)).map(([d, m]) => [d, m.blocked]))
     : null;
   const viewHrefs = Object.fromEntries(VIEWS.map((v) => [v, href(v, anchor)]));
   const year = Number(anchor.slice(0, 4));
@@ -109,6 +115,8 @@ export default async function CalendarPage({ searchParams }) {
               <BlockedTime projectId={projectCalendar.projectId} blocks={upcoming} today={today}>
                 <CalendarSync projectId={projectCalendar.projectId} feed={myFeed} />
               </BlockedTime>
+            ) : together ? (
+              <BlockedTime blocks={upcoming} today={today} />
             ) : calendars.length ? (
               <span className="text-xs text-muted-foreground">Choose a project to see and block out time on its calendar.</span>
             ) : null}
