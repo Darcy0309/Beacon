@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/shared/intent-link";
 import {
-  CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight,
+  CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight, Ban,
   Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText,
 } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
@@ -16,6 +16,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { telHref } from "@/lib/format";
+import { blockDays, blockHours } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
@@ -43,6 +44,16 @@ const DEFAULT_START_HOUR = 7;
 const DEFAULT_END_HOUR = 19;
 /** timeRank() yields 1441 for a time it cannot parse; those get their own strip. */
 const UNTIMED = 24 * 60;
+
+// Time blocked out on a project's calendar (calendar_blocks), as getProjectCalendar() shapes it.
+const blocksDay = (b, day) => day >= b.startsOn && day <= b.endsOn;
+// Its note and who blocked it; a busy time from someone's own calendar says only whose.
+const blockNote = (b) => (b.synced ? (b.by ? `${b.by}'s calendar` : "A connected calendar") : [b.note, b.by ? `by ${b.by}` : null].filter(Boolean).join(" · "));
+const blockTitle = (b) => [b.synced ? "Busy" : "Blocked", blockHours(b), blockNote(b), b.project].filter(Boolean).join(" · ");
+const BLOCKED_FILL = {
+  borderColor: "color-mix(in srgb, var(--neon-amber) 40%, transparent)",
+  backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 20%, transparent) 0 4px, color-mix(in srgb, var(--neon-amber) 6%, transparent) 4px 9px)",
+};
 
 /**
  * What a hover over an appointment shows (TipLayer): who, when, how it
@@ -247,7 +258,7 @@ function AppointmentDialog({ a, onClose }) {
 /* --------------------------------------------------------------------------
    Day and week: an hour grid with appointments placed by start time.
    -------------------------------------------------------------------------- */
-function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null }) {
+function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null, blocks = null }) {
   const [nowMin, setNowMin] = useState(null);
 
   // The "now" line, refreshed every minute, on the business's clock: "today"
@@ -267,9 +278,14 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
   const untimed = rows.filter((a) => a.startMin >= UNTIMED);
   const tips = useMemo(() => appointmentTips(rows), [rows]);
 
+  // Time blocked out on the days shown: whole days head their column, part of a day is banded across its hours.
+  const shownBlocks = (blocks ?? []).filter((b) => days.some((d) => blocksDay(b, d.date)));
+  const dayLong = shownBlocks.filter((b) => b.start == null);
+  const partial = shownBlocks.filter((b) => b.start != null);
+
   // Widen the window to fit anything outside the usual working day.
-  const startHour = Math.min(DEFAULT_START_HOUR, ...timed.map((a) => Math.floor(a.startMin / 60)));
-  const endHour = Math.max(DEFAULT_END_HOUR, ...timed.map((a) => Math.ceil(endOf(a) / 60)));
+  const startHour = Math.min(DEFAULT_START_HOUR, ...timed.map((a) => Math.floor(a.startMin / 60)), ...partial.map((b) => Math.floor(b.start / 60)));
+  const endHour = Math.max(DEFAULT_END_HOUR, ...timed.map((a) => Math.ceil(endOf(a) / 60)), ...partial.map((b) => Math.ceil(b.end / 60)));
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   const height = hours.length * HOUR_PX;
   const top = (min) => ((min - startHour * 60) / 60) * HOUR_PX;
@@ -312,6 +328,26 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
               ))}
             </div>
           </div>
+
+          {dayLong.length > 0 && (
+            <div className="flex border-b border-[var(--panel-border)]" data-blocked-all-day>
+              <div className="flex w-14 shrink-0 items-center justify-end pr-2">
+                <span className="eyebrow text-right leading-tight">All<br />day</span>
+              </div>
+              <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
+                {days.map((d) => (
+                  <div key={d.date} className="space-y-1 border-l border-[var(--panel-border)] p-1">
+                    {dayLong.filter((b) => blocksDay(b, d.date)).map((b) => (
+                      <div key={b.id} data-blocked-time-block={b.id} title={blockTitle(b)} className="flex items-center gap-1 truncate rounded px-1.5 py-1 text-[0.68rem] font-semibold" style={BLOCKED_FILL}>
+                        <Ban className="size-3 shrink-0" style={{ color: "var(--neon-amber)" }} />
+                        <span className="truncate">{b.synced ? "Busy" : "Blocked"}{blockNote(b) ? ` · ${blockNote(b)}` : ""}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {untimed.length > 0 && (
             <div className="flex border-b border-[var(--panel-border)]">
@@ -361,6 +397,18 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
               const placed = layoutDay(timed.filter((a) => a.date === d.date));
               return (
                 <div key={d.date} className={cn("relative border-l border-[var(--panel-border)]", d.isToday && "bg-primary/[0.04]")}>
+                  {/* Blocked hours, behind the appointments: a slot booked over one still shows on top of it. */}
+                  {partial.filter((b) => blocksDay(b, d.date)).map((b) => (
+                    <div key={b.id} data-blocked-time-block={b.id} title={blockTitle(b)}
+                      className="absolute inset-x-0.5 overflow-hidden rounded border px-1.5 py-0.5 text-[0.66rem] font-semibold leading-tight"
+                      style={{ top: top(b.start), height: ((b.end - b.start) / 60) * HOUR_PX, ...BLOCKED_FILL }}>
+                      <span className="flex items-center gap-1">
+                        <Ban className="size-3 shrink-0" style={{ color: "var(--neon-amber)" }} />
+                        <span className="truncate">{b.synced ? "Busy" : "Blocked"} · {blockHours(b)}</span>
+                      </span>
+                      {blockNote(b) ? <span className="block truncate font-normal text-muted-foreground">{blockNote(b)}</span> : null}
+                    </div>
+                  ))}
                   {placed.map((a) => {
                     const blockTop = top(a.startMin);
                     const blockHeight = (Math.max(a.duration, MIN_BLOCK_MIN) / 60) * HOUR_PX;
@@ -397,7 +445,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
 
       {timed.length + untimed.length === 0 && (
         <p className="border-t border-[var(--panel-border)] py-6 text-center text-sm text-muted-foreground">
-          Nothing scheduled {view === "day" ? "on this day" : "this week"}.
+          {shownBlocks.length ? "No appointments" : "Nothing scheduled"} {view === "day" ? "on this day" : "this week"}.
         </p>
       )}
     </Card>
@@ -456,7 +504,7 @@ function Block({ a, dense = false, compact = false }) {
 /* --------------------------------------------------------------------------
    Month: heat-mapped grid with a side panel for the selected day.
    -------------------------------------------------------------------------- */
-function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null }) {
+function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null, blocks = null }) {
   const dayOf = (a) => Number(String(a.date).slice(8, 10));
   // Opened from a notification: show that appointment's day.
   const focusRow = focusId == null ? null : rows.find((a) => a.id === focusId);
@@ -474,6 +522,8 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
   const isoOf = (d) => `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 
   const dayRows = selected ? rows.filter((a) => dayOf(a) === selected) : [];
+  // What is blocked out on the day picked: all day first, then by the hour.
+  const dayBlocks = selected ? (blocks ?? []).filter((b) => blocksDay(b, isoOf(selected))).sort((a, b) => (a.start ?? -1) - (b.start ?? -1)) : [];
   const tips = useMemo(() => appointmentTips(rows), [rows]);
 
   // Month overview: appointments grouped by day, in date order.
@@ -551,17 +601,18 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
           icon={CalendarClock}
           action={
             <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">
-              {selected ? `${dayRows.length} appointment${dayRows.length === 1 ? "" : "s"}` : `${count} total`}
+              {selected ? `${dayRows.length} appointment${dayRows.length === 1 ? "" : "s"}${dayBlocks.length ? ` · ${dayBlocks.length} blocked` : ""}` : `${count} total`}
             </span>
           }
         />
         <TipLayer tips={tips} delay={250} className="max-h-[34rem] space-y-1 overflow-y-auto p-4">
           {selected ? (
             <>
+              {dayBlocks.map((b) => <BlockedRow key={b.id} b={b} />)}
               {dayRows.map((a) => <ApptRow key={a.id} a={a} />)}
               {dayRows.length === 0 && (
                 <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nothing scheduled {selected === todayDay ? "today" : `on ${label(selected)}`}.
+                  {dayBlocks.length ? "No appointments" : "Nothing scheduled"} {selected === todayDay ? "today" : `on ${label(selected)}`}.
                 </p>
               )}
               <div className="flex items-center justify-between gap-3 pt-2">
@@ -602,6 +653,22 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
           )}
         </TipLayer>
       </Card>
+    </div>
+  );
+}
+
+/** Time blocked out on the day picked: when, why, by whom, and on which project's calendar when several are shown. */
+function BlockedRow({ b }) {
+  return (
+    <div data-blocked-row={b.id} className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2" style={BLOCKED_FILL}>
+      <span className="h-9 w-[3px] shrink-0 rounded-full" style={{ background: "var(--neon-amber)" }} />
+      <Ban className="size-4 shrink-0" style={{ color: "var(--neon-amber)" }} />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{b.synced ? "Busy" : "Blocked"} · {blockHours(b)}</div>
+        <div className="truncate text-xs text-muted-foreground" title={blockTitle(b)}>
+          {[b.startsOn !== b.endsOn ? blockDays(b) : null, blockNote(b), b.project].filter(Boolean).join(" · ") || "No appointments in this time"}
+        </div>
+      </div>
     </div>
   );
 }

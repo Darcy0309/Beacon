@@ -91,6 +91,31 @@ try {
     Boolean(await until(async () => /All day · Office closed/.test(await bar()) && /10:00 AM – 1:00 PM · Staff meeting/.test(await bar())))
     && Boolean(await client.ev(`[...document.querySelectorAll('button[data-blocked="day"]')].some((b) => b.getAttribute('aria-label').includes('blocked out'))`)), await bar());
   check("…one toolbar, not a second calendar", !(await client.ev(`!!document.querySelector('[data-project-calendar]')`)));
+
+  section("What is blocked, on the day");
+  // The month marks a day "Part" or "Blocked"; the day itself says which hours, and why.
+  const part = sql(`select starts_on::text from public.calendar_blocks where project_id = ${APPT} and note = 'Staff meeting'`);
+  const pickDay = async (iso) => {
+    await client.go(`/calendar?project=${APPT}&view=month&d=${iso}`, 5000);
+    await until(() => client.ev(`!![...document.querySelectorAll('button[aria-pressed]')].find((b) => b.querySelector('span span')?.textContent.trim() === '${Number(iso.slice(8))}')`));
+    if (!(await client.ev(`[...document.querySelectorAll('button[aria-pressed="true"]')].some((b) => b.querySelector('span span')?.textContent.trim() === '${Number(iso.slice(8))}')`)))
+      await client.ev(`[...document.querySelectorAll('button[aria-pressed]')].find((b) => b.querySelector('span span')?.textContent.trim() === '${Number(iso.slice(8))}').click()`);
+    return until(() => client.ev(`[...document.querySelectorAll('[data-blocked-row]')].map((r) => r.innerText.replace(/\\s+/g, ' ')).join(' | ') || null`));
+  };
+  const partRow = await pickDay(part);
+  check("a day partly blocked lists the hours and the reason", /Blocked · 10:00 AM – 1:00 PM/.test(partRow ?? "") && /Staff meeting/.test(partRow ?? ""), partRow);
+  check("…and counts it beside the appointments", /0 appointments · 1 blocked/i.test(await client.ev(`document.body.innerText`)) && /No appointments on /.test(await client.ev(`document.body.innerText`)));
+  const dayRow = await pickDay(D2);
+  check("a day blocked out says all day, and why", /Blocked · All day/.test(dayRow ?? "") && /Office closed/.test(dayRow ?? ""), dayRow);
+  await client.go(`/calendar?project=${APPT}&view=day&d=${part}`, 5000);
+  const band = await until(() => client.ev(`(() => { const b = document.querySelector('[data-blocked-time-block]'); return b ? b.innerText.replace(/\\s+/g, ' ') + ' | ' + Math.round(b.getBoundingClientRect().height) : null; })()`));
+  check("the Day view bands the blocked hours: three hours tall, saying when and why", /Blocked · 10:00 AM – 1:00 PM/.test(band ?? "") && /Staff meeting/.test(band ?? "") && / \| 168$/.test(band ?? ""), band);
+  await client.go(`/calendar?project=${APPT}&view=week&d=${D2}`, 5000);
+  const week = await until(() => client.ev(`(() => { const all = document.querySelector('[data-blocked-all-day]'); return all ? all.innerText.replace(/\\s+/g, ' ') + ' | ' + document.querySelectorAll('[data-blocked-time-block]').length : null; })()`));
+  check("the Week view heads a day blocked out with “All day”, and bands the rest", /All day/i.test(week ?? "") && /Blocked · Office closed/.test(week ?? "") && Number((week ?? "").split(" | ")[1]) >= 1, week);
+  if (process.env.SHOTS) await client.screenshot(`${process.env.SHOTS}/calendar-week-blocked.png`);
+  await client.go(`/calendar?project=${APPT}&view=month&d=${D2}`, 6000);
+  await until(async () => /All day · Office closed/.test(await bar()));
   await client.click("[data-blocked-time] [data-block-out]");
   await until(() => client.ev(`!!document.querySelector('[data-block-form]')`));
   await client.click("[data-block-form] button[type=submit]");

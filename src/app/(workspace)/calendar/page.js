@@ -142,6 +142,7 @@ export default async function CalendarPage({ searchParams }) {
           dayHrefBase={`/calendar?${only}view=day&d=`}
           focusId={focusId}
           blockedDays={blockedDays}
+          blocks={blocks}
         />
       </div>
     </>
