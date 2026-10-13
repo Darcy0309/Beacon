@@ -241,7 +241,7 @@ try {
   }
 
   section("Appt: results that keep the lead on the list");
-  for (const name of ["Lead-No Contact", "Lead-Left Message", "Lead-Email"]) {
+  for (const name of ["Lead-No Contact", "Lead-Left Message", "Lead-Email", "Lead-ClientList"]) {
     const id = newName(APPT, MIKE);
     const { error } = await record(mike, id, "APPT", name);
     const s = lead(id);
@@ -249,7 +249,7 @@ try {
   }
 
   section("Appt: results that resolve the lead");
-  for (const name of ["Lead-Never Shops", "Lead-Removed", "Lead-DoNotCall", "Lead-Out of Business", "Lead-Branch", "Lead-Not Qualified", "Lead-Client"]) {
+  for (const name of ["Lead-Never Shops", "Lead-Removed", "Lead-DoNotCall", "Lead-Out of Business", "Lead-Branch", "Lead-Not Qualified", "Lead-CurrentClient", "Lead-Disco#"]) {
     const id = newName(APPT, MIKE);
     const { error } = await record(mike, id, "APPT", name);
     check(`${name}: off the list, resolved`, !error && !(await onList(mike, APPT, id)) && lead(id).resolved && lead(id).appt === name, error?.message);
