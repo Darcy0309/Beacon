@@ -28,6 +28,7 @@ import ConversionLines from "@/features/stats/components/conversion-lines";
 import ResultBreakdown from "@/features/stats/components/result-breakdown";
 import { addMonths, monthEnd, monthStart } from "@/lib/dates";
 import { pctLabel } from "@/lib/lead-stats";
+import { cn } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -88,7 +89,7 @@ export default async function ProjectDetail({ params, searchParams }) {
       note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved${dbdev ? "" : ` · ${waiting}`}`,
       icon: Target, accent: "var(--neon-emerald)", series: byMonth("total"), bars: true },
     { label: "Appointments", value: s.appointments.toLocaleString(),
-      note: `${s.invalid.toLocaleString()} invalid · ${overview.apptsMonth} set this month · ${overview.qaPending} waiting for QA`,
+      note: `${s.invalid.toLocaleString()} invalid · ${overview.apptsMonth} this month · ${overview.qaPending} in QA`,
       icon: CalendarCheck, accent: "var(--neon-violet)", series: byMonth("appointment"), bars: true },
     dbdev
       ? { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
@@ -156,16 +157,19 @@ export default async function ProjectDetail({ params, searchParams }) {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {/* The figures in one even row; then the call results beside the calendar, each as tall as the other. */}
+        <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3", dbdev ? "xl:grid-cols-5" : "xl:grid-cols-4")}>
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <ResultBreakdown rows={results} type={p.type} className="lg:col-span-2" />
           <CalendarTile label="Project Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`project=${p.id}`}
             note={scope?.shared ? `Shared with ${scope.label}, where this project's appointments go.` : "Only this project's appointments."}
             className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
         </div>
-
-        <ResultBreakdown rows={results} type={p.type} />
 
         <ProjectTeam
           projectId={p.id}

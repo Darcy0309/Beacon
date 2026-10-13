@@ -85,19 +85,22 @@ try {
 
   section("The client's own people");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1400, height: 1000 });
-  await client.go(`/calendar?project=${APPT}`, 6000);
-  check("the Calendar page opens a project's calendar, with what is booked and blocked",
-    Boolean(await until(() => client.ev(`document.querySelector('[data-project-calendar="${APPT}"] [data-day="${D2}"]')?.dataset.blocked === 'day'`)))
-    && (await client.ev(`document.querySelector('[data-project-calendar] [data-day="${D1}"]')?.dataset.appointments`)) === "1");
-  await client.click(`[data-project-calendar] [data-day="${D1}"]`);
-  await client.click("[data-project-calendar] [data-block-out]");
+  await client.go(`/calendar?project=${APPT}&view=month&d=${D2}`, 6000);
+  const bar = () => client.ev(`document.querySelector('[data-blocked-time]')?.innerText.replace(/\\s+/g, ' ') ?? ''`);
+  check("the Calendar page opens a project's calendar: its blocked time in a line, the day shaded in the month",
+    Boolean(await until(async () => /All day · Office closed/.test(await bar()) && /10:00 AM – 1:00 PM · Staff meeting/.test(await bar())))
+    && Boolean(await client.ev(`[...document.querySelectorAll('button[data-blocked="day"]')].some((b) => b.getAttribute('aria-label').includes('blocked out'))`)), await bar());
+  check("…one toolbar, not a second calendar", !(await client.ev(`!!document.querySelector('[data-project-calendar]')`)));
+  await client.click("[data-blocked-time] [data-block-out]");
   await until(() => client.ev(`!!document.querySelector('[data-block-form]')`));
   await client.click("[data-block-form] button[type=submit]");
-  check("they block out a whole day", Boolean(await until(() => sql(`select count(*) from public.calendar_blocks where project_id = ${APPT} and starts_on = ${lit(D1)} and start_time is null`) === "1")));
-  await until(() => client.ev(`!!document.querySelector('[data-project-calendar] [data-block] [data-remove-block]')`));
+  const TODAY = inDays(0);
+  const mine = await until(() => sql(`select id from public.calendar_blocks where project_id = ${APPT} and starts_on = ${lit(TODAY)} and start_time is null`) || null);
+  check("they block out a whole day", Boolean(mine));
+  await until(() => client.ev(`!!document.querySelector('[data-blocked-time] [data-block="${mine}"] [data-remove-block]')`));
   await sleep(300);
-  await client.click("[data-project-calendar] [data-block] [data-remove-block]");
-  check("…and take it off again", Boolean(await until(() => sql(`select count(*) from public.calendar_blocks where project_id = ${APPT} and starts_on = ${lit(D1)}`) === "0")));
+  await client.click(`[data-blocked-time] [data-block="${mine}"] [data-remove-block]`);
+  check("…and take it off again", Boolean(await until(() => sql(`select count(*) from public.calendar_blocks where id = ${mine}`) === "0")));
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1400, height: 1000 });
   await admin.go(`/projects/${DBDV}`, 6000);
   check("the project's calendar tile shades the day blocked out", Boolean(await until(() => admin.ev(`document.querySelector('[data-calendar-tile] [data-tile-day="${D2}"]')?.dataset.blocked === 'day'`))));

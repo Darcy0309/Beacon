@@ -20,7 +20,7 @@ const R = 15.9155;
  * result with its colour, how many names and what share, most first, and
  * the three kinds of result summed underneath. `rows`: getResultBreakdown().
  */
-export default function ResultBreakdown({ rows, type }) {
+export default function ResultBreakdown({ rows, type, className }) {
   const all = rows.reduce((sum, r) => sum + r.names, 0);
   let turned = 0;
   const slices = rows.map((r, i) => {
@@ -30,13 +30,13 @@ export default function ResultBreakdown({ rows, type }) {
   });
   const kinds = Object.entries(KINDS).map(([key, label]) => ({ key, label, names: rows.filter((r) => r.kind === key).reduce((sum, r) => sum + r.names, 0) }));
   return (
-    <Card data-result-breakdown>
+    <Card data-result-breakdown className={className}>
       <SectionHeader wrap label={`${type === "APPT" ? "Appointment" : "DB Dev"} Call Results`} icon={PieChart}
         action={<span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">{all.toLocaleString()} names</span>} />
       {all ? (
-        <div className="flex flex-col items-center gap-6 p-5 md:flex-row md:items-start">
+        <div className="flex flex-col items-center gap-x-8 gap-y-5 p-5 sm:flex-row sm:items-center">
           <div className="w-52 shrink-0">
-            <svg viewBox="0 0 42 42" className="block w-full -rotate-90" role="img" data-result-chart
+            <svg viewBox="0 0 42 42" className="mx-auto block w-40 -rotate-90" role="img" data-result-chart
               aria-label={`Call results: ${slices.map((s) => `${s.result} ${s.names} (${share(s.share)})`).join(", ")}`}>
               <circle cx="21" cy="21" r={R} fill="none" stroke="var(--muted)" strokeWidth="5.5" />
               {slices.map((s) => (
@@ -53,14 +53,14 @@ export default function ResultBreakdown({ rows, type }) {
             </svg>
             <ul className="mt-3 space-y-0.5 text-xs text-muted-foreground">
               {kinds.map((k) => (
-                <li key={k.key} className="flex justify-between gap-2" data-result-kind={k.key}>
+                <li key={k.key} className="flex justify-between gap-2 whitespace-nowrap" data-result-kind={k.key}>
                   <span>{k.label}</span>
                   <span className="tabular-nums"><strong className="text-foreground">{k.names.toLocaleString()}</strong> ({share((k.names / all) * 100)})</span>
                 </li>
               ))}
             </ul>
           </div>
-          <ul className="grid w-full min-w-0 flex-1 grid-cols-1 content-start gap-x-8 gap-y-1.5 sm:grid-cols-2">
+          <ul className="grid w-full min-w-0 flex-1 grid-cols-1 content-center gap-x-8 gap-y-1.5 min-[1100px]:grid-cols-2">
             {slices.map((s) => (
               <li key={s.result} data-result-row={s.result} className="flex items-center gap-2.5 text-sm">
                 <span className="size-2.5 shrink-0 rounded-sm" style={{ background: s.color }} />

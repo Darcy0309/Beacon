@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Check, ChevronDown, Filter, Search, SlidersHorizontal, X } from "lucide-react";
-import SectionHeader from "@/components/shared/section-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -121,6 +120,8 @@ export default function CallListFilters({ projectId, criteria, options, matching
   const router = useRouter();
   const [draft, setDraft] = useState(criteria);
   const [saving, startSaving] = useTransition();
+  // One line until it is wanted: the list comes first, and what is applied shows on that line.
+  const [open, setOpen] = useState(false);
   useEffect(() => setDraft(criteria), [criteria]);
 
   const clean = cleanCriteria(draft);
@@ -151,13 +152,34 @@ export default function CallListFilters({ projectId, criteria, options, matching
 
   return (
     <Card data-call-list-filters>
-      <SectionHeader wrap label="Filter this list" icon={SlidersHorizontal}
-        action={
-          <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground" data-filter-count>
-            {applied.length ? `${matching.toLocaleString()} of ${all.toLocaleString()} names match` : `${all.toLocaleString()} names, no filter`}
-          </span>
-        } />
-      <div className="space-y-4 p-5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-2.5">
+        <div className="flex shrink-0 items-center gap-2.5">
+          <span aria-hidden className="h-3.5 w-[3px] rounded-full bg-primary" />
+          <SlidersHorizontal className="size-3.5 text-primary" />
+          <span className="eyebrow">Filter this list</span>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" data-applied-filters>
+          {applied.length ? applied.map((a) => (
+            <span key={a.key} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
+              a.exclude ? "border-rose-400/40 text-rose-500" : "border-primary/40 text-primary")}>
+              <Filter className="size-3" /> {a.text}
+            </span>
+          )) : <span className="text-xs text-muted-foreground">No filter: every name left to call.</span>}
+        </div>
+        <span className="shrink-0 text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground" data-filter-count>
+          {applied.length ? `${matching.toLocaleString()} of ${all.toLocaleString()} names match` : `${all.toLocaleString()} names, no filter`}
+        </span>
+        {applied.length ? (
+          <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => { setDraft({}); save({}); }} data-clear-filters>
+            <X /> Clear all
+          </Button>
+        ) : null}
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen((o) => !o)} aria-expanded={open} data-toggle-filters>
+          {open ? "Close" : applied.length ? "Change" : "Filter"} <ChevronDown className={cn("transition-transform duration-150", open && "rotate-180")} />
+        </Button>
+      </div>
+      {open ? (
+      <div className="space-y-4 border-t border-[var(--panel-border)] p-5">
         {/* When it renews: a window of the year, or one month with a click. */}
         <div className="space-y-2" data-renewal-filter>
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -196,7 +218,7 @@ export default function CallListFilters({ projectId, criteria, options, matching
         </div>
 
         {/* Everything else: values to include or exclude. */}
-        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           {FILTER_FIELDS.map((field) => {
             const c = draft[field.key] ?? { values: [], exclude: false };
             return (
@@ -213,30 +235,16 @@ export default function CallListFilters({ projectId, criteria, options, matching
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--panel-border)] pt-4">
-          <div className="flex min-w-0 flex-wrap gap-1.5" data-applied-filters>
-            {applied.length ? applied.map((a) => (
-              <span key={a.key} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs",
-                a.exclude ? "border-rose-400/40 text-rose-500" : "border-primary/40 text-primary")}>
-                <Filter className="size-3" /> {a.text}
-              </span>
-            )) : <span className="text-xs text-muted-foreground">No filter: every name left to call.</span>}
-            {/* Kept through the day (a lunch break, a restart); the list starts in full each morning. */}
-            <span className="w-full text-[0.66rem] text-muted-foreground" data-filter-lasts>
-              {applied.length ? "Kept for today; your list starts in full again tomorrow morning." : "A filter you apply is kept for the rest of today."}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {applied.length || Object.keys(clean).length ? (
-              <Button type="button" variant="ghost" size="sm" disabled={saving} onClick={() => { setDraft({}); save({}); }} data-clear-filters>
-                <X /> Clear all
-              </Button>
-            ) : null}
-            <Button type="button" size="sm" disabled={saving || !dirty} onClick={() => save(draft)} data-apply-filters>
-              <Filter /> {saving ? "Applying…" : "Apply filters"}
-            </Button>
-          </div>
+          {/* Kept through the day (a lunch break, a restart); the list starts in full each morning. */}
+          <span className="text-xs text-muted-foreground" data-filter-lasts>
+            {applied.length ? "Kept for today; your list starts in full again tomorrow morning." : "A filter you apply is kept for the rest of today."}
+          </span>
+          <Button type="button" size="sm" disabled={saving || !dirty} onClick={() => save(draft)} data-apply-filters>
+            <Filter /> {saving ? "Applying…" : "Apply filters"}
+          </Button>
         </div>
       </div>
+      ) : null}
     </Card>
   );
 }

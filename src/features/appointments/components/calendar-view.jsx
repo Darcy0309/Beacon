@@ -456,7 +456,7 @@ function Block({ a, dense = false, compact = false }) {
 /* --------------------------------------------------------------------------
    Month: heat-mapped grid with a side panel for the selected day.
    -------------------------------------------------------------------------- */
-function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null }) {
+function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null }) {
   const dayOf = (a) => Number(String(a.date).slice(8, 10));
   // Opened from a notification: show that appointment's day.
   const focusRow = focusId == null ? null : rows.find((a) => a.id === focusId);
@@ -502,14 +502,17 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
               const isToday = d === todayDay;
               const isSelected = d === selected;
               const heat = n ? 0.25 + (n / busiest) * 0.55 : 0;
+              // Time blocked out on the project's calendar: the whole day ("day") or part of it.
+              const blocked = blockedDays?.[isoOf(d)] ?? null;
               return (
                 <button
                   key={i}
                   type="button"
                   onClick={() => toggle(d)}
                   aria-pressed={isSelected}
-                  aria-label={`${label(d)}, ${n} appointment${n === 1 ? "" : "s"}`}
-                  title={n ? `${n} appointment${n === 1 ? "" : "s"}` : undefined}
+                  aria-label={`${label(d)}, ${n} appointment${n === 1 ? "" : "s"}${blocked ? (blocked === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
+                  title={[n ? `${n} appointment${n === 1 ? "" : "s"}` : null, blocked ? (blocked === "day" ? "Blocked out" : "Partly blocked out") : null].filter(Boolean).join(" · ") || undefined}
+                  data-blocked={blocked || undefined}
                   className={cn(
                     "group relative flex min-h-[4.25rem] flex-col rounded-lg border p-1.5 text-left transition-all duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -517,9 +520,14 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
                     isToday && !isSelected && "border-primary/60 bg-primary/10 shadow-[0_0_18px_-6px_var(--primary)]",
                     isSelected && "border-primary bg-primary/15 ring-1 ring-primary/50 shadow-[0_0_18px_-6px_var(--primary)]"
                   )}
-                  style={n && !isToday && !isSelected ? { background: `color-mix(in srgb, var(--primary) ${Math.round(heat * 18)}%, transparent)` } : undefined}
+                  style={blocked === "day" && !isSelected
+                    ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 22%, transparent) 0 4px, transparent 4px 9px)" }
+                    : n && !isToday && !isSelected ? { background: `color-mix(in srgb, var(--primary) ${Math.round(heat * 18)}%, transparent)` } : undefined}
                 >
-                  <span className={cn("text-xs font-semibold tabular-nums", isToday || isSelected ? "text-primary" : "text-foreground/80")}>{d}</span>
+                  <span className="flex items-center justify-between">
+                    <span className={cn("text-xs font-semibold tabular-nums", isToday || isSelected ? "text-primary" : "text-foreground/80")}>{d}</span>
+                    {blocked ? <span className="text-[0.52rem] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--neon-amber)" }}>{blocked === "day" ? "Blocked" : "Part"}</span> : null}
+                  </span>
                   {n ? (
                     <span className="mt-auto flex items-center justify-between">
                       <span className="flex gap-0.5">

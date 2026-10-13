@@ -42,7 +42,7 @@ try {
   check("1D to begin with: today from 5 AM to 6 PM, counted up to 100", (await current()) === "1D" && /5 AM/.test(await chart()) && /6 PM/.test(await chart()) && /\b100\b/.test(await chart()), await current());
   const leads = await admin.ev(`document.querySelector('[data-production-stats="leads"]')?.innerText ?? ''`);
   check("…today's leads and appointments, with high, low, average an hour and per hour worked",
-    /LEADS\s*[2-9]/i.test(leads) && /High/i.test(leads) && /Avg \/ hour/i.test(leads) && /Per hour/i.test(leads), leads);
+    /LEADS\s*[2-9]/i.test(leads) && /High/i.test(leads) && /Avg\/hr/i.test(leads) && /Per hour/i.test(leads), leads);
   check("…both lines", await admin.ev(`!!document.querySelector('[data-line="leads"]') && !!document.querySelector('[data-line="appts"]')`));
   await admin.click('[data-chart-series] button', "Appointments");
   check("one or the other", Boolean(await until(() => admin.ev(`!document.querySelector('[data-line="leads"]') && !!document.querySelector('[data-line="appts"]')`))));
@@ -53,7 +53,7 @@ try {
     await admin.click("[data-chart-ranges] a", r);
     check(`${r}`, Boolean(await until(async () => (await current()) === r && (await admin.url()).includes(`pr=${r}`))), await admin.url());
   }
-  check("…by the day, its average a day", /Avg \/ (day|week)/i.test(await chart()));
+  check("…by the day, its average a day", /Avg\/(day|wk)/i.test(await chart()));
   await admin.go("/?pr=1Y", 4000);
   check("More: a year (or two, or a range of one's own)", /1 year/.test(await admin.ev(`document.querySelector('[data-chart-more]')?.textContent ?? ''`)) && Boolean(await admin.ev(`!!document.querySelector('[data-chart-custom]')`)));
 

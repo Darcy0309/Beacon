@@ -40,6 +40,10 @@ try {
 
   section("Narrowing the list to a renewal month");
   check("the filter sits over the list, with every name to start", Boolean(await until(async () => (await count()).includes(`${everyone} names, no filter`))), await count());
+  check("…one line until it is opened, so the list comes first", !(await page.ev(`!!document.querySelector('[data-call-list-filters] [data-month]')`))
+    && (await page.ev(`document.querySelector('[data-call-list-filters]').getBoundingClientRect().height`)) < 70);
+  await page.click("[data-toggle-filters]");
+  await until(() => page.ev(`!!document.querySelector('[data-call-list-filters] [data-month]')`));
   await page.click(`[data-call-list-filters] [data-month="${month}"]`);
   await page.click("[data-apply-filters]");
   const inMonth = await until(async () => { const n = await totalNow(); return n && n < everyone ? n : null; });
@@ -60,6 +64,9 @@ try {
   section("More criteria, included or excluded");
   await page.go(`/work/${PROJECT}`, 4000);
   check("the filter is still there on the next visit", (await count()).includes(`${inMonth} of ${everyone}`), await count());
+  check("…named on its one line", /Renews/.test(await page.ev(`document.querySelector('[data-applied-filters]').innerText`)));
+  await page.click("[data-toggle-filters]");
+  await until(() => page.ev(`!!document.querySelector('[data-values="sic"]')`));
   await page.click('[data-values="sic"]');
   await until(() => page.ev(`!!document.querySelector('[data-values-menu="sic"] [data-value]')`));
   const sic = await page.ev(`document.querySelector('[data-values-menu="sic"] [data-value]').dataset.value`);

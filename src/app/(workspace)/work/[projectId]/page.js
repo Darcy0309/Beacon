@@ -153,8 +153,8 @@ export default async function CallListPage({ params, searchParams }) {
                     {r.renewal}
                     {r.renewalLine ? <div className="whitespace-nowrap text-xs text-muted-foreground">{r.renewalLine}</div> : null}
                   </TableCell>
-                  <TableCell>{r.last ? <ToneBadge tone="slate">{r.result}</ToneBadge> : r.result}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.lastCalled}</TableCell>
+                  <TableCell className="whitespace-nowrap">{r.last ? <ToneBadge tone="slate">{r.result}</ToneBadge> : r.result}</TableCell>
+                  <TableCell className="whitespace-nowrap text-muted-foreground">{r.lastCalled}</TableCell>
                   {admin ? <TableCell className="text-right tabular-nums">{r.weight}</TableCell> : null}
                 </TableRow>
               ),

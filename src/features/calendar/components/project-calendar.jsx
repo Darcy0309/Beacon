@@ -22,7 +22,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
 const BLOCKED = "var(--neon-amber)";
 
 /** Block out days, or a time of day on them, on this calendar. */
-function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
+export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
   const [state, action, pending] = useActionState(addCalendarBlock, EMPTY);
   const [allDay, setAllDay] = useState(true);
   const { fe, invalid } = formHelpers(state, null);

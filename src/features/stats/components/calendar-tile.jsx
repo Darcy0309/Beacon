@@ -53,8 +53,10 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
           <button type="button" className={step} disabled={!canNext} onClick={() => setMonth(addMonths(month, 1))} aria-label="Next month"><ChevronRight className="size-3.5" /></button>
         </div>
 
-        <div className="mt-1 grid grid-cols-7 gap-px text-center" role="grid" aria-label={formatIso(month, "month")}>
+        <div className="mt-1 grid grid-cols-7 gap-px text-center" aria-hidden>
           {DOW.map((d, i) => <div key={i} className="text-[0.55rem] font-bold uppercase text-muted-foreground">{d}</div>)}
+        </div>
+        <div className="grid flex-1 grid-cols-7 gap-px text-center [grid-auto-rows:minmax(1.25rem,1fr)]" role="grid" aria-label={formatIso(month, "month")}>
           {grid.map((day) => {
             const count = days[day] ?? 0;
             const dim = !sameMonth(day, month);
@@ -66,7 +68,7 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
                   ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 35%, transparent) 0 2px, transparent 2px 5px)" }
                   : { boxShadow: "inset 0 -2px 0 var(--neon-amber)" }) : undefined}
                 className={cn(
-                  "relative flex h-5 items-center justify-center rounded text-[0.65rem] tabular-nums transition-colors hover:bg-muted",
+                  "relative flex min-h-5 items-center justify-center rounded text-[0.65rem] tabular-nums transition-colors hover:bg-muted",
                   dim && "text-muted-foreground/40",
                   count && !dim && "bg-primary/20 font-bold text-primary hover:bg-primary/30",
                   day === today && "ring-1 ring-primary"
@@ -77,7 +79,7 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
             );
           })}
         </div>
-        {note ? <p className="mt-auto pt-2 text-[0.62rem] leading-tight text-muted-foreground">{note}</p> : null}
+        {note ? <p className="pt-2 text-[0.62rem] leading-tight text-muted-foreground">{note}</p> : null}
       </div>
     </div>
   );

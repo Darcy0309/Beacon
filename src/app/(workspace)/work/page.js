@@ -108,7 +108,7 @@ export default async function WorkPage() {
                   <TableCell className="text-right">
                     <Link
                       href={`/work/${p.id}`}
-                      className="inline-flex items-center gap-1 rounded-md border border-[var(--panel-border)] px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-primary transition-colors hover:border-primary/40"
+                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-[var(--panel-border)] px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.1em] text-primary transition-colors hover:border-primary/40"
                     >
                       Call list <ArrowRight className="size-3" />
                     </Link>

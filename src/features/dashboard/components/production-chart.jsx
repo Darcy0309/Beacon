@@ -108,7 +108,8 @@ function GoalsDialog({ goals, month: start }) {
 /** One series' figures under the chart. */
 function Stats({ label, color, s, per }) {
   const items = [
-    ["High", fmt(s.high)], ["Low", fmt(s.low)], [`Avg / ${per}`, fmt(s.average, 1)],
+    // Short enough to read whole in a narrow column.
+    ["High", fmt(s.high)], ["Low", fmt(s.low)], [`Avg/${{ hour: "hr", week: "wk" }[per] ?? per}`, fmt(s.average, 1)],
     ["Per hour", s.perHour == null ? "—" : fmt(s.perHour, 2), s.targetPerHour != null ? `aim ${fmt(s.targetPerHour, 1)}` : null,
       s.perHour != null && s.targetPerHour != null ? (s.perHour >= s.targetPerHour ? "ok" : "low") : null],
     ["Of goal", s.ofGoal == null ? "—" : `${s.ofGoal}%`,
@@ -120,7 +121,7 @@ function Stats({ label, color, s, per }) {
         <span className="size-2 rounded-full" style={{ background: color }} /> {label}
         <span className="ml-auto text-sm font-bold normal-case tracking-normal text-foreground tabular-nums">{fmt(s.total)}</span>
       </div>
-      <dl className="grid grid-cols-5 gap-2">
+      <dl className="grid grid-cols-[repeat(3,minmax(0,0.8fr))_repeat(2,minmax(0,1.2fr))] gap-2">
         {items.map(([k, v, sub, tone]) => (
           <div key={k} className="min-w-0">
             <dt className="truncate text-[0.6rem] uppercase tracking-[0.1em] text-muted-foreground" title={k === "Per hour" ? "Per hour worked" : undefined}>{k}</dt>

@@ -38,7 +38,9 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
   const id = `spark-${hash.toString(36)}`;
 
   if (bars) {
-    const bw = W / (data.length * 1.6);
+    // Never wider than a bar of a full chart: two or three values are slim bars in their places, not slabs.
+    const slot = W / data.length;
+    const bw = Math.min(slot / 1.6, 14);
     return (
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className={className} aria-hidden>
         {data.map((v, i) => {
@@ -47,7 +49,7 @@ export default function Sparkline({ values = [], color = "var(--primary)", class
           return (
             <rect
               key={i}
-              x={(i * W) / data.length + bw * 0.3}
+              x={i * slot + (slot - bw) / 2}
               y={BASE + 1 - h}
               width={bw}
               height={h}

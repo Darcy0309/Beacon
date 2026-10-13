@@ -237,6 +237,133 @@ export default async function Dashboard({ searchParams }) {
     ];
   }
 
+  // The cards under the tiles, laid out by role below.
+  const scheduleCard = (
+          <Card>
+            <SectionHeader label="Today's Schedule" icon={CalendarClock} href="/appointments" action="All" />
+            <div className="space-y-1 p-4">
+              {appointments.today.length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">Nothing scheduled today.</p>
+              )}
+              {appointments.today.map((a) => (
+                // Opens the appointment on the calendar, highlighted.
+                <Link key={a.id} href={`/calendar?view=day&d=${a.date}&a=${a.id}`} data-list-row data-schedule-link={a.id}
+                  className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60">
+                  <span className={`h-9 w-[3px] rounded-full ${a.bar}`} />
+                  <div className="w-14 shrink-0 text-sm font-bold tabular-nums">
+                    {a.time}
+                    <span className="block text-[0.58rem] font-semibold tracking-[0.1em] text-muted-foreground">{a.ampm}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{a.co}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {a.detail.split(" · ").slice(0, 2).join(" · ")}
+                    </div>
+                  </div>
+                  {/* Rep initials are internal staffing detail. */}
+                  {view.reps ? (
+                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-[0.6rem] font-bold text-white"
+                      style={{ background: a.repC }} title={a.rep}>
+                      {a.repI}
+                    </span>
+                  ) : null}
+                </Link>
+              ))}
+            </div>
+          </Card>
+  );
+  const recentCard = (className) => (
+          <Card className={className}>
+            <SectionHeader label="Recent Leads" icon={ListChecks} href="/leads" action="Open leads" />
+            <FilterTable
+              columns={["Company", "Contact", "Status", "X-Date", ...(view.reps ? ["Assigned"] : [])]}
+              filters={[{ key: "status", label: "Status" }]}
+              placeholder="Search recent leads…"
+              empty="No leads yet."
+              rows={recentLeads.map((l) => {
+                const status = STATUS[l.status]?.label ?? STATUS.new.label;
+                return {
+                  id: l.id,
+                  search: `${l.co} ${l.city} ${l.contact} ${status} ${l.rep}`,
+                  facets: { status },
+                  node: (
+                    <TableRow>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white"
+                            style={{ background: l.color }}>
+                            {l.initials}
+                          </span>
+                          <div>
+                            <Link href={`/leads/${l.id}`} className="font-medium transition-colors hover:text-primary">
+                              {l.co}
+                            </Link>
+                            <div className="text-xs text-muted-foreground">{l.city}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{l.contact}</TableCell>
+                      <TableCell><StatusBadge status={l.status} /></TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
+                      {view.reps ? (
+                        <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
+                      ) : null}
+                    </TableRow>
+                  ),
+                };
+              })}
+            />
+          </Card>
+  );
+  const sideCards = (
+    <>
+            {view.reps ? (
+              <Card>
+                <SectionHeader label="Appointments by Rep" icon={Radio} />
+                <div className="space-y-3 p-4">
+                  {reps.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No appointments recorded yet.</p>
+                  )}
+                  {reps.map((r, i) => (
+                    <MetricBar key={r.name} label={r.name} value={r.appts}
+                      max={reps[0]?.appts || 1} color={BAR_COLORS[i % BAR_COLORS.length]} />
+                  ))}
+                </div>
+              </Card>
+            ) : null}
+
+            {view.campaigns ? (
+              <Card>
+                <SectionHeader label="Delivery by Campaign" icon={FolderKanban} href="/projects" action="All" />
+                <div className="space-y-3 p-4">
+                  {campaigns.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No campaigns yet.</p>
+                  )}
+                  {campaigns.map((p, i) => (
+                    <MetricBar key={p.id} label={p.name} value={p.leads}
+                      max={maxCampaign} color={BAR_COLORS[i % BAR_COLORS.length]} />
+                  ))}
+                </div>
+              </Card>
+            ) : null}
+
+            {view.statusMix ? (
+              <Card>
+                <SectionHeader label="Leads by Status" icon={PieChart} href="/reports" action="Reports" />
+                <div className="space-y-2.5 p-4">
+                  {Object.entries(report?.byStatus ?? {}).map(([name, count]) => (
+                    <MetricBar key={name} label={name} value={count} max={report?.leads || 1}
+                      color={STATUS_COLORS[name] ?? "var(--neon-cyan)"} />
+                  ))}
+                  {Object.keys(report?.byStatus ?? {}).length === 0 && (
+                    <p className="text-sm text-muted-foreground">No leads yet.</p>
+                  )}
+                </div>
+              </Card>
+            ) : null}
+    </>
+  );
+
   return (
     <>
       <Topbar
@@ -302,20 +429,30 @@ export default async function Dashboard({ searchParams }) {
                 <DevelopedCard rows={manager.developed} view={manager.recent}
                   {...viewControls(sp, manager.recent, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
               </div>
-              <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long")} />
+              <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long").replace(/, \d{4}$/, "")} />
             </div>
           </>
+        ) : (
+        <>
+        {chart ? (
+          // An administrator: the chart and the leads down the left, the day's schedule and the reps down
+          // the right, each column its own length, so no card is stretched to match a taller neighbour.
+          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <ProductionChart data={chart.data} range={chart.range} goals={chart.goals} options={chart.options}
+                selected={chart.selected} params={otherParams(sp)} today={businessToday} />
+              {recentCard()}
+            </div>
+            <div className="space-y-4">
+              {scheduleCard}
+              {sideCards}
+            </div>
+          </div>
         ) : (
         <>
         {/* volume over time + today */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* The monthly chart fills its card, which grows beside a long schedule. */}
-          {chart ? (
-            <div className="flex flex-col lg:col-span-2 [&>*]:flex-1">
-              <ProductionChart data={chart.data} range={chart.range} goals={chart.goals} options={chart.options}
-                selected={chart.selected} params={otherParams(sp)} today={businessToday} />
-            </div>
-          ) : (
           <Card className={view.trend === "weeks" ? "lg:col-span-2" : "flex flex-col lg:col-span-2"}>
             {view.trend === "weeks" ? (
               <LeadVolumeChart days={volume} fallback={s.weeks} today={businessToday} />
@@ -356,133 +493,18 @@ export default async function Dashboard({ searchParams }) {
               </>
             )}
           </Card>
-          )}
 
-          <Card>
-            <SectionHeader label="Today's Schedule" icon={CalendarClock} href="/appointments" action="All" />
-            <div className="space-y-1 p-4">
-              {appointments.today.length === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">Nothing scheduled today.</p>
-              )}
-              {appointments.today.map((a) => (
-                // Opens the appointment on the calendar, highlighted.
-                <Link key={a.id} href={`/calendar?view=day&d=${a.date}&a=${a.id}`} data-list-row data-schedule-link={a.id}
-                  className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-muted/60">
-                  <span className={`h-9 w-[3px] rounded-full ${a.bar}`} />
-                  <div className="w-14 shrink-0 text-sm font-bold tabular-nums">
-                    {a.time}
-                    <span className="block text-[0.58rem] font-semibold tracking-[0.1em] text-muted-foreground">{a.ampm}</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{a.co}</div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {a.detail.split(" · ").slice(0, 2).join(" · ")}
-                    </div>
-                  </div>
-                  {/* Rep initials are internal staffing detail. */}
-                  {view.reps ? (
-                    <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-[0.6rem] font-bold text-white"
-                      style={{ background: a.repC }} title={a.rep}>
-                      {a.repI}
-                    </span>
-                  ) : null}
-                </Link>
-              ))}
-            </div>
-          </Card>
+          {scheduleCard}
         </div>
 
         {/* recent leads + the side panel this role gets */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
-            <SectionHeader label="Recent Leads" icon={ListChecks} href="/leads" action="Open leads" />
-            <FilterTable
-              columns={["Company", "Contact", "Status", "X-Date", ...(view.reps ? ["Assigned"] : [])]}
-              filters={[{ key: "status", label: "Status" }]}
-              placeholder="Search recent leads…"
-              empty="No leads yet."
-              rows={recentLeads.map((l) => {
-                const status = STATUS[l.status]?.label ?? STATUS.new.label;
-                return {
-                  id: l.id,
-                  search: `${l.co} ${l.city} ${l.contact} ${status} ${l.rep}`,
-                  facets: { status },
-                  node: (
-                    <TableRow>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white"
-                            style={{ background: l.color }}>
-                            {l.initials}
-                          </span>
-                          <div>
-                            <Link href={`/leads/${l.id}`} className="font-medium transition-colors hover:text-primary">
-                              {l.co}
-                            </Link>
-                            <div className="text-xs text-muted-foreground">{l.city}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{l.contact}</TableCell>
-                      <TableCell><StatusBadge status={l.status} /></TableCell>
-                      <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
-                      {view.reps ? (
-                        <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
-                      ) : null}
-                    </TableRow>
-                  ),
-                };
-              })}
-            />
-          </Card>
+          {recentCard("lg:col-span-2")}
 
-          <div className="space-y-4">
-            {view.reps ? (
-              <Card>
-                <SectionHeader label="Appointments by Rep" icon={Radio} />
-                <div className="space-y-3 p-4">
-                  {reps.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No appointments recorded yet.</p>
-                  )}
-                  {reps.map((r, i) => (
-                    <MetricBar key={r.name} label={r.name} value={r.appts}
-                      max={reps[0]?.appts || 1} color={BAR_COLORS[i % BAR_COLORS.length]} />
-                  ))}
-                </div>
-              </Card>
-            ) : null}
-
-            {view.campaigns ? (
-              <Card>
-                <SectionHeader label="Delivery by Campaign" icon={FolderKanban} href="/projects" action="All" />
-                <div className="space-y-3 p-4">
-                  {campaigns.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No campaigns yet.</p>
-                  )}
-                  {campaigns.map((p, i) => (
-                    <MetricBar key={p.id} label={p.name} value={p.leads}
-                      max={maxCampaign} color={BAR_COLORS[i % BAR_COLORS.length]} />
-                  ))}
-                </div>
-              </Card>
-            ) : null}
-
-            {view.statusMix ? (
-              <Card>
-                <SectionHeader label="Leads by Status" icon={PieChart} href="/reports" action="Reports" />
-                <div className="space-y-2.5 p-4">
-                  {Object.entries(report?.byStatus ?? {}).map(([name, count]) => (
-                    <MetricBar key={name} label={name} value={count} max={report?.leads || 1}
-                      color={STATUS_COLORS[name] ?? "var(--neon-cyan)"} />
-                  ))}
-                  {Object.keys(report?.byStatus ?? {}).length === 0 && (
-                    <p className="text-sm text-muted-foreground">No leads yet.</p>
-                  )}
-                </div>
-              </Card>
-            ) : null}
-          </div>
+          <div className="space-y-4">{sideCards}</div>
         </div>
+        </>
+        )}
         </>
         )}
       </div>

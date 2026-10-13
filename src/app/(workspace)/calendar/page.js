@@ -1,14 +1,14 @@
 import Topbar from "@/components/layout/topbar";
 import CalendarView from "@/features/appointments/components/calendar-view";
 import { getCalendarMonth, getCalendarRange } from "@/features/appointments/queries";
-import { addDays, addMonths, formatIso, formatRange, isIsoDate, makeIso, monthGrid, monthStart, weekdayOf } from "@/lib/dates";
+import { addDays, addMonths, formatIso, formatRange, isIsoDate, makeIso, monthEnd, monthGrid, monthStart, weekdayOf } from "@/lib/dates";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import Link from "@/components/shared/intent-link";
 import { getCalendarScope } from "@/features/stats/queries";
 import ParamSelect from "@/components/shared/param-select";
-import ProjectCalendar from "@/features/calendar/components/project-calendar";
+import BlockedTime from "@/features/calendar/components/blocked-time";
+import { dayMarks } from "@/lib/project-calendar";
 import { getCalendarProjects, getProjectCalendar } from "@/features/calendar/queries";
-import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +41,14 @@ export default async function CalendarPage({ searchParams }) {
 
   // One project's calendar, with its blocked time, to look at and to block time out on: the one
   // chosen, or the only one there is (a client with a single project).
-  const [me, calendars] = await Promise.all([getCurrentUser(), getCalendarProjects()]);
+  const calendars = await getCalendarProjects();
   const openId = id(sp?.project) ? projectIds?.[0] : calendars.length === 1 ? calendars[0].value : null;
-  const projectCalendar = openId
-    ? await getProjectCalendar({ projectId: openId, from: monthGrid(monthStart(today))[0], to: monthGrid(addMonths(monthStart(today), 2))[41] })
+  // Its blocked time: what is still to come (for the toolbar) and the month on show (shaded below).
+  const shown = { from: anchor < today ? monthStart(anchor) : today, to: monthEnd(addMonths(monthStart(anchor > today ? anchor : today), 3)) };
+  const projectCalendar = openId ? await getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }) : null;
+  const upcoming = (projectCalendar?.blocks ?? []).filter((b) => b.endsOn >= today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+  const blockedDays = projectCalendar
+    ? Object.fromEntries(Object.entries(dayMarks({ blocks: projectCalendar.blocks }, projectCalendar.from, projectCalendar.to)).map(([d, m]) => [d, m.blocked]))
     : null;
   const viewHrefs = Object.fromEntries(VIEWS.map((v) => [v, href(v, anchor)]));
   const year = Number(anchor.slice(0, 4));
@@ -85,24 +89,25 @@ export default async function CalendarPage({ searchParams }) {
     <>
       <Topbar title="Calendar" sub={`${title} · ${data.count} appointment${data.count === 1 ? "" : "s"}`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        {scope ? (
-          <div data-calendar-scope className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/40 bg-primary/8 px-4 py-2.5 text-sm">
-            <span>
-              Showing <strong>{scope.label}</strong>
-              {scope.shared ? <span className="text-muted-foreground"> (the calendar {scope.shared} shares)</span> : null}
-            </span>
-            <Link href={`/calendar?view=${view}&d=${anchor}`} className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Show every calendar</Link>
+        {/* One line: whose calendar this is, its blocked time still to come, and blocking out more. */}
+        {calendars.length || scope ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--panel-border)] bg-card/60 px-4 py-2.5" data-calendar-picker>
+            {calendars.length ? (
+              <ParamSelect name="project" label="Project calendar" placeholder="Every calendar" value={id(sp?.project) ? String(openId ?? "") : ""} options={calendars} clears={["client", "a"]} />
+            ) : null}
+            {scope && !id(sp?.project) ? (
+              <span className="flex items-center gap-3 text-sm" data-calendar-scope>
+                <span>Showing <strong>{scope.label}</strong></span>
+                <Link href={`/calendar?view=${view}&d=${anchor}`} className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Show every calendar</Link>
+              </span>
+            ) : null}
+            {scope?.shared ? <span className="text-xs text-muted-foreground" data-calendar-scope>Shared with {scope.shared}</span> : null}
+            {projectCalendar ? (
+              <BlockedTime projectId={projectCalendar.projectId} blocks={upcoming} today={today} />
+            ) : calendars.length ? (
+              <span className="text-xs text-muted-foreground">Choose a project to see and block out time on its calendar.</span>
+            ) : null}
           </div>
-        ) : null}
-        {calendars.length ? (
-          <div className="flex flex-wrap items-center gap-3" data-calendar-picker>
-            <ParamSelect name="project" label="Project calendar" placeholder="Every calendar" value={id(sp?.project) ? String(openId ?? "") : ""} options={calendars} clears={["client", "a"]} />
-            {!projectCalendar ? <span className="text-xs text-muted-foreground">Choose a project to see its calendar and block out time.</span> : null}
-          </div>
-        ) : null}
-        {projectCalendar ? (
-          <ProjectCalendar projectId={projectCalendar.projectId} initial={projectCalendar} today={today}
-            leadLinks={["admin", "manager", "agent"].includes(me?.role)} title="Project Calendar & Blocked Time" className="max-w-3xl" />
         ) : null}
         <CalendarView
           view={view}
@@ -123,6 +128,7 @@ export default async function CalendarPage({ searchParams }) {
           viewHrefs={viewHrefs}
           dayHrefBase={`/calendar?${only}view=day&d=`}
           focusId={focusId}
+          blockedDays={blockedDays}
         />
       </div>
     </>
