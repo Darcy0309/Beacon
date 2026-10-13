@@ -1,6 +1,8 @@
 /** A project's calendar: the appointments on it and the time blocked out. */
 
 import "server-only";
+import { after } from "next/server";
+import { refreshStaleFeeds } from "@/features/calendar/sync";
 import { minutesOf } from "@/lib/project-calendar";
 import { one } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -22,10 +24,12 @@ export async function getProjectCalendar({ projectId, from, to }) {
       .select("id, appt_date, appt_time, duration_min, confirmed_at, lead:leads(id, company_name)")
       .eq("project_id", calendarId).is("invalid_at", null).gte("appt_date", from).lte("appt_date", to).limit(2000),
     supabase.from("calendar_blocks")
-      .select("id, starts_on, ends_on, start_time, end_time, note, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)")
+      .select("id, starts_on, ends_on, start_time, end_time, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)")
       .eq("project_id", calendarId).lte("starts_on", to).gte("ends_on", from).limit(2000),
   ]);
   if (!project.data) return null;
+  // Personal calendars connected to this one are read again, once this answer has gone, when they have gone stale.
+  after(() => refreshStaleFeeds(calendarId).catch((err) => console.error("[calendar sync]", err?.message ?? err)));
   if (appts.error) throw appts.error;
   if (blocks.error) throw blocks.error;
   return {
@@ -42,6 +46,8 @@ export async function getProjectCalendar({ projectId, from, to }) {
       return {
         id: b.id, startsOn: b.starts_on, endsOn: b.ends_on, start: b.start_time ? minutesOf(b.start_time) : null,
         end: b.end_time ? minutesOf(b.end_time) : null, note: b.note,
+        // Busy on someone's own calendar (connected to this one): no more is known of it than when.
+        synced: b.feed_id != null,
         by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || null : null, byClient: by?.role === "client",
       };
     }),
@@ -61,4 +67,18 @@ export async function getCalendarProjects() {
   return (data ?? [])
     .filter((p) => one(p.type)?.code === "APPT" || !p.appt_project_id)
     .map((p) => ({ value: p.id, label: [one(p.company)?.name, p.name].filter(Boolean).join(" · ") }));
+}
+
+/**
+ * The personal calendar the signed-in person connected to a project's
+ * calendar, if any: where it is from, when it was last read and how that
+ * went. Never the link.
+ */
+export async function getMyCalendarFeed(calendarProjectId) {
+  const supabase = await createClient();
+  const { data } = await supabase.from("calendar_feeds")
+    .select("id, provider, busy_count, last_synced_at, last_error").eq("project_id", Number(calendarProjectId)).maybeSingle();
+  return data
+    ? { id: data.id, provider: data.provider, busy: data.busy_count, syncedAt: data.last_synced_at, error: data.last_error }
+    : null;
 }

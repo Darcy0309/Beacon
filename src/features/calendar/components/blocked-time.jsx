@@ -13,9 +13,13 @@ import { BlockDialog } from "@/features/calendar/components/project-calendar";
  * A project calendar's blocked time, in a line: each block still to come
  * (its days, its hours, its note) with a way to take it off, and Block out
  * time. For the Calendar page's toolbar, where the month below shades the
- * same days. `blocks`: getProjectCalendar()'s, from today on.
+ * same days. `blocks`: getProjectCalendar()'s, from today on. `children`:
+ * more for the line (Sync my calendar).
  */
-export default function BlockedTime({ projectId, blocks, today }) {
+export default function BlockedTime({ projectId, blocks: every, today, children }) {
+  // Blocked out by hand, each named; busy times from connected calendars, counted.
+  const blocks = every.filter((b) => !b.synced);
+  const synced = every.length - blocks.length;
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [removing, startRemoving] = useTransition();
@@ -44,8 +48,10 @@ export default function BlockedTime({ projectId, blocks, today }) {
         </span>
       ))}
       {blocks.length > 4 ? <span className="text-xs text-muted-foreground">+{blocks.length - 4} more</span> : null}
-      {blocks.length === 0 ? <span className="text-xs text-muted-foreground">No time blocked out.</span> : null}
+      {synced ? <span className="text-xs text-muted-foreground" data-synced-count>{synced} busy time{synced === 1 ? "" : "s"} from synced calendars</span> : null}
+      {every.length === 0 ? <span className="text-xs text-muted-foreground">No time blocked out.</span> : null}
       </div>
+      {children}
       <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setAdding(true)} data-block-out><Ban /> Block out time</Button>
       <BlockDialog open={adding} onOpenChange={setAdding} projectId={projectId} day={today}
         onDone={() => { setAdding(false); router.refresh(); }} />

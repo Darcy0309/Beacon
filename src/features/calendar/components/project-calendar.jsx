@@ -200,17 +200,22 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
           </div>
           <ul className={cn("max-h-52 flex-1 space-y-1 overflow-y-auto", removing && "opacity-60")}>
             {events.map((e) => e.kind === "block" ? (
-              <li key={e.key} data-block={e.block.id} className="flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-xs"
+              <li key={e.key} data-block={e.block.id} data-synced={e.block.synced || undefined} className="flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-xs"
                 style={{ borderColor: `color-mix(in srgb, ${BLOCKED} 45%, transparent)`, background: `color-mix(in srgb, ${BLOCKED} 8%, transparent)` }}>
                 <Ban className="mt-0.5 size-3.5 shrink-0" style={{ color: BLOCKED }} />
                 <span className="min-w-0 flex-1">
-                  <span className="font-semibold">Blocked · {blockHours(e.block)}</span>
+                  <span className="font-semibold">{e.block.synced ? "Busy" : "Blocked"} · {blockHours(e.block)}</span>
                   <span className="block truncate text-muted-foreground" title={e.block.note ?? undefined}>
-                    {[e.block.startsOn !== e.block.endsOn ? blockDays(e.block) : null, e.block.note, e.block.by ? `by ${e.block.by}` : null].filter(Boolean).join(" · ") || "No appointments"}
+                    {e.block.synced
+                      // From someone's own calendar: when they are busy, and nothing about why.
+                      ? (e.block.by ? `${e.block.by}'s calendar` : "A connected calendar")
+                      : [e.block.startsOn !== e.block.endsOn ? blockDays(e.block) : null, e.block.note, e.block.by ? `by ${e.block.by}` : null].filter(Boolean).join(" · ") || "No appointments"}
                   </span>
                 </span>
+                {e.block.synced ? null : (
                 <button type="button" onClick={() => remove(e.block.id)} disabled={removing} aria-label="Take this block off the calendar" title="Take it off the calendar" data-remove-block
                   className="shrink-0 rounded text-muted-foreground transition-colors hover:text-destructive"><X className="size-3.5" /></button>
+                )}
               </li>
             ) : (
               <li key={e.key} data-appointment={e.appointment.id} className="flex items-start gap-1.5 rounded-md bg-primary/8 px-2 py-1.5 text-xs">

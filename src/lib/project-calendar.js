@@ -77,6 +77,8 @@ export function slotClashes({ date, time, duration = 30, exceptId = null }, cale
   return eventsOn(date, calendar)
     .filter((e) => e.start < end && e.end > start && !(e.kind === "appointment" && e.appointment.id === exceptId))
     .map((e) => (e.kind === "block"
-      ? { kind: "block", text: `Blocked out ${e.block.start == null ? "all day" : blockHours(e.block)}${e.block.note ? ` (${e.block.note})` : ""}` }
+      ? { kind: "block", text: e.block.synced
+          ? `Busy ${e.block.start == null ? "all day" : blockHours(e.block)}${e.block.by ? ` on ${e.block.by}'s calendar` : " on a connected calendar"}`
+          : `Blocked out ${e.block.start == null ? "all day" : blockHours(e.block)}${e.block.note ? ` (${e.block.note})` : ""}` }
       : { kind: "appointment", text: `Already booked: ${e.appointment.time}${e.appointment.company ? ` ${e.appointment.company}` : ""}, ${e.appointment.duration ?? 30} min` }));
 }

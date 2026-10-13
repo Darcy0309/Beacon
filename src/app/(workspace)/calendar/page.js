@@ -8,7 +8,8 @@ import { getCalendarScope } from "@/features/stats/queries";
 import ParamSelect from "@/components/shared/param-select";
 import BlockedTime from "@/features/calendar/components/blocked-time";
 import { dayMarks } from "@/lib/project-calendar";
-import { getCalendarProjects, getProjectCalendar } from "@/features/calendar/queries";
+import CalendarSync from "@/features/calendar/components/calendar-sync";
+import { getCalendarProjects, getMyCalendarFeed, getProjectCalendar } from "@/features/calendar/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,9 @@ export default async function CalendarPage({ searchParams }) {
   const openId = id(sp?.project) ? projectIds?.[0] : calendars.length === 1 ? calendars[0].value : null;
   // Its blocked time: what is still to come (for the toolbar) and the month on show (shaded below).
   const shown = { from: anchor < today ? monthStart(anchor) : today, to: monthEnd(addMonths(monthStart(anchor > today ? anchor : today), 3)) };
-  const projectCalendar = openId ? await getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }) : null;
+  const [projectCalendar, myFeed] = openId
+    ? await Promise.all([getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }), getMyCalendarFeed(openId)])
+    : [null, null];
   const upcoming = (projectCalendar?.blocks ?? []).filter((b) => b.endsOn >= today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
   const blockedDays = projectCalendar
     ? Object.fromEntries(Object.entries(dayMarks({ blocks: projectCalendar.blocks }, projectCalendar.from, projectCalendar.to)).map(([d, m]) => [d, m.blocked]))
@@ -103,7 +106,9 @@ export default async function CalendarPage({ searchParams }) {
             ) : null}
             {scope?.shared ? <span className="text-xs text-muted-foreground" data-calendar-scope>Shared with {scope.shared}</span> : null}
             {projectCalendar ? (
-              <BlockedTime projectId={projectCalendar.projectId} blocks={upcoming} today={today} />
+              <BlockedTime projectId={projectCalendar.projectId} blocks={upcoming} today={today}>
+                <CalendarSync projectId={projectCalendar.projectId} feed={myFeed} />
+              </BlockedTime>
             ) : calendars.length ? (
               <span className="text-xs text-muted-foreground">Choose a project to see and block out time on its calendar.</span>
             ) : null}

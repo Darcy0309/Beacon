@@ -55,6 +55,8 @@ const ACTION_LABEL = {
   "appointment.qa_fail": "Failed an appointment in QA",
   "appointment.moved": "Moved an appointment",
   "calendar.block": "Blocked out time on a calendar",
+  "calendar.connect": "Connected their calendar",
+  "calendar.disconnect": "Disconnected their calendar",
   "calendar.unblock": "Took blocked time off a calendar",
   "production.goal": "Set production goals",
   "settings.pay": "Changed the pay rules",
