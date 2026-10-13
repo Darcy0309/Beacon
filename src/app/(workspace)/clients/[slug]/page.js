@@ -1,15 +1,21 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, FolderKanban, Target, CalendarCheck, UserCog } from "lucide-react";
+import { ArrowLeft, FolderKanban, Target, CalendarCheck, Percent } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
-import { clientSlug } from "@/lib/format";
+import { clientSlug, mediumDate } from "@/lib/format";
 import { getClientBySlug } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
 import { getProjects } from "@/features/projects/queries";
+import { getAppointmentDays, getLeadStats } from "@/features/stats/queries";
+import CalendarTile from "@/features/stats/components/calendar-tile";
+import ConversionLines from "@/features/stats/components/conversion-lines";
+import { addMonths, monthEnd, monthStart } from "@/lib/dates";
+import { pctLabel, shapeStats, statsLine } from "@/lib/lead-stats";
+import { getBusinessToday } from "@/lib/server/business-day";
 
 export const dynamic = "force-dynamic";
 
@@ -26,22 +32,28 @@ function Field({ label, children }) {
 
 export default async function ClientProfile({ params }) {
   const { slug } = await params;
-  const [c, projects] = await Promise.all([getClientBySlug(slug), getProjects()]);
+  const [c, projects, today] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday()]);
   if (!c) notFound();
 
-  const clientProjects = projects.filter((p) => p.client === c.name);
+  const clientProjects = projects.filter((p) => p.clientId === c.id);
   const delivery = `leads-${slug}@signaturemktg.net`;
-  const activeProjects = clientProjects.filter((p) => p.status === "Active").length;
+  // The client calendar: every project's appointments together, last month to three months on.
+  const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
+  const [stats, days] = await Promise.all([
+    getLeadStats({ companyId: c.id }),
+    getAppointmentDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
+  ]);
+  const s = stats.total;
+  const of = (p) => stats.byProject[p.id] ?? shapeStats(null);
 
+  // Counted by call result (lead_stats()): where each name stands, not how many were loaded.
   const tiles = [
-    { label: "Active Leads", value: String(c.leads), note: "on this account",
-      icon: Target, accent: "var(--neon-cyan)", series: clientProjects.map((p) => p.leads), bars: true },
-    { label: "Appointments", value: String(c.appts), note: "set to date",
-      icon: CalendarCheck, accent: "var(--neon-emerald)", series: clientProjects.map((p) => p.leads) },
-    { label: "Campaigns", value: String(clientProjects.length), note: `${activeProjects} active`,
-      icon: FolderKanban, accent: "var(--neon-violet)", series: clientProjects.map((p) => (p.status === "Active" ? 1 : 0.4)), bars: true },
-    { label: "Conversion", value: c.leads ? `${Math.round((c.appts / c.leads) * 100)}%` : "—", note: "leads to appointments",
-      icon: UserCog, accent: "var(--neon-amber)", series: clientProjects.map((p) => p.leads) },
+    { label: "Leads", value: s.leads.toLocaleString(), note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved`,
+      icon: Target, accent: "var(--neon-cyan)", series: clientProjects.map((p) => of(p).leads), bars: true },
+    { label: "Appointments", value: s.appointments.toLocaleString(), note: `${s.invalid.toLocaleString()} invalid`,
+      icon: CalendarCheck, accent: "var(--neon-emerald)", series: clientProjects.map((p) => of(p).appointments), bars: true },
+    { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
+      icon: Percent, accent: "var(--neon-violet)", children: <ConversionLines s={s} /> },
   ];
 
   return (
@@ -82,6 +94,8 @@ export default async function ClientProfile({ params }) {
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
+          <CalendarTile label="Client Calendar" days={days} today={today} first={calendar.first} last={calendar.last} query={`client=${c.id}`}
+            note="Every project's appointments together." className="animate-pop-in" style={{ animationDelay: "180ms" }} />
         </div>
 
         <Card>
@@ -89,15 +103,25 @@ export default async function ClientProfile({ params }) {
           <div className="divide-y divide-[var(--panel-border)]">
             {clientProjects.length === 0 && <p className="p-6 text-sm text-muted-foreground">No projects on record.</p>}
             {clientProjects.map((p) => (
-              <Link key={p.id} href={`/projects/${p.id}`} data-list-row className="flex items-center justify-between gap-3 px-5 py-3.5">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white" style={{ background: p.color }}>{p.name.slice(0, 2).toUpperCase()}</span>
-                  <div>
-                    <div className="text-sm font-medium">{p.name}</div>
-                    <div className="text-xs text-muted-foreground">{p.type} · {p.manager} · <span className="tabular-nums text-primary">{p.leads}</span> leads</div>
+              <Link key={p.id} href={`/projects/${p.id}`} data-list-row data-client-project={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white" style={{ background: p.color }}>{p.name.slice(0, 2).toUpperCase()}</span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{p.name} <span className="ml-1 text-xs font-normal text-muted-foreground">{p.type} · {p.manager}</span></div>
+                    {/* The same figures as the tiles above, for this project. */}
+                    <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs tabular-nums text-muted-foreground" data-project-stats>
+                      {statsLine(of(p), p.type).map((part) => <span key={part}>{part}</span>)}
+                    </div>
                   </div>
                 </div>
-                <ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge>
+                <div className="flex shrink-0 items-center gap-3">
+                  {p.raw?.start_date || p.raw?.end_date ? (
+                    <span className="text-xs tabular-nums text-muted-foreground" data-project-dates>
+                      {p.raw.start_date ? mediumDate(p.raw.start_date) : "—"} – {p.raw.end_date ? mediumDate(p.raw.end_date) : "—"}
+                    </span>
+                  ) : null}
+                  <ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge>
+                </div>
               </Link>
             ))}
           </div>

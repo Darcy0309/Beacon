@@ -51,11 +51,15 @@ try {
   section("The Capital Insurance project");
   await admin.go(`/projects/${CAPITAL}`, 5000);
   const total = count("");
-  const left = count("and r.viable and r.callable");
+  // The tiles count by call result: names left includes those pending; leads are the names this project sent on.
+  const stillToCall = count("and r.viable");
+  const sentOn = Number(sql(`select count(*) from public.leads where source_project_id=${CAPITAL} and project_id<>${CAPITAL} and stage='appt'`));
   // Waited for: the page may still be loading, and the figures count up.
   const settles = (label, want) => until(async () => num(await tile(admin, label)) === want, { timeout: 8000 });
-  check("Leads tile: every lead on the project, not the newest 25", (await settles("Leads", total)) && total > 25, `${await tile(admin, "Leads")} vs ${total}`);
-  check("Names Left to Call tile matches the database", await settles("Names Left to Call", left), `${await tile(admin, "Names Left to Call")} vs ${left}`);
+  check("Leads tile: the names this project made leads, wherever they are now", (await settles("Leads", sentOn)) && total > 25, `${await tile(admin, "Leads")} vs ${sentOn}`);
+  check("Names Left to Call tile matches the database", await settles("Names Left to Call", stillToCall), `${await tile(admin, "Names Left to Call")} vs ${stillToCall}`);
+  check("…with Conversions, the project's calendar and its call results graphed",
+    Boolean(await tile(admin, "Conversions")) && await admin.ev(`!!document.querySelector('[data-calendar-tile]') && document.querySelectorAll('[data-result-breakdown] [data-result-row]').length > 0`));
   const sean = await cells(admin, `tr[data-rep="${SEAN}"]`);
   const seanLeft = count(`and r.viable and r.callable and l.assigned_user_id=${SEAN}`);
   check("Sean is on it, with his names left and leads held", sean[0]?.startsWith("Sean Fitzgerald") && num(sean[1]) === seanLeft && num(sean[2]) === count(`and l.assigned_user_id=${SEAN}`), JSON.stringify(sean));

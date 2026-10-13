@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight } from "lucide-react";
+import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatusBadge from "@/components/shared/status-badge";
@@ -22,6 +22,12 @@ import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getPayRules } from "@/features/pay/queries";
+import { getAppointmentDays, getCalendarScope, getLeadStats, getResultBreakdown } from "@/features/stats/queries";
+import CalendarTile from "@/features/stats/components/calendar-tile";
+import ConversionLines from "@/features/stats/components/conversion-lines";
+import ResultBreakdown from "@/features/stats/components/result-breakdown";
+import { addMonths, monthEnd, monthStart } from "@/lib/dates";
+import { pctLabel } from "@/lib/lead-stats";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -57,20 +63,40 @@ export default async function ProjectDetail({ params, searchParams }) {
   ]);
   if (!p) notFound();
 
+  // Counted by call result, as on the client's page; and the project's calendar (a DB dev
+  // project shares the one of the appointment project it promotes to).
+  const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
+  const [{ total: s }, results, scope] = await Promise.all([getLeadStats({ projectId: p.id }), getResultBreakdown(p.id), getCalendarScope({ projectId: p.id })]);
+  const days = await getAppointmentDays({ projectIds: scope?.ids ?? [p.id], from: calendar.first, to: calendar.last });
+  const dbdev = p.type === "DBDV";
+
   const raw = p.raw ?? {};
   const apptProject = raw.appt_project_id ? options.projects.find((x) => x.id === raw.appt_project_id) : null;
   const canOpenLists = admin || team.some((r) => r.id === me?.id);
   const byMonth = (key) => xdates.months.map((m) => m[key]);
 
+  const waiting = overview.unassigned ? `${overview.unassigned.toLocaleString()} waiting for a rep` : `across ${team.length} rep${team.length === 1 ? "" : "s"}`;
   const tiles = [
-    { label: "Leads", value: overview.leads.toLocaleString(), note: `${overview.offList.toLocaleString()} off the list`,
-      icon: Target, accent: "var(--neon-cyan)", series: byMonth("total"), bars: true },
-    { label: "Names Left to Call", value: overview.viableLeft.toLocaleString(),
-      note: overview.unassigned ? `${overview.unassigned.toLocaleString()} waiting for a rep` : `across ${team.length} rep${team.length === 1 ? "" : "s"}`,
-      icon: ListChecks, accent: "var(--neon-emerald)", series: byMonth("viable") },
-    { label: "Appointments", value: overview.appointments.toLocaleString(),
-      note: `${overview.apptsMonth} this month · ${overview.qaPending} waiting for QA`,
+    // DB dev only: an appointment project's names are leads, counted in the next tile.
+    ...(dbdev ? [{ label: "Names Left to Call", value: s.namesLeft.toLocaleString(),
+      note: [`of ${s.names.toLocaleString()} names`, overview.pending ? `${overview.pending.toLocaleString()} pending` : null, waiting].filter(Boolean).join(" · "),
+      icon: ListChecks, accent: "var(--neon-cyan)", series: byMonth("viable") }] : []),
+    { label: "Leads", value: s.leads.toLocaleString(),
+      note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved${dbdev ? "" : ` · ${waiting}`}`,
+      icon: Target, accent: "var(--neon-emerald)", series: byMonth("total"), bars: true },
+    { label: "Appointments", value: s.appointments.toLocaleString(),
+      note: `${s.invalid.toLocaleString()} invalid · ${overview.apptsMonth} set this month · ${overview.qaPending} waiting for QA`,
       icon: CalendarCheck, accent: "var(--neon-violet)", series: byMonth("appointment"), bars: true },
+    dbdev
+      ? { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
+          icon: Percent, accent: "var(--neon-magenta)", children: <ConversionLines s={s} /> }
+      : { label: "Conversions", value: pctLabel(s.apptRate === null && s.leads ? Math.round((s.appointmentsSet / s.leads) * 100) : s.apptRate), note: "of leads became appointments",
+          icon: Percent, accent: "var(--neon-magenta)",
+          children: (
+            <div className="mt-2 text-xs tabular-nums text-muted-foreground" data-conversions>
+              {s.leads.toLocaleString()} leads · {s.developed.toLocaleString()} from DB dev · {s.appointmentsSet.toLocaleString()} appointments
+            </div>
+          ) },
     { label: "Calls This Month", value: overview.callsMonth.toLocaleString(), note: `${overview.callsToday} today · last ${overview.lastWorked.toLowerCase()}`,
       icon: PhoneCall, accent: "var(--neon-amber)", series: overview.calls14d, bars: true },
   ];
@@ -127,11 +153,16 @@ export default async function ProjectDetail({ params, searchParams }) {
           </div>
         </Card>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
+          <CalendarTile label="Project Calendar" days={days} today={today} first={calendar.first} last={calendar.last} query={`project=${p.id}`}
+            note={scope?.shared ? `Shared with ${scope.label}, where this project's appointments go.` : "Only this project's appointments."}
+            className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
         </div>
+
+        <ResultBreakdown rows={results} type={p.type} />
 
         <ProjectTeam
           projectId={p.id}

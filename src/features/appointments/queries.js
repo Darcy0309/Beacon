@@ -71,7 +71,9 @@ function toApptView(a) {
 }
 
 /** Every appointment between two ISO days, inclusive, in date and time order. */
-async function fetchAppointments({ from, to } = {}) {
+async function fetchAppointments({ from, to, projectIds = null } = {}) {
+  // A calendar of no projects (a client with none yet) is empty, not everyone's.
+  if (projectIds && !projectIds.length) return [];
   const supabase = await createClient();
   // A busy month passes the API's 1,000-row cap, so it is read in pages.
   const rows = await readAll((first, last) => {
@@ -79,6 +81,8 @@ async function fetchAppointments({ from, to } = {}) {
     let q = supabase.from("appointments").select(APPT_SELECT).is("invalid_at", null).order("appt_date").order("id").range(first, last);
     if (from) q = q.gte("appt_date", from);
     if (to) q = q.lte("appt_date", to);
+    // One client's or one project's calendar: the projects its appointments are kept on.
+    if (projectIds) q = q.in("project_id", projectIds);
     return q;
   });
   return rows
@@ -114,18 +118,18 @@ export async function getWeekAppointments() {
  * Appointments between two ISO days, inclusive — what the calendar's day and
  * week views render. `byDate` keys the same rows by "YYYY-MM-DD".
  */
-export async function getCalendarRange(from, to) {
-  const rows = await fetchAppointments({ from, to });
+export async function getCalendarRange(from, to, projectIds = null) {
+  const rows = await fetchAppointments({ from, to, projectIds });
   const byDate = {};
   for (const a of rows) (byDate[a.date] ||= []).push(a);
   return { rows, byDate, count: rows.length };
 }
 
 /** A calendar month keyed by day-of-month. */
-export async function getCalendarMonth(year, month /* 0-indexed */) {
+export async function getCalendarMonth(year, month /* 0-indexed */, projectIds = null) {
   const first = new Date(Date.UTC(year, month, 1));
   const last = new Date(Date.UTC(year, month + 1, 0));
-  const rows = await fetchAppointments({ from: isoDay(first), to: isoDay(last) });
+  const rows = await fetchAppointments({ from: isoDay(first), to: isoDay(last), projectIds });
 
   const byDay = {};
   for (const a of rows) {
