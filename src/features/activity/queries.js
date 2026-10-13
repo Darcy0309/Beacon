@@ -104,7 +104,8 @@ export async function listActivity(params) {
       paged(
         supabase
           .from("activity_log")
-          .select(`*, user:users${inner(Boolean(p.filters?.user))}(id, first_name, last_name, email, role)`, { count: "exact" })
+          // Whose it is, by name: named, so the join stays one join whatever else comes to link the log and users.
+          .select(`*, user:users!activity_log_user_id_fkey${inner(Boolean(p.filters?.user))}(id, first_name, last_name, email, role)`, { count: "exact" })
           .order("created_at", { ascending: false })
           .order("id", { ascending: false }),
         p,

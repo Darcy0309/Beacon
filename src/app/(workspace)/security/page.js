@@ -17,7 +17,12 @@ export default async function SecurityPage({ searchParams }) {
   const [me, twoFactor, { rows }] = await Promise.all([
     getCurrentUser(),
     getMyTwoFactor(),
-    listActivity({ page: 1, perPage: 10, q: "", filters: {} }),
+    // This is where someone with an invitation or a temporary password must set their own: their
+    // recent activity is beside the point, and never a reason for the page not to open.
+    listActivity({ page: 1, perPage: 10, q: "", filters: {} }).catch((err) => {
+      console.error("[security] recent activity", err?.message ?? err);
+      return { rows: [] };
+    }),
   ]);
 
   // A fresh invitation lands here to set a password; so does an invited
