@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent } from "lucide-react";
+import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatusBadge from "@/components/shared/status-badge";
@@ -197,7 +197,22 @@ export default async function ProjectDetail({ params, searchParams }) {
         </Card>
 
         <Card id="leads">
-          <SectionHeader label="Leads on this Project" icon={ListChecks} />
+          <SectionHeader
+            label="Leads on this Project"
+            icon={ListChecks}
+            action={admin ? (
+              // Administrators only: every lead on the project, in the import template's columns. A plain download link.
+              <a
+                href={`/api/projects/${p.id}/export`}
+                download
+                data-export-project
+                title="Every lead on this project with its current data, in the import template's columns"
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                <Download className="size-3.5" /> Export CSV
+              </a>
+            ) : null}
+          />
           <FilterTable
             columns={["Company", "Contact", "Status", "X-Date", "Assigned"]}
             filters={[

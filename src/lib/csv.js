@@ -365,7 +365,8 @@ export function rowsToImport(csvRows) {
 
     resolved.forEach((target, i) => {
       if (!target) return;
-      const value = (raw[i] ?? "").trim();
+      // An exported value that would open as a formula carries an apostrophe before it (lead-export.js): taken off here.
+      const value = (raw[i] ?? "").trim().replace(/^'(?=[=+\-@])/, "");
       if (!value) return;
 
       const parsed = DATE_COLUMNS.has(target.column)

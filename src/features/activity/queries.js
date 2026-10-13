@@ -45,6 +45,7 @@ const ACTION_LABEL = {
   "user.update": "Updated a user",
   "user.email": "Changed a user's sign-in email",
   "leads.import": "Imported leads",
+  "leads.export": "Exported a project's leads",
   "sign_out.idle": "Signed out after 30 minutes idle",
   "sic.import": "Loaded SIC codes",
   "project.rates": "Set a project's pay rates",
