@@ -10,13 +10,24 @@ export const SUM_KEYS = [
   "leadPay", "appointmentPay", "specialPay", "chargebackAmount", "amount",
 ];
 
-/** The ways the CSV can be laid out: day by day, or totals per account manager, project or client. */
+/** The ways the CSV can be laid out: day by day, or totals per account manager, project, client or agency group. */
 export const GROUPINGS = [
   ["day", "Day by day"],
   ["rep", "Totals by account manager"],
   ["project", "Totals by project"],
   ["client", "Totals by client"],
+  ["group", "Totals by agency group"],
 ];
+
+/**
+ * Each row with its client's agency group (the carrier group the client
+ * belongs to): `groups` is { [clientId]: { id, name } }. With `only` (a
+ * group's id), just that group's rows.
+ */
+export function withGroups(rows, groups = {}, only = null) {
+  const out = rows.map((r) => ({ ...r, groupId: groups[r.clientId]?.id ?? null, group: groups[r.clientId]?.name ?? "No agency group" }));
+  return only ? out.filter((r) => r.groupId === only) : out;
+}
 
 const add = (into, row) => {
   for (const k of SUM_KEYS) into[k] = Math.round(((into[k] ?? 0) + (row[k] ?? 0)) * 100) / 100;
@@ -31,17 +42,17 @@ export function totalOf(rows) {
 }
 
 /**
- * Rows added up per account manager ("rep"), project or client, largest pay
- * first; "day" leaves them as they are.
+ * Rows added up per account manager ("rep"), project, client or agency
+ * group, largest pay first; "day" leaves them as they are.
  */
 export function groupProduction(rows, by) {
   if (by === "day") return rows;
-  const key = { rep: (r) => r.userId, project: (r) => r.projectId ?? "none", client: (r) => r.clientId ?? "none" }[by];
+  const key = { rep: (r) => r.userId, project: (r) => r.projectId ?? "none", client: (r) => r.clientId ?? "none", group: (r) => r.groupId ?? "none" }[by];
   const groups = new Map();
   for (const r of rows) {
     const k = key(r);
     if (!groups.has(k)) {
-      groups.set(k, { userId: r.userId, rep: r.rep, projectId: r.projectId, project: r.project, clientId: r.clientId, client: r.client });
+      groups.set(k, { userId: r.userId, rep: r.rep, projectId: r.projectId, project: r.project, clientId: r.clientId, client: r.client, groupId: r.groupId ?? null, group: r.group });
     }
     add(groups.get(k), r);
   }
@@ -69,6 +80,7 @@ export const CSV_COLUMNS = {
   rep: [["Account manager", (r) => r.rep], ...FIGURES],
   project: [["Client", (r) => r.client], ["Project", (r) => r.project], ...FIGURES],
   client: [["Client", (r) => r.client], ...FIGURES],
+  group: [["Agency group", (r) => r.group], ...FIGURES],
 };
 
 /** The Total row for a layout: "Total" first, the summed figures, nothing under the names. */

@@ -7,7 +7,7 @@ import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { clientSlug, mediumDate } from "@/lib/format";
-import { getClientBySlug } from "@/features/clients/queries";
+import { getClientBySlug, getAgencyGroups } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
 import { getProjects } from "@/features/projects/queries";
 import { getAppointmentDays, getBlockedDays, getLeadStats } from "@/features/stats/queries";
@@ -32,7 +32,7 @@ function Field({ label, children }) {
 
 export default async function ClientProfile({ params }) {
   const { slug } = await params;
-  const [c, projects, today] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday()]);
+  const [c, projects, today, groups] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups()]);
   if (!c) notFound();
 
   const clientProjects = projects.filter((p) => p.clientId === c.id);
@@ -77,12 +77,13 @@ export default async function ClientProfile({ params }) {
               </div>
               <div className="flex items-center gap-2">
                 <ToneBadge tone={c.status === "Active" ? "emerald" : "slate"}>{c.status}</ToneBadge>
-                <ClientForm client={c.raw} />
+                <ClientForm client={c.raw} groups={groups} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 pt-5 sm:grid-cols-3">
               <Field label="Account manager">{c.manager}</Field>
               <Field label="Primary contact">{c.contact}</Field>
+              <Field label="Agency group"><span data-agency-group>{c.group}</span></Field>
               <Field label="Phone"><span className="tabular-nums">{c.phone}</span></Field>
               <Field label="Email"><span className="break-all">{c.email}</span></Field>
               <Field label="Delivery email"><span className="break-all">{delivery}</span></Field>

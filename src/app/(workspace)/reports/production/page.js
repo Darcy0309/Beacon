@@ -16,7 +16,8 @@ import ProjectRatesForm from "@/features/projects/components/project-rates-form"
 import { getProjectRates } from "@/features/projects/queries";
 import { getBusinessTimeZone, getProductionReport } from "@/features/reports/queries";
 import { daysBetween, PERIODS, readPeriod, trendStart } from "@/features/reports/period";
-import { GROUPINGS, groupProduction } from "@/features/reports/production";
+import { GROUPINGS, groupProduction, withGroups } from "@/features/reports/production";
+import { getClientGroups } from "@/features/clients/queries";
 import { getPayRules } from "@/features/pay/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
@@ -51,13 +52,18 @@ export default async function ProductionReport({ searchParams }) {
   // The tiles show a trend of at least two weeks, so one read covers the
   // range and the days before it that the trend needs.
   const trendFrom = trendStart(range);
-  const [trendRows, options, staff, rates, payRules] = await Promise.all([
+  const [allRows, options, staff, rates, payRules, clientGroups] = await Promise.all([
     getProductionReport({ from: trendFrom, to: range.to, projectId, userId }),
     getLookups(),
     admin ? getAssignableStaff() : [],
     admin ? getProjectRates() : [],
     admin ? getPayRules() : null,
+    getClientGroups(),
   ]);
+  // ?group=<insurance company id>: only the clients in that agency group (the carrier group a client belongs to).
+  const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+  const groupId = groupOptions.some((g) => g.value === sp?.group) ? Number(sp.group) : null;
+  const trendRows = withGroups(allRows, clientGroups, groupId);
   const rows = trendRows.filter((r) => r.day >= range.from && r.day <= range.to);
 
   const totals = rows.reduce(add, {});
@@ -91,6 +97,7 @@ export default async function ProductionReport({ searchParams }) {
     const p = new URLSearchParams();
     if (projectId) p.set("project", String(projectId));
     if (userId) p.set("rep", String(userId));
+    if (groupId) p.set("group", String(groupId));
     for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
     return p.toString();
   };
@@ -120,6 +127,7 @@ export default async function ProductionReport({ searchParams }) {
               <input type="hidden" name="period" value="custom" />
               {projectId ? <input type="hidden" name="project" value={projectId} /> : null}
               {userId ? <input type="hidden" name="rep" value={userId} /> : null}
+              {groupId ? <input type="hidden" name="group" value={groupId} /> : null}
               <DateRangePicker key={`${range.from}:${range.to}`} defaultFrom={range.from} defaultTo={range.to} max="today" active={range.period === "custom"} />
             </form>
           </div>
@@ -129,6 +137,9 @@ export default async function ProductionReport({ searchParams }) {
             {admin ? (
               <ParamSelect name="rep" label="Rep" value={userId ? String(userId) : ""} placeholder="Every rep"
                 options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+            ) : null}
+            {groupOptions.length ? (
+              <ParamSelect name="group" label="Agency group" value={groupId ? String(groupId) : ""} placeholder="All groups" options={groupOptions} />
             ) : null}
             <span className="text-xs text-muted-foreground">Days run midnight to midnight, {timeZone.replace(/_/g, " ")} time.</span>
             {/* Day by day, or totals per account manager, project or client; every file ends with a Total row. */}
@@ -213,7 +224,10 @@ export default async function ProductionReport({ searchParams }) {
               <TableBody>
                 {clients.map((c) => (
                   <TableRow key={c.clientId ?? "none"} data-client={c.clientId ?? "none"}>
-                    <TableCell className="font-medium">{c.client}</TableCell>
+                    <TableCell className="font-medium">
+                      {c.client}
+                      {c.groupId ? <span className="block text-xs font-normal text-muted-foreground" data-client-group>{c.group}</span> : null}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.leadPay)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.appointmentPay)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.specialPay)}</TableCell>

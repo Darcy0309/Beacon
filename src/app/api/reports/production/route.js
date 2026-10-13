@@ -1,6 +1,7 @@
 import { getBusinessTimeZone, getProductionReport } from "@/features/reports/queries";
 import { readPeriod } from "@/features/reports/period";
-import { CSV_COLUMNS, groupProduction, totalOf, totalRow } from "@/features/reports/production";
+import { CSV_COLUMNS, groupProduction, totalOf, totalRow, withGroups } from "@/features/reports/production";
+import { getClientGroups } from "@/features/clients/queries";
 import { getCurrentUser } from "@/lib/server/session";
 import { rolesForPath } from "@/lib/nav";
 
@@ -18,8 +19,9 @@ const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
 /**
  * The production report as a CSV, for payroll: the same range and filters as
  * the page, run as the signed-in user, so only an administrator gets every
- * rep. ?by=day (each day, account manager and project), rep, project or
- * client (totals for each); every layout ends with a Total row.
+ * rep. ?by=day (each day, account manager and project), rep, project,
+ * client or group (totals for each); every layout ends with a Total row.
+ * ?group=<insurance company id> keeps one agency group's clients.
  */
 export async function GET(request) {
   const me = await getCurrentUser();
@@ -33,18 +35,22 @@ export async function GET(request) {
   const by = Object.hasOwn(CSV_COLUMNS, sp.by ?? "") ? sp.by : "day";
 
   try {
-    const rows = await getProductionReport({
-      from: range.from,
-      to: range.to,
-      projectId: idParam(sp.project),
-      userId: me.role === "admin" ? idParam(sp.rep) : null,
-    });
+    const [all, groups] = await Promise.all([
+      getProductionReport({
+        from: range.from,
+        to: range.to,
+        projectId: idParam(sp.project),
+        userId: me.role === "admin" ? idParam(sp.rep) : null,
+      }),
+      getClientGroups(),
+    ]);
+    const rows = withGroups(all, groups, idParam(sp.group));
     const columns = CSV_COLUMNS[by];
     const line = (r) => columns.map(([, get]) => cell(get(r))).join(",");
     const total = totalRow(columns, totalOf(rows)).map(cell).join(",");
     const lines = [columns.map(([h]) => h).join(","), ...groupProduction(rows, by).map(line), ...(rows.length ? [total] : [])];
     const name = range.from === range.to ? range.from : `${range.from}_to_${range.to}`;
-    const suffix = by === "day" ? "" : `-by-${by === "rep" ? "account-manager" : by}`;
+    const suffix = by === "day" ? "" : `-by-${by === "rep" ? "account-manager" : by === "group" ? "agency-group" : by}`;
     return new Response(`﻿${lines.join("\r\n")}\r\n`, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",

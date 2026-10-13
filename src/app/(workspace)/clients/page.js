@@ -6,7 +6,8 @@ import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
 import { Card } from "@/components/ui/card";
 import { clientSlug } from "@/lib/format";
-import { getClients } from "@/features/clients/queries";
+import { getAgencyGroups, getClients } from "@/features/clients/queries";
+import ParamSelect from "@/components/shared/param-select";
 import ClientForm from "@/features/clients/components/client-form";
 
 export const dynamic = "force-dynamic";
@@ -16,8 +17,13 @@ const ACCENTS = [
   "var(--neon-violet)", "var(--neon-magenta)", "var(--neon-blue)",
 ];
 
-export default async function ClientsPage() {
-  const clients = await getClients();
+export default async function ClientsPage({ searchParams }) {
+  const sp = await searchParams;
+  const [every, groups] = await Promise.all([getClients(), getAgencyGroups()]);
+  // ?group=<insurance company id>: only that agency group's clients, in the tiles too.
+  const inUse = [...new Map(every.filter((c) => c.groupId).map((c) => [c.groupId, { value: String(c.groupId), label: c.group }])).values()].sort((a, b) => a.label.localeCompare(b.label));
+  const groupId = inUse.some((g) => g.value === sp?.group) ? Number(sp.group) : null;
+  const clients = groupId ? every.filter((c) => c.groupId === groupId) : every;
   const active = clients.filter((c) => c.status === "Active").length;
   const totalLeads = clients.reduce((s, c) => s + c.leads, 0);
   const totalAppts = clients.reduce((s, c) => s + c.appts, 0);
@@ -46,7 +52,13 @@ export default async function ClientsPage() {
         </div>
 
         <Card>
-          <SectionHeader label="Client Accounts" icon={Building2} action={<ClientForm />} />
+          <SectionHeader wrap label="Client Accounts" icon={Building2}
+            action={
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                {inUse.length ? <ParamSelect name="group" label="Agency group" placeholder="All groups" value={groupId ? String(groupId) : ""} options={inUse} /> : null}
+                <ClientForm groups={groups} />
+              </div>
+            } />
           <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
             {clients.map((c, i) => {
               const accent = ACCENTS[i % ACCENTS.length];
@@ -67,7 +79,7 @@ export default async function ClientsPage() {
                         </span>
                         <div className="min-w-0">
                           <div className="truncate font-semibold">{c.name}</div>
-                          <div className="text-xs text-muted-foreground">{c.city}</div>
+                          <div className="truncate text-xs text-muted-foreground">{[c.city !== "—" ? c.city : null, c.group].filter(Boolean).join(" · ") || "—"}</div>
                         </div>
                         <span
                           className="ml-auto rounded-full border px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.12em]"
@@ -95,7 +107,7 @@ export default async function ClientsPage() {
               );
             })}
             {clients.length === 0 && (
-              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">No client accounts yet. Add the first with New client.</p>
+              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">{groupId ? "No clients in this agency group." : "No client accounts yet. Add the first with New client."}</p>
             )}
           </div>
         </Card>

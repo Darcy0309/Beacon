@@ -2,6 +2,7 @@
 
 import "server-only";
 import { cityState, colorFor, initialsOf, shortName } from "@/lib/format";
+import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -23,7 +24,7 @@ async function companyRollups(supabase) {
 export async function getClients() {
   const supabase = await createClient();
   const [{ data, error }, roll] = await Promise.all([
-    supabase.from("companies").select("*").order("name"),
+    supabase.from("companies").select("*, group:agencies(id, name)").order("name"),
     companyRollups(supabase),
   ]);
   if (error) throw error;
@@ -43,8 +44,11 @@ export async function getClients() {
     email: c.email ?? "—",
     phone: c.phone ?? "—",
     status: c.status === "active" ? "Active" : "Inactive",
+    // The carrier group it belongs to, if any (an insurance company from the list).
+    groupId: one(c.group)?.id ?? null,
+    group: one(c.group)?.name ?? null,
     // As saved, for the edit form.
-    raw: c,
+    raw: { ...c, group: undefined },
   }));
 }
 
@@ -59,4 +63,26 @@ export async function getClientBySlug(slug) {
   const slugify = (n) =>
     String(n).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return rows.find((c) => slugify(c.name) === slug) ?? null;
+}
+
+/**
+ * The agency groups a client can be put in: the insurance companies list,
+ * by name. A name on the list twice is offered once (its first entry).
+ */
+export async function getAgencyGroups() {
+  const supabase = await createClient();
+  const rows = await readAll((from, to) => supabase.from("agencies").select("id, name").order("name").order("id").range(from, to));
+  const seen = new Set();
+  return rows.filter((r) => r.name && !seen.has(r.name.toLowerCase()) && seen.add(r.name.toLowerCase())).map((r) => ({ id: r.id, name: r.name }));
+}
+
+/**
+ * Which agency group each client is in, for reports: { [companyId]: { id, name } },
+ * only the clients that have one.
+ */
+export async function getClientGroups() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("companies").select("id, group:agencies(id, name)").not("agency_group_id", "is", null);
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).filter((c) => one(c.group)).map((c) => [c.id, { id: one(c.group).id, name: one(c.group).name }]));
 }

@@ -3,7 +3,7 @@
 /** Clients (companies). */
 
 import { revalidatePath } from "next/cache";
-import { check, deleteRow, fail, idFrom, logActivity, ok, s } from "@/lib/server/action-helpers";
+import { check, deleteRow, fail, idFrom, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
@@ -25,6 +25,8 @@ export async function saveCompany(prevState, formData) {
     zip: s(formData, "zip"),
     website: s(formData, "website"),
     status: s(formData, "status") || "active",
+    // The carrier group it belongs to (an insurance company), or none.
+    agency_group_id: n(formData, "agency_group_id"),
   };
   // A state as its two letters ("az" -> "AZ").
   if (payload.state) payload.state = payload.state.toUpperCase();

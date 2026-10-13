@@ -2,7 +2,7 @@
 /** Unit tests for pay: the rates an administrator picks from, pay periods, hours, and production totals. */
 import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, stepView, tileRange, viewRange, workDays } from "../../src/lib/pay.js";
 import { generateTempPassword } from "../../src/lib/temp-password.js";
-import { CSV_COLUMNS, groupProduction, totalOf, totalRow } from "../../src/features/reports/production.js";
+import { CSV_COLUMNS, GROUPINGS, groupProduction, totalOf, totalRow, withGroups } from "../../src/features/reports/production.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -77,6 +77,13 @@ const total = totalOf(rows);
 eq("the total", [total.calls, total.amount, total.chargebackAmount], [25, 25, -30]);
 eq("the CSV's Total row: names blank, figures summed", totalRow(CSV_COLUMNS.project, total),
   ["Total", "", 25, 2, 1, 1, 1, "20.00", "30.00", "5.00", "-30.00", "25.00"]);
+// A client's agency group: the carrier group it belongs to.
+const grouped = withGroups(rows, { 7: { id: 31, name: "Farmers" } });
+eq("each row carries its client's agency group, or says there is none", grouped.map((r) => [r.client, r.groupId, r.group]), [["Capital", 31, "Farmers"], ["Capital", 31, "Farmers"], ["Bender", null, "No agency group"]]);
+eq("…kept to one group when asked", withGroups(rows, { 7: { id: 31, name: "Farmers" } }, 31).map((r) => r.project), ["DBDev", "Appts"]);
+eq("…and to nothing for a group no client is in", withGroups(rows, { 7: { id: 31, name: "Farmers" } }, 99), []);
+eq("by agency group: a group's clients added, the rest together", groupProduction(grouped, "group").map((r) => [r.group, r.calls, r.amount]), [["Farmers", 20, 55], ["No agency group", 5, -30]]);
+eq("the CSV by agency group: the group, then the figures", [CSV_COLUMNS.group[0][0], CSV_COLUMNS.group.length, GROUPINGS.at(-1)], ["Agency group", 11, ["group", "Totals by agency group"]]);
 eq("every layout ends with the total pay", Object.values(CSV_COLUMNS).every((cols) => cols.at(-1)[0] === "Total pay (USD)"), true);
 
 // --- a custom schedule (the business's 2026 pay periods) ---------------------

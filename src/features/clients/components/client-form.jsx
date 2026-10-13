@@ -20,8 +20,10 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * contact, phone, email, address and website, and whether it is active.
  * Its projects and its users are added after it, on Projects and on Users &
  * Access. `client`: the companies row to edit; none for a new one.
+ * `groups`: the insurance companies ([{ id, name }]) its Agency Group is
+ * chosen from: the national carrier group it belongs to, for reports.
  */
-export default function ClientForm({ client }) {
+export default function ClientForm({ client, groups = [] }) {
   const isEdit = Boolean(client?.id);
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -64,6 +66,13 @@ export default function ClientForm({ client }) {
             </Field>
             <Field label="Title" error={fe("contact_title")}>
               <Input name="contact_title" defaultValue={dv("contact_title")} maxLength={60} aria-invalid={invalid("contact_title")} />
+            </Field>
+            <Field label="Agency Group" error={fe("agency_group_id")} className="sm:col-span-2"
+              hint={groups.length ? "The national carrier group this client is part of, from Insurance Cos. Reports can be filtered by it." : "Add insurance companies under Insurance Cos. to choose one here."}>
+              <Select name="agency_group_id" defaultValue={dv("agency_group_id", "") ?? ""} aria-invalid={invalid("agency_group_id")} data-agency-group>
+                <option value="">None</option>
+                {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </Select>
             </Field>
             <Field label="Phone" error={fe("phone")}>
               <Input name="phone" type="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} placeholder="(602) 555-0100" />

@@ -498,6 +498,7 @@ export const schemas = {
     zip: [zip],
     website: [max(120)],
     status: [oneOf(["active", "inactive"])],
+    agency_group_id: [id],
   },
 };
 
