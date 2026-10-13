@@ -19,7 +19,7 @@ const stops = (colors) =>
 export default function SignatureLogo({ className }) {
   const id = `sm${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
-    <svg viewBox="0 0 266 104" className={cn("h-12 w-auto", className)} role="img" aria-label="Signature Marketing">
+    <svg viewBox="0 0 266 112" className={cn("h-12 w-auto", className)} role="img" aria-label="Signature Marketing">
       <defs>
         <linearGradient id={`${id}L`} x1="0.15" y1="0" x2="0.55" y2="1">{stops(SPHERE_LEFT_STOPS)}</linearGradient>
         <linearGradient id={`${id}R`} x1="0.3" y1="0" x2="0.7" y2="1">{stops(SPHERE_RIGHT_STOPS)}</linearGradient>
