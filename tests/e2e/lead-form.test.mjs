@@ -7,6 +7,7 @@
  */
 import { check, finish, sleep, until } from "../support/assert.mjs";
 import { signIn } from "../support/auth.mjs";
+import { sql } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
 const SHOTS = process.env.SHOTS;
@@ -55,7 +56,7 @@ await sleep(600);
 const { data } = await sb.from("leads").select("id, state, email").eq("company_name", marker).maybeSingle();
 check("valid submit created the lead", Boolean(data?.id));
 check("state was stored as the 2-letter code", data?.state === "AZ");
-if (data?.id) await sb.from("leads").delete().eq("id", data.id);
+if (data?.id) sql(`delete from public.leads where id = ${Number(data.id)}`);
 await shot("lead-form-after-valid");
 
 browser.close();

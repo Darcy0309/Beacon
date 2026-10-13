@@ -42,5 +42,5 @@ export async function archiveBulletin(formData) {
 }
 
 export async function deleteBulletin(formData) {
-  return deleteRow("bulletin_board", formData, ["/bulletin", "/"]);
+  return deleteRow("bulletin_board", formData, ["/bulletin", "/"], { action: "bulletin.delete", entity: "bulletin" });
 }

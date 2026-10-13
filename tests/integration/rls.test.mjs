@@ -6,6 +6,7 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL as URL_, ANON_KEY as KEY, PASSWORD } from "../support/env.mjs";
+import { sql } from "../support/db.mjs";
 
 const TABLES = ["leads", "appointments", "companies", "projects", "bulletin_board", "users", "activity_log"];
 
@@ -150,6 +151,9 @@ if (created?.id) {
   const { error: delErr } = await mgr.from("leads").delete().eq("id", created.id);
   const { data: gone } = await mgr.from("leads").select("id").eq("id", created.id).maybeSingle();
   check("manager can delete a lead", !delErr && !gone, delErr?.message);
+  // Their delete only flags the rows (soft delete): take them out for real.
+  sql(`delete from public.appointments where lead_id = ${Number(created.id)}`);
+  sql(`delete from public.leads where id = ${Number(created.id)}`);
 }
 
 if (failures) {

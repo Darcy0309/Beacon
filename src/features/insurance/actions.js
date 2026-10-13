@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { carrierKey } from "@/lib/coverage";
 
 export async function deleteAgency(formData) {
-  return deleteRow("agencies", formData, ["/insurance-companies"]);
+  return deleteRow("agencies", formData, ["/insurance-companies"], { action: "carrier.delete", entity: "carrier", name: "name" });
 }
 
 /**

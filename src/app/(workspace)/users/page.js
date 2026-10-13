@@ -112,7 +112,7 @@ export default async function UsersPage({ searchParams }) {
                       onResendInvite={awaitingInvite(u.raw) ? resendInvitation : undefined}
                       forms={u.id === me?.id || u.status === "disabled" ? [] : [{ key: "temp", label: "Set temporary password", icon: <KeyRound />, element: <TempPasswordForm user={{ id: u.id, name: u.name }} /> }]}
                       onDelete={deleteUser}
-                      warning="Their sign-in and inbox are removed. Leads, appointments and other work they touched stay, but no longer name them. To keep them on record, set them to Disabled instead."
+                      warning="Their sign-in is removed, so they can no longer get in, and they come off every list. The work they did stays as it is. Nothing else is erased: an administrator can restore the account under Settings › Deleted records, then invite them again. To keep them on the list, set them to Disabled instead."
                     />
                   </TableCell>
                 </TableRow>

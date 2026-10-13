@@ -154,7 +154,10 @@ try {
   await b.click("[data-desktop-switch] button", "Turn on");
   check("Turn on: saved again", Boolean(await until(() => saved() === "1")));
   await b.key("Escape");
-  await b.ev(`document.querySelector('form button[aria-label="Sign out"]')?.click()`);
+  await b.ev(`document.querySelector('button[aria-label="Sign out"]')?.click()`);
+  const asked = await until(() => b.ev(`document.querySelector('[data-confirm-dialog]')?.innerText ?? null`));
+  check("signing out asks first", /Sign out of Lighthouse\?/.test(asked ?? "") && (await b.path()) !== "/login", asked);
+  await b.click("[data-confirm-dialog] form [data-confirm]");
   check("signing out forgets it, so the next person here does not get this person's", Boolean(await until(() => saved() === "0", { timeout: 10000 })));
   check("…and signs out", Boolean(await until(async () => (await b.path()) === "/login", { timeout: 10000 })));
 } finally {

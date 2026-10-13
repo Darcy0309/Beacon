@@ -80,6 +80,9 @@ try {
 
   section("Disconnecting");
   await client.click("[role=dialog] [data-disconnect]");
+  const asked = await until(() => client.ev(`document.querySelector('[data-confirm-dialog]')?.innerText ?? null`));
+  check("disconnecting asks first", /^Disconnect /.test(asked ?? "") && sql(`select count(*) from public.calendar_feeds where id = ${feed}`) === "1", asked);
+  await client.click("[data-confirm-dialog] [data-confirm]");
   check("my calendar is disconnected, and its busy times are off the project's calendar",
     Boolean(await until(() => sql(`select (select count(*) from public.calendar_feeds where id = ${feed}) || '/' || (select count(*) from public.calendar_blocks where project_id = ${APPT})`) === "0/0")));
   check("…and the calendar offers to sync again", Boolean(await until(async () => /^Sync my calendar$/i.test(await client.ev(`document.querySelector('[data-sync-calendar]')?.innerText.trim() ?? ''`)))));

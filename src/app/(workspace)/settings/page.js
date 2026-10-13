@@ -7,15 +7,18 @@ import { getBusinessToday } from "@/lib/server/business-day";
 import { getPayRules } from "@/features/pay/queries";
 import { mailServerInfo } from "@/lib/server/mail";
 import SicCodesCard from "@/features/sic/components/sic-codes-card";
+import DeletedRecordsCard from "@/features/trash/components/deleted-records-card";
+import { getDeletedRecords } from "@/features/trash/queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const [{ settings }, payRules, today, sic] = await Promise.all([
+  const [{ settings }, payRules, today, sic, deleted] = await Promise.all([
     getSettings(), getPayRules(), getBusinessToday(),
     supabase.from("sic_codes").select("code", { count: "exact", head: true }),
+    getDeletedRecords(),
   ]);
 
   return (
@@ -26,6 +29,7 @@ export default async function SettingsPage() {
         <PayRulesForm rules={payRules} />
         <PaySchedule periods={payRules.time.schedule} today={today} editable />
         <SicCodesCard count={sic.count ?? 0} />
+        <DeletedRecordsCard records={deleted} />
       </div>
     </>
   );

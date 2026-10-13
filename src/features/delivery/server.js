@@ -42,6 +42,8 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       project_id, insurance:insurance_details(*),
       assigned:users!leads_assigned_user_id_fkey(first_name, last_name, email)`)
     .eq("id", leadId)
+    // The server's role reads past the rule that hides a deleted lead: a deleted lead has no sheet.
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) throw error;
   if (!lead) return null;
@@ -62,7 +64,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
     projectId
       ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, company:companies(name)").eq("id", projectId).maybeSingle()
       : Promise.resolve({ data: null }),
-    admin.from("appointments").select("id, appt_date, appt_time, duration_min, rep_name").eq("lead_id", leadId).is("invalid_at", null)
+    admin.from("appointments").select("id, appt_date, appt_time, duration_min, rep_name").eq("lead_id", leadId).is("invalid_at", null).is("deleted_at", null)
       .order("appt_create_date", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle(),
     admin.rpc("business_tz"),
     lead.sic_code

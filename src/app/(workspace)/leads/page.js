@@ -74,7 +74,7 @@ export default async function LeadsPage({ searchParams }) {
                       id={l.id}
                       edit={<LeadForm lead={l.raw} options={options} />}
                       onDelete={deleteLead}
-                      warning="This cannot be undone. Its call history and insurance details are deleted with it. Appointments, documents and feedback stay, no longer linked to this lead."
+                      warning="It comes off every list, call list, calendar and count, with its appointments. Nothing is erased: its call history, coverage and notes are kept, and an administrator can restore it under Settings › Deleted records."
                     />
                   </TableCell>
                 </TableRow>

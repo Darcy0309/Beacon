@@ -16,6 +16,7 @@ import { addMonths, formatIso, monthGrid, monthStart, sameMonth } from "@/lib/da
 import { BLOCK_TIMES, blockDays, blockHours, dayMarks, eventsOn } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 import { addCalendarBlock, removeCalendarBlock } from "@/features/calendar/actions";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -105,6 +106,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
   const [extra, setExtra] = useState({}); // months read beyond what the page arrived with
   const [blocking, setBlocking] = useState(false);
   const [removing, startRemoving] = useTransition();
+  const [asking, setAsking] = useState(null); // the block about to be taken off
   const calendarId = initial.projectId;
 
   // What the page arrives with is fresh after every change: months read since are read again.
@@ -138,6 +140,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
       const result = await removeCalendarBlock(f);
       if (result.ok) {
         toast.success("Taken off the calendar");
+        setAsking(null);
         router.refresh();
       } else toast.error(result.error);
     });
@@ -213,7 +216,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
                   </span>
                 </span>
                 {e.block.synced ? null : (
-                <button type="button" onClick={() => remove(e.block.id)} disabled={removing} aria-label="Take this block off the calendar" title="Take it off the calendar" data-remove-block
+                <button type="button" onClick={() => setAsking(e.block)} disabled={removing} aria-label="Take this block off the calendar" title="Take it off the calendar" data-remove-block
                   className="shrink-0 rounded text-muted-foreground transition-colors hover:text-destructive"><X className="size-3.5" /></button>
                 )}
               </li>
@@ -237,6 +240,10 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
         </div>
       </div>
       <BlockDialog open={blocking} onOpenChange={setBlocking} projectId={calendarId} day={selected < today ? today : selected} onDone={reload} />
+      <ConfirmDialog open={asking !== null} onOpenChange={(o) => !o && setAsking(null)} pending={removing}
+        title="Take this block off the calendar?"
+        description={asking ? `${blockDays(asking)} · ${blockHours(asking)}${asking.note ? ` · ${asking.note}` : ""}. The time opens up for appointments again.` : null}
+        confirm="Take it off" onConfirm={() => remove(asking.id)} />
     </Card>
   );
 }

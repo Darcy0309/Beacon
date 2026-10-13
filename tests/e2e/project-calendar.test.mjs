@@ -100,6 +100,9 @@ try {
   await until(() => client.ev(`!!document.querySelector('[data-blocked-time] [data-block="${mine}"] [data-remove-block]')`));
   await sleep(300);
   await client.click(`[data-blocked-time] [data-block="${mine}"] [data-remove-block]`);
+  const asked = await until(() => client.ev(`document.querySelector('[data-confirm-dialog]')?.innerText ?? null`));
+  check("taking it off asks first", /Take this block off the calendar\?/.test(asked ?? "") && sql(`select count(*) from public.calendar_blocks where id = ${mine}`) === "1", asked);
+  await client.click("[data-confirm-dialog] [data-confirm]");
   check("…and take it off again", Boolean(await until(() => sql(`select count(*) from public.calendar_blocks where id = ${mine}`) === "0")));
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1400, height: 1000 });
   await admin.go(`/projects/${DBDV}`, 6000);

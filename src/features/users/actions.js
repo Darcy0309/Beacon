@@ -7,7 +7,7 @@
  */
 
 import { revalidatePath } from "next/cache";
-import { NOT_DELETED, check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
+import { check, currentAppUser, fail, idFrom, logActivity, n, ok, removeRecord, requestOrigin, s } from "@/lib/server/action-helpers";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { mailFailure } from "@/lib/email";
@@ -379,7 +379,7 @@ export async function deleteUser(formData) {
   if (!target) return fail("That user no longer exists.");
 
   // Sign-in first: if that fails nothing has changed and the admin can retry.
-  // Deleting it clears users.auth_id (on delete set null), then the row goes.
+  // Deleting it clears users.auth_id (on delete set null), then the row is flagged.
   // The other order could leave a sign-in with no directory row, which would
   // block ever inviting that email again.
   if (target.auth_id) {
@@ -392,9 +392,9 @@ export async function deleteUser(formData) {
     }
   }
 
-  const { data: gone, error } = await supabase.from("users").delete().eq("id", id).select("id");
-  if (error) return fail(error);
-  if (!gone?.length) return fail(NOT_DELETED);
+  // The directory row stays, flagged and disabled, so an administrator can restore it; the sign-in above does not come back with it.
+  const problem = await removeRecord(supabase, "users", id);
+  if (problem) return fail(problem);
 
   await logActivity(supabase, "user.delete", { entity: "user", entityId: id, detail: target.email });
   revalidatePath("/users");

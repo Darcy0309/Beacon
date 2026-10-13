@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { RowEditContext } from "@/components/shared/row-edit-context";
 
-const DEFAULT_WARNING = "This cannot be undone. Records that referred to it will be left without it.";
+// A delete sets a flag (migration 20261104100000): the record is hidden, not erased.
+const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is erased: an administrator can restore it under Settings › Deleted records.";
 
 /**
  * The ⋯ menu on a table row. Every item does what it says or is not shown:

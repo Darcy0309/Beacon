@@ -116,18 +116,37 @@ export async function logActivity(supabase, action, { entity, entityId, detail, 
   }
 }
 
-/** Shared delete helper — one row, by id, then revalidate. */
 // Row Level Security answers a delete it refuses with "0 rows", not an
 // error, so a delete must check that something actually went.
 export const NOT_DELETED = "Nothing was deleted — you may not have permission, or it was already removed.";
 
-export async function deleteRow(table, formData, paths) {
+/**
+ * Delete one record of a kind that is kept: a client, project, lead,
+ * appointment, insurance company, document, bulletin post or user. Its row
+ * stays in the database, flagged as deleted and hidden from everyone
+ * (migration 20261104100000); an administrator can restore it under
+ * Settings. The caller's own rights decide, as for any delete. Returns
+ * null when it went, else what to say.
+ */
+export async function removeRecord(supabase, table, id) {
+  const { data: gone, error } = await supabase.rpc("remove_record", { p_table: table, p_id: id });
+  if (error) return String(error.message || error);
+  return gone ? null : NOT_DELETED;
+}
+
+/**
+ * Shared delete helper: one record, by id, then revalidate. `log`:
+ * { action, entity, name } puts it in the activity log, with what the
+ * record was called (its `name` column, read while it can still be seen).
+ */
+export async function deleteRow(table, formData, paths, log = null) {
   const id = idFrom(formData);
   if (!id) return fail("Missing id.");
   const supabase = await createClient();
-  const { data, error } = await supabase.from(table).delete().eq("id", id).select("id");
-  if (error) return fail(error);
-  if (!data?.length) return fail(NOT_DELETED);
+  const { data: before } = log?.name ? await supabase.from(table).select(log.name).eq("id", id).maybeSingle() : { data: null };
+  const problem = await removeRecord(supabase, table, id);
+  if (problem) return fail(problem);
+  if (log) await logActivity(supabase, log.action, { entity: log.entity, entityId: id, detail: before?.[log.name] ?? null });
   for (const p of paths) revalidatePath(p);
   return ok({ id });
 }

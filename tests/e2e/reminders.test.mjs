@@ -125,7 +125,10 @@ try {
   const second = Number(await until(() => sql(`select id from public.reminders where lead_id = ${lead} and sent_at is null`) || null));
   await until(() => sean.ev(`!!document.querySelector('[data-reminder="${second}"] button')`));
   await sean.click(`[data-reminder="${second}"] button`);
-  check("the × cancels it", Boolean(await until(() => sql(`select count(*) from public.reminders where id = ${second}`) === "0")));
+  const asked = await until(() => sean.ev(`document.querySelector('[data-confirm-dialog]')?.innerText ?? null`));
+  check("the × asks first", /Cancel this reminder\?/.test(asked ?? "") && sql(`select count(*) from public.reminders where id = ${second}`) === "1", asked);
+  await sean.click("[data-confirm-dialog] [data-confirm]");
+  check("…then cancels it", Boolean(await until(() => sql(`select count(*) from public.reminders where id = ${second}`) === "0")));
 
   section("Someone not on the name");
   const tyler = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();

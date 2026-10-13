@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Field, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { connectCalendar, disconnectCalendar, syncCalendarNow } from "@/features/calendar/actions";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -36,6 +37,7 @@ export default function CalendarSync({ projectId, feed }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(connectCalendar, EMPTY);
   const [working, startWork] = useTransition();
+  const [asking, setAsking] = useState(false); // about to disconnect
   const { fe, invalid } = formHelpers(state, null);
   const handled = useRef(null);
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function CalendarSync({ projectId, feed }) {
       const result = await fn(f);
       if (result.ok) {
         toast.success(done(result.data));
+        setAsking(false);
         router.refresh();
       } else toast.error(result.error);
     });
@@ -91,9 +94,13 @@ export default function CalendarSync({ projectId, feed }) {
               <Button type="button" variant="outline" size="sm" disabled={working} data-sync-now
                 onClick={() => run(syncCalendarNow, (d) => `Read again: ${d.busy} busy time${d.busy === 1 ? "" : "s"}`)}><RefreshCw /> Sync now</Button>
               <Button type="button" variant="outline" size="sm" disabled={working} data-disconnect
-                onClick={() => run(disconnectCalendar, () => "Disconnected: its busy times are off the calendar")}><Unlink /> Disconnect</Button>
+                onClick={() => setAsking(true)}><Unlink /> Disconnect</Button>
             </div>
             <p className="text-xs text-muted-foreground">To use a different calendar, paste its link below.</p>
+            <ConfirmDialog open={asking} onOpenChange={setAsking} pending={working}
+              title={`Disconnect ${feed.provider}?`}
+              description="Its busy times come off this project's calendar, and the link to it is forgotten. You can connect it again whenever you like."
+              confirm="Disconnect" icon={<Unlink />} onConfirm={() => run(disconnectCalendar, () => "Disconnected: its busy times are off the calendar")} />
           </div>
         ) : null}
 

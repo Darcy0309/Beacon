@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import DatePicker from "@/components/shared/date-picker";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
 import { cancelReminder, setReminder } from "@/features/leads/actions";
 import { REMINDER_TIMES } from "@/lib/validate";
 
@@ -29,6 +30,7 @@ export default function ReminderCard({ leadId, company, upcoming }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(setReminder, EMPTY);
   const [cancelling, startCancel] = useTransition();
+  const [asking, setAsking] = useState(null); // the reminder about to be cancelled
   const { fe, invalid, dv } = formHelpers(state, null);
   const problem = state?.error && !state?.fieldErrors ? state.error : null;
 
@@ -48,6 +50,7 @@ export default function ReminderCard({ leadId, company, upcoming }) {
       const result = await cancelReminder(f);
       if (result.ok) {
         toast.success("Reminder cancelled");
+        setAsking(null);
         router.refresh();
       } else toast.error(result.error);
     });
@@ -103,7 +106,7 @@ export default function ReminderCard({ leadId, company, upcoming }) {
                 <span className="font-semibold text-primary">{m.when}</span>
                 {m.note ? <span className="block break-words text-muted-foreground">{m.note}</span> : null}
               </span>
-              <button type="button" disabled={cancelling} onClick={() => cancel(m.id)} aria-label={`Cancel the reminder for ${m.when}`}
+              <button type="button" disabled={cancelling} onClick={() => setAsking(m)} aria-label={`Cancel the reminder for ${m.when}`}
                 className="mt-0.5 shrink-0 cursor-pointer rounded text-muted-foreground transition-colors hover:text-destructive">
                 <X className="size-3.5" />
               </button>
@@ -111,6 +114,10 @@ export default function ReminderCard({ leadId, company, upcoming }) {
           ))}
         </ul>
       ) : null}
+      <ConfirmDialog open={asking !== null} onOpenChange={(o) => !o && setAsking(null)} pending={cancelling}
+        title="Cancel this reminder?"
+        description={asking ? `${asking.when}${asking.note ? ` · ${asking.note}` : ""}. You will not be reminded to call back.` : null}
+        confirm="Cancel the reminder" icon={<X />} onConfirm={() => cancel(asking.id)} />
     </Card>
   );
 }

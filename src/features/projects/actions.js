@@ -51,7 +51,10 @@ export async function saveProject(prevState, formData) {
 }
 
 export async function deleteProject(formData) {
-  return deleteRow("projects", formData, ["/projects", "/clients"]);
+  // Its leads and their appointments go with it, and come back with it.
+  const result = await deleteRow("projects", formData, ["/projects", "/clients", "/leads", "/appointments", "/calendar"], { action: "project.delete", entity: "project", name: "name" });
+  if (result.ok) revalidatePath("/work", "layout");
+  return result;
 }
 
 /** "12 names moved" — what a re-share did, for the toast. */

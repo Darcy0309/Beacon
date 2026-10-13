@@ -70,8 +70,9 @@ section("Part A: attacks through the API");
   const c = await signIn("client@beacon.test");
   const { error } = await c.sb.rpc("notify_password_changed", { p_auth_id: c.session.user.id, p_first_time: false });
   check("users cannot send the password-changed notice themselves", !!error, error?.message ?? "call allowed");
+  const docsBefore = sql("select count(*) from public.documents where deleted_at is null");
   const { data: docs } = await c.sb.from("documents").delete().gt("id", 0).select("id");
-  check("client cannot delete documents", (docs ?? []).length === 0, `deleted ${docs?.length}`);
+  check("client cannot delete documents", (docs ?? []).length === 0 && sql("select count(*) from public.documents where deleted_at is null") === docsBefore, `deleted ${docs?.length}`);
   const a = await signIn("admin@beacon.test");
   const { data: star } = await a.sb.rpc("user_by_email", { p_email: "*@beacon.test" });
   const { data: under } = await a.sb.rpc("user_by_email", { p_email: "agent_beacon.test" });
@@ -208,7 +209,7 @@ try {
     await page.click("[role=dialog] button", "Delete");
     selfToast = await page.waitToast(/can't delete your own/);
   }
-  check("admin cannot delete themselves", sql("select count(*) from public.users where email='admin@beacon.test'") === "1" && /can't delete your own/.test(selfToast), selfToast);
+  check("admin cannot delete themselves", sql("select count(*) from public.users where email='admin@beacon.test' and deleted_at is null") === "1" && /can't delete your own/.test(selfToast), selfToast);
 
   // Delete for real
   await page.go("/users?q=" + encodeURIComponent(email));
@@ -220,11 +221,14 @@ try {
   check("delete asks for confirmation", /Delete Nova Reyes\?/.test(confirmText));
   check("…and says what happens to their work", /set them to Disabled instead/.test(confirmText));
   await page.click("[role=dialog] button", "Delete");
-  check("directory row deleted", await until(() => sql(`select count(*) from public.users where email=${lit(email)}`) === "0", { timeout: 8000 }));
+  // Deleting sets a flag: the row stays, marked and disabled, off the list.
+  check("directory row flagged as deleted, and disabled", await until(() => sql(`select count(*) from public.users where email=${lit(email)} and deleted_at is not null and status = 'disabled'`) === "1", { timeout: 8000 }));
+  check("…and off the Users list", Boolean(await until(async () => !(await page.text()).includes("Nova Reyes"))));
   check("auth account deleted", sql(`select count(*) from auth.users where email=${lit(email)}`) === "0");
   check("delete logged", sql(`select count(*) from public.activity_log where action='user.delete' and detail=${lit(email)}`) === "1");
 } finally {
   browser.close();
+  sql("delete from public.users where email like 'newrep.%' and deleted_at is not null");
   sql("delete from public.notifications where kind='system' and title like '%newrep.%'; delete from public.activity_log where detail like 'newrep.%'");
 }
 

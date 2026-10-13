@@ -42,5 +42,5 @@ export async function saveCompany(prevState, formData) {
 }
 
 export async function deleteCompany(formData) {
-  return deleteRow("companies", formData, ["/clients", "/projects"]);
+  return deleteRow("companies", formData, ["/clients", "/projects", "/leads", "/appointments", "/calendar"], { action: "company.delete", entity: "company", name: "name" });
 }

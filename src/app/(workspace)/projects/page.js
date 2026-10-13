@@ -1,5 +1,6 @@
 import { Plus, FolderKanban, Target, Activity, DollarSign } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import Link from "@/components/shared/intent-link";
 import ToneBadge from "@/components/shared/tone-badge";
 import RowActions from "@/components/shared/row-actions";
 import ProjectForm from "@/features/projects/components/project-form";
@@ -78,7 +79,8 @@ export default async function ProjectsPage({ searchParams }) {
                       <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white" style={{ background: p.color }}>
                         {p.name.slice(0, 2).toUpperCase()}
                       </span>
-                      <span className="font-medium">{p.name}</span>
+                      {/* The name opens the project; the menu on the right edits or deletes it. */}
+                      <Link href={`/projects/${p.id}`} className="font-medium transition-colors hover:text-primary hover:underline" data-project-link>{p.name}</Link>
                     </div>
                   </TableCell>
                   <TableCell>{p.client}</TableCell>
@@ -103,6 +105,7 @@ export default async function ProjectsPage({ searchParams }) {
                         />
                       }
                       onDelete={deleteProject}
+                      warning={`The project comes off Lighthouse for everyone, with its ${Number(p.leads).toLocaleString()} name${Number(p.leads) === 1 ? "" : "s"} and their appointments: no list, call list, calendar or count shows them. Nothing is erased: an administrator can restore all of it under Settings › Deleted records. Calls made and pay earned stay as they are.`}
                     />
                   </TableCell>
                 </TableRow>

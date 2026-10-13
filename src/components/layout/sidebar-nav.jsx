@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useLinkStatus } from "next/link";
 import Link from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose } from "lucide-react";
+import { LogOut, PanelLeftClose } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
 import SignatureLogo from "@/components/brand/signature-logo";
 import LighthouseMark from "@/components/brand/logo-mark";
 import { navGroups, ROLES } from "@/lib/nav";
@@ -48,6 +51,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
   const path = usePathname();
   const { role, user } = useRole();
   const { collapsed: rawCollapsed, toggle } = useSidebar();
+  const [leaving, setLeaving] = useState(false); // asked whether to sign out
   const collapsed = forceExpanded ? false : rawCollapsed;
   const name = user
     ? [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email
@@ -157,16 +161,22 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
               <div className="truncate text-xs text-sidebar-foreground/60">{ROLES[role]?.label}</div>
             </div>
           )}
-          <form action={signOut} onSubmit={forgetPushThenSubmit}>
-            <button
-              type="submit"
-              title="Sign out"
-              aria-label="Sign out"
-              className="signout-button flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            >
-              <SignOutIcon />
-            </button>
-          </form>
+          {/* Signing out asks first: the button is small and sits by the navigation. */}
+          <button
+            type="button"
+            title="Sign out"
+            aria-label="Sign out"
+            onClick={() => setLeaving(true)}
+            className="signout-button flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          >
+            <SignOutIcon />
+          </button>
+          <ConfirmDialog open={leaving} onOpenChange={setLeaving} title="Sign out of Lighthouse?"
+            description="You will need your password, and your authenticator code if you use one, to sign back in.">
+            <form action={signOut} onSubmit={forgetPushThenSubmit}>
+              <Button type="submit" data-confirm><LogOut /> Sign out</Button>
+            </form>
+          </ConfirmDialog>
         </div>
       </div>
     </div>

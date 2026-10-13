@@ -3,7 +3,7 @@
 /** Setting and managing appointments. */
 
 import { revalidatePath } from "next/cache";
-import { check, currentAppUser, fail, idFrom, n, ok, s } from "@/lib/server/action-helpers";
+import { check, currentAppUser, fail, idFrom, n, ok, removeRecord, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { cross, schemas } from "@/lib/validate";
 
@@ -101,8 +101,8 @@ export async function deleteAppointment(formData) {
   const id = idFrom(formData);
   if (!id) return fail("Missing appointment id.");
   const supabase = await createClient();
-  const { error } = await supabase.from("appointments").delete().eq("id", id);
-  if (error) return fail(error);
+  const problem = await removeRecord(supabase, "appointments", id);
+  if (problem) return fail(problem);
   revalidatePath("/appointments");
   revalidatePath("/calendar");
   return ok({ id });

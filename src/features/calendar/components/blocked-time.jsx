@@ -9,6 +9,7 @@ import { blockDays, blockHours } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 import { removeCalendarBlock } from "@/features/calendar/actions";
 import { BlockDialog } from "@/features/calendar/components/project-calendar";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
 
 /**
  * A project calendar's blocked time, in a line: each block still to come
@@ -25,6 +26,7 @@ export default function BlockedTime({ projectId = null, blocks: every, today, ch
   const synced = every.length - blocks.length;
   const router = useRouter();
   const [adding, setAdding] = useState(false);
+  const [asking, setAsking] = useState(null); // the block about to be taken off
   const [removing, startRemoving] = useTransition();
   const remove = (id) =>
     startRemoving(async () => {
@@ -33,6 +35,7 @@ export default function BlockedTime({ projectId = null, blocks: every, today, ch
       const result = await removeCalendarBlock(f);
       if (result.ok) {
         toast.success("Taken off the calendar");
+        setAsking(null);
         router.refresh();
       } else toast.error(result.error);
     });
@@ -47,7 +50,7 @@ export default function BlockedTime({ projectId = null, blocks: every, today, ch
           <Ban className="size-3 shrink-0" style={{ color: "var(--neon-amber)" }} />
           <span className="truncate">{blockDays(b)} · {blockHours(b)}{b.note ? ` · ${b.note}` : ""}{b.project ? ` · ${b.project}` : ""}</span>
           {projectId ? (
-            <button type="button" onClick={() => remove(b.id)} disabled={removing} aria-label={`Take the block on ${blockDays(b)} off the calendar`} data-remove-block
+            <button type="button" onClick={() => setAsking(b)} disabled={removing} aria-label={`Take the block on ${blockDays(b)} off the calendar`} data-remove-block
               className="shrink-0 rounded-full text-muted-foreground transition-colors hover:text-destructive"><X className="size-3" /></button>
           ) : null}
         </span>
@@ -57,6 +60,10 @@ export default function BlockedTime({ projectId = null, blocks: every, today, ch
       {every.length === 0 ? <span className="text-xs text-muted-foreground">No time blocked out.</span> : null}
       </div>
       {children}
+      <ConfirmDialog open={asking !== null} onOpenChange={(o) => !o && setAsking(null)} pending={removing}
+        title="Take this block off the calendar?"
+        description={asking ? `${blockDays(asking)} · ${blockHours(asking)}${asking.note ? ` · ${asking.note}` : ""}. The time opens up for appointments again.` : null}
+        confirm="Take it off" onConfirm={() => remove(asking.id)} />
       {projectId ? (
         <>
           <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setAdding(true)} data-block-out><Ban /> Block out time</Button>

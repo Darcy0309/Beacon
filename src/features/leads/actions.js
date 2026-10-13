@@ -3,7 +3,7 @@
 /** Creating, editing and working leads. */
 
 import { revalidatePath } from "next/cache";
-import { NOT_DELETED, check, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
+import { check, fail, idFrom, logActivity, n, ok, onlySubmitted, removeRecord, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeEin, normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
@@ -118,10 +118,11 @@ export async function deleteLead(formData) {
   const id = idFrom(formData);
   if (!id) return fail("Missing lead id.");
   const supabase = await createClient();
-  const { data, error } = await supabase.from("leads").delete().eq("id", id).select("id");
-  if (error) return fail(error);
-  if (!data?.length) return fail(NOT_DELETED);
-  await logActivity(supabase, "lead.delete", { entity: "lead", entityId: id });
+  const { data: before } = await supabase.from("leads").select("company_name").eq("id", id).maybeSingle();
+  // The lead stays in the database, flagged; its appointments go with it (removeRecord).
+  const problem = await removeRecord(supabase, "leads", id);
+  if (problem) return fail(problem);
+  await logActivity(supabase, "lead.delete", { entity: "lead", entityId: id, detail: before?.company_name ?? null });
   revalidatePath("/leads");
   return ok({ id });
 }
