@@ -23,9 +23,11 @@ const BAR_COLORS = [
 /**
  * One breakdown panel: the counts that answer a slice of the question. The
  * first `shown` rows are always visible and the rest open beneath them, so
- * no count is ever hidden behind "+ N more".
+ * no count is ever hidden behind "+ N more". `scroll`: every row at once in a
+ * box of its own height that scrolls, for a long list (industries) that
+ * would otherwise run down the page when opened.
  */
-function Breakdown({ label, icon, rows, shown = 8, empty = "Nothing to show." }) {
+function Breakdown({ label, icon, rows, shown = 8, empty = "Nothing to show.", scroll = false }) {
   const max = Math.max(1, ...rows.map((r) => Number(r.count)));
   const bar = (r, i) => (
     <MetricBar key={`${r.label}-${i}`} label={r.label} value={Number(r.count)} max={max} color={BAR_COLORS[i % BAR_COLORS.length]} />
@@ -36,8 +38,12 @@ function Breakdown({ label, icon, rows, shown = 8, empty = "Nothing to show." })
       <SectionHeader label={label} icon={icon} />
       <div className="space-y-2 p-4" data-breakdown={label}>
         {rows.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">{empty}</p> : null}
-        {rows.slice(0, shown).map(bar)}
-        {rest.length ? (
+        {scroll && rows.length ? (
+          <div className="-mr-2 max-h-[24rem] space-y-2 overflow-y-auto overscroll-contain pr-2" data-breakdown-scroll tabIndex={0} aria-label={`${label}: ${rows.length} rows, scroll for more`}>
+            {rows.map(bar)}
+          </div>
+        ) : rows.slice(0, shown).map(bar)}
+        {!scroll && rest.length ? (
           <details className="group">
             <summary className="cursor-pointer list-none pt-1 text-center text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary [&::-webkit-details-marker]:hidden">
               <span className="group-open:hidden">Show {rest.length} more</span>
@@ -76,7 +82,7 @@ export default async function ExplorePage({ searchParams }) {
     { label: "With a Renewal Date", value: withXdate.toLocaleString(),
       note: total ? `${Math.round((withXdate / total) * 100)}% of matches` : "no matches",
       icon: CalendarClock, accent: "var(--neon-amber)", series: byMonth.map((m) => Number(m.count)) },
-    { label: "Industries", value: String(byIndustry.length), note: byIndustry[0]?.label ?? "—",
+    { label: "Industries", value: String(byIndustry.length), note: [...byIndustry].filter((i) => i.code).sort((a, b) => Number(b.count) - Number(a.count))[0]?.label ?? "—",
       icon: Building2, accent: "var(--neon-violet)", series: byIndustry.map((i) => Number(i.count)), bars: true },
   ];
 
@@ -125,7 +131,7 @@ export default async function ExplorePage({ searchParams }) {
           <Breakdown label="Leads by Client" icon={Users} rows={byClient} empty="No leads match." />
           <Breakdown label="By Status" icon={PieChart} rows={byStatus} empty="No leads match." />
           <Breakdown label="By State" icon={Map} rows={byState} empty="No leads match." />
-          <Breakdown label="By Industry" icon={Building2} rows={byIndustry} empty="No leads match." />
+          <Breakdown label="By Industry" icon={Building2} rows={byIndustry} empty="No leads match." scroll />
         </div>
 
         <Card>

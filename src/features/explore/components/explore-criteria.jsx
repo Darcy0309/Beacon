@@ -169,7 +169,7 @@ function MultiSelect({ label, hint, options, selected, onToggle, onClear }) {
         <div
           role="listbox"
           aria-multiselectable
-          className="absolute left-0 z-30 mt-1 w-64 overflow-hidden rounded-lg border bg-card shadow-xl"
+          className="absolute left-0 z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border bg-card shadow-xl"
         >
           {hint ? <div className="border-b border-[var(--panel-border)] px-3 py-1.5 text-[0.62rem] text-muted-foreground">{hint}</div> : null}
           {options.length > 8 ? (
@@ -199,7 +199,7 @@ function MultiSelect({ label, hint, options, selected, onToggle, onClear }) {
                   <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", on ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
                     {on ? <Check className="size-3" /> : null}
                   </span>
-                  <span className="flex-1 truncate">{o.label}</span>
+                  <span className="line-clamp-2 flex-1" title={o.label}>{o.label}</span>
                   {o.count != null ? <span className="tabular-nums text-muted-foreground">{o.count}</span> : null}
                 </button>
               );
