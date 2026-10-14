@@ -20,7 +20,7 @@ const R = 15.9155;
  * result with its colour, how many names and what share, most first, and
  * the three kinds of result summed underneath. `rows`: getResultBreakdown().
  */
-export default function ResultBreakdown({ rows, type, className }) {
+export default function ResultBreakdown({ rows, type, className, style }) {
   const all = rows.reduce((sum, r) => sum + r.names, 0);
   let turned = 0;
   const slices = rows.map((r, i) => {
@@ -30,7 +30,7 @@ export default function ResultBreakdown({ rows, type, className }) {
   });
   const kinds = Object.entries(KINDS).map(([key, label]) => ({ key, label, names: rows.filter((r) => r.kind === key).reduce((sum, r) => sum + r.names, 0) }));
   return (
-    <Card data-result-breakdown className={className}>
+    <Card data-result-breakdown className={className} style={style}>
       <SectionHeader wrap label={`${type === "APPT" ? "Appointment" : "DB Dev"} Call Results`} icon={PieChart}
         action={<span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">{all.toLocaleString()} names</span>} />
       {all ? (

@@ -164,11 +164,12 @@ export default async function ProjectDetail({ params, searchParams }) {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <ResultBreakdown rows={results} type={p.type} className="lg:col-span-2" />
+        {/* Either takes more of the row while it is pointed at (.expand-row). */}
+        <div className="expand-row grid grid-cols-1 gap-4 lg:flex" data-from="lg">
+          <ResultBreakdown rows={results} type={p.type} className="expands" style={{ "--w": 2, "--min": "24rem", "--grow": 1.35 }} />
           <CalendarTile label="Project Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`project=${p.id}`}
             note={scope?.shared ? `Shared with ${scope.label}, where this project's appointments go.` : "Only this project's appointments."}
-            className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
+            className="expands animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms`, "--w": 1, "--min": "17rem", "--grow": 1.7 }} />
         </div>
 
         <ProjectTeam

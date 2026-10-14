@@ -51,11 +51,11 @@ export default async function ClientsPage({ searchParams }) {
     <>
       <Topbar title="Clients" sub={`${active.length} active agency account${active.length === 1 ? "" : "s"}`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        {/* One row on a desktop: the two charts get the room. */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.1fr)]">
+        {/* One row on a desktop, the two charts with the most room; a chart or the breakdown takes more while it is pointed at (.expand-row). */}
+        <div className="expand-row grid grid-cols-1 gap-4 md:grid-cols-2 xl:flex" data-from="xl" data-client-tiles>
           <StatTile label="Active Clients" value={String(active.length)} icon={Building2} accent="var(--neon-cyan)"
             note={`${(clients.length - active.length).toLocaleString()} inactive · ${clients.length.toLocaleString()} in all`}
-            className="animate-pop-in">
+            className="animate-pop-in" style={{ "--w": 0.7, "--min": "9.5rem" }}>
             <dl className="mt-3 space-y-1 text-sm" data-client-statuses>
               {[["Active", active.length, "var(--neon-emerald)"], ["Paused", paused, "var(--neon-amber)"], ["Completed", completed, "var(--neon-blue)"]].map(([name, n, color]) => (
                 <div key={name} className="flex items-center justify-between gap-2">
@@ -68,17 +68,17 @@ export default async function ClientsPage({ searchParams }) {
           <TrendTile label="Leads" icon={<Target className="size-4" />} accent="var(--neon-emerald)" series="leads" param="lr" params={params}
             value={(overview.leadsActive + overview.leadsResolved).toLocaleString()}
             note={`${overview.leadsActive.toLocaleString()} active · ${overview.leadsResolved.toLocaleString()} resolved · active clients`}
-            data={overview.leads} range={ranges.leads} developed="developed" className="animate-pop-in" style={{ animationDelay: "60ms" }} />
+            data={overview.leads} range={ranges.leads} developed="developed" className="expands animate-pop-in" style={{ animationDelay: "60ms", "--w": 1.4, "--min": "18.5rem" }} />
           <TrendTile label="Appointments" icon={<CalendarCheck className="size-4" />} accent="var(--neon-amber)" series="appts" param="ar" params={params}
             value={overview.appointments.toLocaleString()}
             note={`${overview.invalid.toLocaleString()} invalid · active clients`}
-            data={overview.appts} range={ranges.appts} developed="set" className="animate-pop-in" style={{ animationDelay: "120ms" }} />
+            data={overview.appts} range={ranges.appts} developed="set" className="expands animate-pop-in" style={{ animationDelay: "120ms", "--w": 1.4, "--min": "18.5rem" }} />
           <BreakdownTile label="Active Clients By" icon={<Globe2 className="size-4" />} accent="var(--neon-violet)"
             groups={[
               { title: "Time zone", rows: countBy(active, "zone", "Not set") },
               { title: "Agency group", rows: countBy(active, "group", "No group") },
             ]}
-            className="animate-pop-in" style={{ animationDelay: "180ms" }} />
+            className="expands animate-pop-in" style={{ animationDelay: "180ms", "--w": 1.1, "--min": "13rem" }} />
         </div>
 
         <Card>

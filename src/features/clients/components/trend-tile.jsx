@@ -66,7 +66,7 @@ export default function TrendTile({ label, value, note, icon, accent, data, seri
 
   return (
     <div data-panel data-accent-edge="" data-trend-tile={series}
-      className={cn("group relative flex flex-col overflow-hidden rounded-xl transition-colors duration-200", className)}
+      className={cn("group relative flex flex-col overflow-hidden rounded-xl", className)}
       style={{ "--edge": accent, ...style }}>
       <div aria-hidden className="pointer-events-none absolute inset-0 opacity-70"
         style={{ background: `radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, ${accent} 16%, transparent), transparent 62%)` }} />
@@ -86,7 +86,7 @@ export default function TrendTile({ label, value, note, icon, accent, data, seri
         </div>
 
         {/* The range, as on a stock chart. */}
-        <nav className="mt-2 flex flex-wrap items-center gap-px" aria-label={`${label} range`} data-trend-ranges>
+        <nav className="mt-2 flex flex-nowrap items-center gap-px" aria-label={`${label} range`} data-trend-ranges>
           {RANGES.filter((r) => !r.more).map((r) => (
             <Link key={r.key} href={href(r.key)} scroll={false} aria-current={range.key === r.key ? "true" : undefined} className={chip(range.key === r.key)}>{r.label}</Link>
           ))}
