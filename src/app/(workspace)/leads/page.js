@@ -1,6 +1,6 @@
 import { Plus, ListChecks } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
-import StatusBadge from "@/components/shared/status-badge";
+import ResultBadge from "@/components/shared/result-badge";
 import RowActions from "@/components/shared/row-actions";
 import LeadForm from "@/features/leads/components/lead-form";
 import SectionHeader from "@/components/shared/section-header";
@@ -11,22 +11,17 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { listLeads, getLeadCounts } from "@/features/leads/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
+import { getCallResults } from "@/features/work/queries";
 import { deleteLead } from "@/features/leads/actions";
 
 export const dynamic = "force-dynamic";
 
-// Chip labels for the status facet, shorter than the full status names.
-const CHIP_LABEL = { appt: "Phone appt", survey: "Survey", hot: "Hot leads", xdate: "X-date", profile: "Profile", new: "New" };
-
 export default async function LeadsPage({ searchParams }) {
-  const params = readListParams(await searchParams, ["status"]);
-  const [{ rows, total }, summary, options] = await Promise.all([listLeads(params), getLeadCounts(), getLookups()]);
-
-  const statusOptions = options.statuses.map((s) => ({
-    value: s.code,
-    label: CHIP_LABEL[s.code] ?? s.name,
-    count: summary.counts[s.code] ?? 0,
-  }));
+  const params = readListParams(await searchParams, ["result"]);
+  if (params.filters.result && !/^[1-9]\d{0,17}$/.test(params.filters.result)) delete params.filters.result;
+  const [{ rows, total }, summary, options, results] = await Promise.all([listLeads(params), getLeadCounts(), getLookups(), getCallResults()]);
+  // Filtered by call result, each stage's results under its name.
+  const resultOptions = results.map((r) => ({ value: String(r.id), label: `${r.name} (${r.project_type === "APPT" ? "Appt" : "DB dev"})` }));
 
   return (
     <>
@@ -42,8 +37,8 @@ export default async function LeadsPage({ searchParams }) {
             action={<LeadForm options={options} trigger={<Button size="sm"><Plus /> New lead</Button>} />}
           />
           <FilterTable
-            columns={["Company", "Contact", "Phone", "Status", "X-Date", "Assigned", { label: "Action", className: "text-right" }]}
-            filters={[{ key: "status", label: "Status", kind: "chips", options: statusOptions }]}
+            columns={["Company", "Contact", "Phone", "Call result", "X-Date", "Assigned", { label: "Action", className: "text-right" }]}
+            filters={[{ key: "result", label: "Call result", kind: "select", options: resultOptions }]}
             placeholder="Search leads…"
             empty="No leads yet."
             query={params.q}
@@ -64,7 +59,7 @@ export default async function LeadsPage({ searchParams }) {
                   </TableCell>
                   <TableCell>{l.contact}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{l.phone}</TableCell>
-                  <TableCell><StatusBadge status={l.status} /></TableCell>
+                  <TableCell><ResultBadge result={l.result} /></TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                   <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
                   <TableCell className="text-right">

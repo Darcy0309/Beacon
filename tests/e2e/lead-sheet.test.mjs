@@ -9,7 +9,7 @@
  *     appointment, the address as a Google Maps link, the SIC code with what
  *     it means, Locations above Employees, and the agency after the policies;
  *   - the lead's Business tab has Locations and EIN (typed on the lead,
- *     written one way); the appointment form's "Client notes" can be edited.
+ *     written one way).
  *
  * Needs the app started with SMTP_HOST=127.0.0.1 SMTP_PORT=2525 (any
  * SMTP_USER and SMTP_PASSWORD), as the delivery test does.
@@ -104,8 +104,11 @@ try {
     [`Project: ${TAG} Appointments`, "With: Jacob Termini", "Name: Daniel", "Business phone: 602-555-0101", "Address: 12 Main St, Phoenix AZ 85004", "Liability / Package: Mar 1, 2027", "Agency: Garry Insurance",
       "Employees: 14", "EIN: 98-7654321", "SIC code: 1731 – Electrical Work", `Client notes: ${NOTE}`].every((l) => notes.split("\n").includes(l)), notes);
   const linkNotes = (re, param) => { const href = body.match(re)?.[0]; return href ? new URL(href).searchParams.get(param) ?? "" : ""; };
-  check("Google's and Outlook's links carry the sheet too", [linkNotes(/https:\/\/calendar\.google\.com\/calendar\/render\?[^\s"<>]+/, "details"), linkNotes(/https:\/\/outlook\.office\.com\/calendar\/[^\s"<>]+/, "body")]
-    .every((t) => t.includes("PROSPECT\nCompany: ") && t.includes("Business phone: 602-555-0101") && !/INTERNAL|OLD-HISTORY/.test(t)));
+  const google = linkNotes(/https:\/\/calendar\.google\.com\/calendar\/render\?[^\s"<>]+/, "details");
+  const outlook = linkNotes(/https:\/\/outlook\.office\.com\/calendar\/[^\s"<>]+/, "body");
+  check("Google's link carries the sheet, a line at a time", google.includes("PROSPECT\nCompany: ") && google.includes("Business phone: 602-555-0101") && !/INTERNAL|OLD-HISTORY/.test(google), google.slice(0, 200));
+  check("…Outlook's too, as HTML, so it does not run into one long sentence (Sean, Oct 2026)",
+    outlook.includes("<b>PROSPECT</b><br>Company: ") && outlook.includes("<br>Business phone: 602-555-0101") && !outlook.includes("\n") && !/INTERNAL|OLD-HISTORY/.test(outlook), outlook.slice(0, 200));
   check("a made-up link gets no calendar file", (await fetch(`${APP_URL}/sheet/AAAA.BBBB/appointment.ics`)).status === 404);
 
   section("Moving it: the notes keep a trail");
@@ -120,7 +123,7 @@ try {
     with: document.querySelector('input[name="rep_name"]').value, note: document.querySelector('[data-current-appt]')?.innerText ?? '' })`);
   check("…and starts from the appointment as it stands: its day, time, length and whom it is with",
     current.date === tomorrow && current.time === "10:00 AM" && current.duration === "30" && current.with === "Jacob Termini", JSON.stringify(current));
-  check("…saying when it is set for, and to change it to move it", /Set for .* at 10:00 AM\.[\s\S]*Change the date or time to move it/.test(current.note), current.note);
+  check("…saying when it is set for, the day of the week first, and to change it to move it", /Set for (Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2}\/\d{2}\/\d{4} 10:00 AM\.[\s\S]*Change the date or time to move it/.test(current.note), current.note);
   await mike.ev(`document.querySelector('textarea[data-client-note]').focus()`);
   await sleep(100);
   const begun = await mike.ev(`document.querySelector('textarea[data-client-note]').value`);
@@ -163,8 +166,9 @@ try {
   check("the client notes are there", (await agent.ev(`document.querySelector('[data-note="client"]')?.innerText ?? ''`)).includes("Appt set with Daniel"));
   check("…not the internal notes, nor what was said on the calls, anywhere in the page",
     !(await agent.ev(`!!document.querySelector('[data-note="internal"]')`)) && !/INTERNAL-SECRET|OLD-HISTORY|INTERNAL-CALL-NOTE/.test(agentHtml));
-  await agent.click("[data-contact-card] button", "Edit");
-  check("…nor in the lead form", Boolean(await until(() => agent.ev(`!!document.querySelector('[role=dialog] input[name="ein"]')`))) && !(await agent.ev(`!!document.querySelector('[role=dialog] textarea[name="internal_notes"]')`)));
+  await agent.click("[data-edit-prospect]");
+  check("…nor in the Prospect Info form, which has the contact details alone", Boolean(await until(() => agent.ev(`!!document.querySelector('[data-prospect-form] input[name="address"]')`)))
+    && !(await agent.ev(`!!document.querySelector('[data-prospect-form] textarea, [data-prospect-form] [name="status_id"], [data-prospect-form] [name="sic_code"]')`)));
   await agent.key("Escape");
 
   section("For staff: the Notes tab");
@@ -192,8 +196,8 @@ try {
 
   section("For staff: the lead's Business tab");
   await admin.go(`/leads/${lead}`, 4000);
-  await admin.click("button", "Edit");
-  await until(() => admin.ev(`!!document.querySelector('[role=dialog] input[name="ein"]')`));
+  await admin.click("[data-edit-business]");
+  await until(() => admin.ev(`!!document.querySelector('[data-business-form] input[name="ein"]')`));
   await admin.fill('[role=dialog] input[name="ein"]', "1234");
   await admin.click("[role=dialog] button[type=submit]");
   const einError = await until(() => admin.ev(`[...document.querySelectorAll('[role=dialog] [role=alert]')].map((a) => a.textContent).join(' ') || null`));
@@ -210,14 +214,6 @@ try {
   check("EIN between Sales volume and Years in business", labels.indexOf("EIN") === labels.indexOf("Sales volume") + 1 && labels.indexOf("Years in business") === labels.indexOf("EIN") + 1 && value("EIN") === "12-3456789", JSON.stringify(business));
   check("the SIC code with what it means", value("SIC code") === "1731 – Electrical Work", value("SIC code"));
 
-  section("The appointment form's “Client notes”");
-  await admin.click("button", "Appointment");
-  const prefilled = await until(() => admin.ev(`document.querySelector('[role=dialog] textarea[data-client-note]')?.value ?? null`));
-  check("it starts from the lead's note, and can be edited", prefilled === NOTE, prefilled);
-  await admin.fill("[role=dialog] textarea[data-client-note]", "Appt moved to Monday, same people");
-  await admin.fill('[role=dialog] input[name="appt_date"]', tomorrow);
-  await admin.click("[role=dialog] button[type=submit]");
-  check("…saved as the lead's note for the client", Boolean(await until(() => sql(`select client_note from public.leads where id = ${lead}`) === "Appt moved to Monday, same people")));
   await sleep(500);
 } finally {
   browser.close();

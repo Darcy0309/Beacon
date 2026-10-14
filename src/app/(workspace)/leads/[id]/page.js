@@ -1,18 +1,25 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, Send, CalendarPlus, ChevronDown, Mail, Pencil, Phone, PhoneCall, Repeat } from "lucide-react";
+import { headers } from "next/headers";
+import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, Send, ChevronDown, Mail, Pencil, Phone, PhoneCall, Printer, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
-import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
-import PrintButton from "@/components/shared/print-button";
 import Tabs from "@/components/shared/tabs";
-import LeadForm from "@/features/leads/components/lead-form";
-import AppointmentForm from "@/features/appointments/components/appointment-form";
+import ProspectForm from "@/features/leads/components/prospect-form";
+import BusinessForm from "@/features/leads/components/business-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
 import EmailLead from "@/features/email/components/email-lead";
 import CoverageForm from "@/features/leads/components/coverage-form";
 import LeadNotes from "@/features/leads/components/lead-notes";
 import ReminderCard from "@/features/leads/components/reminder-card";
+import LeadFiles from "@/features/leads/components/lead-files";
+import { listLeadFiles } from "@/features/leads/files";
+import { createClient } from "@/lib/supabase/server";
+import SendLead from "@/features/leads/components/send-lead";
+import { getAssignableStaff } from "@/features/users/queries";
+import { calendarLinks } from "@/lib/appointment-links";
+import { reminderEvent } from "@/lib/reminder-event";
+import { publicOrigin } from "@/lib/origin";
 import ProjectCalendar from "@/features/calendar/components/project-calendar";
 import { getProjectCalendar } from "@/features/calendar/queries";
 import ResendButton from "@/features/delivery/components/resend-button";
@@ -23,12 +30,12 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getLead, getLeadActivity } from "@/features/leads/queries";
 import { getCallResults, getNextOnList, getOpenAppointment, getWorkProject } from "@/features/work/queries";
-import { getLookups } from "@/lib/server/lookups";
 import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { addMonths, daysBetween, monthGrid, monthStart, todayIn } from "@/lib/dates";
-import { fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
+import { apptWhen, fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { autosLine, employeesLine, locationsLine, subcontractorsLine } from "@/lib/business";
 
 export const dynamic = "force-dynamic";
 
@@ -158,8 +165,8 @@ export default async function LeadSheet({ params, searchParams }) {
   // Names already skipped on this pass through the list, so Skip keeps going down it.
   const skipped = String(sp?.skipped ?? "").split(",").filter((v) => /^[1-9]\d{0,17}$/.test(v)).map(Number).slice(-50);
 
-  const [lead, activity, options, me, results, openAppt, today, tz] = await Promise.all([
-    getLead(id), getLeadActivity(id), getLookups(), getCurrentUser(), getCallResults(), getOpenAppointment(id), getBusinessToday(),
+  const [lead, activity, me, results, openAppt, today, tz] = await Promise.all([
+    getLead(id), getLeadActivity(id), getCurrentUser(), getCallResults(), getOpenAppointment(id), getBusinessToday(),
     getBusinessTimeZone(),
   ]);
   if (!lead) notFound();
@@ -174,13 +181,18 @@ export default async function LeadSheet({ params, searchParams }) {
 
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
-  const [list, listProject, inProject, sender, carriers] = await Promise.all([
+  const origin = publicOrigin(await headers());
+  const [list, listProject, inProject, sender, carriers, staffList, files] = await Promise.all([
     listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
     staff ? getEmailSender(me) : null,
     staff ? getCarrierNames() : [],
+    seesInternal ? getAssignableStaff() : [],
+    listLeadFiles(await createClient(), lead.id),
   ]);
+  // Who a manager can send this lead to: anyone on the team but themselves.
+  const people = staffList.filter((p) => p.id !== me?.id);
 
   // The confirmation follow-up belongs to whoever set the appointment.
   const followUp = openAppt && (admin || openAppt.user_id === me?.id)
@@ -189,7 +201,7 @@ export default async function LeadSheet({ params, searchParams }) {
         setStage: openAppt.set_stage ?? r.stage,
         confirmed: Boolean(openAppt.confirmed_at),
         qa: openAppt.qa_status,
-        when: `${shortDate(openAppt.appt_date)}${openAppt.appt_time ? ` · ${openAppt.appt_time}` : ""}`,
+        when: apptWhen(openAppt.appt_date, openAppt.appt_time),
       }
     : null;
 
@@ -207,7 +219,7 @@ export default async function LeadSheet({ params, searchParams }) {
         time: openAppt.appt_time ?? "",
         duration: openAppt.duration_min ?? 30,
         repName: openAppt.rep_name ?? "",
-        when: `${mediumDate(openAppt.appt_date)}${openAppt.appt_time ? ` at ${openAppt.appt_time}` : ""}`,
+        when: apptWhen(openAppt.appt_date, openAppt.appt_time),
       }
     : null;
   // With no Ultimate X-Date, the soonest policy line is a renewal to confirm before a Lead or Appointment.
@@ -292,7 +304,7 @@ export default async function LeadSheet({ params, searchParams }) {
             {[
               ["Client", r.project?.company?.name],
               ["Project", r.project ? (
-                staff && me?.role !== "agent"
+                admin
                   ? <Link href={`/projects/${r.project.id}`} className="hover:text-primary">{r.project.name}</Link>
                   : r.project.name
               ) : null],
@@ -310,85 +322,54 @@ export default async function LeadSheet({ params, searchParams }) {
         </Card>
 
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(17rem,1fr)_minmax(0,1.5fr)] xl:grid-cols-[minmax(17rem,1fr)_minmax(0,1.45fr)_minmax(19rem,1fr)]">
-          {/* Left: the contact card. */}
-          <Card data-contact-card className="overflow-hidden">
-            <div className="flex flex-wrap items-center gap-0.5 border-b border-[var(--panel-border)] px-1.5 py-1.5">
-              <LeadForm lead={r} options={options} trigger={<Button size="sm" variant="ghost" className="px-2"><Pencil /> Edit</Button>} />
-              <AppointmentForm
-                options={options}
-                leads={[{ id: lead.id, company_name: lead.co }]}
-                defaultLeadId={lead.id}
-                clientNote={r.client_note ?? ""}
-                calendarProjectId={calendar?.projectId ?? null}
-                trigger={<Button size="sm" variant="ghost" className="px-2" aria-label="Add an appointment by hand"><CalendarPlus /> Appointment</Button>}
-              />
-              <span className="ml-auto"><PrintButton variant="ghost" compact /></span>
+          {/* Left: Prospect Info (Sean, Oct 2026): the business, where it is, and its three people. */}
+          <Card data-contact-card data-prospect-info className="overflow-hidden">
+            <div className="flex flex-wrap items-center gap-0.5 border-b border-[var(--panel-border)] py-1.5 pl-4 pr-1.5">
+              <span className="text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">Prospect Info</span>
+              <span className="ml-auto flex items-center gap-0.5">
+                {staff ? <ProspectForm lead={r} trigger={<Button size="sm" variant="ghost" className="px-2" data-edit-prospect><Pencil /> Edit</Button>} /> : null}
+                {/* The lead as the client gets it, to print: not a picture of this screen. */}
+                <Button asChild size="sm" variant="ghost" className="px-2">
+                  <a href={`/api/leads/${lead.id}/sheet`} target="_blank" rel="noreferrer" data-print-sheet><Printer /> Print</a>
+                </Button>
+              </span>
             </div>
 
             <div className="px-4 pb-3 pt-4">
-              <Person
-                who="Contact"
-                phone={r.phone}
-                mobile={r.contact_mobile}
-                email={r.email}
-                leadId={lead.id}
-                alwaysEmail
-                emailButton={emailButton(r.contact_name, true)}
-              >
-                <h2 className="text-lg font-bold leading-tight tracking-tight">{r.contact_name || <span className="text-muted-foreground">No contact name</span>}</h2>
-                {r.contact_title ? (
-                  <div className="mt-1 inline-block rounded border border-primary/40 bg-primary/5 px-2 py-0.5 text-xs text-primary">{r.contact_title}</div>
-                ) : null}
-                <div className="mt-3 text-sm font-semibold">{lead.co}</div>
-                {address.map((line) => <div key={line} className="text-xs text-muted-foreground">{line}</div>)}
-                {website ? <div className="mb-2 text-xs">{website}</div> : <div className="mb-2" />}
-              </Person>
+              <h2 className="text-lg font-bold leading-tight tracking-tight">{lead.co}</h2>
+              {address.map((line) => <div key={line} className="text-xs text-muted-foreground">{line}</div>)}
+              {r.county ? <div className="text-xs text-muted-foreground" data-county>{/county$/i.test(r.county) ? r.county : `${r.county} County`}</div> : null}
+              {website ? <div className="mt-1 text-xs">{website}</div> : null}
+              <div className="mt-3">
+                <Line kind="Business phone" action={telHref(r.phone) ? <CallButton tel={telHref(r.phone)} leadId={lead.id} label={`Call the business: ${r.phone}`} /> : null}>
+                  {r.phone || <span className="text-muted-foreground">None on file</span>}
+                </Line>
+                {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
+              </div>
 
-              {r.decision_maker || r.dm_phone || r.dm_mobile || r.dm_email ? (
-                <div className="mt-3">
-                  <Person
-                    who="Decision maker"
-                    allLines
-                    phone={r.dm_phone}
-                    mobile={r.dm_mobile}
-                    email={r.dm_email}
-                    leadId={lead.id}
-                    emailButton={emailButton(r.decision_maker)}
-                  >
-                    <div className="eyebrow">Decision maker</div>
+              {/* The three people, the decision maker first: every line of theirs, "None on file" when empty,
+                  so a number or address given on the phone has its place; the secondary contact once there is one. */}
+              {[
+                ["Decision maker", r.decision_maker, r.dm_title, { phone: r.dm_phone, mobile: r.dm_mobile, email: r.dm_email, allLines: true }],
+                ["Contact", r.contact_name, r.contact_title, { mobile: r.contact_mobile, email: r.email, alwaysEmail: true, primary: true }],
+                ["Secondary contact", r.contact2_name, r.contact2_title, { phone: r.contact2_phone, mobile: r.contact2_mobile, email: r.contact2_email,
+                  allLines: Boolean(r.contact2_name || r.contact2_phone || r.contact2_mobile || r.contact2_email) }],
+              ].map(([who, name, title, ways]) => (
+                <div key={who} className="mt-3">
+                  <Person who={who} phone={ways.phone} mobile={ways.mobile} email={ways.email} leadId={lead.id}
+                    alwaysEmail={ways.alwaysEmail} allLines={ways.allLines} emailButton={emailButton(name, ways.primary)}>
+                    <div className="eyebrow">{who}</div>
                     <div className="mb-2 mt-1 text-sm">
-                      <span className="font-semibold">{r.decision_maker || "—"}</span>
-                      {r.dm_title ? <span className="text-muted-foreground"> · {r.dm_title}</span> : null}
+                      {name ? <span className="font-semibold">{name}</span> : <span className="text-muted-foreground">Not on file</span>}
+                      {title ? <span className="text-muted-foreground"> · {title}</span> : null}
                     </div>
                   </Person>
                 </div>
-              ) : null}
-              {r.contact2_name || r.contact2_phone || r.contact2_mobile || r.contact2_email ? (
-                <div className="mt-3">
-                  <Person
-                    who="Secondary contact"
-                    allLines
-                    phone={r.contact2_phone}
-                    mobile={r.contact2_mobile}
-                    email={r.contact2_email}
-                    leadId={lead.id}
-                    emailButton={emailButton(r.contact2_name)}
-                  >
-                    <div className="eyebrow">Secondary contact</div>
-                    <div className="mb-2 mt-1 text-sm">
-                      <span className="font-semibold">{r.contact2_name || "—"}</span>
-                      {r.contact2_title ? <span className="text-muted-foreground"> · {r.contact2_title}</span> : null}
-                    </div>
-                  </Person>
-                </div>
-              ) : null}
-              {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
-              {!r.phone && !r.contact_mobile ? <p className="border-t border-[var(--panel-border)] pt-2 text-xs text-muted-foreground">No phone number on file.</p> : null}
+              ))}
             </div>
 
             <div className="border-t border-[var(--panel-border)] px-4 py-3">
               <div className="flex flex-wrap items-center gap-1.5 pb-2">
-                <StatusBadge status={lead.status} />
                 {r.result ? <ToneBadge tone={r.result.viable ? "cyan" : "slate"}>{r.result.name}</ToneBadge> : null}
                 {admin && daysOut !== null ? (
                   <span
@@ -423,27 +404,36 @@ export default async function LeadSheet({ params, searchParams }) {
           <Card className="overflow-hidden">
             <Tabs
               label="About this name"
+              initial={sp?.tab === "files" ? "files" : undefined}
               tabs={[
                 {
                   id: "business",
                   label: "Business",
                   content: (
-                    <Rows
-                      rows={[
-                        ["Company", lead.co],
-                        ["Phone", r.phone],
-                        ["Website", website],
-                        ["Locations", r.location],
-                        ["Employees", r.employees],
-                        ["Autos", r.autos],
-                        ["Sales volume", r.sales_volume],
-                        ["EIN", r.ein ? <span className="tabular-nums">{r.ein}</span> : null],
-                        ["Years in business", r.years_in_business],
-                        ["SIC code", sicLabel(r.sic_code, r.sic_description)],
-                        ["Est. premium", r.estimated_annual_premium],
-                        ["County", r.county],
-                      ]}
-                    />
+                    <div>
+                      {staff ? (
+                        <div className="flex justify-end border-b border-[var(--panel-border)] px-4 py-2">
+                          <BusinessForm lead={r} trigger={<Button size="sm" variant="outline" data-edit-business><Pencil /> Edit</Button>} />
+                        </div>
+                      ) : null}
+                      <Rows
+                        rows={[
+                          ["Company", lead.co],
+                          ["Phone", r.phone],
+                          ["Locations", locationsLine(r)],
+                          ["Employees", employeesLine(r)],
+                          ["Sub-contractors", subcontractorsLine(r)],
+                          ["Autos", autosLine(r)],
+                          ["Sales volume", r.sales_volume],
+                          ["EIN", r.ein ? <span className="tabular-nums">{r.ein}</span> : null],
+                          ["Years in business", r.years_in_business],
+                          ["Est. annual premium", r.estimated_annual_premium],
+                          ["Professionals", r.professionals],
+                          ["Covered employees", r.covered_employees],
+                          ["SIC code", sicLabel(r.sic_code, r.sic_description)],
+                        ]}
+                      />
+                    </div>
                   ),
                 },
                 {
@@ -484,6 +474,13 @@ export default async function LeadSheet({ params, searchParams }) {
                   ),
                 },
                 {
+                  // Files the prospect sent, kept with the lead and sent to the client with it.
+                  id: "files",
+                  label: "Policy Files",
+                  count: files.length || null,
+                  content: <LeadFiles leadId={lead.id} initial={files} canDelete={staff} />,
+                },
+                {
                   id: "notes",
                   label: "Notes",
                   count: noteCount || null,
@@ -498,11 +495,16 @@ export default async function LeadSheet({ params, searchParams }) {
           {/* Right: a call-back reminder, then the call result buttons. */}
           {/* Pinned beside the sheet; with the calendar under it, it scrolls on its own on a short screen. */}
           <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1">
+            {seesInternal && people.length ? <SendLead leadId={lead.id} company={lead.co} people={people} /> : null}
             {canRecord ? (
               <ReminderCard
                 leadId={lead.id}
                 company={lead.co}
-                upcoming={activity.reminders.filter((m) => !m.sent && m.userId === me?.id).map((m) => ({ id: m.id, when: stamp(m.remindAt), note: m.note }))}
+                upcoming={activity.reminders.filter((m) => !m.sent && m.userId === me?.id).map((m) => ({
+                  id: m.id, when: stamp(m.remindAt), note: m.note,
+                  // To put on my own calendar, with the lead to open from it.
+                  links: calendarLinks(reminderEvent({ remindAt: m.remindAt, note: m.note, lead: { id: lead.id, company_name: lead.co, ...r }, origin }), `${origin}/api/reminders/${m.id}/ics`),
+                }))}
               />
             ) : null}
             {staff && r.projectType && r.stage !== (r.projectType === "APPT" ? "appt" : "dbdev") ? (

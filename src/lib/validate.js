@@ -221,13 +221,24 @@ export const schemas = {
     state: [stateCode],
     zip: [zip],
     county: [max(60)],
-    sic_code: [rules.pattern(/^\d{4}$/, "SIC codes are 4 digits, e.g. 6411")],
+    // 4 digits, or with the 2-digit extension the SIC list carries ("7342-00").
+    sic_code: [rules.pattern(/^\d{4}(-?\d{2})?$/, "SIC codes are 4 digits, e.g. 6411 or 7342-00")],
     description: [max(255)],
     list_source: [max(80)],
     location: [max(60)],
     employees: [int({ min: 0, max: 1000000 })],
     covered_employees: [int({ min: 0, max: 1000000 })],
     autos: [int({ min: 0, max: 100000 })],
+    // The Business tab's details (Sean, Oct 2026).
+    location_ownership: [oneOf(["own", "lease"])],
+    building_age: [int({ min: 0, max: 500 })],
+    building_stories: [int({ min: 0, max: 300 })],
+    building_acres: [num({ min: 0, max: 99999 })],
+    employees_full_time: [int({ min: 0, max: 1000000 })],
+    employees_part_time: [int({ min: 0, max: 1000000 })],
+    subcontractors_pct: [num({ min: 0, max: 100 })],
+    travel_radius: [oneOf(["25", "50", "100", "250", "300", "500+"])],
+    professionals: [int({ min: 0, max: 1000000 })],
     sales_volume: [max(30)],
     ein: [rules.custom((v) => (!v || normalizeEin(v) ? null : "An EIN is 9 digits, like 12-3456789"))],
     years_in_business: [int({ min: 0, max: 300 })],
@@ -452,6 +463,15 @@ export const schemas = {
   },
 
   // A call-back reminder on a lead sheet.
+  // A lead handed to someone else to call, with a note and a time to call (send_lead()).
+  sendLead: {
+    lead_id: [required("Missing lead"), id],
+    to: [required("Choose who to send it to"), id],
+    remind_date: [date],
+    remind_time: [time12],
+    note: [max(1000)],
+  },
+
   reminder: {
     lead_id: [required("Missing lead"), id],
     remind_date: [required("Choose the day"), date],

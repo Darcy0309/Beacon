@@ -11,7 +11,8 @@ import { POLICY_LINES } from "@/lib/coverage";
 import { mailFailure, isReservedAddress, oneLine } from "@/lib/email";
 import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "@/lib/delivery";
 import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links";
-import { fullName, sicLabel } from "@/lib/format";
+import { fileSize, fullName, sicLabel } from "@/lib/format";
+import { autosLine, employeesLine, locationsLine, subcontractorsLine } from "@/lib/business";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { LINK_DAYS, sheetToken } from "@/lib/server/sheet-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -39,6 +40,8 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email,
       address, city, state, zip, website, fax, producer_name, list_source,
       location, employees, autos, sales_volume, ein, years_in_business, sic_code, estimated_annual_premium, description, client_note,
+      professionals, covered_employees, location_ownership, building_age, building_stories, building_acres,
+      employees_full_time, employees_part_time, subcontractors_pct, auto_types, travel_radius,
       project_id, insurance:insurance_details(*),
       assigned:users!leads_assigned_user_id_fkey(first_name, last_name, email)`)
     .eq("id", leadId)
@@ -60,7 +63,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   }
 
   const projectId = call?.project_id ?? lead.project_id;
-  const [{ data: project }, { data: appt }, { data: tz }, { data: sic }] = await Promise.all([
+  const [{ data: project }, { data: appt }, { data: tz }, { data: sic }, { data: docs }] = await Promise.all([
     projectId
       ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, company:companies(name)").eq("id", projectId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -71,7 +74,10 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       ? admin.from("sic_codes").select("code, description").in("code", [lead.sic_code, String(lead.sic_code).slice(0, 4)])
           .then(({ data: rows }) => ({ data: rows?.find((r) => r.code === lead.sic_code) ?? rows?.[0] ?? null }))
       : Promise.resolve({ data: null }),
+    // The policy files kept with the lead: they go with it, each behind the sheet's own signed link.
+    admin.from("documents").select("id, name, file_type, size_bytes").eq("lead_id", leadId).is("deleted_at", null).order("created_at"),
   ]);
+  const fileToken = origin && docs?.length ? sheetToken(leadId) : null;
 
   const ins = one(lead.insurance) ?? {};
   const rep = one(call?.user) ?? one(lead.assigned);
@@ -103,12 +109,19 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       lines: POLICY_LINES.map((l) => ({ label: l.label, xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
     },
     profile: [
-      ["Locations", lead.location], ["Employees", lead.employees], ["Autos", lead.autos], ["Sales volume", lead.sales_volume],
+      // What the Business tab holds, as it reads there.
+      ["Locations", locationsLine(lead)], ["Employees", employeesLine(lead)], ["Sub-contractors", subcontractorsLine(lead)],
+      ["Autos", autosLine(lead)], ["Sales volume", lead.sales_volume],
       ["EIN", lead.ein], ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
-      ["Est. premium", lead.estimated_annual_premium],
+      ["Est. premium", lead.estimated_annual_premium], ["Professionals", lead.professionals], ["Covered employees", lead.covered_employees],
     ],
     // Only what was written for the client: the call notes stay internal.
     notes: [["Client notes", lead.client_note], ["Description", lead.description]],
+    files: (docs ?? []).map((d) => ({
+      name: d.name,
+      about: [d.file_type, d.size_bytes != null ? fileSize(d.size_bytes) : null].filter(Boolean).join(" · ") || "File",
+      href: fileToken ? `${origin}/sheet/${fileToken}/files/${d.id}` : null,
+    })),
   };
 
   // The calendar event carries the whole sheet as its notes, not only whom to meet and where.

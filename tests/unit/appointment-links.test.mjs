@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for "Add to calendar" on a lead sheet, its map link, EINs and SIC labels. */
-import { appointmentIcs, appointmentSpan, calendarLinks, mapLink } from "../../src/lib/appointment-links.js";
+import { appointmentIcs, appointmentSpan, calendarLinks, mapLink, outlookBody } from "../../src/lib/appointment-links.js";
 import { normalizeEin, rowsToImport } from "../../src/lib/csv.js";
 import { sicLabel } from "../../src/lib/format.js";
 import { schemas, validate } from "../../src/lib/validate.js";
@@ -37,11 +37,14 @@ check("Apple: the .ics file, when there is one", links[2]?.label === "Apple" && 
 const sheetNotes = Array.from({ length: 80 }, (_, i) => `Row ${i + 1}: 16827 E Parkview Ave, Fountain Hills AZ 85268 · Sean, Owner`).join("\n");
 const long = calendarLinks({ ...event, details: sheetNotes }, "https://crm.example/sheet/t.k/appointment.ics");
 const kept = (href, param) => new URL(href).searchParams.get(param);
-check("short notes go into the links whole", google.searchParams.get("details") === event.details && outlook.searchParams.get("body") === event.details);
+check("short notes go into the links whole: Google's as written, Outlook's as HTML, a line at a time",
+  google.searchParams.get("details") === event.details && outlook.searchParams.get("body") === "Contact: Daniel, Owner<br>Appt set with Daniel and Henry, both owners");
+check("…Outlook's escaped, its headings bold", outlookBody("PROSPECT\nCompany: A & B <Co>") === "<b>PROSPECT</b><br>Company: A &amp; B &lt;Co&gt;");
 check("long notes: Google's link stays within 4,000 characters, Outlook's within 2,000", long[0].href.length <= 4000 && long[1].href.length <= 2000 && long[0].href.length > 3800 && long[1].href.length > 1800,
   `${long[0].href.length} ${long[1].href.length}`);
 check("…cut at the end of a line, saying the rest is on the lead sheet",
-  [kept(long[0].href, "details"), kept(long[1].href, "body")].every((t) => t.endsWith("Sean, Owner\n… (the rest is on the lead sheet)") && sheetNotes.startsWith(t.slice(0, t.lastIndexOf("\n")))),
+  kept(long[0].href, "details").endsWith("Sean, Owner\n… (the rest is on the lead sheet)") && sheetNotes.startsWith(kept(long[0].href, "details").slice(0, kept(long[0].href, "details").lastIndexOf("\n")))
+  && kept(long[1].href, "body").endsWith("Sean, Owner<br>… (the rest is on the lead sheet)"),
   kept(long[1].href, "body").slice(-120));
 check("…the title, the time and the place are kept", kept(long[1].href, "subject") === event.title && kept(long[1].href, "location") === event.location && kept(long[0].href, "dates") === "20261009T170000Z/20261009T173000Z");
 const one = calendarLinks({ ...event, details: "x".repeat(9000) });

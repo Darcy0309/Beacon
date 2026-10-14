@@ -177,7 +177,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
                   {/* Full width: the panel is narrow, and the date reads in words. Set from a call, so today or later. */}
                   <Field label="Date" required error={fe("appt_date")} className="col-span-2">
                     <DatePicker name="appt_date" required defaultValue={dv("appt_date", currentAppt?.date ?? "")} invalid={invalid("appt_date")} aria-label="Appointment date"
-                      min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future onChange={(date) => tellSlot({ date })} />
+                      min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" calendarProject={calendarProjectId} future onChange={(date) => tellSlot({ date })} />
                   </Field>
                   <Field label="Time" required error={fe("appt_time")}>
                     <Select name="appt_time" defaultValue={dv("appt_time", currentAppt?.time ?? "")} aria-invalid={invalid("appt_time")} onChange={(e) => tellSlot({ time: e.target.value })}>

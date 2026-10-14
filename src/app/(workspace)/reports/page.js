@@ -16,19 +16,14 @@ import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
+// The call results, most first, each a colour of its own.
+const RESULT_COLORS = ["var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-violet)", "var(--neon-amber)", "var(--neon-rose)", "var(--neon-blue)"];
+
 const BAR_COLORS = [
   "var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-amber)",
   "var(--neon-violet)", "var(--neon-magenta)",
 ];
 
-const STATUS_COLORS = {
-  "Phone appointment": "var(--neon-emerald)",
-  "Survey appointment": "var(--neon-violet)",
-  "X-date hot lead": "var(--neon-rose)",
-  "X-date lead": "var(--neon-cyan)",
-  "X-date profile": "var(--neon-amber)",
-  New: "var(--neon-blue)",
-};
 
 const SUBTITLE = {
   admin: "Performance across projects and reps",
@@ -159,11 +154,11 @@ export default async function ReportsPage() {
           </Card>
 
           <Card>
-            <SectionHeader label="Leads by Status" icon={PieChart} />
+            <SectionHeader label="Leads by Call Result" icon={PieChart} />
             <div className="space-y-2.5 p-4">
-              {Object.entries(r.byStatus).map(([name, count]) => (
+              {Object.entries(r.byStatus).sort((x, y) => y[1] - x[1]).map(([name, count], i) => (
                 <MetricBar key={name} label={name} value={count} max={r.leads || 1}
-                  color={STATUS_COLORS[name] ?? "var(--neon-cyan)"} />
+                  color={RESULT_COLORS[i % RESULT_COLORS.length]} />
               ))}
               {Object.keys(r.byStatus).length === 0 && (
                 <p className="text-sm text-muted-foreground">No leads yet.</p>

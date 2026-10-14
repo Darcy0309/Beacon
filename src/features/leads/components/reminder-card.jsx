@@ -23,7 +23,9 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * before saving the result and moving on. At the chosen day and time (the
  * business's clock) a notification links back to this lead. Lists my
  * reminders on this name that have not gone off yet, each with Cancel.
- * `upcoming`: [{ id, when, note }], `when` already in words.
+ * `upcoming`: [{ id, when, note, links }], `when` already in words, `links`
+ * ([{ label, href }]) adding it to one's own calendar: Google, Outlook, or
+ * the .ics file (Apple, Outlook on a desktop).
  */
 export default function ReminderCard({ leadId, company, upcoming }) {
   const router = useRouter();
@@ -105,6 +107,14 @@ export default function ReminderCard({ leadId, company, upcoming }) {
               <span className="min-w-0">
                 <span className="font-semibold text-primary">{m.when}</span>
                 {m.note ? <span className="block break-words text-muted-foreground">{m.note}</span> : null}
+                {m.links?.length ? (
+                  <span className="mt-0.5 block text-muted-foreground" data-reminder-calendar>
+                    Add to my calendar:{" "}
+                    {m.links.map((l, i) => (
+                      <span key={l.label}>{i ? " · " : ""}<a href={l.href} target="_blank" rel="noreferrer" className="text-primary hover:underline">{l.label}</a></span>
+                    ))}
+                  </span>
+                ) : null}
               </span>
               <button type="button" disabled={cancelling} onClick={() => setAsking(m)} aria-label={`Cancel the reminder for ${m.when}`}
                 className="mt-0.5 shrink-0 cursor-pointer rounded text-muted-foreground transition-colors hover:text-destructive">

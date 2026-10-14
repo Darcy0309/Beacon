@@ -105,6 +105,8 @@ function sheetSections(s, { forCalendar = false } = {}) {
   ])]);
   sections.push(["Profile", rows(s.profile ?? [])]);
   sections.push(["Notes", rows(s.notes ?? [])]);
+  // The files the prospect sent, each a link the client can open from the email.
+  sections.push(["Policy files", (s.files ?? []).map((f) => [f.about, f.href ? { text: f.name, href: f.href } : f.name])]);
 
   return sections.filter(([, pairs]) => pairs.length);
 }
@@ -120,6 +122,7 @@ function sheetSections(s, { forCalendar = false } = {}) {
  *   address: [lines], map: url | null, website, fax,
  *   coverage: { ultimate, agency, lines: [{ label, xdate, carrier }] },
  *   profile: [[label, value]], notes: [[label, text]],
+ *   files: [{ name, about, href }],   (policy files kept with the lead)
  *   logo: url | null }   (the business's logo, at the top as on its old sheets)
  */
 export function renderLeadSheet(s) {

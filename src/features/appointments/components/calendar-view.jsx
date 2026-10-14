@@ -7,7 +7,6 @@ import {
   Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText,
 } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
-import StatusBadge from "@/components/shared/status-badge";
 import ToneBadge from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,6 +15,8 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { telHref } from "@/lib/format";
+import LeadFiles from "@/features/leads/components/lead-files";
+import { useRole } from "@/components/layout/role-provider";
 import { blockDays, blockHours } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 
@@ -200,6 +201,7 @@ function Detail({ icon: Icon, label, children, href, leadId, wide = false, multi
  * here: ring the contact, or open the full lead sheet.
  */
 function AppointmentDialog({ a, onClose }) {
+  const { role } = useRole();
   const tel = a ? telHref(a.phone) : null;
 
   return (
@@ -215,7 +217,6 @@ function AppointmentDialog({ a, onClose }) {
 
           <div className="flex flex-wrap items-center gap-2">
             <ToneBadge tone={APPT_TONE[a.status] ?? "slate"}>{a.status}</ToneBadge>
-            {a.leadStatus ? <StatusBadge status={a.statusCode} /> : null}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -231,6 +232,14 @@ function AppointmentDialog({ a, onClose }) {
             </Detail>
             <Detail icon={MessageSquareText} label="Client notes" wide multiline>{a.clientNote}</Detail>
           </div>
+
+          {/* The policy files kept with its lead: the client's people add theirs here too. */}
+          {a.leadId ? (
+            <div className="overflow-hidden rounded-lg border border-[var(--panel-border)]" data-appointment-files>
+              <div className="px-4 pt-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">Policy files</div>
+              <LeadFiles leadId={a.leadId} canDelete={role !== "client"} />
+            </div>
+          ) : null}
 
           <DialogFooter>
             {tel ? (

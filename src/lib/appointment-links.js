@@ -64,6 +64,17 @@ function fitted(build, details, max) {
   return build(kept.trimEnd() + CUT);
 }
 
+// Outlook reads the event's body as HTML, so plain new lines run together
+// into one long sentence (Sean, Oct 2026): the notes go as HTML, escaped,
+// each line on its own and a heading in capitals bold.
+const escapeHtml = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+export function outlookBody(text) {
+  if (!text) return text;
+  return String(text).split("\n")
+    .map((line) => (/^[A-Z][A-Z /&-]+$/.test(line.trim()) ? `<b>${escapeHtml(line)}</b>` : escapeHtml(line)))
+    .join("<br>");
+}
+
 /**
  * Links that open the appointment in Google Calendar and Outlook (Microsoft
  * 365) ready to save, and the .ics file (Apple Calendar, Outlook on a
@@ -78,7 +89,7 @@ export function calendarLinks(event, icsUrl = null) {
   })}`, event.details, LINK_MAX.google);
   const outlook = fitted((body) => `https://outlook.office.com/calendar/0/deeplink/compose?${q({
     path: "/calendar/action/compose", rru: "addevent", subject: event.title,
-    startdt: event.start.toISOString(), enddt: event.end.toISOString(), body, location: event.location,
+    startdt: event.start.toISOString(), enddt: event.end.toISOString(), body: outlookBody(body), location: event.location,
   })}`, event.details, LINK_MAX.outlook);
   return [
     { label: "Google", href: google },

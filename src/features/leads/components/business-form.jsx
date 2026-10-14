@@ -1,0 +1,163 @@
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Field, Select, formHelpers } from "@/components/ui/field";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { updateLead } from "@/features/leads/actions";
+import { AUTO_TYPES, TRAVEL_RADII } from "@/lib/business";
+
+const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
+
+// The SIC list, read once a page when the form first opens.
+let sicList = null;
+async function loadSic() {
+  if (sicList) return sicList;
+  try {
+    const res = await fetch("/api/sic-codes?format=json");
+    sicList = res.ok ? (await res.json()).codes ?? [] : [];
+  } catch {
+    sicList = [];
+  }
+  return sicList;
+}
+
+/**
+ * Edit what a business is (the Business tab; Sean, Oct 2026): its name and
+ * phone; its locations and the building (owned or leased, its age, stories
+ * and acres); employees, full-time and part-time; sub-contractors as a %;
+ * autos, their kinds and how far they travel; sales volume, EIN, years in
+ * business, estimated premium, professionals, covered employees; and its
+ * SIC code, with what the code means from the SIC list. Only these fields
+ * are sent, so nothing else on the lead changes.
+ */
+export default function BusinessForm({ lead, trigger }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [state, formAction, pending] = useActionState(updateLead, EMPTY);
+  const { fe, invalid, dv } = formHelpers(state, lead);
+  const [sic, setSic] = useState([]);
+  const [code, setCode] = useState(lead.sic_code ?? "");
+  useEffect(() => {
+    if (open) loadSic().then(setSic);
+  }, [open]);
+  useEffect(() => {
+    if (state?.ok) {
+      toast.success("Business details saved");
+      setOpen(false);
+      router.refresh();
+    } else if (state?.error && !state?.fieldErrors) toast.error(state.error);
+  }, [state, router]);
+  const errors = state?.fieldErrors ? Object.keys(state.fieldErrors).length : 0;
+  const meaning = sic.find((s) => s.code === code.trim())?.description ?? (code.trim() && sic.length ? "Not on the SIC list" : null);
+  const types = new Set(state?.values ? [] : lead.auto_types ?? []);
+  const num = (name, label, props = {}) => (
+    <Field key={name} label={label} error={fe(name)} hint={props.hint}>
+      <Input name={name} inputMode={props.decimal ? "decimal" : "numeric"} defaultValue={dv(name)} maxLength={props.max ?? 9} aria-invalid={invalid(name)} />
+    </Field>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>{trigger}</DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Edit business details</DialogTitle>
+          <DialogDescription>{lead.company_name}: what the business is.</DialogDescription>
+        </DialogHeader>
+        <form action={formAction} noValidate className="flex min-h-0 flex-col gap-4" data-business-form>
+          <input type="hidden" name="id" value={lead.id} />
+          {errors ? (
+            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
+              {errors === 1 ? "One field needs attention." : `${errors} fields need attention.`}
+            </p>
+          ) : null}
+          <div className="-mr-1 grid max-h-[60svh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+            <Field label="Company name" required error={fe("company_name")}>
+              <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} />
+            </Field>
+            <Field label="Phone" error={fe("phone")}>
+              <Input name="phone" type="tel" inputMode="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} />
+            </Field>
+
+            <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2 sm:grid-cols-5" data-group="locations">
+              <legend className="px-1 text-xs font-semibold">Locations</legend>
+              <Field label="Locations" error={fe("location")}>
+                <Input name="location" defaultValue={dv("location")} maxLength={60} aria-invalid={invalid("location")} />
+              </Field>
+              <Field label="Building" error={fe("location_ownership")}>
+                <Select name="location_ownership" defaultValue={dv("location_ownership", "") ?? ""} aria-invalid={invalid("location_ownership")}>
+                  <option value="">—</option>
+                  <option value="own">Own</option>
+                  <option value="lease">Lease</option>
+                </Select>
+              </Field>
+              {num("building_age", "Age (years)", { max: 3 })}
+              {num("building_stories", "Stories", { max: 3 })}
+              {num("building_acres", "Acres", { decimal: true, max: 8 })}
+            </fieldset>
+
+            <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2 sm:grid-cols-4" data-group="employees">
+              <legend className="px-1 text-xs font-semibold">Employees</legend>
+              {num("employees", "Total")}
+              {num("employees_full_time", "Full-time")}
+              {num("employees_part_time", "Part-time")}
+              {num("subcontractors_pct", "Sub-contractors %", { decimal: true, max: 6 })}
+            </fieldset>
+
+            <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-group="autos">
+              <legend className="px-1 text-xs font-semibold">Autos</legend>
+              {num("autos", "Autos", { max: 6 })}
+              <Field label="Travel radius" error={fe("travel_radius")}>
+                <Select name="travel_radius" defaultValue={dv("travel_radius", "") ?? ""} aria-invalid={invalid("travel_radius")}>
+                  <option value="">—</option>
+                  {TRAVEL_RADII.map((r) => <option key={r} value={r}>{r} miles</option>)}
+                </Select>
+              </Field>
+              <div className="sm:col-span-2" role="group" aria-label="Kinds of vehicles">
+                <div className="mb-1.5 text-xs font-medium">Kinds of vehicles</div>
+                {/* Sent even when none is ticked, so taking every one off clears them. */}
+                <input type="hidden" name="auto_types" value="" />
+                <div className="flex flex-wrap gap-x-4 gap-y-2">
+                  {AUTO_TYPES.map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-1.5 text-sm">
+                      <input type="checkbox" name="auto_types" value={key} defaultChecked={types.has(key)} className="size-4 accent-[var(--primary)]" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </fieldset>
+
+            <Field label="Sales volume" error={fe("sales_volume")} hint="e.g. $12.4M">
+              <Input name="sales_volume" defaultValue={dv("sales_volume")} maxLength={30} aria-invalid={invalid("sales_volume")} />
+            </Field>
+            <Field label="EIN" error={fe("ein")} hint="Federal employer ID, 9 digits">
+              <Input name="ein" inputMode="numeric" placeholder="12-3456789" defaultValue={dv("ein")} maxLength={12} aria-invalid={invalid("ein")} />
+            </Field>
+            {num("years_in_business", "Years in business", { max: 3 })}
+            <Field label="Est. annual premium" error={fe("estimated_annual_premium")}>
+              <Input name="estimated_annual_premium" defaultValue={dv("estimated_annual_premium")} maxLength={30} aria-invalid={invalid("estimated_annual_premium")} />
+            </Field>
+            {num("professionals", "Professionals")}
+            {num("covered_employees", "Covered employees")}
+
+            <Field label="SIC code" error={fe("sic_code")} className="sm:col-span-2" hint={meaning ? <span data-sic-meaning>{meaning}</span> : "Type a code or what the business does, and pick from the list"}>
+              <Input name="sic_code" list="sic-codes" value={code} onChange={(e) => setCode(e.target.value)} maxLength={12} placeholder="7342-00" aria-invalid={invalid("sic_code")} autoComplete="off" />
+            </Field>
+            <datalist id="sic-codes">
+              {sic.map((s) => <option key={s.code} value={s.code}>{s.description}</option>)}
+            </datalist>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save changes"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

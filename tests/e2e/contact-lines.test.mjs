@@ -43,8 +43,8 @@ try {
   const contact = people.find((p) => p.who === "Contact");
   const dm = people.find((p) => p.who === "Decision maker");
   check("the contact, with name and title", contact?.text.includes("Anna Huff") && contact.text.includes("Office Manager"), JSON.stringify(contact));
-  check("…a Call button beside the business number, dialling its extension after a pause",
-    contact?.lines.find((l) => l.kind === "Business")?.call === "tel:+12142697488,203", JSON.stringify(contact?.lines));
+  check("…a Call button beside the business's number, under its name, dialling the extension after a pause",
+    (await sean.ev(`document.querySelector('[data-prospect-info] [data-contact-line="Business phone"] a[href^="tel:"]')?.getAttribute('href') ?? null`)) === "tel:+12142697488,203");
   check("…beside the mobile", contact?.lines.find((l) => l.kind === "Mobile")?.call === `tel:+1${MOBILE.replace(/\D/g, "")}`);
   check("…and an Email button beside the address", contact?.lines.find((l) => l.kind === "Email")?.email === "anna.huff@agsi.test");
   check("the decision maker, with their own business phone, mobile and email, each with its button",
@@ -52,6 +52,17 @@ try {
     && dm.lines.find((l) => l.kind === "Business")?.call === "tel:+12142697400"
     && dm.lines.find((l) => l.kind === "Mobile")?.call === "tel:+12147852055"
     && dm.lines.find((l) => l.kind === "Email")?.email === "robert@agsi.test", JSON.stringify(dm));
+  // Prospect Info (Sean, Oct 2026): the business first, then its three people, the decision maker on top.
+  const prospect = await sean.ev(`(() => { const c = document.querySelector('[data-prospect-info]'); return {
+    title: c.querySelector('.uppercase, [class*="uppercase"]')?.innerText ?? '', heading: c.querySelector('h2')?.innerText ?? '',
+    people: [...c.querySelectorAll('[data-person]')].map((p) => p.dataset.person),
+    buttons: [...c.querySelectorAll('button, a')].map((b) => b.innerText.trim()).filter(Boolean),
+    print: c.querySelector('[data-print-sheet]')?.getAttribute('href') ?? null }; })()`);
+  check("the card is Prospect Info, headed by the business's name, not the contact's", /prospect info/i.test(prospect.title) && prospect.heading === `${TAG} AGSI Business`, JSON.stringify(prospect));
+  check("…its three people in order: decision maker, contact, secondary contact", JSON.stringify(prospect.people) === JSON.stringify(["Decision maker", "Contact", "Secondary contact"]), JSON.stringify(prospect.people));
+  check("…with Edit and Print, and no Appointment button (appointments come from the call results)",
+    prospect.buttons.some((b) => /^edit$/i.test(b)) && prospect.buttons.some((b) => /^print$/i.test(b)) && !prospect.buttons.some((b) => /appointment/i.test(b)) && prospect.print === `/api/leads/${lead}/sheet`,
+    JSON.stringify(prospect.buttons));
   check("laid out as the client's example: the contact card on the left, tabs in the middle, results on the right",
     await sean.ev(`(() => { const card = document.querySelector('[data-contact-card]').getBoundingClientRect(), tabs = document.querySelector('[role=tablist]').getBoundingClientRect(),
       results = [...document.querySelectorAll('button[aria-pressed]')][0]?.getBoundingClientRect();

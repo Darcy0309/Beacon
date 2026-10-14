@@ -14,9 +14,10 @@ const TYPE_TONE = { Lead: "cyan", "Hot Lead": "rose", Appointment: "violet", "Ph
  * ones the manager developed on a day (today by default), or over a week or
  * pay period — client, project, the name (company), what it became, and
  * when. Searchable by company, phone, contact, client or project.
- * `rows`: getDeveloped().
+ * `rows`: getDeveloped(). `projectLinks`: each project opens its page (an
+ * administrator's view; managers have no Projects pages).
  */
-export default function DevelopedCard({ rows, view, switcher, nav }) {
+export default function DevelopedCard({ rows, view, switcher, nav, projectLinks = false }) {
   const when = view.key === "day" ? "Developed" : "Date developed";
   return (
     <Card data-developed>
@@ -40,7 +41,7 @@ export default function DevelopedCard({ rows, view, switcher, nav }) {
             <TableRow data-developed-row={r.id}>
               <TableCell className="font-medium">{r.client}</TableCell>
               <TableCell className="text-muted-foreground">
-                {r.projectId ? <Link href={`/projects/${r.projectId}`} className="transition-colors hover:text-primary">{r.project}</Link> : r.project}
+                {r.projectId && projectLinks ? <Link href={`/projects/${r.projectId}`} className="transition-colors hover:text-primary">{r.project}</Link> : r.project}
               </TableCell>
               <TableCell>
                 {r.leadId ? <Link href={`/leads/${r.leadId}`} className="font-medium transition-colors hover:text-primary">{r.company}</Link> : r.company}

@@ -8,6 +8,7 @@ import {
   addDays, addMonths, addYears, formatIso, monthGrid, monthStart, parseTypedDate, relativeDay, todayIso,
 } from "@/lib/dates";
 import { cn } from "@/lib/utils";
+import { blockHours, dayMarks as calendarDayMarks, eventsOn } from "@/lib/project-calendar";
 
 /** Quick picks offered under the calendar, by name. */
 const PRESETS = {
@@ -18,6 +19,24 @@ const PRESETS = {
   nextMonth: ["In a month", (t) => addMonths(t, 1)],
   nextYear: ["In a year", (t) => addYears(t, 1)],
 };
+
+// A project's calendar for the visible month (appointments and blocked time), kept a minute too.
+const projectCache = new Map();
+async function projectMonth(projectId, month) {
+  const key = `${projectId}:${month}`;
+  const hit = projectCache.get(key);
+  if (hit && Date.now() - hit.at < MARK_TTL_MS) return hit.data;
+  const grid = monthGrid(month);
+  try {
+    const res = await fetch(`/api/project-calendar?project=${projectId}&from=${grid[0]}&to=${grid[41]}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    projectCache.set(key, { at: Date.now(), data });
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 // Appointment counts per visible month, kept a minute so paging back and forth is free.
 const markCache = new Map();
@@ -48,12 +67,15 @@ async function appointmentMarks(month) {
  *   presets    quick picks by name: today, tomorrow, nextMonday, nextWeek,
  *              nextMonth, nextYear
  *   marks      "appointments" puts a dot on days that already have some
+ *   calendarProject  a project's calendar (its id) to pick on: its booked days
+ *              dotted, its blocked time shaded, and what a day holds said
+ *              under the calendar as it is pointed at or chosen
  *   future     a typed date with no year means the next one ("Jan 5" in December)
  *   value/onChange to control it; defaultValue otherwise
  */
 export default function DatePicker({
   name, value: controlled, defaultValue = "", onChange, min, max, required, invalid, disabled, id,
-  "aria-label": ariaLabel = "Date", placeholder = "Type or pick a date", presets = [], marks, future = false, className,
+  "aria-label": ariaLabel = "Date", placeholder = "Type or pick a date", presets = [], marks, future = false, calendarProject = null, className,
 }) {
   const today = todayIso();
   const lo = min === "today" ? today : min || null;
@@ -68,6 +90,8 @@ export default function DatePicker({
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => monthStart(value || lo || today));
   const [dayMarks, setDayMarks] = useState({});
+  const [projectData, setProjectData] = useState(null);
+  const [hoverDay, setHoverDay] = useState(null);
   const inputRef = useRef(null);
   const fieldRef = useRef(null);
   const contentRef = useRef(null);
@@ -90,6 +114,27 @@ export default function DatePicker({
       live = false;
     };
   }, [open, month, marks]);
+
+  useEffect(() => {
+    if (!open || !calendarProject) return;
+    let live = true;
+    projectMonth(calendarProject, month).then((data) => live && setProjectData(data));
+    return () => {
+      live = false;
+    };
+  }, [open, month, calendarProject]);
+  // The project's month as the calendar draws it: dots for appointments, shading for blocked time.
+  const grid = monthGrid(month);
+  const projectMarks = projectData ? calendarDayMarks(projectData, grid[0], grid[41]) : null;
+  const shownMarks = projectMarks
+    ? Object.fromEntries(Object.entries(projectMarks).filter(([, m]) => m.appointments).map(([d, m]) => [d, m.appointments]))
+    : marks === "appointments" ? dayMarks : undefined;
+  const shownBlocked = projectMarks
+    ? Object.fromEntries(Object.entries(projectMarks).filter(([, m]) => m.blocked).map(([d, m]) => [d, m.blocked]))
+    : undefined;
+  // What the day pointed at (else the one chosen) holds on the project's calendar.
+  const shownDay = hoverDay ?? value;
+  const dayEvents = projectData && shownDay ? eventsOn(shownDay, projectData) : [];
 
   const set = (iso) => {
     setProblem(null);
@@ -264,8 +309,27 @@ export default function DatePicker({
             onSelect={choose}
             min={lo}
             max={hi}
-            marks={marks === "appointments" ? dayMarks : undefined}
+            marks={shownMarks}
+            blocked={shownBlocked}
+            onHover={calendarProject ? setHoverDay : undefined}
           />
+          {calendarProject ? (
+            // The project's calendar for the day pointed at: booked times and blocked time, before choosing.
+            <div className="mt-2 max-w-[17rem] border-t border-[var(--panel-border)] pt-2 text-[0.7rem]" data-picker-day onMouseLeave={() => setHoverDay(null)}>
+              {shownDay ? (
+                <>
+                  <div className="font-semibold">{formatIso(shownDay, "medium")}</div>
+                  {dayEvents.length ? dayEvents.map((e) => (
+                    <div key={e.key} className="truncate" style={e.kind === "block" ? { color: "var(--neon-amber)" } : undefined}>
+                      {e.kind === "block"
+                        ? `${e.block.synced ? "Busy" : "Blocked"} · ${blockHours(e.block)}${e.block.note ? ` · ${e.block.note}` : ""}`
+                        : `${e.appointment.time ?? "No time"} · ${e.appointment.company ?? "Appointment"}`}
+                    </div>
+                  )) : <div className="text-muted-foreground">{projectData ? "Nothing booked or blocked." : "Reading the project's calendar…"}</div>}
+                </>
+              ) : <div className="text-muted-foreground">Point at a day to see what the project&apos;s calendar has on it.</div>}
+            </div>
+          ) : null}
           {quick.length || (value && !required) ? (
             <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-[var(--panel-border)] pt-2">
               {quick.map(([label, iso]) => {
@@ -293,10 +357,11 @@ export default function DatePicker({
               ) : null}
             </div>
           ) : null}
-          {marks === "appointments" ? (
+          {marks === "appointments" || calendarProject ? (
             <p className="mt-1.5 flex items-center gap-1.5 text-[0.66rem] text-muted-foreground">
               <span className="size-1 rounded-full bg-emerald-500" /> already booked
               <span className="ml-1 size-1 rounded-full bg-amber-500" /> 4 or more
+              {calendarProject ? <><span className="ml-1 inline-block h-2 w-3 rounded-sm" style={{ backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 45%, transparent) 0 2px, transparent 2px 4px)" }} /> blocked</> : null}
             </p>
           ) : null}
         </PopoverContent>

@@ -56,6 +56,19 @@ export const shortDate = (v) => {
   return `${MONTHS[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}`;
 };
 
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/**
+ * An appointment's day with its weekday, and its time when it has one:
+ * "Thu, 10/22/2026 11:00 AM" (Sean, Oct 2026: the day of the week at a glance).
+ * `date` "YYYY-MM-DD…"; "—" without one.
+ */
+export const apptWhen = (date, time = null) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(date ?? ""));
+  if (!m) return "—";
+  const day = WEEKDAYS[new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay()];
+  return `${day}, ${m[2]}/${m[3]}/${m[1]}${time ? ` ${time}` : ""}`;
+};
+
 /** 2026-09-25 -> "Friday, September 25" */
 export const longDate = (v) => {
   if (!v) return "—";

@@ -87,7 +87,7 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
 
             <Field label="Date" required error={fe("appt_date")}>
               <DatePicker name="appt_date" required defaultValue={dv("appt_date")} invalid={invalid("appt_date")} aria-label="Appointment date"
-                presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" future onChange={(date) => tellSlot({ date })} />
+                presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" calendarProject={calendarProjectId} future onChange={(date) => tellSlot({ date })} />
             </Field>
             <Field label="Time" required error={fe("appt_time")}>
               <Select name="appt_time" required defaultValue={dv("appt_time")} aria-invalid={invalid("appt_time")} onChange={(e) => tellSlot({ time: e.target.value })}>

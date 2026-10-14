@@ -8,6 +8,15 @@ import { createClient } from "@/lib/supabase/server";
 import { normalizeEin, normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
 import { POLICY_LINES } from "@/lib/coverage";
+import { AUTO_TYPES } from "@/lib/business";
+
+const AUTO_TYPE_KEYS = new Set(AUTO_TYPES.map(([k]) => k));
+
+// The vehicle kinds ticked: the form sends an empty auto_types alongside, so none ticked clears them.
+const autoTypes = (formData) => {
+  const picked = formData.getAll("auto_types").map(String).filter((v) => AUTO_TYPE_KEYS.has(v));
+  return picked.length ? [...new Set(picked)] : null;
+};
 
 function leadPayload(formData) {
   return {
@@ -47,6 +56,17 @@ function leadPayload(formData) {
     ein: normalizeEin(s(formData, "ein")),
     years_in_business: s(formData, "years_in_business"),
     estimated_annual_premium: s(formData, "estimated_annual_premium"),
+    // The Business tab's details.
+    professionals: s(formData, "professionals"),
+    location_ownership: s(formData, "location_ownership"),
+    building_age: n(formData, "building_age"),
+    building_stories: n(formData, "building_stories"),
+    building_acres: n(formData, "building_acres"),
+    employees_full_time: n(formData, "employees_full_time"),
+    employees_part_time: n(formData, "employees_part_time"),
+    subcontractors_pct: n(formData, "subcontractors_pct"),
+    auto_types: autoTypes(formData),
+    travel_radius: s(formData, "travel_radius"),
     client_note: s(formData, "client_note"),
     status_id: n(formData, "status_id"),
     project_id: n(formData, "project_id"),
@@ -236,4 +256,58 @@ export async function saveLeadNote(prevState, formData) {
   await logActivity(supabase, "lead.notes", { entity: "lead", entityId: leadId, detail: values.kind === "client" ? "Client notes" : "Internal notes" });
   revalidatePath(`/leads/${leadId}`);
   return ok({ kind: values.kind });
+}
+
+/**
+ * Hand a lead to someone on the team to call (send_lead()): it becomes
+ * theirs to work unless "keep" is ticked, they are told once with the note,
+ * and with a day and time a call-back reminder is set for them.
+ */
+export async function sendLead(prevState, formData) {
+  const { values, failed } = check(formData, schemas.sendLead);
+  if (failed) return failed;
+  if (Boolean(values.remind_date) !== Boolean(values.remind_time)) {
+    const field = values.remind_date ? "remind_time" : "remind_date";
+    return fail("Choose both the day and the time to call, or neither.", { [field]: "Choose both, or neither" }, values);
+  }
+  const leadId = Number(values.lead_id);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("send_lead", {
+    p_lead: leadId, p_to: Number(values.to), p_note: values.note || null,
+    p_date: values.remind_date || null, p_time: values.remind_time || null, p_assign: formData.get("assign") === "on",
+  });
+  if (error) {
+    const field = /time|passed/i.test(error.message) ? "remind_time" : /day/i.test(error.message) ? "remind_date" : /send it to|yourself/i.test(error.message) ? "to" : null;
+    return fail(error, field ? { [field]: error.message } : null, values);
+  }
+  await logActivity(supabase, "lead.send", { entity: "lead", entityId: leadId, detail: values.note ? String(values.note).slice(0, 200) : null });
+  revalidatePath(`/leads/${leadId}`);
+  return ok(data);
+}
+
+/** The most one policy file may weigh: the bucket refuses more. */
+const MAX_FILE_MB = 25;
+
+/**
+ * Record a policy file the browser has just put in the lead's folder
+ * (lead/<lead id>/…, in the lead-files bucket): its row in documents, so it
+ * shows on the lead and goes to the client with it. Whoever can see the
+ * lead may (Row Level Security decides); the database fills in its project,
+ * client and who added it, and tells whoever should hear.
+ */
+export async function recordLeadFile({ leadId, path, name, size }) {
+  const id = Number(leadId);
+  if (!Number.isInteger(id) || id < 1) return fail("Missing lead.");
+  if (typeof path !== "string" || !path.startsWith(`lead/${id}/`) || path.includes("..") || path.length > 400) return fail("That file was not stored with this lead.");
+  const label = String(name ?? "").trim().slice(0, 200) || "File";
+  if (!(Number(size) > 0) || Number(size) > MAX_FILE_MB * 1024 * 1024) return fail(`Files must be ${MAX_FILE_MB} MB or smaller.`);
+  const supabase = await createClient();
+  const ext = /\.([a-z0-9]{1,8})$/i.exec(label)?.[1]?.toUpperCase() ?? null;
+  const { data, error } = await supabase.from("documents")
+    .insert({ name: label, file_type: ext, size_bytes: Math.round(Number(size)), storage_path: path, lead_id: id })
+    .select("id").single();
+  if (error) return fail(error);
+  await logActivity(supabase, "lead.file", { entity: "lead", entityId: id, detail: label });
+  revalidatePath(`/leads/${id}`);
+  return ok({ id: data.id });
 }

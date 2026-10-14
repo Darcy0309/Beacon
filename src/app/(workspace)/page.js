@@ -4,7 +4,7 @@ import {
   Activity, CalendarClock, ListChecks, Radio, FolderKanban, PieChart, CheckCheck, UserCheck,
 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
-import StatusBadge from "@/components/shared/status-badge";
+import ResultBadge from "@/components/shared/result-badge";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
@@ -14,7 +14,6 @@ import FilterTable from "@/components/shared/filter-table";
 import TipLayer from "@/components/shared/tip-layer";
 import ParamSelect from "@/components/shared/param-select";
 import { monthBarTips } from "@/lib/chart-tips";
-import { STATUS } from "@/lib/lead-status";
 import { dashboardView } from "@/features/dashboard/role-views";
 import { getAppointments } from "@/features/appointments/queries";
 import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
@@ -48,14 +47,6 @@ const BAR_COLORS = [
   "var(--neon-violet)", "var(--neon-magenta)",
 ];
 
-const STATUS_COLORS = {
-  "Phone appointment": "var(--neon-emerald)",
-  "Survey appointment": "var(--neon-violet)",
-  "X-date hot lead": "var(--neon-rose)",
-  "X-date lead": "var(--neon-cyan)",
-  "X-date profile": "var(--neon-amber)",
-  New: "var(--neon-blue)",
-};
 
 const PERIOD_KEYS = TILE_PERIODS.map(([k]) => k);
 const VIEW_KEYS = VIEW_PERIODS.map(([k]) => k);
@@ -276,16 +267,16 @@ export default async function Dashboard({ searchParams }) {
           <Card className={className}>
             <SectionHeader label="Recent Leads" icon={ListChecks} href="/leads" action="Open leads" />
             <FilterTable
-              columns={["Company", "Contact", "Status", "X-Date", ...(view.reps ? ["Assigned"] : [])]}
-              filters={[{ key: "status", label: "Status" }]}
+              columns={["Company", "Contact", "Call result", "X-Date", ...(view.reps ? ["Assigned"] : [])]}
+              filters={[{ key: "result", label: "Call result" }]}
               placeholder="Search recent leads…"
               empty="No leads yet."
               rows={recentLeads.map((l) => {
-                const status = STATUS[l.status]?.label ?? STATUS.new.label;
+                const result = l.result?.name ?? "Not called yet";
                 return {
                   id: l.id,
-                  search: `${l.co} ${l.city} ${l.contact} ${status} ${l.rep}`,
-                  facets: { status },
+                  search: `${l.co} ${l.city} ${l.contact} ${result} ${l.rep}`,
+                  facets: { result },
                   node: (
                     <TableRow>
                       <TableCell>
@@ -303,7 +294,7 @@ export default async function Dashboard({ searchParams }) {
                         </div>
                       </TableCell>
                       <TableCell>{l.contact}</TableCell>
-                      <TableCell><StatusBadge status={l.status} /></TableCell>
+                      <TableCell><ResultBadge result={l.result} /></TableCell>
                       <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                       {view.reps ? (
                         <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
@@ -334,7 +325,7 @@ export default async function Dashboard({ searchParams }) {
 
             {view.campaigns ? (
               <Card>
-                <SectionHeader label="Delivery by Campaign" icon={FolderKanban} href="/projects" action="All" />
+                <SectionHeader label="Delivery by Campaign" icon={FolderKanban} href={role === "admin" ? "/projects" : undefined} action={role === "admin" ? "All" : undefined} />
                 <div className="space-y-3 p-4">
                   {campaigns.length === 0 && (
                     <p className="text-sm text-muted-foreground">No campaigns yet.</p>
@@ -349,11 +340,11 @@ export default async function Dashboard({ searchParams }) {
 
             {view.statusMix ? (
               <Card>
-                <SectionHeader label="Leads by Status" icon={PieChart} href="/reports" action="Reports" />
+                <SectionHeader label="Leads by Call Result" icon={PieChart} href="/reports" action="Reports" />
                 <div className="space-y-2.5 p-4">
-                  {Object.entries(report?.byStatus ?? {}).map(([name, count]) => (
+                  {Object.entries(report?.byStatus ?? {}).sort((x, y) => y[1] - x[1]).map(([name, count], i) => (
                     <MetricBar key={name} label={name} value={count} max={report?.leads || 1}
-                      color={STATUS_COLORS[name] ?? "var(--neon-cyan)"} />
+                      color={BAR_COLORS[i % BAR_COLORS.length]} />
                   ))}
                   {Object.keys(report?.byStatus ?? {}).length === 0 && (
                     <p className="text-sm text-muted-foreground">No leads yet.</p>
@@ -426,7 +417,7 @@ export default async function Dashboard({ searchParams }) {
             {/* Row three: what they developed, and the team's day. */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               <div className="lg:col-span-2">
-                <DevelopedCard rows={manager.developed} view={manager.recent}
+                <DevelopedCard rows={manager.developed} view={manager.recent} projectLinks={role === "admin"}
                   {...viewControls(sp, manager.recent, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
               </div>
               <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long").replace(/, \d{4}$/, "")} />

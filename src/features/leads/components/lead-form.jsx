@@ -44,7 +44,7 @@ export default function LeadForm({ lead, options, trigger }) {
     }
   }, [state, isEdit, router, setOpen]);
 
-  const { statuses = [], projects = [], managers: staff = [], agencies = [] } = options ?? {};
+  const { projects = [], managers: staff = [], agencies = [] } = options ?? {};
   // Whoever holds the lead now is always an option (an administrator who set an
   // appointment holds it, and is not in the list), so saving never unassigns it.
   const holder = lead?.assigned;
@@ -147,6 +147,9 @@ export default function LeadForm({ lead, options, trigger }) {
               <Input name="producer_name" defaultValue={dv("producer_name")} maxLength={80} aria-invalid={invalid("producer_name")} />
             </Field>
 
+            <Field label="Street address" error={fe("address")} className="sm:col-span-2">
+              <Input name="address" defaultValue={dv("address")} maxLength={120} aria-invalid={invalid("address")} />
+            </Field>
             <Field label="City" error={fe("city")}>
               <Input name="city" defaultValue={dv("city")} maxLength={60} aria-invalid={invalid("city")} />
             </Field>
@@ -158,15 +161,9 @@ export default function LeadForm({ lead, options, trigger }) {
               <Input name="zip" inputMode="numeric" placeholder="85016" defaultValue={dv("zip")} maxLength={10} aria-invalid={invalid("zip")} />
             </Field>
             <Field label="SIC code" error={fe("sic_code")}>
-              <Input name="sic_code" inputMode="numeric" placeholder="6411" defaultValue={dv("sic_code")} maxLength={4} aria-invalid={invalid("sic_code")} />
+              <Input name="sic_code" placeholder="6411" defaultValue={dv("sic_code")} maxLength={12} aria-invalid={invalid("sic_code")} />
             </Field>
 
-            <Field label="Status" error={fe("status_id")}>
-              <Select name="status_id" defaultValue={dv("status_id")} aria-invalid={invalid("status_id")}>
-                <option value="">—</option>
-                {statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </Select>
-            </Field>
             <Field label="Project" error={fe("project_id")}>
               <Select name="project_id" defaultValue={dv("project_id")} aria-invalid={invalid("project_id")}>
                 <option value="">—</option>

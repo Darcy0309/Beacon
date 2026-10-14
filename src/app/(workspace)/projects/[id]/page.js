@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
-import StatusBadge from "@/components/shared/status-badge";
+import ResultBadge from "@/components/shared/result-badge";
+import { getCallResults } from "@/features/work/queries";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
@@ -45,12 +46,13 @@ export default async function ProjectDetail({ params, searchParams }) {
   const { id } = await params;
   if (!/^[1-9]\d{0,17}$/.test(id)) notFound();
   const sp = await searchParams;
-  const list = readListParams(sp, ["status", "rep"]);
+  const list = readListParams(sp, ["result", "rep"]);
+  if (list.filters.result && !/^[1-9]\d{0,17}$/.test(list.filters.result)) delete list.filters.result;
   const me = await getCurrentUser();
   const admin = me?.role === "admin";
   const canManage = admin || me?.role === "manager";
 
-  const [p, overview, team, leads, options, staff, xdates, today, payRules] = await Promise.all([
+  const [p, overview, team, leads, options, staff, xdates, today, payRules, callResults] = await Promise.all([
     getProject(id),
     getProjectOverview(id),
     getProjectTeam(id),
@@ -60,6 +62,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getXdatesByMonth({ projectId: Number(id) }),
     getBusinessToday(),
     admin ? getPayRules() : null,
+    getCallResults(),
   ]);
   if (!p) notFound();
 
@@ -214,9 +217,10 @@ export default async function ProjectDetail({ params, searchParams }) {
             ) : null}
           />
           <FilterTable
-            columns={["Company", "Contact", "Status", "X-Date", "Assigned"]}
+            columns={["Company", "Contact", "Call result", "X-Date", "Assigned"]}
             filters={[
-              { key: "status", label: "Status", kind: "chips", options: options.statuses.map((s) => ({ value: s.code, label: s.name })) },
+              // A project's names stand on its own kind of project's results.
+              { key: "result", label: "Call result", kind: "select", options: callResults.filter((c) => c.project_type === (dbdev ? "DBDV" : "APPT")).map((c) => ({ value: String(c.id), label: c.name })) },
               { key: "rep", label: "Assigned", kind: "select", options: team.map((r) => ({ value: String(r.id), label: r.name })) },
             ]}
             placeholder="Search this project's leads…"
@@ -230,7 +234,7 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <TableRow>
                   <TableCell className="font-medium"><Link href={`/leads/${l.id}`} className="transition-colors hover:text-primary">{l.co}</Link></TableCell>
                   <TableCell>{l.contact}</TableCell>
-                  <TableCell><StatusBadge status={l.status} /></TableCell>
+                  <TableCell><ResultBadge result={l.result} /></TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                   <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
                 </TableRow>

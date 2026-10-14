@@ -53,8 +53,9 @@ export const navGroups = [
   {
     label: "Accounts",
     items: [
-      { href: "/clients", label: "Clients", icon: Users, roles: ["admin", "manager"] },
-      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "manager"] },
+      // Administrators only (Sean, Oct 2026): a manager works their call lists from My Projects.
+      { href: "/clients", label: "Clients", icon: Users, roles: ["admin"] },
+      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin"] },
       { href: "/account-managers", label: "Account Managers", icon: UserCog, roles: ["admin"] },
       { href: "/insurance-companies", label: "Insurance Cos.", icon: Building2, roles: ["admin"] },
     ],
@@ -76,9 +77,9 @@ export const navGroups = [
       { href: "/explore", label: "Lead Explorer", icon: Database, roles: ["admin", "manager"] },
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
       // Agents get the same page scoped to their own productivity.
-      { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "manager", "agent", "client"] },
+      { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "agent", "client"] },
       // Renewal months across the book, a client or a project; each number opens its names.
-      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin", "manager"] },
+      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin"] },
       // Calls and paid events per day; everyone but an administrator sees only their own.
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.

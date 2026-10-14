@@ -70,7 +70,7 @@ const PAGES = [
   ["/bulletin", "Bulletin", ["Bulletin"]],
   ["/documents", "Documents", ["All documents"]],
   ["/imports", "Imports", imports.length ? ["Recent imports", imports[0].file_name] : ["Recent imports"]],
-  ["/reports", "Reports", ["Leads Delivered", "Appointments Set", "Leads by Status"]],
+  ["/reports", "Reports", ["Leads Delivered", "Appointments Set", "Leads by Call Result"]],
   ["/reports/x-dates", "X-Dates by Month", ["Renewals by Month", "All months", project.name]],
   ["/reports/production", "Production & Pay", ["By Rep", "Pay Rates by Project", project.name]],
   ["/reports/pay", "Pay & Hours", ["Pay for the Period", "Hours Paid", "Commission", "Sean Fitzgerald"]],

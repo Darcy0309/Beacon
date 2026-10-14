@@ -33,6 +33,8 @@ const ACTION_LABEL = {
   "pay.period.update": "Changed a pay period",
   "pay.period.delete": "Removed a pay period",
   "lead.reminder": "Set a call-back reminder",
+  "lead.send": "Sent a lead to someone to call",
+  "lead.file": "Added a policy file to a lead",
   "lead.deliver": "Sent a lead to the client again",
   "carriers.import": "Imported carriers",
   "carrier.create": "Added a carrier",

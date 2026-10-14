@@ -20,6 +20,8 @@ const navButton =
  *   onSelect(iso)  a day chosen by click, Enter or Space
  *   min, max       the first and last days that can be chosen
  *   marks          { iso: count }, drawn as dots under the day (appointments)
+ *   blocked        { iso: "day" | "part" }: time blocked out on a project's
+ *                  calendar, the whole day striped, part of it a bar
  *   months         how many months side by side
  *
  * The title opens a month list, and from there a year list, so a date far
@@ -28,7 +30,7 @@ const navButton =
  */
 export default function Calendar({
   value, range, hover, onHover, month, onMonthChange, onSelect, min, max,
-  marks, markLabel = (n) => `${n} appointment${n === 1 ? "" : "s"}`, months = 1, autoFocus = false,
+  marks, markLabel = (n) => `${n} appointment${n === 1 ? "" : "s"}`, blocked, months = 1, autoFocus = false,
 }) {
   const today = todayIso();
   const [view, setView] = useState("days");
@@ -195,7 +197,9 @@ export default function Calendar({
                   const isEnd = rangeTo === iso;
                   const inRange = Boolean(rangeFrom && rangeTo && iso > rangeFrom && iso < rangeTo);
                   const selected = range ? isStart || isEnd : value === iso;
-                  const label = [formatIso(iso, "full"), isToday ? "today" : null, count ? markLabel(count) : null, disabled ? "not available" : null]
+                  const block = blocked?.[iso] ?? null;
+                  const label = [formatIso(iso, "full"), isToday ? "today" : null, count ? markLabel(count) : null,
+                    block === "day" ? "blocked out" : block === "part" ? "partly blocked out" : null, disabled ? "not available" : null]
                     .filter(Boolean).join(", ");
                   return (
                     <div key={iso} role="gridcell" aria-selected={selected || inRange} className="relative flex justify-center py-0.5">
@@ -210,6 +214,10 @@ export default function Calendar({
                         disabled={disabled}
                         aria-label={label}
                         aria-current={isToday ? "date" : undefined}
+                        data-blocked={block || undefined}
+                        style={block === "day" && !selected
+                          ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 28%, transparent) 0 3px, transparent 3px 7px)" }
+                          : undefined}
                         onClick={() => { setFocusIso(iso); onSelect(iso); }}
                         onMouseEnter={() => onHover?.(iso)}
                         onFocus={() => setFocusIso(iso)}
@@ -227,6 +235,7 @@ export default function Calendar({
                         )}
                       >
                         <span className="leading-none">{Number(iso.slice(8))}</span>
+                        {block === "part" ? <span aria-hidden className="absolute inset-x-2 top-[3px] h-[2px] rounded-full" style={{ background: "var(--neon-amber)" }} /> : null}
                         {count ? (
                           <span aria-hidden className="absolute bottom-[3px] flex gap-0.5" title={markLabel(count)}>
                             {Array.from({ length: Math.min(count, 3) }, (_, i) => (
