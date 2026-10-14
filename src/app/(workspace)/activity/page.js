@@ -1,5 +1,6 @@
 import { History, LogIn, Users, Activity as ActivityIcon } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import Link from "@/components/shared/intent-link";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
@@ -12,6 +13,8 @@ import { readListParams, pageInfo } from "@/lib/paging";
 export const dynamic = "force-dynamic";
 
 const roleTone = { Administrator: "amber", Manager: "cyan", Agent: "emerald", Client: "violet" };
+// The pages an entry can open: what it was done to.
+const ENTITY_PAGE = { lead: "/leads", project: "/projects" };
 
 /** How busy an account is, relative to the busiest one, as a bar width. */
 function Bar({ value, max, color }) {
@@ -127,7 +130,12 @@ export default async function ActivityPage({ searchParams }) {
                       {r.action}
                     </ToneBadge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{r.detail || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {/* What it was done to, when that has a page: the lead or the project. */}
+                    {r.entityId && ENTITY_PAGE[r.entity] ? (
+                      <Link href={`${ENTITY_PAGE[r.entity]}/${r.entityId}`} className="transition-colors hover:text-primary hover:underline" data-activity-link>{r.detail || "Open"}</Link>
+                    ) : r.detail || "—"}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground" title={r.when}>{r.ago}</TableCell>
                 </TableRow>
               ),

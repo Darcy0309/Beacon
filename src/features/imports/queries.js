@@ -25,7 +25,7 @@ export async function listImports(params) {
         paged(
           supabase
             .from("import_batches")
-            .select(`*, project:projects${inner(Boolean(p.filters?.project))}(name)`, { count: "exact" })
+            .select(`*, project:projects${inner(Boolean(p.filters?.project))}(id, name)`, { count: "exact" })
             .order("created_at", { ascending: false })
             .order("id", { ascending: false }),
           p,
@@ -53,6 +53,7 @@ export async function listImports(params) {
       status: IMPORT_LABEL[i.status] ?? i.status,
       date: dateTime(i.created_at),
       project: one(i.project)?.name ?? "—",
+      projectId: one(i.project)?.id ?? null,
     })),
     total,
     stats,

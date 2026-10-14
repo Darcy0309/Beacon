@@ -39,6 +39,8 @@ export async function listDocuments(params) {
       client: one(d.company)?.name ?? "—",
       size: fileSize(d.size_bytes),
       date: shortDate(d.created_at),
+      // A file kept with a lead (its Policy Files) opens; an older record has no file to open.
+      href: d.storage_path?.startsWith("lead/") ? `/api/files/${d.id}` : null,
     })),
     total,
     stats,

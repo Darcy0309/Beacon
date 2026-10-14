@@ -1,5 +1,6 @@
 import { UserPlus, ShieldCheck, Users, KeyRound, Mail } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import EditName from "@/components/shared/edit-name";
 import ToneBadge from "@/components/shared/tone-badge";
 import RowActions from "@/components/shared/row-actions";
 import UserForm from "@/features/users/components/user-form";
@@ -87,7 +88,8 @@ export default async function UsersPage({ searchParams }) {
                     <div className="flex items-center gap-3">
                       <span className="flex size-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: u.color }}>{u.initials}</span>
                       <div>
-                        <div className="font-medium">{u.name}</div>
+                        <EditName name={u.name} data-user-link
+                          edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} pay={payProfiles.get(u.id)} hourly={hourly} />} />
                         <div className="text-xs text-muted-foreground">{u.email}</div>
                       </div>
                     </div>

@@ -98,6 +98,8 @@ export async function getAccountManagers() {
     const name = shortName(m);
     const projects = (m.assignments ?? []).map((a) => one(a.project)).filter(Boolean);
     return {
+      id: m.id,
+      active: m.status === "active",
       name,
       initials: initialsOf(fullName(m)),
       color: colorFor(name),

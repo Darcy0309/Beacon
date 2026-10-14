@@ -1,5 +1,6 @@
 import { UserCog, Building2, CalendarCheck, Target } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import Link from "@/components/shared/intent-link";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
@@ -57,7 +58,11 @@ export default async function AccountManagersPage() {
                         {m.initials}
                       </span>
                       <div className="min-w-0">
-                        <div className="truncate font-semibold">{m.name}</div>
+                        {m.active ? (
+                          <Link href={`/?view=${m.id}`} className="block truncate font-semibold transition-colors hover:text-primary hover:underline" data-manager-link>{m.name}</Link>
+                        ) : (
+                          <div className="truncate font-semibold">{m.name}</div>
+                        )}
                         <div className="text-xs text-muted-foreground">{m.region} region</div>
                       </div>
                     </div>

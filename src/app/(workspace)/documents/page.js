@@ -71,14 +71,18 @@ export default async function DocumentsPage({ searchParams }) {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <FileText className="size-4 shrink-0 text-primary" />
-                      <span className="font-medium">{d.name}</span>
+                      {d.href ? (
+                        <a href={d.href} target="_blank" rel="noopener" className="font-medium transition-colors hover:text-primary hover:underline" data-document-link>{d.name}</a>
+                      ) : (
+                        <span className="font-medium">{d.name}</span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell><ToneBadge tone={typeTone[d.type] ?? "slate"}>{d.type}</ToneBadge></TableCell>
                   <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{d.size}</TableCell>
                   <TableCell className="text-muted-foreground">{d.date}</TableCell>
-                  <TableCell className="text-right"><RowActions name={d.name} id={d.id} onDelete={canDelete ? deleteDocument : undefined} /></TableCell>
+                  <TableCell className="text-right"><RowActions name={d.name} id={d.id} href={d.href ?? undefined} onDelete={canDelete ? deleteDocument : undefined} /></TableCell>
                 </TableRow>
               ),
             }))}

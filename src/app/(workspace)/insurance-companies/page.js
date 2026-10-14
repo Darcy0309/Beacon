@@ -1,5 +1,6 @@
 import { Building2, Target, MapPin, Star } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import EditName from "@/components/shared/edit-name";
 import ToneBadge from "@/components/shared/tone-badge";
 import RowActions from "@/components/shared/row-actions";
 import StatTile from "@/components/shared/stat-tile";
@@ -66,7 +67,7 @@ export default async function InsuranceCompaniesPage({ searchParams }) {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <span className="flex size-8 items-center justify-center rounded-md text-xs font-bold text-white" style={{ background: c.color }}>{c.initials}</span>
-                      <span className="font-medium">{c.name}</span>
+                      <EditName name={c.name} edit={<CarrierForm carrier={c} />} data-carrier-link />
                     </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{c.lines}</TableCell>

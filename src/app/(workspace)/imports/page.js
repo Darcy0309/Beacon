@@ -1,5 +1,6 @@
 import { Upload, Rows3, CheckCheck, AlertTriangle } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import Link from "@/components/shared/intent-link";
 import ToneBadge from "@/components/shared/tone-badge";
 import CsvImport from "@/features/imports/components/csv-import";
 import StatTile from "@/components/shared/stat-tile";
@@ -66,7 +67,9 @@ export default async function ImportsPage({ searchParams }) {
               node: (
                 <TableRow>
                   <TableCell className="font-medium">{r.file}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.project}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {r.projectId ? <Link href={`/projects/${r.projectId}`} className="transition-colors hover:text-primary hover:underline" data-import-project>{r.project}</Link> : r.project}
+                  </TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{r.rows.toLocaleString()}</TableCell>
                   <TableCell className="font-semibold tabular-nums text-primary">{r.imported.toLocaleString()}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{r.errors}</TableCell>

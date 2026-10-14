@@ -1,5 +1,6 @@
 import { Plus, ListChecks } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import Link from "@/components/shared/intent-link";
 import ResultBadge from "@/components/shared/result-badge";
 import RowActions from "@/components/shared/row-actions";
 import LeadForm from "@/features/leads/components/lead-form";
@@ -52,7 +53,7 @@ export default async function LeadsPage({ searchParams }) {
                     <div className="flex items-center gap-3">
                       <span className="flex size-8 items-center justify-center rounded-lg text-xs font-semibold text-white" style={{ background: l.color }}>{l.initials}</span>
                       <div>
-                        <div className="font-medium">{l.co}</div>
+                        <Link href={`/leads/${l.id}`} className="font-medium transition-colors hover:text-primary hover:underline" data-lead-link>{l.co}</Link>
                         <div className="text-xs text-muted-foreground">{l.city}</div>
                       </div>
                     </div>
