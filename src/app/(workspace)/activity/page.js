@@ -55,7 +55,7 @@ export default async function ActivityPage({ searchParams }) {
     <>
       <Topbar title="Activity Log" sub={`${loginsMonth} sign-ins this month · ${activeUsers} of ${summary.length} accounts active`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}

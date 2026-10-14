@@ -13,6 +13,7 @@ import { signOut } from "@/features/auth/actions";
 import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import ActivityTracker from "@/features/pay/components/activity-tracker";
 import IdleGuard from "@/features/auth/components/idle-guard";
+import ExpandRowGuard from "@/components/layout/expand-row-guard";
 import { idleLimitFor } from "@/lib/idle";
 
 /**
@@ -57,6 +58,7 @@ export default function WorkspaceShell({ children }) {
     <div className="flex min-h-svh">
       {tracked ? <ActivityTracker /> : null}
       {guarded ? <IdleGuard /> : null}
+      <ExpandRowGuard />
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col overflow-x-clip">
         {denied ? <NoAccess /> : children}

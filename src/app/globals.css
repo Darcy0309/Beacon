@@ -333,23 +333,28 @@
 .animate-pop-in { animation: pop-in 0.28s ease-out both; }
 
 /* ---------------------------------------------------------------------------
-   A row of cards of uneven widths (.expand-row). Each card's share of the row
-   is its --w; one that holds a lot (.expands) takes more of the row while it
-   is pointed at or holds the focus, from its neighbours on both sides, and
-   gives it back when left. Its neighbours dim a little and it lifts, so the
-   eye follows the room it is given. No card goes under its --min, so nothing
-   inside one wraps and the row keeps its height.
+   A row of cards (.expand-row): the metric tiles across the top of a page,
+   or two cards side by side. Each card's share of the row is its --w (one,
+   unless it says otherwise, so the cards start the same width); the card
+   pointed at, or holding the focus, takes more of the row from its
+   neighbours on both sides, and gives it back when left. Its neighbours dim
+   a little and it lifts in its own colour, so the eye follows the room it is
+   given. No card goes under its --min. A card that should hold still: .holds.
 
-   The row is a flex row from the width in data-from ("lg" or "xl") up, and
-   whatever the page makes it (a grid, stacked) below that, where nothing
-   expands. Only with a pointer that hovers, and not for people who have asked
-   for less motion.
+   The row is a flex row from the width in data-from ("lg", "xl" or "2xl")
+   up, and whatever the page makes it (a grid, stacked) below that, where
+   nothing expands. Only with a pointer that hovers, and not for people who
+   have asked for less motion. ExpandRowGuard holds the row's height while a
+   card is pointed at, so nothing under the row moves.
    --------------------------------------------------------------------------- */
 @media (min-width: 64rem) {
-  .expand-row[data-from="lg"] > * { flex: var(--w, 1) 1 0%; min-width: var(--min, 0); }
+  .expand-row[data-from="lg"] > * { flex: var(--w, 1) 1 0%; min-width: var(--min, 10rem); }
 }
 @media (min-width: 80rem) {
-  .expand-row[data-from="xl"] > * { flex: var(--w, 1) 1 0%; min-width: var(--min, 0); }
+  .expand-row[data-from="xl"] > * { flex: var(--w, 1) 1 0%; min-width: var(--min, 10rem); }
+}
+@media (min-width: 96rem) {
+  .expand-row[data-from="2xl"] > * { flex: var(--w, 1) 1 0%; min-width: var(--min, 10rem); }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .expand-row > * {
@@ -361,26 +366,40 @@
   }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) and (min-width: 64rem) {
-  .expand-row[data-from="lg"] > .expands:is(:hover, :focus-within) {
+  .expand-row[data-from="lg"] > :not(.holds):is(:hover, :focus-within) {
     flex-grow: calc(var(--w, 1) * var(--grow, 1.6));
     /* A moment's wait, so the row holds still while the pointer only passes over. */
     transition-delay: 0.12s;
     border-color: color-mix(in srgb, var(--edge, var(--primary)) 45%, var(--panel-border));
     box-shadow: 0 18px 44px -24px color-mix(in srgb, var(--edge, var(--primary)) 70%, transparent);
   }
-  .expand-row[data-from="lg"]:has(> .expands:is(:hover, :focus-within)) > :not(:hover):not(:focus-within) {
+  .expand-row[data-from="lg"]:has(> :not(.holds):is(:hover, :focus-within)) > :not(:hover):not(:focus-within) {
     filter: brightness(0.86) saturate(0.9);
     transition-delay: 0.12s;
   }
 }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) and (min-width: 80rem) {
-  .expand-row[data-from="xl"] > .expands:is(:hover, :focus-within) {
+  .expand-row[data-from="xl"] > :not(.holds):is(:hover, :focus-within) {
     flex-grow: calc(var(--w, 1) * var(--grow, 1.6));
+    /* A moment's wait, so the row holds still while the pointer only passes over. */
     transition-delay: 0.12s;
     border-color: color-mix(in srgb, var(--edge, var(--primary)) 45%, var(--panel-border));
     box-shadow: 0 18px 44px -24px color-mix(in srgb, var(--edge, var(--primary)) 70%, transparent);
   }
-  .expand-row[data-from="xl"]:has(> .expands:is(:hover, :focus-within)) > :not(:hover):not(:focus-within) {
+  .expand-row[data-from="xl"]:has(> :not(.holds):is(:hover, :focus-within)) > :not(:hover):not(:focus-within) {
+    filter: brightness(0.86) saturate(0.9);
+    transition-delay: 0.12s;
+  }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) and (min-width: 96rem) {
+  .expand-row[data-from="2xl"] > :not(.holds):is(:hover, :focus-within) {
+    flex-grow: calc(var(--w, 1) * var(--grow, 1.6));
+    /* A moment's wait, so the row holds still while the pointer only passes over. */
+    transition-delay: 0.12s;
+    border-color: color-mix(in srgb, var(--edge, var(--primary)) 45%, var(--panel-border));
+    box-shadow: 0 18px 44px -24px color-mix(in srgb, var(--edge, var(--primary)) 70%, transparent);
+  }
+  .expand-row[data-from="2xl"]:has(> :not(.holds):is(:hover, :focus-within)) > :not(:hover):not(:focus-within) {
     filter: brightness(0.86) saturate(0.9);
     transition-delay: 0.12s;
   }

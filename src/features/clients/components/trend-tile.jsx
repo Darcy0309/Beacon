@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 const HEIGHT = 132;
 const PAD = { left: 30, right: 10, top: 10, bottom: 20 };
 const RANGES = CHART_RANGES.filter((r) => r.key !== "custom");
+// The ranges a tile always has room for.
+const MAIN_RANGES = ["1D", "1W", "1M", "3M", "YTD"];
 const fmt = (n) => Number(n ?? 0).toLocaleString("en-US", { maximumFractionDigits: 0 });
 
 /**
@@ -34,7 +36,7 @@ export default function TrendTile({ label, value, note, icon, accent, data, seri
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(220, e.contentRect.width)));
+    const ro = new ResizeObserver(([e]) => setWidth(Math.max(150, e.contentRect.width)));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -62,11 +64,11 @@ export default function TrendTile({ label, value, note, icon, accent, data, seri
     return s ? `/clients?${s}` : "/clients";
   };
   const current = RANGES.find((r) => r.key === range.key) ?? RANGES[0];
-  const chip = (on) => cn("rounded px-1.5 py-0.5 text-[0.62rem] font-bold tracking-[0.04em] transition-colors", on ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground");
+  const chip = (on) => cn("rounded px-1 py-0.5 @[19rem]:px-1.5 text-[0.62rem] font-bold tracking-[0.04em] transition-colors", on ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground");
 
   return (
     <div data-panel data-accent-edge="" data-trend-tile={series}
-      className={cn("group relative flex flex-col overflow-hidden rounded-xl", className)}
+      className={cn("group @container relative flex flex-col overflow-hidden rounded-xl", className)}
       style={{ "--edge": accent, ...style }}>
       <div aria-hidden className="pointer-events-none absolute inset-0 opacity-70"
         style={{ background: `radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, ${accent} 16%, transparent), transparent 62%)` }} />
@@ -88,7 +90,9 @@ export default function TrendTile({ label, value, note, icon, accent, data, seri
         {/* The range, as on a stock chart. */}
         <nav className="mt-2 flex flex-nowrap items-center gap-px" aria-label={`${label} range`} data-trend-ranges>
           {RANGES.filter((r) => !r.more).map((r) => (
-            <Link key={r.key} href={href(r.key)} scroll={false} aria-current={range.key === r.key ? "true" : undefined} className={chip(range.key === r.key)}>{r.label}</Link>
+            // A narrow tile keeps the main ranges (and the one chosen); the rest show when it has the room, as when it is pointed at.
+            <Link key={r.key} href={href(r.key)} scroll={false} aria-current={range.key === r.key ? "true" : undefined}
+              className={cn(chip(range.key === r.key), !MAIN_RANGES.includes(r.key) && range.key !== r.key && "hidden @[19rem]:block")}>{r.label}</Link>
           ))}
           <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>

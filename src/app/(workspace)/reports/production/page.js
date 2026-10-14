@@ -159,7 +159,7 @@ export default async function ProductionReport({ searchParams }) {
           {range.error ? <p role="alert" className="border-t border-[var(--panel-border)] px-5 py-2 text-sm text-destructive">{range.error} Showing today instead.</p> : null}
         </Card>
 
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:grid-cols-6">
+        <div className="expand-row grid grid-cols-2 gap-4 lg:grid-cols-3 2xl:flex" data-from="2xl">
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 50}ms` }} />
           ))}

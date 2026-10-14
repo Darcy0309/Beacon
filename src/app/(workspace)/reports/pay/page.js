@@ -109,7 +109,7 @@ export default async function PayReport({ searchParams }) {
           {range.error ? <p role="alert" className="border-t border-[var(--panel-border)] px-5 py-2 text-sm text-destructive">{range.error} Showing this pay period instead.</p> : null}
         </Card>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
           {tiles.map((tile, i) => (
             <StatTile key={tile.label} {...tile} className="animate-pop-in" style={{ animationDelay: `${i * 50}ms` }} />
           ))}
