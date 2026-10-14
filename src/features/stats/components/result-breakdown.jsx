@@ -1,6 +1,10 @@
+"use client";
+
+import { useState } from "react";
 import { PieChart } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 // Still to call, a lead or an appointment, or resolved another way.
 const KINDS = {
@@ -13,14 +17,26 @@ const share = (v) => (v > 0 && v < 1 ? "<1%" : `${Math.round(v)}%`);
 const colorOf = (i) => `hsl(${Math.round((190 + i * 137.5) % 360)} 72% 52%)`;
 // A circle whose circumference is 100, so a slice's length is its percentage.
 const R = 15.9155;
+// How far a slice pointed at comes away from the circle, and how much wider it is drawn.
+const PULL = 1.4;
+const WIDTH = 5.5;
+const WIDTH_ACTIVE = 7;
+// Where a slice's middle points (the drawing's own x and y, before it is turned to start at 12 o'clock).
+const outward = (s) => {
+  const a = ((s.from + s.share / 2) / 100) * 2 * Math.PI;
+  return `translate(${(Math.cos(a) * PULL).toFixed(3)}px, ${(Math.sin(a) * PULL).toFixed(3)}px)`;
+};
 
 /**
  * A project's names by call result, as a circle: a slice a result, sized by
  * its share of the project's names, the total in the middle; beside it each
  * result with its colour, how many names and what share, most first, and
  * the three kinds of result summed underneath. `rows`: getResultBreakdown().
+ * A slice pointed at comes away from the circle and its line on the right
+ * lights up; pointing at (or tabbing to) a line does the same the other way.
  */
 export default function ResultBreakdown({ rows, type, className, style }) {
+  const [active, setActive] = useState(null);
   const all = rows.reduce((sum, r) => sum + r.names, 0);
   let turned = 0;
   const slices = rows.map((r, i) => {
@@ -36,13 +52,18 @@ export default function ResultBreakdown({ rows, type, className, style }) {
       {all ? (
         <div className="flex flex-col items-center gap-x-8 gap-y-5 p-5 sm:flex-row sm:items-center">
           <div className="w-52 shrink-0">
-            <svg viewBox="0 0 42 42" className="mx-auto block w-40 -rotate-90" role="img" data-result-chart
+            <svg viewBox="0 0 42 42" className="mx-auto block w-40 -rotate-90 overflow-visible" role="img" data-result-chart
               aria-label={`Call results: ${slices.map((s) => `${s.result} ${s.names} (${share(s.share)})`).join(", ")}`}>
-              <circle cx="21" cy="21" r={R} fill="none" stroke="var(--muted)" strokeWidth="5.5" />
+              <circle cx="21" cy="21" r={R} fill="none" stroke="var(--muted)" strokeWidth={WIDTH} />
               {slices.map((s) => (
-                <circle key={s.result} cx="21" cy="21" r={R} fill="none" stroke={s.color} strokeWidth="5.5" data-slice={s.result}
+                <circle key={s.result} cx="21" cy="21" r={R} fill="none" stroke={s.color} data-slice={s.result} data-active={active === s.result || undefined}
+                  strokeWidth={active === s.result ? WIDTH_ACTIVE : WIDTH}
                   // A hairline between slices; a sliver is still drawn wide enough to see.
-                  strokeDasharray={`${Math.max(s.share - (slices.length > 1 ? 0.35 : 0), 0.25)} 100`} strokeDashoffset={-s.from}>
+                  strokeDasharray={`${Math.max(s.share - (slices.length > 1 ? 0.35 : 0), 0.25)} 100`} strokeDashoffset={-s.from}
+                  className="cursor-pointer motion-safe:transition-[transform,stroke-width,opacity] motion-safe:duration-200 motion-safe:ease-out"
+                  style={{ transform: active === s.result ? outward(s) : "none", opacity: active && active !== s.result ? 0.35 : 1 }}
+                  onMouseEnter={() => setActive(s.result)} onMouseLeave={() => setActive(null)}
+                  onClick={() => setActive((a) => (a === s.result ? null : s.result))}>
                   <title>{`${s.result}: ${s.names.toLocaleString()} (${share(s.share)})`}</title>
                 </circle>
               ))}
@@ -62,11 +83,18 @@ export default function ResultBreakdown({ rows, type, className, style }) {
           </div>
           <ul className="grid w-full min-w-0 flex-1 grid-cols-1 content-center gap-x-8 gap-y-1.5 min-[1100px]:grid-cols-2">
             {slices.map((s) => (
-              <li key={s.result} data-result-row={s.result} className="flex items-center gap-2.5 text-sm">
-                <span className="size-2.5 shrink-0 rounded-sm" style={{ background: s.color }} />
-                <span className="min-w-0 flex-1 truncate" title={s.result}>{s.result}</span>
+              <li key={s.result} data-result-row={s.result} data-active={active === s.result || undefined} tabIndex={0}
+                onMouseEnter={() => setActive(s.result)} onMouseLeave={() => setActive(null)}
+                onFocus={() => setActive(s.result)} onBlur={() => setActive(null)}
+                className={cn(
+                  "-mx-2 flex cursor-default items-center gap-2.5 rounded-md px-2 py-0.5 text-sm outline-none motion-safe:transition-[background-color,opacity] motion-safe:duration-200",
+                  active && active !== s.result && "opacity-45"
+                )}
+                style={active === s.result ? { background: `color-mix(in srgb, ${s.color} 16%, transparent)`, boxShadow: `inset 2px 0 0 ${s.color}` } : undefined}>
+                <span className={cn("size-2.5 shrink-0 rounded-sm motion-safe:transition-transform motion-safe:duration-200", active === s.result && "scale-125")} style={{ background: s.color }} />
+                <span className={cn("min-w-0 flex-1 truncate", active === s.result && "font-semibold")} title={s.result}>{s.result}</span>
                 <span className="shrink-0 tabular-nums">
-                  <strong>{s.names.toLocaleString()}</strong> <span className="inline-block w-9 text-right text-xs text-muted-foreground">{share(s.share)}</span>
+                  <strong>{s.names.toLocaleString()}</strong> <span className={cn("inline-block w-9 text-right text-xs", active === s.result ? "font-semibold text-foreground" : "text-muted-foreground")}>{share(s.share)}</span>
                 </span>
               </li>
             ))}

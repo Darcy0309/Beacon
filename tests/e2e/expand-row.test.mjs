@@ -119,6 +119,35 @@ try {
   check("pointed at, the calendar holds still: no wider, no glow, the call results not dimmed", !calMoved, calMoved);
   const resMoved = await still("[data-result-breakdown]");
   check("…and so do the call results", !resMoved, resMoved);
+
+  section("A project: the call results' slices and their lines");
+  const first = await proj.ev(`document.querySelector('[data-result-breakdown] [data-slice]').dataset.slice`);
+  const state = () => proj.ev(`(() => {
+    const on = [...document.querySelectorAll('[data-result-breakdown] [data-active]')].map((e) => (e.dataset.slice ? 'slice:' + e.dataset.slice : 'row:' + e.dataset.resultRow));
+    const slice = document.querySelector('[data-result-breakdown] [data-slice][data-active]');
+    const other = document.querySelector('[data-result-breakdown] [data-slice]:not([data-active])');
+    return { on, moved: slice ? getComputedStyle(slice).transform !== 'none' : false, wider: slice ? Number(slice.getAttribute('stroke-width')) > 5.5 : false, dimmed: other ? Number(getComputedStyle(other).opacity) < 1 : null };
+  })()`);
+  // The middle of the slice's band on screen: its own middle angle, turned to start at 12 o'clock as the chart is.
+  const onSlice = await proj.ev(`(() => {
+    const c = document.querySelector('[data-result-breakdown] [data-slice=${JSON.stringify(first).replace(/"/g, '\\"')}]');
+    const box = c.ownerSVGElement.getBoundingClientRect();
+    const from = -Number(c.getAttribute('stroke-dashoffset')), len = parseFloat(c.getAttribute('stroke-dasharray'));
+    const a = ((from + len / 2) / 100) * 2 * Math.PI - Math.PI / 2, r = (15.9155 / 42) * box.width;
+    return { x: box.x + box.width / 2 + Math.cos(a) * r, y: box.y + box.height / 2 + Math.sin(a) * r };
+  })()`);
+  await proj.hover(onSlice);
+  const fromSlice = await until(async () => { const s = await state(); return s.moved ? s : null; }, { timeout: 3000 });
+  check("a slice pointed at comes away from the circle, drawn wider, and its line lights up",
+    Boolean(fromSlice) && fromSlice.wider && fromSlice.on.includes(`slice:${first}`) && fromSlice.on.includes(`row:${first}`) && fromSlice.on.length === 2, JSON.stringify(fromSlice ?? await state()));
+  const second = await proj.ev(`document.querySelectorAll('[data-result-breakdown] [data-result-row]')[1]?.dataset.resultRow ?? null`);
+  if (second) {
+    await proj.hover(`[data-result-breakdown] [data-result-row=${JSON.stringify(second)}]`);
+    const fromRow = await until(async () => { const s = await state(); return s.on.includes(`slice:${second}`) && s.moved ? s : null; }, { timeout: 3000 });
+    check("…and a line pointed at brings its slice out, the rest dimmed", Boolean(fromRow) && fromRow.on.includes(`row:${second}`) && fromRow.dimmed === true, JSON.stringify(fromRow ?? await state()));
+  }
+  await away(proj);
+  check("…and both go back when left", Boolean(await until(async () => (await state()).on.length === 0, { timeout: 3000 })));
 } finally {
   browser.close();
 }
