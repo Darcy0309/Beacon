@@ -25,6 +25,7 @@ import {
 } from "@/features/dashboard/queries";
 import DailyProductionCard from "@/features/dashboard/components/daily-production";
 import DevelopedCard from "@/features/dashboard/components/developed-card";
+import RecentDevelopedCard, { RECENT_KINDS } from "@/features/dashboard/components/recent-developed-card";
 import MySchedule from "@/features/dashboard/components/my-schedule";
 import PeriodSwitch from "@/features/dashboard/components/period-switch";
 import ProductionCard from "@/features/dashboard/components/production-card";
@@ -32,7 +33,7 @@ import TeamProductionCard from "@/features/dashboard/components/team-production"
 import ViewNav from "@/features/dashboard/components/view-nav";
 import { otherParams, readView } from "@/features/dashboard/views";
 import { getPayRules } from "@/features/pay/queries";
-import { addDays, formatIso, isIsoDate, monthGrid, monthStart } from "@/lib/dates";
+import { addDays, daysBetween, formatIso, formatRange, isIsoDate, monthGrid, monthStart } from "@/lib/dates";
 import { hoursLabel, TILE_PERIODS, tileRange, VIEW_PERIODS } from "@/lib/pay";
 import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
@@ -81,7 +82,8 @@ export default async function Dashboard({ searchParams }) {
   const view = dashboardView(isManager ? "manager" : role);
 
   const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday] = await Promise.all([
-    isManager ? [] : getRecentLeads(6),
+    // An administrator has Recent Leads & Appointments instead (below).
+    isManager || view.audience === "company" ? [] : getRecentLeads(6),
     isManager ? { today: [], tomorrow: [] } : getAppointments(),
     isManager ? null : getDashboardStats(),
     // Months, status mix and totals — only the client dashboard renders them.
@@ -142,6 +144,23 @@ export default async function Dashboard({ searchParams }) {
       getProductionChartOptions(),
     ]);
     chart = { data, range, goals, options, selected };
+  }
+
+  // The administrator's Recent Leads & Appointments: what every manager developed on a day (today to begin
+  // with), a week, a pay period or days of their own choosing; leads, appointments or both.
+  let recentAll = null;
+  if (view.audience === "company") {
+    const kind = RECENT_KINDS.some(([k]) => k === sp?.rk) ? sp.rk : "both";
+    let v;
+    if (sp?.rl === "custom" && isIsoDate(sp?.rf) && isIsoDate(sp?.rt)) {
+      const to = sp.rt <= businessToday ? sp.rt : businessToday;
+      const from = sp.rf > to ? to : daysBetween(sp.rf, to) > 366 ? addDays(to, -366) : sp.rf;
+      v = { key: "custom", anchor: to, range: { key: "custom", from, to }, label: formatRange(from, to), today: businessToday };
+    } else {
+      v = readView(sp, { keyParam: "rl", dateParam: "rd", keys: RECENT_PERIODS.map(([k]) => k), today: businessToday, time: rules.time });
+    }
+    const rows = await getDeveloped({ from: v.range.from, to: v.range.to, timeZone: tz, kinds: kind === "both" ? ["lead", "appointment"] : [kind] });
+    recentAll = { view: v, kind, rows };
   }
 
   // Appointments per rep ride along with the dashboard stats.
@@ -432,7 +451,9 @@ export default async function Dashboard({ searchParams }) {
             <div className="space-y-4 lg:col-span-2">
               <ProductionChart data={chart.data} range={chart.range} goals={chart.goals} options={chart.options}
                 selected={chart.selected} params={otherParams(sp)} today={businessToday} />
-              {recentCard()}
+              <RecentDevelopedCard rows={recentAll.rows} view={recentAll.view} kind={recentAll.kind} params={otherParams(sp)}
+                kindSwitch={<PeriodSwitch param="rk" current={recentAll.kind} params={otherParams(sp, "rk")} options={RECENT_KINDS} />}
+                {...viewControls(sp, recentAll.view, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
             </div>
             <div className="space-y-4">
               {scheduleCard}

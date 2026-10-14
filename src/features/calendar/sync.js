@@ -75,7 +75,11 @@ export async function syncFeed(admin, feed, timeZone) {
   try {
     const text = await fetchCalendar(feed.url);
     const blocks = busyTimes(text, { timeZone, from: today, to: addDays(today, SYNC_DAYS) });
-    const { data: old } = await admin.from("calendar_blocks").select("id").eq("feed_id", feed.id);
+    // What it put there before is everything up to its newest row now: a list of their ids would stop
+    // at the API's 1,000-row cap and leave the rest behind on every read.
+    const { data: newest, error: oldError } = await admin.from("calendar_blocks").select("id").eq("feed_id", feed.id)
+      .order("id", { ascending: false }).limit(1).maybeSingle();
+    if (oldError) throw new Error(oldError.message);
     for (let i = 0; i < blocks.length; i += 250) {
       const { error } = await admin.from("calendar_blocks").insert(blocks.slice(i, i + 250).map((b) => ({
         project_id: feed.project_id, feed_id: feed.id, created_by: feed.user_id, starts_on: b.startsOn, ends_on: b.endsOn,
@@ -84,7 +88,10 @@ export async function syncFeed(admin, feed, timeZone) {
       if (error) throw new Error(error.message);
     }
     // The new ones are in: now the ones they replace go.
-    if (old?.length) await admin.from("calendar_blocks").delete().in("id", old.map((o) => o.id));
+    if (newest) {
+      const { error } = await admin.from("calendar_blocks").delete().eq("feed_id", feed.id).lte("id", newest.id);
+      if (error) throw new Error(error.message);
+    }
     await admin.from("calendar_feeds").update({ last_synced_at: new Date().toISOString(), last_error: null, busy_count: blocks.length }).eq("id", feed.id);
     return { ok: true, busy: blocks.length };
   } catch (err) {

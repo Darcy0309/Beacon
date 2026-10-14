@@ -3,8 +3,8 @@
 import "server-only";
 import { shapeReps } from "@/features/users/queries";
 import { addDays, todayIn } from "@/lib/dates";
-import { cityState, splitTime, timeRank } from "@/lib/format";
-import { one } from "@/lib/server/query-helpers";
+import { cityState, shortDate, splitTime, timeRank } from "@/lib/format";
+import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 export async function getDashboardStats() {
@@ -232,32 +232,42 @@ function developedType(kind, result) {
 }
 
 /**
- * The leads and appointments the signed-in manager developed over a range,
- * newest first, as the production report counts them (what they were paid
- * for): the client and project, the name, what it became, and when.
+ * The leads and appointments developed over a range, newest first, as the
+ * production report counts them (what was paid for): the client and project,
+ * the name, what it became, and when. `userId`: one manager's (their own
+ * dashboard); null for every manager's (an administrator's). `kinds`: "lead",
+ * "appointment" or both. Each also carries the manager, the name's call
+ * result now, and its ultimate X-date.
  */
-export async function getDeveloped({ userId, from, to, timeZone }) {
+export async function getDeveloped({ userId = null, from, to, timeZone, kinds = ["lead", "appointment"] }) {
   const supabase = await createClient();
   const [lo, hi] = around({ from, to });
-  const { data, error } = await supabase
-    .from("pay_events")
-    .select(`id, kind, created_at,
-      project:projects(id, name, company:companies(id, name)),
-      lead:leads(id, company_name, contact_name, phone, city, state),
-      call:call_records(call_result, result:call_results(name))`)
-    .eq("user_id", userId)
-    .in("kind", ["lead", "appointment"])
-    .eq("is_chargeback", false)
-    .gte("created_at", lo)
-    .lt("created_at", hi)
-    .order("created_at", { ascending: false })
-    .limit(1000);
-  if (error) throw error;
-  return (data ?? [])
+  // A pay period across the team can pass the API's 1,000-row cap: read in pages.
+  const data = await readAll((first, last) => {
+    let q = supabase
+      .from("pay_events")
+      .select(`id, kind, created_at,
+        user:users!pay_events_user_id_fkey(id, first_name, last_name),
+        project:projects(id, name, company:companies(id, name)),
+        lead:leads(id, company_name, contact_name, phone, city, state, result:call_results(id, name, viable), insurance:insurance_details(ultimate_xdate)),
+        call:call_records(call_result, result:call_results(name))`)
+      .in("kind", kinds)
+      .eq("is_chargeback", false)
+      .gte("created_at", lo)
+      .lt("created_at", hi)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(first, last);
+    if (userId) q = q.eq("user_id", userId);
+    return q;
+  }, { max: userId ? 1000 : 10000 });
+  return data
     .map((e) => {
       const project = one(e.project);
       const lead = one(e.lead);
       const call = one(e.call);
+      const user = one(e.user);
+      const result = one(lead?.result);
       return {
         id: e.id,
         day: dayOf(e.created_at, timeZone),
@@ -273,6 +283,9 @@ export async function getDeveloped({ userId, from, to, timeZone }) {
         contact: lead?.contact_name ?? null,
         phone: lead?.phone ?? null,
         location: cityState(lead),
+        manager: user ? [user.first_name, user.last_name].filter(Boolean).join(" ") || "—" : "—",
+        result: result ? { id: result.id, name: result.name, viable: result.viable } : null,
+        xdate: shortDate(one(lead?.insurance)?.ultimate_xdate),
       };
     })
     .filter((e) => e.day >= from && e.day <= to);
