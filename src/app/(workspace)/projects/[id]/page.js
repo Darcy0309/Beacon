@@ -166,12 +166,12 @@ export default async function ProjectDetail({ params, searchParams }) {
           ))}
         </div>
 
-        {/* The same width to begin with; either takes more of the row while it is pointed at (.expand-row). */}
-        <div className="expand-row grid grid-cols-1 gap-4 lg:flex" data-from="lg">
-          <ResultBreakdown rows={results} type={p.type} style={{ "--min": "22rem", "--grow": 1.5 }} />
+        {/* Side by side, the call results the wider (3 to 2); they hold still when pointed at (Sean, Oct 2026). */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[3fr_2fr]" data-project-cards>
+          <ResultBreakdown rows={results} type={p.type} />
           <CalendarTile label="Project Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`project=${p.id}`}
             note={scope?.shared ? `Shared with ${scope.label}, where this project's appointments go.` : "Only this project's appointments."}
-            className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms`, "--min": "17rem", "--grow": 1.5 }} />
+            className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
         </div>
 
         <ProjectTeam

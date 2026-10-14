@@ -5,7 +5,7 @@
  * back when left, the row never changing height;
  * nothing moves on a narrower screen, where the tiles are not one row, nor
  * for someone who has asked for less motion. The project page's call
- * results and calendar do the same.
+ * results and calendar do not: they hold still when pointed at.
  *
  *   node tests/run.mjs tests/e2e/expand-row.test.mjs
  */
@@ -102,17 +102,23 @@ try {
   const project = sql("select p.id from public.projects p where p.deleted_at is null order by (select count(*) from public.leads l where l.project_id = p.id) desc limit 1");
   const proj = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1600, height: 950 });
   await proj.go(`/projects/${project}`, 6000);
-  const PROW = ".expand-row[data-from=lg]";
+  const PROW = "[data-project-cards]";
   await until(() => proj.ev(`document.querySelectorAll('${PROW} > *').length === 2`));
   await proj.ev(`document.querySelector('${PROW}').scrollIntoView({ block: 'center' })`);
   await sleep(600);
   const before = await boxes(proj, PROW);
-  check("at rest: the call results and the calendar the same width", Math.abs(before[0].w - before[1].w) <= 1 && before[0].h === before[1].h, JSON.stringify(before));
-  await proj.hover("[data-calendar-tile]");
-  const cal = await until(async () => { const b = await boxes(proj, PROW); return b[1].w > before[1].w * 1.15 ? b : null; }, { timeout: 4000 });
-  check("pointed at, the calendar takes more of the row, the call results less", Boolean(cal) && cal[0].w < before[0].w, JSON.stringify(cal ?? await boxes(proj, PROW)));
-  await proj.hover("[data-result-breakdown]");
-  check("…and the call results take it back, and more", Boolean(await until(async () => (await boxes(proj, PROW))[0].w > before[0].w * 1.15, { timeout: 4000 })), JSON.stringify(await boxes(proj, PROW)));
+  check("the call results the wider, 3 to 2, and the two as tall", Math.abs(before[0].w / before[1].w - 1.5) < 0.05 && before[0].h === before[1].h, JSON.stringify(before));
+  const still = async (sel) => {
+    await proj.hover(sel);
+    await sleep(900);
+    const b = await boxes(proj, PROW);
+    const glow = await proj.ev(`getComputedStyle(document.querySelector(${JSON.stringify(sel)})).boxShadow`);
+    return b.every((x, i) => Math.abs(x.w - before[i].w) <= 1 && !x.dim) && !/rgb/.test(glow) ? null : `${JSON.stringify(b)} ${glow}`;
+  };
+  const calMoved = await still("[data-calendar-tile]");
+  check("pointed at, the calendar holds still: no wider, no glow, the call results not dimmed", !calMoved, calMoved);
+  const resMoved = await still("[data-result-breakdown]");
+  check("…and so do the call results", !resMoved, resMoved);
 } finally {
   browser.close();
 }
