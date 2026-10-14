@@ -5,10 +5,10 @@
 import { revalidatePath } from "next/cache";
 import { check, deleteRow, fail, idFrom, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
-import { schemas } from "@/lib/validate";
+import { cross, schemas } from "@/lib/validate";
 
 export async function saveCompany(prevState, formData) {
-  const { values, failed } = check(formData, schemas.company);
+  const { values, failed } = check(formData, schemas.company, cross.company);
   if (failed) return failed;
 
   const supabase = await createClient();
@@ -25,6 +25,10 @@ export async function saveCompany(prevState, formData) {
     zip: s(formData, "zip"),
     website: s(formData, "website"),
     status: s(formData, "status") || "active",
+    // Where it is on the clock, and when its work with us starts and ends.
+    timezone_id: n(formData, "timezone_id"),
+    subscription_start: s(formData, "subscription_start"),
+    subscription_end: s(formData, "subscription_end"),
     // The carrier group it belongs to (an insurance company), or none.
     agency_group_id: n(formData, "agency_group_id"),
   };

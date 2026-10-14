@@ -1,7 +1,7 @@
 /** Clients (companies) with their project and lead roll-ups. */
 
 import "server-only";
-import { cityState, colorFor, initialsOf, shortName } from "@/lib/format";
+import { cityState, colorFor, initialsOf, mediumDate, shortName } from "@/lib/format";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,10 +21,13 @@ async function companyRollups(supabase) {
   return out;
 }
 
+/** A client's status as it reads: Active, Paused or Completed (the old "inactive" is Paused). */
+export const CLIENT_STATUS = { active: "Active", paused: "Paused", completed: "Completed", inactive: "Paused" };
+
 export async function getClients() {
   const supabase = await createClient();
   const [{ data, error }, roll] = await Promise.all([
-    supabase.from("companies").select("*, group:agencies(id, name)").order("name"),
+    supabase.from("companies").select("*, group:agencies(id, name), zone:timezones(id, name)").order("name"),
     companyRollups(supabase),
   ]);
   if (error) throw error;
@@ -43,12 +46,17 @@ export async function getClients() {
     contact: c.contact_name ?? "—",
     email: c.email ?? "—",
     phone: c.phone ?? "—",
-    status: c.status === "active" ? "Active" : "Inactive",
+    status: CLIENT_STATUS[c.status] ?? "Paused",
+    state: c.state ?? null,
+    // Its time zone, and when its work with us starts and ends.
+    zone: one(c.zone)?.name ?? null,
+    start: c.subscription_start ? mediumDate(c.subscription_start) : null,
+    end: c.subscription_end ? mediumDate(c.subscription_end) : null,
     // The carrier group it belongs to, if any (an insurance company from the list).
     groupId: one(c.group)?.id ?? null,
     group: one(c.group)?.name ?? null,
     // As saved, for the edit form.
-    raw: { ...c, group: undefined },
+    raw: { ...c, group: undefined, zone: undefined, status: c.status === "inactive" ? "paused" : c.status },
   }));
 }
 
@@ -85,4 +93,34 @@ export async function getClientGroups() {
   const { data, error } = await supabase.from("companies").select("id, group:agencies(id, name)").not("agency_group_id", "is", null);
   if (error) throw error;
   return Object.fromEntries((data ?? []).filter((c) => one(c.group)).map((c) => [c.id, { id: one(c.group).id, name: one(c.group).name }]));
+}
+
+/** The time zones a client can be in: [{ id, name }]. */
+export async function getTimeZones() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("timezones").select("id, name").order("id");
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * The Clients page's figures for the active clients: their leads and
+ * appointments counted by call result (clients_totals()), and what was
+ * developed for them over each tile's own range (clients_chart(): days,
+ * and hours for a single day, as the production chart reads them).
+ * `leads` and `appts`: { from, to }.
+ */
+export async function getClientsOverview({ leads, appts }) {
+  const supabase = await createClient();
+  const chart = (r) => supabase.rpc("clients_chart", { p_from: r.from, p_to: r.to });
+  const same = leads.from === appts.from && leads.to === appts.to;
+  const [totals, a, b] = await Promise.all([supabase.rpc("clients_totals"), chart(leads), same ? null : chart(appts)]);
+  for (const r of [totals, a, b]) if (r?.error) throw r.error;
+  const shape = (d) => ({ days: d?.days ?? [], hours: d?.hours ?? [] });
+  const t = totals.data?.[0] ?? {};
+  return {
+    leadsActive: Number(t.leads_active ?? 0), leadsResolved: Number(t.leads_resolved ?? 0),
+    appointments: Number(t.appointments ?? 0), invalid: Number(t.invalid_appointments ?? 0),
+    leads: shape(a.data), appts: shape((b ?? a).data),
+  };
 }

@@ -7,7 +7,7 @@ import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { clientSlug, mediumDate } from "@/lib/format";
-import { getClientBySlug, getAgencyGroups } from "@/features/clients/queries";
+import { getClientBySlug, getAgencyGroups, getTimeZones } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
 import { getProjects } from "@/features/projects/queries";
 import { getAppointmentDays, getBlockedDays, getLeadStats } from "@/features/stats/queries";
@@ -32,7 +32,7 @@ function Field({ label, children }) {
 
 export default async function ClientProfile({ params }) {
   const { slug } = await params;
-  const [c, projects, today, groups] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups()]);
+  const [c, projects, today, groups, zones] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups(), getTimeZones()]);
   if (!c) notFound();
 
   const clientProjects = projects.filter((p) => p.clientId === c.id);
@@ -76,8 +76,8 @@ export default async function ClientProfile({ params }) {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <ToneBadge tone={c.status === "Active" ? "emerald" : "slate"}>{c.status}</ToneBadge>
-                <ClientForm client={c.raw} groups={groups} />
+                <ToneBadge tone={{ Active: "emerald", Paused: "amber", Completed: "sky" }[c.status] ?? "slate"}>{c.status}</ToneBadge>
+                <ClientForm client={c.raw} groups={groups} zones={zones} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 pt-5 sm:grid-cols-3">
@@ -88,6 +88,8 @@ export default async function ClientProfile({ params }) {
               <Field label="Email"><span className="break-all">{c.email}</span></Field>
               <Field label="Delivery email"><span className="break-all">{delivery}</span></Field>
               <Field label="Location">{c.city}</Field>
+              <Field label="Time zone">{c.zone}</Field>
+              <Field label="Start – end"><span className="tabular-nums">{c.start || c.end ? `${c.start ?? "—"} – ${c.end ?? "—"}` : null}</span></Field>
             </div>
           </div>
         </Card>

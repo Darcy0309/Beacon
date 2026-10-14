@@ -497,8 +497,11 @@ export const schemas = {
     state: [stateCode],
     zip: [zip],
     website: [max(120)],
-    status: [oneOf(["active", "inactive"])],
+    status: [oneOf(["active", "paused", "completed"])],
     agency_group_id: [id],
+    timezone_id: [id],
+    subscription_start: [date],
+    subscription_end: [date],
   },
 };
 
@@ -515,6 +518,12 @@ export const cross = {
     if (!errors.start_date && !errors.end_date && values.start_date && values.end_date &&
         values.end_date < values.start_date) {
       errors.end_date = "End date must be on or after the start date";
+    }
+  },
+  company(values, errors) {
+    if (!errors.subscription_start && !errors.subscription_end && values.subscription_start && values.subscription_end &&
+        values.subscription_end < values.subscription_start) {
+      errors.subscription_end = "End date must be on or after the start date";
     }
   },
   user(values, errors) {

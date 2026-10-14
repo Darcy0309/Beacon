@@ -1,115 +1,124 @@
 import Link from "@/components/shared/intent-link";
-import { Building2, Target, CalendarCheck, UserCog } from "lucide-react";
+import { Building2, CalendarCheck, Globe2, Target } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
-import MetricBar from "@/components/shared/metric-bar";
+import FilterTable from "@/components/shared/filter-table";
+import LinkRow from "@/components/shared/link-row";
+import ToneBadge from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
+import { TableCell } from "@/components/ui/table";
 import { clientSlug } from "@/lib/format";
-import { getAgencyGroups, getClients } from "@/features/clients/queries";
-import ParamSelect from "@/components/shared/param-select";
+import { chartRange } from "@/lib/production-chart";
+import { getBusinessToday } from "@/lib/server/business-day";
+import { getAgencyGroups, getClients, getClientsOverview, getTimeZones } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
+import TrendTile from "@/features/clients/components/trend-tile";
+import BreakdownTile from "@/features/clients/components/breakdown-tile";
 
 export const dynamic = "force-dynamic";
 
-const ACCENTS = [
-  "var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-amber)",
-  "var(--neon-violet)", "var(--neon-magenta)", "var(--neon-blue)",
-];
+const statusTone = { Active: "emerald", Paused: "amber", Completed: "sky" };
 
+// Counted by `key`, the most first; those with none last, as `none`.
+function countBy(list, key, none) {
+  const counts = new Map();
+  for (const c of list) counts.set(c[key] ?? "", (counts.get(c[key] ?? "") ?? 0) + 1);
+  return [...counts].map(([label, count]) => ({ label: label || none, count, none: !label }))
+    .sort((a, b) => a.none - b.none || b.count - a.count || a.label.localeCompare(b.label));
+}
+
+/**
+ * Clients: how many are active, the active clients' leads and appointments
+ * (each with a chart over a range chosen on its tile), where the active
+ * clients are and which agency groups they belong to; then every client in
+ * a row, to search and filter. A row opens the client's own page.
+ */
 export default async function ClientsPage({ searchParams }) {
   const sp = await searchParams;
-  const [every, groups] = await Promise.all([getClients(), getAgencyGroups()]);
-  // ?group=<insurance company id>: only that agency group's clients, in the tiles too.
-  const inUse = [...new Map(every.filter((c) => c.groupId).map((c) => [c.groupId, { value: String(c.groupId), label: c.group }])).values()].sort((a, b) => a.label.localeCompare(b.label));
-  const groupId = inUse.some((g) => g.value === sp?.group) ? Number(sp.group) : null;
-  const clients = groupId ? every.filter((c) => c.groupId === groupId) : every;
-  const active = clients.filter((c) => c.status === "Active").length;
-  const totalLeads = clients.reduce((s, c) => s + c.leads, 0);
-  const totalAppts = clients.reduce((s, c) => s + c.appts, 0);
-  const managers = new Set(clients.map((c) => c.manager).filter((m) => m !== "Unassigned")).size;
-  const maxLeads = Math.max(1, ...clients.map((c) => c.leads));
+  const today = await getBusinessToday();
+  // ?lr= and ?ar=: the range of the Leads chart and of the Appointments chart (a month to begin with).
+  const range = (v) => chartRange(typeof v === "string" && v !== "custom" ? v : "1M", today);
+  const ranges = { leads: range(sp?.lr), appts: range(sp?.ar) };
+  const [clients, groups, zones, overview] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getClientsOverview(ranges)]);
 
-  const tiles = [
-    { label: "Active Accounts", value: String(active), note: `${clients.length} total`,
-      icon: Building2, accent: "var(--neon-cyan)", series: clients.map((c) => c.leads), bars: true },
-    { label: "Names on Book", value: totalLeads.toLocaleString(), note: "across all accounts",
-      icon: Target, accent: "var(--neon-emerald)", series: clients.map((c) => c.leads) },
-    { label: "Appointments", value: totalAppts.toLocaleString(), note: "set to date",
-      icon: CalendarCheck, accent: "var(--neon-amber)", series: clients.map((c) => c.appts) },
-    { label: "Account Managers", value: String(managers), note: "covering the book",
-      icon: UserCog, accent: "var(--neon-violet)", series: clients.map((c) => c.appts), bars: true },
-  ];
+  const active = clients.filter((c) => c.status === "Active");
+  const paused = clients.filter((c) => c.status === "Paused").length;
+  const completed = clients.filter((c) => c.status === "Completed").length;
+  const params = Object.fromEntries(["lr", "ar"].filter((k) => typeof sp?.[k] === "string").map((k) => [k, sp[k]]));
 
   return (
     <>
-      <Topbar title="Clients" sub={`${active} active agency accounts`} />
+      <Topbar title="Clients" sub={`${active.length} active agency account${active.length === 1 ? "" : "s"}`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {tiles.map((t, i) => (
-            <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
-          ))}
+        {/* One row on a desktop: the two charts get the room. */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,1.4fr)_minmax(0,1.4fr)_minmax(0,1.1fr)]">
+          <StatTile label="Active Clients" value={String(active.length)} icon={Building2} accent="var(--neon-cyan)"
+            note={`${(clients.length - active.length).toLocaleString()} inactive · ${clients.length.toLocaleString()} in all`}
+            className="animate-pop-in">
+            <dl className="mt-3 space-y-1 text-sm" data-client-statuses>
+              {[["Active", active.length, "var(--neon-emerald)"], ["Paused", paused, "var(--neon-amber)"], ["Completed", completed, "var(--neon-blue)"]].map(([name, n, color]) => (
+                <div key={name} className="flex items-center justify-between gap-2">
+                  <dt className="flex items-center gap-1.5 text-muted-foreground"><span className="size-1.5 rounded-full" style={{ background: color }} />{name}</dt>
+                  <dd className="font-semibold tabular-nums">{n.toLocaleString()}</dd>
+                </div>
+              ))}
+            </dl>
+          </StatTile>
+          <TrendTile label="Leads" icon={<Target className="size-4" />} accent="var(--neon-emerald)" series="leads" param="lr" params={params}
+            value={(overview.leadsActive + overview.leadsResolved).toLocaleString()}
+            note={`${overview.leadsActive.toLocaleString()} active · ${overview.leadsResolved.toLocaleString()} resolved · active clients`}
+            data={overview.leads} range={ranges.leads} developed="developed" className="animate-pop-in" style={{ animationDelay: "60ms" }} />
+          <TrendTile label="Appointments" icon={<CalendarCheck className="size-4" />} accent="var(--neon-amber)" series="appts" param="ar" params={params}
+            value={overview.appointments.toLocaleString()}
+            note={`${overview.invalid.toLocaleString()} invalid · active clients`}
+            data={overview.appts} range={ranges.appts} developed="set" className="animate-pop-in" style={{ animationDelay: "120ms" }} />
+          <BreakdownTile label="Active Clients By" icon={<Globe2 className="size-4" />} accent="var(--neon-violet)"
+            groups={[
+              { title: "Time zone", rows: countBy(active, "zone", "Not set") },
+              { title: "Agency group", rows: countBy(active, "group", "No group") },
+            ]}
+            className="animate-pop-in" style={{ animationDelay: "180ms" }} />
         </div>
 
         <Card>
-          <SectionHeader wrap label="Client Accounts" icon={Building2}
-            action={
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                {inUse.length ? <ParamSelect name="group" label="Agency group" placeholder="All groups" value={groupId ? String(groupId) : ""} options={inUse} /> : null}
-                <ClientForm groups={groups} />
-              </div>
-            } />
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
-            {clients.map((c, i) => {
-              const accent = ACCENTS[i % ACCENTS.length];
-              return (
-                <Link key={c.id} href={`/clients/${clientSlug(c.name)}`} className="block">
-                  <Card accent={accent} className="h-full transition-all duration-200 hover:border-primary/40">
-                    <div className="p-5">
-                      <div className="flex items-center gap-3">
-                        <span
-                          className="flex size-11 items-center justify-center rounded-lg border text-sm font-bold"
-                          style={{
-                            borderColor: `color-mix(in srgb, ${accent} 40%, transparent)`,
-                            background: `color-mix(in srgb, ${accent} 12%, transparent)`,
-                            color: accent,
-                          }}
-                        >
-                          {c.initials}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="truncate font-semibold">{c.name}</div>
-                          <div className="truncate text-xs text-muted-foreground">{[c.city !== "—" ? c.city : null, c.group].filter(Boolean).join(" · ") || "—"}</div>
-                        </div>
-                        <span
-                          className="ml-auto rounded-full border px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.12em]"
-                          style={{
-                            borderColor: c.status === "Active" ? "color-mix(in srgb, var(--neon-emerald) 45%, transparent)" : "var(--panel-border)",
-                            color: c.status === "Active" ? "var(--neon-emerald)" : "var(--muted-foreground)",
-                          }}
-                        >
-                          {c.status}
-                        </span>
-                      </div>
-
-                      <div className="mt-4 space-y-2 border-t border-[var(--panel-border)] pt-4">
-                        <MetricBar label="Names" value={c.leads} max={maxLeads} color={accent} />
-                        <MetricBar label="Appointments" value={c.appts} max={Math.max(1, c.leads)} color="var(--neon-emerald)" />
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between text-xs">
-                        <span className="eyebrow">Manager</span>
-                        <span className="font-medium">{c.manager}</span>
+          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} />} />
+          <FilterTable
+            columns={["Client", "Contact", "State", "Time zone", "Start date", "End date", "Status"]}
+            filters={[
+              { key: "status", label: "Status", kind: "chips" },
+              { key: "state", label: "State", kind: "select" },
+              { key: "zone", label: "Time zone", kind: "select" },
+              { key: "group", label: "Agency group", kind: "select" },
+              { key: "manager", label: "Account manager", kind: "select" },
+            ]}
+            placeholder="Search clients, contacts, cities…"
+            empty="No client accounts yet. Add the first with New client."
+            rows={clients.map((c) => ({
+              id: c.id,
+              search: [c.name, c.contact, c.city, c.state, c.zone, c.group, c.manager, c.email, c.phone].filter((v) => v && v !== "—").join(" "),
+              facets: { status: c.status, state: c.state ?? "", zone: c.zone ?? "", group: c.group ?? "", manager: c.manager },
+              node: (
+                <LinkRow href={`/clients/${clientSlug(c.name)}`} data-client-row={c.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white" style={{ background: c.color }}>{c.initials}</span>
+                      <div className="min-w-0">
+                        <Link href={`/clients/${clientSlug(c.name)}`} className="font-medium transition-colors hover:text-primary hover:underline" data-client-link>{c.name}</Link>
+                        {c.group ? <div className="truncate text-xs text-muted-foreground">{c.group}</div> : null}
                       </div>
                     </div>
-                  </Card>
-                </Link>
-              );
-            })}
-            {clients.length === 0 && (
-              <p className="col-span-full py-8 text-center text-sm text-muted-foreground">{groupId ? "No clients in this agency group." : "No client accounts yet. Add the first with New client."}</p>
-            )}
-          </div>
+                  </TableCell>
+                  <TableCell>{c.contact}</TableCell>
+                  <TableCell>{c.state ?? "—"}</TableCell>
+                  <TableCell>{c.zone ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{c.start ?? "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{c.end ?? "—"}</TableCell>
+                  <TableCell><ToneBadge tone={statusTone[c.status] ?? "slate"}>{c.status}</ToneBadge></TableCell>
+                </LinkRow>
+              ),
+            }))}
+          />
         </Card>
       </div>
     </>

@@ -7,6 +7,7 @@ import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, formHelpers } from "@/components/ui/field";
+import DatePicker from "@/components/shared/date-picker";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -22,8 +23,10 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * Access. `client`: the companies row to edit; none for a new one.
  * `groups`: the insurance companies ([{ id, name }]) its Agency Group is
  * chosen from: the national carrier group it belongs to, for reports.
+ * `zones`: the time zones ([{ id, name }]) it can be in. Its start and end
+ * dates and its status (Active, Paused, Completed) show on the Clients list.
  */
-export default function ClientForm({ client, groups = [] }) {
+export default function ClientForm({ client, groups = [], zones = [] }) {
   const isEdit = Boolean(client?.id);
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -97,10 +100,23 @@ export default function ClientForm({ client, groups = [] }) {
             <Field label="Website" error={fe("website")}>
               <Input name="website" defaultValue={dv("website")} maxLength={120} aria-invalid={invalid("website")} />
             </Field>
-            <Field label="Status" error={fe("status")}>
+            <Field label="Time zone" error={fe("timezone_id")}>
+              <Select name="timezone_id" defaultValue={dv("timezone_id", "") ?? ""} aria-invalid={invalid("timezone_id")}>
+                <option value="">Not set</option>
+                {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Start date" error={fe("subscription_start")}>
+              <DatePicker name="subscription_start" defaultValue={dv("subscription_start")} invalid={invalid("subscription_start")} aria-label="Start date" presets={["today"]} />
+            </Field>
+            <Field label="End date" error={fe("subscription_end")}>
+              <DatePicker name="subscription_end" defaultValue={dv("subscription_end")} invalid={invalid("subscription_end")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
+            </Field>
+            <Field label="Status" error={fe("status")} className="sm:col-span-2">
               <Select name="status" defaultValue={dv("status", "active")}>
                 <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
               </Select>
             </Field>
           </div>
