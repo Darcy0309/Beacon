@@ -138,3 +138,84 @@ export async function getCalendarMonth(year, month /* 0-indexed */, projectIds =
   }
   return { rows, byDay, count: rows.length };
 }
+
+/**
+ * The Appointments page's list (Sean, Oct 2026): appointments from `from` to
+ * `to` (their day), filtered by client (`clientId`: its projects'), project
+ * (one kept on it, or set from it), the manager who set it (`userId`) and
+ * status (`status`, a name; "Invalid" shows the ones marked invalid, which
+ * are otherwise left out). In date and time order, at most 2,000. Each:
+ * when, the company and contact, client, project, agent, status, who set it.
+ */
+export async function listAppointments({ from, to, clientId = null, projectId = null, userId = null, status = null }) {
+  const supabase = await createClient();
+  let projectIds = null;
+  if (clientId) {
+    const { data, error } = await supabase.from("projects").select("id").eq("company_id", clientId);
+    if (error) throw error;
+    projectIds = (data ?? []).map((p) => p.id);
+    if (!projectIds.length) return { rows: [], capped: false };
+  }
+  let statusId = null;
+  if (status && status !== "Invalid") {
+    const { data } = await supabase.from("appointment_statuses").select("id").eq("name", status).maybeSingle();
+    if (!data) return { rows: [], capped: false };
+    statusId = data.id;
+  }
+  const MAX = 2000;
+  const rows = await readAll((first, last) => {
+    let q = supabase.from("appointments")
+      .select(`id, appt_date, appt_time, duration_min, rep_name, invalid_at,
+        status:appointment_statuses(name),
+        setter:users!appointments_user_id_fkey(first_name, last_name),
+        project:projects!appointments_project_id_fkey(id, name, company:companies(id, name)),
+        lead:leads!inner(id, company_name, contact_name, city, state)`)
+      // Only with a lead still there to open (one deleted leaves nothing to show).
+      .gte("appt_date", from).lte("appt_date", to)
+      .order("appt_date").order("id").range(first, last);
+    if (status === "Invalid") q = q.not("invalid_at", "is", null);
+    else {
+      q = q.is("invalid_at", null);
+      if (statusId) q = q.eq("status_id", statusId);
+    }
+    if (projectIds) q = q.in("project_id", projectIds);
+    if (projectId) q = q.or(`project_id.eq.${Number(projectId)},set_project_id.eq.${Number(projectId)}`);
+    if (userId) q = q.eq("user_id", Number(userId));
+    return q;
+  }, { max: MAX });
+  const shaped = rows.map((a) => {
+    const lead = one(a.lead);
+    const project = one(a.project);
+    const setter = one(a.setter);
+    const { time, ampm } = splitTime(a.appt_time);
+    return {
+      id: a.id, date: a.appt_date, time, ampm, appt_time: a.appt_time, duration: a.duration_min ?? 30,
+      co: lead?.company_name ?? "—", contact: lead?.contact_name ?? null, location: cityState(lead), leadId: lead?.id ?? null,
+      client: one(project?.company)?.name ?? "—", project: project?.name ?? "—", agent: a.rep_name || "—",
+      status: a.invalid_at ? "Invalid" : one(a.status)?.name ?? "—",
+      manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—",
+    };
+  }).sort((a, b) => a.date.localeCompare(b.date) || timeRank(a.appt_time) - timeRank(b.appt_time));
+  return { rows: shaped, capped: rows.length >= MAX };
+}
+
+/**
+ * What the Appointments page's filters offer, as the signed-in person may
+ * see it: clients, projects (each with its client), the staff who set
+ * appointments, and the appointment statuses.
+ */
+export async function getAppointmentFilters() {
+  const supabase = await createClient();
+  const [companies, projects, staff, statuses] = await Promise.all([
+    supabase.from("companies").select("id, name").order("name").limit(2000),
+    supabase.from("projects").select("id, name, company_id").order("name").limit(5000),
+    supabase.from("users").select("id, first_name, last_name").in("role", ["admin", "manager", "agent"]).order("first_name").order("last_name").limit(1000),
+    supabase.from("appointment_statuses").select("name").order("id"),
+  ]);
+  return {
+    clients: (companies.data ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+    projects: (projects.data ?? []).map((p) => ({ value: String(p.id), label: p.name, clientId: p.company_id })),
+    managers: (staff.data ?? []).map((u) => ({ value: String(u.id), label: [u.first_name, u.last_name].filter(Boolean).join(" ") || "—" })),
+    statuses: (statuses.data ?? []).map((s) => ({ value: s.name, label: s.name })),
+  };
+}
