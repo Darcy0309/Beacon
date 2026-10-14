@@ -154,7 +154,10 @@ export default async function ExplorePage({ searchParams }) {
                   <TableCell className="tabular-nums text-muted-foreground">
                     {l.phone ? <a href={`tel:${String(l.phone).replace(/[^\d+]/g, "")}`} data-lead-id={l.id} className="transition-colors hover:text-primary">{l.phone}</a> : "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{l.client}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {l.client}
+                    {l.group ? <span className="block text-xs" data-lead-group>{l.group}</span> : null}
+                  </TableCell>
                   <TableCell><StatusBadge status={{ code: l.status_code, name: l.status_name }} /></TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                   <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>

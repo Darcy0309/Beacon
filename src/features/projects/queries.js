@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const projectSelect = ({ company = false, type = false, status = false } = {}) => `
   *,
-  company:companies${inner(company)}(id, name),
+  company:companies${inner(company)}(id, name, group:agencies(id, name)),
   type:project_types${inner(type)}(id, code, description),
   status:project_statuses${inner(status)}(id, name),
   assignments:project_assignments(ae:users!project_assignments_ae_user_id_fkey(id, first_name, last_name, email)),
@@ -23,6 +23,8 @@ function toProjectView(p) {
     name: p.name,
     client: company?.name ?? p.client_name ?? "—",
     clientId: company?.id ?? null,
+    // The carrier group its client belongs to, if any.
+    group: one(company?.group)?.name ?? null,
     type: one(p.type)?.code ?? "—",
     leads: p.leads?.[0]?.count ?? 0,
     status: one(p.status)?.name ?? "—",
@@ -65,12 +67,12 @@ export async function listProjects(params) {
         supabase
           .from("projects")
           .select(
-            projectSelect({ company: Boolean(p.filters?.client), type: Boolean(p.filters?.type), status: Boolean(p.filters?.status) }),
+            projectSelect({ company: Boolean(p.filters?.client || p.filters?.group), type: Boolean(p.filters?.type), status: Boolean(p.filters?.status) }),
             { count: "exact" }
           )
           .order("id"),
         p,
-        { search: ["name", "client_name"], alsoOr, columns: { status: "status.name", type: "type.code", client: "company.name" } }
+        { search: ["name", "client_name"], alsoOr, columns: { status: "status.name", type: "type.code", client: "company.name", group: "company.agency_group_id" } }
       ),
     params
   );

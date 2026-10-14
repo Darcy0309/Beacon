@@ -17,6 +17,8 @@ export const getExploreOptions = cache(async function getExploreOptions() {
     counties: data?.counties ?? [],
     statuses: data?.statuses ?? [],
     clients: data?.clients ?? [],
+    // The agency groups clients are in (insurance companies), each with how many clients.
+    groups: data?.groups ?? [],
     carriers: data?.carriers ?? [],
     reps: (data?.reps ?? []).filter((r) => r.label),
   };
@@ -43,6 +45,7 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
       xdate: shortDate(r.renewal_date ?? r.ultimate_xdate),
       rep: r.rep_name || "Unassigned",
       client: r.client_name || "—",
+      group: r.agency_group || null,
     })),
     byClient: data?.by_client ?? [],
     byState: data?.by_state ?? [],

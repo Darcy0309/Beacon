@@ -21,6 +21,7 @@ export const FIELDS = [
   { key: "counties", label: "County", options: "counties" },
   { key: "statuses", label: "Status", options: "statuses" },
   { key: "clients", label: "Client", options: "clients" },
+  { key: "groups", label: "Agency group", options: "groups", hint: "The carrier group a client belongs to" },
   { key: "carriers", label: "Current carrier", options: "carriers" },
   { key: "reps", label: "Assigned rep", options: "reps" },
 ];
@@ -34,6 +35,7 @@ const LIST_KEYS = FIELDS.map((f) => f.key);
 const VALID = {
   months: (v) => /^(?:[1-9]|1[0-2])$/.test(v),
   clients: (v) => /^\d{1,12}$/.test(v),
+  groups: (v) => /^\d{1,12}$/.test(v),
   reps: (v) => /^\d{1,12}$/.test(v),
 };
 

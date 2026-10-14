@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
 import { listProjects, getProjectStats, getOfficeOptions } from "@/features/projects/queries";
+import { getClientGroups } from "@/features/clients/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
@@ -21,8 +22,11 @@ const typeTone = { DBDV: "cyan", APPT: "violet" };
 const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Completed: "sky" };
 
 export default async function ProjectsPage({ searchParams }) {
-  const params = readListParams(await searchParams, ["status", "type", "client"]);
-  const [{ rows, total }, projects, lookups, offices] = await Promise.all([listProjects(params), getProjectStats(), getLookups(), getOfficeOptions()]);
+  const params = readListParams(await searchParams, ["status", "type", "client", "group"]);
+  // ?group=<insurance company id>: the projects of the clients in that agency group.
+  if (params.filters.group && !/^[1-9]\d{0,17}$/.test(params.filters.group)) delete params.filters.group;
+  const [{ rows, total }, projects, lookups, offices, clientGroups] = await Promise.all([listProjects(params), getProjectStats(), getLookups(), getOfficeOptions(), getClientGroups()]);
+  const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
   const options = { ...lookups, ...offices };
 
   // Tiles describe every project; the table shows one page of them.
@@ -64,6 +68,7 @@ export default async function ProjectsPage({ searchParams }) {
               { key: "status", label: "Status", options: options.projectStatuses.map((s) => ({ value: s.name, label: s.name })) },
               { key: "type", label: "Type", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
               { key: "client", label: "Client", kind: "select", options: options.companies.map((c) => ({ value: c.name, label: c.name })) },
+              ...(groupOptions.length ? [{ key: "group", label: "Agency group", kind: "select", options: groupOptions }] : []),
             ]}
             placeholder="Search projects…"
             empty="No projects yet."
@@ -83,7 +88,10 @@ export default async function ProjectsPage({ searchParams }) {
                       <Link href={`/projects/${p.id}`} className="font-medium transition-colors hover:text-primary hover:underline" data-project-link>{p.name}</Link>
                     </div>
                   </TableCell>
-                  <TableCell>{p.client}</TableCell>
+                  <TableCell>
+                    {p.client}
+                    {p.group ? <span className="block text-xs text-muted-foreground" data-project-group>{p.group}</span> : null}
+                  </TableCell>
                   <TableCell><ToneBadge tone={typeTone[p.type] ?? "slate"}>{p.type}</ToneBadge></TableCell>
                   <TableCell className="font-semibold tabular-nums text-primary">{p.leads}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge></TableCell>

@@ -66,9 +66,73 @@ try {
   await admin.key("Escape");
   await admin.go("/clients", 4000);
   check("the Clients page names each client's group", Boolean(await until(async () => (await admin.text()).includes(GROUP))));
-  await admin.go(`/clients?group=${groupId}`, 4000);
-  const shown = await admin.ev(`[...document.querySelectorAll('a[href^="/clients/"]')].map((a) => a.innerText.split('\\n')[0].trim())`);
-  check("…and filters to one agency group: this client, not the other group's", (await admin.text()).includes(NAME) && !(await admin.text()).includes(`${NAME} Elsewhere`) && /1 total/i.test(await admin.text()), JSON.stringify(shown));
+
+  section("The Clients page: time zone, dates and status on the client");
+  await admin.go(`/clients/${slug}`, 4000);
+  await admin.click("[data-edit-client]");
+  await until(() => admin.ev(`!!document.querySelector('[data-client-form] select[name="timezone_id"]')`));
+  const statuses = await admin.ev(`[...document.querySelectorAll('[data-client-form] select[name="status"] option')].map((o) => o.textContent)`);
+  check("the form has a time zone, start and end dates, and a status of Active, Paused or Completed", JSON.stringify(statuses) === JSON.stringify(["Active", "Paused", "Completed"])
+    && (await admin.ev(`!!document.querySelector('[data-client-form] input[name="subscription_start"]') && !!document.querySelector('[data-client-form] input[name="subscription_end"]')`)), JSON.stringify(statuses));
+  const MST = sql("select id from public.timezones where name = 'MST'");
+  await admin.fill('[data-client-form] select[name="timezone_id"]', MST);
+  await admin.ev(`(() => { const set = (n, v) => { const i = document.querySelector('[data-client-form] input[name="' + n + '"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }; set('subscription_start', '2026-01-26'); set('subscription_end', '2026-12-31'); })()`);
+  await admin.click("[data-client-form] button[type=submit]");
+  const saved = () => sql(`select timezone_id || '|' || coalesce(subscription_start::text, '') || '|' || coalesce(subscription_end::text, '') || '|' || status from public.companies where name = ${lit(NAME)}`);
+  check("they are saved on the client", Boolean(await until(() => saved() === `${MST}|2026-01-26|2026-12-31|active`)), saved());
+  sql(`update public.companies set status = 'paused', state = 'CA' where id = ${otherClient}`);
+
+  section("The Clients page: clients in rows");
+  await admin.go("/clients", 5000);
+  const heads = await until(() => admin.ev(`[...document.querySelectorAll('thead th')].map((h) => h.textContent.trim())`).then((h) => h.length && h));
+  check("a table: client, contact, state, time zone, start date, end date, status", JSON.stringify(heads) === JSON.stringify(["Client", "Contact", "State", "Time zone", "Start date", "End date", "Status"]), JSON.stringify(heads));
+  const rowOf = (name) => admin.ev(`(() => { const r = [...document.querySelectorAll('tr[data-client-row]')].find((x) => x.querySelector('[data-client-link]')?.textContent === ${JSON.stringify(name)}); return r ? [...r.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()) : null; })()`);
+  const myRow = await rowOf(NAME);
+  check("the client's row has them all, its agency group under its name", myRow?.[1] === "Bret Godsey" && myRow[2] === "AZ" && myRow[3] === "MST" && myRow[4] === "Jan 26, 2026" && myRow[5] === "Dec 31, 2026"
+    && /^active$/i.test(myRow[6]) && myRow[0].includes(NAME) && myRow[0].includes(GROUP), JSON.stringify(myRow));
+  const names = () => admin.ev(`[...document.querySelectorAll('tr[data-client-row] [data-client-link]')].map((a) => a.textContent)`);
+  const pick = (label, value) => admin.ev(`(() => { const sel = document.querySelector('select[aria-label="Filter by ${label}"]'); if (!sel) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, ${JSON.stringify(value)}); sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+  check("it filters by agency group", (await pick("Agency group", GROUP)) && Boolean(await until(async () => { const n = await names(); return n.includes(NAME) && !n.includes(`${NAME} Elsewhere`); })), JSON.stringify(await names()));
+  await admin.click("button", "Clear");
+  check("…by state", (await pick("State", "CA")) && Boolean(await until(async () => { const n = await names(); return n.includes(`${NAME} Elsewhere`) && !n.includes(NAME); })), JSON.stringify(await names()));
+  await admin.click("button", "Clear");
+  check("…by time zone", (await pick("Time zone", "MST")) && Boolean(await until(async () => { const n = await names(); return n.includes(NAME) && !n.includes(`${NAME} Elsewhere`); })), JSON.stringify(await names()));
+  await admin.click("button", "Clear");
+  await admin.click("button", "Paused");
+  check("…by status", Boolean(await until(async () => { const n = await names(); return n.includes(`${NAME} Elsewhere`) && !n.includes(NAME); })), JSON.stringify(await names()));
+  await admin.click("button", "Clear");
+  await admin.fill('input[aria-label^="Search clients"]', "Bret Godsey");
+  check("…and searches by contact", Boolean(await until(async () => { const n = await names(); return n.length === 1 && n[0] === NAME; })), JSON.stringify(await names()));
+  await admin.ev(`[...document.querySelectorAll('tr[data-client-row]')].find((x) => x.querySelector('[data-client-link]')?.textContent === ${JSON.stringify(NAME)}).cells[2].click()`);
+  check("clicking anywhere on a row opens the client", Boolean(await until(async () => (await admin.path()) === `/clients/${slug}`)), await admin.path());
+  check("…whose page shows its time zone and dates", /MST/.test(await admin.text()) && /Jan 26, 2026 – Dec 31, 2026/.test(await admin.text()));
+
+  section("The Clients page: tiles");
+  const companyNow = Number(sql(`select id from public.companies where name = ${lit(NAME)}`));
+  const tileProject = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${NAME} P0`)}, ${companyNow}, (select id from public.project_types where code='APPT'), 1) returning id`));
+  const adminId = Number(sql("select id from public.users where email = 'admin@beacon.test'"));
+  sql(`insert into public.pay_events (user_id, project_id, kind, amount, created_at) values (${adminId}, ${tileProject}, 'lead', 1, now()), (${adminId}, ${tileProject}, 'lead', 1, now()), (${adminId}, ${tileProject}, 'appointment', 1, now()), (${adminId}, ${tileProject}, 'lead', 1, now() - interval '20 days')`);
+  await admin.go("/clients?lr=1D&ar=1D", 6000);
+  const counts = sql("select count(*) filter (where status = 'active') || '|' || count(*) filter (where status in ('paused', 'inactive')) || '|' || count(*) filter (where status = 'completed') || '|' || count(*) from public.companies where deleted_at is null").split("|").map(Number);
+  const first = await until(() => admin.ev(`document.querySelector('[data-client-statuses]')?.closest('[data-panel]')?.innerText.replace(/\\s+/g, ' ') ?? null`));
+  check("1st tile: the active clients, and the inactive ones", new RegExp(`Active Clients ${counts[0]} ${counts[3] - counts[0]} inactive · ${counts[3]} in all`, "i").test(first ?? "")
+    && new RegExp(`Paused ${counts[1]} Completed ${counts[2]}`, "i").test(first ?? ""), first);
+  const tile = (k) => admin.ev(`document.querySelector('[data-trend-tile="${k}"]')?.innerText.replace(/\\s+/g, ' ') ?? ''`);
+  const devToday = (k) => Number(sql(`select count(*) from public.pay_events pe join public.projects p on p.id = pe.project_id join public.companies c on c.id = p.company_id where c.status = 'active' and c.deleted_at is null and p.deleted_at is null and pe.kind = '${k}' and not pe.is_chargeback and (pe.created_at at time zone public.business_tz())::date = (now() at time zone public.business_tz())::date`));
+  check("2nd tile: the active clients' leads, with a chart and what was developed today", /^Leads [\d,]+ [\d,]+ active · [\d,]+ resolved · active clients/i.test(await tile("leads")) && new RegExp(`${devToday("lead")} developed`).test(await tile("leads"))
+    && (await admin.ev(`!!document.querySelector('[data-trend-tile="leads"] [data-trend-line]')`)), await tile("leads"));
+  check("3rd tile: their appointments, the same way", /^Appointments [\d,]+ [\d,]+ invalid · active clients/i.test(await tile("appts")) && new RegExp(`${devToday("appointment")} set`).test(await tile("appts")), await tile("appts"));
+  const ranges = await admin.ev(`[...document.querySelectorAll('[data-trend-tile="leads"] [data-trend-ranges] a, [data-trend-tile="leads"] [data-trend-ranges] button')].map((a) => a.textContent.trim())`);
+  check("each has a stock chart's ranges", JSON.stringify(ranges) === JSON.stringify(["1D", "5D", "1W", "2W", "1M", "3M", "6M", "YTD", "More"]), JSON.stringify(ranges));
+  await admin.ev(`[...document.querySelectorAll('[data-trend-tile="leads"] [data-trend-ranges] a')].find((a) => a.textContent.trim() === '1M').click()`);
+  check("a range changes that tile alone: Leads to a month, Appointments still the day",
+    Boolean(await until(async () => new RegExp(`${devToday("lead") + 1} developed`).test(await tile("leads")) && !/by the hour/.test(await tile("leads")) && /by the hour/.test(await tile("appts")))), `${await tile("leads")} || ${await tile("appts")}`);
+  const fourth = await admin.ev(`document.querySelector('[data-breakdown-tile]')?.innerText.replace(/\\s+/g, ' ') ?? ''`);
+  const mstClients = sql("select count(*) from public.companies c join public.timezones z on z.id = c.timezone_id where c.status = 'active' and c.deleted_at is null and z.name = 'MST'");
+  check("4th tile: the active clients by time zone and by agency group", /Active Clients By/i.test(fourth) && /Time zone/i.test(fourth) && new RegExp(`MST ${mstClients}`).test(fourth) && /Agency group/i.test(fourth) && new RegExp(`${GROUP} 1`).test(fourth)
+    && !fourth.includes(`${GROUP} Other`), fourth);
+  if (process.env.SHOTS) await admin.screenshot(`${process.env.SHOTS}/clients-page.png`);
+  sql(`update public.companies set status = 'active' where id = ${otherClient}`);
 
   section("Agency Group in Production & Pay");
   // A call today on a project of each client.
@@ -90,6 +154,27 @@ try {
   check("the CSV adds up by agency group", new RegExp(`^.?Agency group,Calls,`).test(csv) && new RegExp(`\\n${GROUP},2,`).test(csv) && new RegExp(`\\n${GROUP} Other,1,`).test(csv), csv.slice(0, 260));
   const one = await admin.ev(`fetch('/api/reports/production?period=today&by=client&group=${groupId}').then((r) => r.text())`);
   check("…and any CSV keeps to the group chosen", one.includes(NAME) && !one.includes(`${NAME} Elsewhere`) && /\nTotal,2,/.test(one), one.slice(0, 200));
+
+  section("Agency Group on the Projects list");
+  await admin.go(`/projects?q=${encodeURIComponent(NAME)}`, 5000);
+  const projectNames = () => admin.ev(`[...document.querySelectorAll('a[data-project-link]')].map((a) => a.textContent)`);
+  check("each project names its client's agency group", Boolean(await until(async () => (await admin.ev(`[...document.querySelectorAll('[data-project-group]')].map((e) => e.textContent)`)).includes(GROUP))));
+  const offered = await admin.ev(`[...(document.querySelector('select[aria-label="Filter by Agency group"]')?.options ?? [])].map((o) => o.textContent.replace(/ \\(\\d+\\)$/, ''))`);
+  check("…and the list filters by agency group, offering the groups clients are in", offered.includes(GROUP) && offered.includes(`${GROUP} Other`), JSON.stringify(offered));
+  await admin.go(`/projects?q=${encodeURIComponent(NAME)}&group=${groupId}`, 5000);
+  check("filtered: that group's clients' projects, not another group's", Boolean(await until(async () => { const n = await projectNames(); return n.includes(`${NAME} P1`) && !n.includes(`${NAME} P2`); })), JSON.stringify(await projectNames()));
+
+  section("Agency Group in the Lead Explorer");
+  sql(`insert into public.leads (company_name, project_id) values (${lit(`${NAME} Lead One`)}, ${mine}), (${lit(`${NAME} Lead Two`)}, ${mine}), (${lit(`${NAME} Lead Three`)}, ${theirs})`);
+  await admin.go("/explore", 6000);
+  check("the explorer has Agency group among its criteria", /Agency group/i.test(await admin.text()));
+  await admin.go(`/explore?groups=${groupId}`, 6000);
+  const explored = await until(async () => { const t = await admin.ev(`document.body.innerText.replace(/\\s+/g, ' ')`); return /agency group: /i.test(t) ? t : null; });
+  check("asked for a group, it finds the leads of that group's clients", (explored ?? "").includes(`${NAME} Lead One`) && (explored ?? "").includes(`${NAME} Lead Two`) && !(explored ?? "").includes(`${NAME} Lead Three`), (explored ?? "").slice(0, 300));
+  check("…says so in words, and names the group on each lead", new RegExp(`agency group: ${GROUP}`, "i").test(explored ?? "") && (await admin.ev(`[...document.querySelectorAll('[data-lead-group]')].every((e) => e.textContent === ${JSON.stringify(GROUP)}) && document.querySelectorAll('[data-lead-group]').length === 2`)));
+  const exported = await admin.ev(`fetch('/api/explore/export?groups=${groupId}').then(async (r) => ({ total: r.headers.get('x-total-count'), text: await r.text() }))`);
+  check("the export keeps to the group and has an Agency Group column", exported.total === "2" && /,Client,Agency Group,/.test(exported.text.split("\r\n")[0]) && exported.text.includes(`,${GROUP},`) && !exported.text.includes("Lead Three"), exported.text.slice(0, 300));
+  check("a made-up group in the address is ignored, not an error", (await admin.go("/explore?groups=abc", 5000), !/Something went wrong/i.test(await admin.text())));
 
   section("A project with its own office");
   const companyId = Number(sql(`select id from public.companies where name = ${lit(NAME)}`));
@@ -115,6 +200,8 @@ try {
   const template = await admin.ev(`decodeURIComponent((document.querySelector('[data-import-template]')?.getAttribute('href') ?? '').split(',').slice(1).join(','))`);
   check("a template to download: the headings the import reads", template.startsWith("Company,Contact,") && /Ultimate XDate/.test(template) && /Call Result DBDV/.test(template), template.slice(0, 80));
 } finally {
+  sql(`delete from public.leads where company_name like ${lit(`${NAME} Lead %`)}`);
+  sql(`delete from public.pay_events where project_id in (select id from public.projects where name like ${lit(`${NAME} P%`)})`);
   sql(`delete from public.call_records where project_id in (select id from public.projects where name like ${lit(`${NAME} P%`)})`);
   sql(`delete from public.projects where name = ${lit(`${NAME} CA Appts`)} or name like ${lit(`${NAME} P%`)}`);
   browser.close();
