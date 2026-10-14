@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { cleanCriteria } from "@/lib/call-list-filter";
 import { deliverLead } from "@/features/delivery/server";
+import { APPOINTMENT_NOTICES, sendsSheet } from "@/lib/delivery";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
@@ -69,7 +70,7 @@ export async function recordCallResult(prevState, formData) {
     p_ultimate_xdate: values.ultimate_xdate || null,
     // What the client is told, when the result sends them the lead: given
     // only when the panel asked for it, so an empty box clears it.
-    p_client_note: result?.delivers && formData.has("client_note") ? (s(formData, "client_note") ?? "") : null,
+    p_client_note: sendsSheet(result) && formData.has("client_note") ? (s(formData, "client_note") ?? "") : null,
   });
   if (error) {
     const field = FIELD_FOR.find(([re]) => re.test(error.message))?.[1];
@@ -78,9 +79,18 @@ export async function recordCallResult(prevState, formData) {
 
   await logActivity(supabase, "lead.call", { entity: "lead", entityId: leadId, detail: data.result });
 
+  // Confirming or cancelling an appointment: the Client notes written with it (why it was cancelled,
+  // what the client should know) go on the lead before its sheet goes out. record_call_result keeps
+  // them only as a name becomes a Lead or an Appointment.
+  if (APPOINTMENT_NOTICES[result?.effect] && formData.has("client_note")) {
+    const { error: noteError } = await supabase.from("leads").update({ client_note: s(formData, "client_note") }).eq("id", leadId);
+    if (noteError) console.error("[call result] client note not saved", leadId, noteError.message);
+  }
+
   // A lead or an appointment goes to the client: its sheet, emailed to the
-  // project's delivery addresses, once the rep has moved on.
-  if (result?.delivers) {
+  // project's delivery addresses, once the rep has moved on. So does news of
+  // the appointment: confirmed, or cancelled (marked invalid).
+  if (sendsSheet(result)) {
     const [me, origin] = await Promise.all([currentAppUser(supabase), requestOrigin()]);
     after(() => deliverLead({ leadId, callRecordId: data.call_record_id, sentBy: me?.id ?? null, origin }));
   }

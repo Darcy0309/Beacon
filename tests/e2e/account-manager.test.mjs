@@ -71,8 +71,8 @@ try {
 
   section("The lead sheet");
   t = await sean.text();
-  check("the contact card on the left, with a Call button by the number",
-    await sean.ev(`!!document.querySelector('[data-contact-card] [data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')`));
+  check("Prospect Info on the left, with a Call button by the business's number",
+    await sean.ev(`!!document.querySelector('[data-prospect-info] [data-contact-line="Business phone"] a[href^="tel:"]')`));
   check("business, coverage and notes in tabs in the middle", ["BUSINESS", "COVERAGE", "NOTES"].every((b) => t.toUpperCase().includes(b)));
   check("history in tabs underneath", /CALL HISTORY/i.test(t) && /APPOINTMENTS/i.test(t));
   const dbdvButtons = await buttons(sean);
@@ -175,8 +175,8 @@ try {
   check("appointment-project buttons on his sheet", ["Lead-No Contact", "Lead-Not Shopping", "Lead-Corrected", "Lead-Invalid"].every((b) => apptButtons.includes(b)) && !apptButtons.includes("Viable-Staged"), apptButtons.join(", "));
   check("the sheet shows who developed it (the lead account manager) and who holds it now (the appointment manager)",
     /Lead account mgr\s*Sean Fitzgerald/i.test(await mike.text()) && /Appt mgr\s*Mike Preston/i.test(await mike.text()));
-  const dial = await mike.ev(`[...document.querySelectorAll('[data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')].map((a) => a.getAttribute('href'))`);
-  check("the contact's Call button dials the lead's number", dial.length === 1 && dial[0] === "tel:+16145550110", JSON.stringify(dial));
+  const dial = await mike.ev(`[...document.querySelectorAll('[data-prospect-info] [data-contact-line="Business phone"] a[href^="tel:"]')].map((a) => a.getAttribute('href'))`);
+  check("the business's Call button dials the lead's number", dial.length === 1 && dial[0] === "tel:+16145550110", JSON.stringify(dial));
 
   // At 1280px the panel is at its narrowest. Whatever the result, Save and
   // Cancel stay whole inside it (a long name once pushed Cancel off the edge).

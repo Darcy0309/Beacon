@@ -15,6 +15,7 @@ import { Field, Select, formHelpers } from "@/components/ui/field";
 import { recordCallResult } from "@/features/work/actions";
 import { APPOINTMENT_TIMES, DURATIONS } from "@/lib/validate";
 import { cn } from "@/lib/utils";
+import { sendsSheet } from "@/lib/delivery";
 import SlotWarning, { useSlotControl } from "@/features/calendar/components/slot-warning";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -205,14 +206,19 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
               ) : null}
             </div>
 
-            {picked.delivers ? (
-              <Field label="Client notes" error={fe("client_note")} hint="The client sees these, with the lead sheet. Add to them: earlier ones stay, a trail of what took place.">
+            {sendsSheet(picked) ? (
+              <Field label="Client notes" error={fe("client_note")}
+                hint={picked.effect === "appointment_invalid" ? "The client is emailed the lead sheet, marked CANCELLED, with these: say why. Earlier notes stay, a trail of what took place."
+                  : picked.effect === "confirm" ? "The client is emailed the lead sheet, marked CONFIRMED, with these: add anything they need to know. Earlier notes stay."
+                  : "The client sees these, with the lead sheet. Add to them: earlier ones stay, a trail of what took place."}>
                 <StampedTextarea name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
-                  placeholder="e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am" data-client-note />
+                  placeholder={picked.effect === "appointment_invalid" ? "e.g. Cancelled: the owner is out of town until next month"
+                    : picked.effect === "confirm" ? "e.g. Confirmed with Daniel; bring the current dec pages"
+                    : "e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am"} data-client-note />
               </Field>
             ) : null}
 
-            <Field label={picked.delivers ? "Call notes" : "Notes"} error={fe("notes")} hint={picked.delivers ? "Internal: the client never sees them. Added to the lead's internal notes." : "Added to the lead's internal notes."}>
+            <Field label={sendsSheet(picked) ? "Call notes" : "Notes"} error={fe("notes")} hint={sendsSheet(picked) ? "Internal: the client never sees them. Added to the lead's internal notes." : "Added to the lead's internal notes."}>
               <StampedTextarea ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")} />
             </Field>
 

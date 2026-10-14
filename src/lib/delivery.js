@@ -33,8 +33,22 @@ export function parseDeliveryAddresses(text, linkOnly = false) {
   return { list, bad };
 }
 
-/** The subject, as the old system wrote it: "<result> - <company>". */
-export const deliverySubject = (result, company) => `${result} - ${company}`.slice(0, 200);
+/**
+ * What a follow-up on an appointment tells the client, in the subject and on
+ * the sheet (Sean, Oct 2026): confirmed, or cancelled (marked invalid). By
+ * the call result's effect.
+ */
+export const APPOINTMENT_NOTICES = { confirm: "CONFIRMED", appointment_invalid: "CANCELLED" };
+
+/** Whether a call result ({ delivers, effect }) emails the client the lead sheet: a lead or an appointment, or news of one. */
+export const sendsSheet = (result) => Boolean(result?.delivers || APPOINTMENT_NOTICES[result?.effect]);
+
+/**
+ * The subject, as the old system wrote it: "<result> - <company>"; with
+ * news of the appointment, "Appointment - <company> (CONFIRMED)".
+ */
+export const deliverySubject = (result, company, notice = null) =>
+  (notice ? `Appointment - ${company} (${notice})` : `${result} - ${company}`).slice(0, 200);
 
 // A value on the sheet: text, a link ({ text, href }), or text with links
 // under it ({ text, links: [{ label, href }], linksLabel }).
@@ -78,8 +92,12 @@ function cellText(v) {
 function sheetSections(s, { forCalendar = false } = {}) {
   const sections = [];
   const rows = (pairs) => pairs.filter(([, v]) => !blank(v));
+  // A cancelled appointment says so, and has nothing to add to a calendar.
   const appointment = s.appointment
-    ? { text: [s.appointment.date, s.appointment.time].filter(Boolean).join(" at "), links: s.appointment.links ?? [], linksLabel: "Add to calendar" }
+    ? {
+        text: [[s.appointment.date, s.appointment.time].filter(Boolean).join(" at "), s.notice ? `(${s.notice})` : null].filter(Boolean).join(" "),
+        links: s.notice === "CANCELLED" ? [] : s.appointment.links ?? [], linksLabel: "Add to calendar",
+      }
     : null;
   const address = (s.address ?? []).join(", ");
   sections.push(["Client information", rows([
@@ -135,6 +153,7 @@ export function renderLeadSheet(s) {
 ${logoHtml(s.logo)}<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;">Lead sheet</div>
 <div style="font-size:20px;font-weight:bold;margin-top:4px;">${esc(s.company)}</div>
 <div style="font-size:14px;color:#0e7490;margin-top:2px;">${esc(s.result)}</div>
+${s.notice ? `<div data-notice style="display:inline-block;margin-top:10px;padding:4px 10px;border-radius:4px;font-size:13px;font-weight:bold;letter-spacing:.08em;color:#ffffff;background:${s.notice === "CANCELLED" ? "#b91c1c" : "#047857"};">APPOINTMENT ${esc(s.notice)}</div>` : ""}
 </td></tr>
 ${shown.map(([title, pairs]) => `<tr><td style="padding:14px 10px 4px;">
 <div style="font-size:11px;font-weight:bold;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;padding:0 10px 6px;">${esc(title)}</div>
@@ -147,6 +166,7 @@ ${pairs.map(([k, v]) => `<tr><td style="${td}width:34%;color:#6b7280;">${esc(k)}
   const text = [
     `LEAD SHEET: ${s.company}`,
     s.result,
+    ...(s.notice ? [`APPOINTMENT ${s.notice}`] : []),
     ...shown.flatMap(([title, pairs]) => ["", title.toUpperCase(), ...pairs.map(([k, v]) => `${k}: ${cellText(v)}`)]),
   ].join("\n");
 

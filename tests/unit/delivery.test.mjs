@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for lead delivery: a project's delivery addresses, and the lead sheet emailed. */
-import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "../../src/lib/delivery.js";
+import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet, sendsSheet } from "../../src/lib/delivery.js";
 import { schemas, validate } from "../../src/lib/validate.js";
 
 let failures = 0;
@@ -19,6 +19,11 @@ check("the project form refuses a bad address, saying which", /Not an email addr
 check("…and takes good ones", !validate({ name: "P", email: "a@x.com; _b@y.org", delivery_link_only: "on" }, schemas.project).errors.email);
 
 check("the subject reads “<result> - <company>”", deliverySubject("Lead-Hot Lead", "Calvary Baptist Church") === "Lead-Hot Lead - Calvary Baptist Church");
+check("…news of an appointment: “Appointment - <company> (CONFIRMED)” or “(CANCELLED)”",
+  deliverySubject("Appointment-Confirmed", "Delta Door and Components LLC", "CONFIRMED") === "Appointment - Delta Door and Components LLC (CONFIRMED)"
+  && deliverySubject("Appointment-Invalid", "Delta Door", "CANCELLED") === "Appointment - Delta Door (CANCELLED)");
+check("a lead or an appointment sends the sheet, and so do confirmed and invalid; other results do not",
+  sendsSheet({ delivers: true }) && sendsSheet({ effect: "confirm" }) && sendsSheet({ effect: "appointment_invalid" }) && !sendsSheet({ effect: "none" }) && !sendsSheet({ effect: "lead_invalid" }) && !sendsSheet(null));
 
 const sheet = {
   company: "Calvary <Baptist> & Co", result: "Appointment-Phone", client: "Capital Insurance Services", logo: "https://lighthouse.example/brand/signature-marketing.png",
@@ -66,6 +71,12 @@ check("…with the rows the email has", ["Project: CapitalIns-Churches", "Call r
 check("…an address and a website as their text alone", notes.includes("Address: 1502 20th St, Santa Monica CA 90404\n") && notes.includes("Website: calvarysantamonica.org") && !/https?:\/\//.test(notes), notes);
 check("…without the appointment's own row and its links, or an empty row", !/Appointment:|Add to calendar|Autos|Decision maker|DECISION MAKER/.test(notes), notes);
 check("a sheet with no appointment still reads whole", leadSheetNotes({ ...sheet, appointment: null }).includes("RESULT\nCall result: Appointment-Phone\n\nPROSPECT"));
+
+const cancelledSheet = renderLeadSheet({ ...sheet, notice: "CANCELLED" });
+check("a cancelled appointment's sheet says so at the top and by the appointment, with nothing to add to a calendar",
+  /APPOINTMENT CANCELLED/.test(cancelledSheet.text) && /10:00 AM \(CANCELLED\)/.test(cancelledSheet.text) && !/Add to calendar/.test(cancelledSheet.text) && !/calendar\.google\.com/.test(cancelledSheet.html), cancelledSheet.text.slice(0, 300));
+const confirmedSheet = renderLeadSheet({ ...sheet, notice: "CONFIRMED" });
+check("…a confirmed one keeps its calendar links", /APPOINTMENT CONFIRMED/.test(confirmedSheet.text) && /calendar\.google\.com/.test(confirmedSheet.html));
 
 console.log(failures ? `\n${failures} delivery check(s) failed.\n` : "\nAll delivery checks passed.\n");
 process.exit(failures ? 1 : 0);

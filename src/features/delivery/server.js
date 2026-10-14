@@ -9,7 +9,7 @@
 import "server-only";
 import { POLICY_LINES } from "@/lib/coverage";
 import { mailFailure, isReservedAddress, oneLine } from "@/lib/email";
-import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet } from "@/lib/delivery";
+import { APPOINTMENT_NOTICES, deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet, sendsSheet } from "@/lib/delivery";
 import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links";
 import { fileSize, fullName, sicLabel } from "@/lib/format";
 import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
@@ -53,22 +53,30 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
 
   let call = null;
   const calls = admin.from("call_records")
-    .select("id, project_id, call_result, user:users(first_name, last_name, email), result:call_results(delivers)")
+    .select("id, project_id, call_result, appointment_id, user:users(first_name, last_name, email), result:call_results(delivers, effect)")
     .eq("lead_id", leadId);
   if (callRecordId) {
     ({ data: call } = await calls.eq("id", callRecordId).maybeSingle());
   } else {
     const { data } = await calls.order("call_date", { ascending: false }).limit(50);
-    call = (data ?? []).find((c) => one(c.result)?.delivers) ?? null;
+    // Sent again: as the latest call that sent it last (the appointment's confirmation or cancellation, too).
+    call = (data ?? []).find((c) => sendsSheet(one(c.result))) ?? null;
   }
+  // News of the appointment: confirmed, or cancelled. A cancelled one is no longer the lead's
+  // appointment, so it is read by the call that cancelled it.
+  const notice = APPOINTMENT_NOTICES[one(call?.result)?.effect] ?? null;
+  const apptColumns = "id, appt_date, appt_time, duration_min, rep_name";
+  const apptQuery = notice === "CANCELLED" && call?.appointment_id
+    ? admin.from("appointments").select(apptColumns).eq("id", call.appointment_id).maybeSingle()
+    : admin.from("appointments").select(apptColumns).eq("lead_id", leadId).is("invalid_at", null).is("deleted_at", null)
+      .order("appt_create_date", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle();
 
   const projectId = call?.project_id ?? lead.project_id;
   const [{ data: project }, { data: appt }, { data: tz }, { data: sic }, { data: docs }] = await Promise.all([
     projectId
       ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, company:companies(name)").eq("id", projectId).maybeSingle()
       : Promise.resolve({ data: null }),
-    admin.from("appointments").select("id, appt_date, appt_time, duration_min, rep_name").eq("lead_id", leadId).is("invalid_at", null).is("deleted_at", null)
-      .order("appt_create_date", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle(),
+    apptQuery,
     admin.rpc("business_tz"),
     lead.sic_code
       ? admin.from("sic_codes").select("code, description").in("code", [lead.sic_code, String(lead.sic_code).slice(0, 4)])
@@ -86,6 +94,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   const sheet = {
     company: lead.company_name,
     result: call?.call_result ?? "Lead",
+    notice,
     // The business's logo, from the app's own address (an email cannot carry the app's drawn one).
     logo: origin ? `${origin}/brand/signature-marketing.png` : null,
     client: one(project?.company)?.name ?? null,
@@ -127,7 +136,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   };
 
   // The calendar event carries the whole sheet as its notes, not only whom to meet and where.
-  const event = appt ? appointmentEvent(lead.company_name, appt, address, tz, leadSheetNotes(sheet)) : null;
+  const event = appt && notice !== "CANCELLED" ? appointmentEvent(lead.company_name, appt, address, tz, leadSheetNotes(sheet)) : null;
   const token = event && origin ? sheetToken(leadId) : null;
   if (event) sheet.appointment.links = calendarLinks(event, token ? `${origin}/sheet/${token}/appointment.ics` : null);
 
@@ -171,7 +180,7 @@ export async function deliverLead({ leadId, callRecordId = null, sentBy = null, 
     const full = renderLeadSheet(sheet);
     const token = sheetToken(leadId);
     const link = token ? renderLeadLink(sheet, `${origin}/sheet/${token}`, LINK_DAYS) : null;
-    const subject = oneLine(deliverySubject(sheet.result, sheet.company));
+    const subject = oneLine(deliverySubject(sheet.result, sheet.company, sheet.notice));
 
     let sent = 0;
     let failed = 0;
