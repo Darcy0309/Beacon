@@ -20,12 +20,15 @@ const PHONE_AREA = String(200 + (Date.now() % 700));
 const PHONE = `(${PHONE_AREA}) 851-8511`;
 
 const companyId = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Insurance Group`)}) returning id`));
-const typeId = sql("select id from public.project_types where code='DBDV'");
+// An appointment project: the explorer reads only leads promoted to one (a lead's stage follows its project's type).
+const typeId = sql("select id from public.project_types where code='APPT'");
 const projectId = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
   values (${lit(`${TAG} Plumbers Campaign`)}, ${companyId}, ${typeId}, 1) returning id`));
+const devProjectId = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
+  values (${lit(`${TAG} Plumbers DBDev`)}, ${companyId}, (select id from public.project_types where code='DBDV'), 1) returning id`));
 const carrierId = Number(sql(`insert into public.agencies (name) values (${lit(`${TAG} Mutual`)}) returning id`));
 
-/** A lead on the test project; `ins` adds a policy-details row. */
+/** A lead on the test (appointment) project; `ins` adds a policy-details row. */
 function lead(name, more = {}, ins = null) {
   const cols = { company_name: lit(`${TAG} ${name}`), project_id: projectId, status_id: "(select id from public.lead_statuses where code='new')", ...more };
   const id = Number(sql(`insert into public.leads (${Object.keys(cols).join(", ")}) values (${Object.values(cols).join(", ")}) returning id`));
@@ -135,6 +138,23 @@ try {
     check("a carrier is listed once however an import spelled it", mutual.length === 1 && mutual[0].label === `${TAG} Mutual` && mutual[0].count === 2, JSON.stringify(mutual));
     const row = (await explore({ carriers: [String(carrierId)] })).rows.find((r) => Number(r.id) === BY_NAME);
     check("the row names the carrier", row?.carrier_name?.trim().toLowerCase() === `${TAG} mutual`, JSON.stringify(row?.carrier_name));
+  }
+
+  section("Lead Explorer: leads promoted to appointments, by call result");
+  {
+    const STILL_DEV = lead("Still Developing Roofing", { project_id: devProjectId }, { ultimate_xdate: "2026-11-01" });
+    const result = (name) => sql(`select id from public.call_results where project_type = 'APPT' and name = ${lit(name)}`);
+    const NO_CONTACT = lead("No Contact Roofing", { result_id: result("Lead-No Contact") });
+    const all = await explore({});
+    check("a name still being developed is not in it, renewal date or no", !ids(all.rows).includes(STILL_DEV), JSON.stringify(ids(all.rows)));
+    const byResult = all.by_result ?? [];
+    check("its breakdown is by call result", byResult.some((r) => r.label === "Lead-No Contact") && !("by_status" in all), JSON.stringify(byResult));
+    const noContact = ids((await explore({ results: ["Lead-No Contact"] })).rows);
+    check("…and filters by it", noContact.includes(NO_CONTACT) && (await explore({ results: ["Lead-No Contact"] })).rows.every((r) => r.result_name === "Lead-No Contact"), JSON.stringify(noContact));
+    const row = all.rows.find((r) => Number(r.id) === NO_CONTACT);
+    check("each row carries its call result", row?.result_name === "Lead-No Contact", JSON.stringify(row?.result_name));
+    const { data: options } = await admin.sb.rpc("lead_explore_options");
+    check("the pickers offer call results, not the old statuses", (options?.results ?? []).some((r) => r.value === "Lead-No Contact") && !("statuses" in (options ?? {})));
   }
 
   section("Lead Explorer: paging limits");

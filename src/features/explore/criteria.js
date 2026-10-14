@@ -19,7 +19,8 @@ export const FIELDS = [
   { key: "months", label: "Renewal month", options: "months", hint: "Ultimate X-date, else the soonest line" },
   { key: "states", label: "State", options: "states" },
   { key: "counties", label: "County", options: "counties" },
-  { key: "statuses", label: "Status", options: "statuses" },
+  // Where each lead stands now: its call result (the old system's statuses no longer say).
+  { key: "results", label: "Call result", options: "results" },
   { key: "clients", label: "Client", options: "clients" },
   { key: "groups", label: "Agency group", options: "groups", hint: "The carrier group a client belongs to" },
   { key: "carriers", label: "Current carrier", options: "carriers" },
@@ -86,7 +87,7 @@ export function criteriaToParams(criteria, extra = {}) {
 
 /** A plain-English summary of what is being asked, for the results header. */
 export function describe(criteria, options) {
-  if (isEmpty(criteria)) return "Every lead in the book";
+  if (isEmpty(criteria)) return "Every lead promoted to an appointment project";
   const labelFor = (field, value) => {
     const source = field.options === "months" ? MONTHS : options?.[field.options] ?? [];
     return source.find((o) => String(o.value) === String(value))?.label ?? value;

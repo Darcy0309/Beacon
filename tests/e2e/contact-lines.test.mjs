@@ -109,6 +109,10 @@ try {
   check("…typed as bare digits too", (await admin.text()).includes(`${TAG} AGSI Business`));
   await admin.go(`/leads?q=${encodeURIComponent("Robert Huff")}`, 4000);
   check("…and the decision maker's name", (await admin.text()).includes(`${TAG} AGSI Business`));
+  // Promoted to an appointment project, as the explorer reads only those.
+  const apptProject = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
+    values (${lit(`${TAG} Appts`)}, ${company}, (select id from public.project_types where code='APPT'), 1) returning id`));
+  sql(`update public.leads set project_id = ${apptProject} where id = ${lead}`);
   const csv = await admin.ev(`fetch('/api/explore/export?q=' + encodeURIComponent(${JSON.stringify(TAG)})).then((r) => r.text())`);
   const [head, row] = csv.replace(/^\uFEFF/, "").trim().split(/\r?\n/);
   check("the Lead Explorer's CSV carries them: mobile, and the decision maker's title, phone, mobile and email",
@@ -134,7 +138,7 @@ try {
   sql(`delete from public.work_activity where lead_id = ${lead}`);
   sql(`delete from public.activity_log where entity = 'lead' and entity_id = ${lead}`);
   sql(`delete from public.leads where id = ${lead}`);
-  sql(`delete from public.projects where id = ${project}`);
+  sql(`delete from public.projects where company_id = ${company}`);
   sql(`delete from public.companies where id = ${company}`);
 }
 

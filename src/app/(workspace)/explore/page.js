@@ -4,7 +4,7 @@ import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
-import StatusBadge from "@/components/shared/status-badge";
+import ResultBadge from "@/components/shared/result-badge";
 import FilterTable from "@/components/shared/filter-table";
 import ExploreCriteria from "@/features/explore/components/explore-criteria";
 import { Card } from "@/components/ui/card";
@@ -70,12 +70,12 @@ export default async function ExplorePage({ searchParams }) {
     shownPage = 1;
   }
 
-  const { total, rows, byClient, byState, byMonth, byIndustry, byStatus, clientsTouched, withXdate } = result;
+  const { total, rows, byClient, byState, byMonth, byIndustry, byResult, clientsTouched, withXdate } = result;
   const summary = describe(criteria, options);
   const exportHref = `/api/explore/export?${criteriaToParams(criteria).toString()}`;
 
   const tiles = [
-    { label: "Matching Leads", value: total.toLocaleString(), note: isEmpty(criteria) ? "the whole book" : "match these criteria",
+    { label: "Matching Leads", value: total.toLocaleString(), note: isEmpty(criteria) ? "every lead promoted to appts" : "match these criteria",
       icon: Database, accent: "var(--neon-cyan)", series: byMonth.map((m) => Number(m.count)), bars: true },
     { label: "Client Accounts", value: String(clientsTouched), note: "hold these leads",
       icon: Users, accent: "var(--neon-emerald)", series: byClient.map((c) => Number(c.count)), bars: true },
@@ -129,7 +129,7 @@ export default async function ExplorePage({ searchParams }) {
         <div className="gap-4 space-y-4 lg:columns-3 [&>*]:break-inside-avoid">
           <Breakdown label="By Renewal Month" icon={CalendarClock} rows={byMonth} shown={12} empty="No renewal dates on these leads." />
           <Breakdown label="Leads by Client" icon={Users} rows={byClient} empty="No leads match." />
-          <Breakdown label="By Status" icon={PieChart} rows={byStatus} empty="No leads match." />
+          <Breakdown label="By Call Result" icon={PieChart} rows={byResult} empty="No leads match." />
           <Breakdown label="By State" icon={Map} rows={byState} empty="No leads match." />
           <Breakdown label="By Industry" icon={Building2} rows={byIndustry} empty="No leads match." scroll />
         </div>
@@ -137,7 +137,7 @@ export default async function ExplorePage({ searchParams }) {
         <Card>
           <SectionHeader label="Matching Leads" icon={ListChecks} />
           <FilterTable
-            columns={["Company", "Contact", "Phone", "Client", "Status", "Renewal", "Assigned"]}
+            columns={["Company", "Contact", "Phone", "Client", "Call result", "Renewal", "Assigned"]}
             placeholder="Search within these results…"
             empty="No leads match these criteria."
             query={q}
@@ -164,7 +164,7 @@ export default async function ExplorePage({ searchParams }) {
                     {l.client}
                     {l.group ? <span className="block text-xs" data-lead-group>{l.group}</span> : null}
                   </TableCell>
-                  <TableCell><StatusBadge status={{ code: l.status_code, name: l.status_name }} /></TableCell>
+                  <TableCell><ResultBadge result={l.result} /></TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                   <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>
                 </TableRow>

@@ -24,7 +24,7 @@ const made = ["5812", "1711-04", "1711-04", "0742"].map((code, i) => {
     sql(`insert into public.sic_codes (code) values (${lit(code)})`);
     added.push(code);
   }
-  return Number(sql(`insert into public.leads (company_name, sic_code, state) values (${lit(`${TAG} Co ${i}`)}, ${lit(code)}, 'AZ') returning id`));
+  return Number(sql(`insert into public.leads (company_name, sic_code, state, stage) values (${lit(`${TAG} Co ${i}`)}, ${lit(code)}, 'AZ', 'appt') returning id`));
 });
 
 const browser = await launchBrowser();

@@ -165,7 +165,10 @@ try {
   check("filtered: that group's clients' projects, not another group's", Boolean(await until(async () => { const n = await projectNames(); return n.includes(`${NAME} P1`) && !n.includes(`${NAME} P2`); })), JSON.stringify(await projectNames()));
 
   section("Agency Group in the Lead Explorer");
-  sql(`insert into public.leads (company_name, project_id) values (${lit(`${NAME} Lead One`)}, ${mine}), (${lit(`${NAME} Lead Two`)}, ${mine}), (${lit(`${NAME} Lead Three`)}, ${theirs})`);
+  // On the two clients' appointment projects: the explorer reads only leads promoted to one.
+  const appt = (name, company) => Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(name)}, ${company}, (select id from public.project_types where code='APPT'), 1) returning id`));
+  const [mineAppt, theirsAppt] = [appt(`${NAME} P1 Appts`, companyOf), appt(`${NAME} P2 Appts`, otherClient)];
+  sql(`insert into public.leads (company_name, project_id) values (${lit(`${NAME} Lead One`)}, ${mineAppt}), (${lit(`${NAME} Lead Two`)}, ${mineAppt}), (${lit(`${NAME} Lead Three`)}, ${theirsAppt})`);
   await admin.go("/explore", 6000);
   check("the explorer has Agency group among its criteria", /Agency group/i.test(await admin.text()));
   await admin.go(`/explore?groups=${groupId}`, 6000);

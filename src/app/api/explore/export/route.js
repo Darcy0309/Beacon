@@ -33,7 +33,7 @@ const COLUMNS = [
   ["SIC", (r) => r.sic_code],
   ["Client", (r) => r.client_name],
   ["Agency Group", (r) => r.agency_group],
-  ["Status", (r) => r.status_name],
+  ["Call Result", (r) => r.result_name ?? "Not called yet"],
   // The ultimate X-date, else the soonest policy line's: what the renewal-month filter matches.
   ["Renewal Date", (r) => r.renewal_date ?? r.ultimate_xdate],
   ["Ultimate X-Date", (r) => r.ultimate_xdate],

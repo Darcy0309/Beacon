@@ -44,7 +44,7 @@ export const getExploreOptions = cache(async function getExploreOptions() {
     industries: await sicLabelled(supabase, data?.industries ?? [], "value"),
     states: data?.states ?? [],
     counties: data?.counties ?? [],
-    statuses: data?.statuses ?? [],
+    results: data?.results ?? [],
     clients: data?.clients ?? [],
     // The agency groups clients are in (insurance companies), each with how many clients.
     groups: data?.groups ?? [],
@@ -76,12 +76,13 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
       rep: r.rep_name || "Unassigned",
       client: r.client_name || "—",
       group: r.agency_group || null,
+      result: r.result_name ? { id: r.result_id, name: r.result_name, viable: r.result_viable } : null,
     })),
     byClient: data?.by_client ?? [],
     byState: data?.by_state ?? [],
     byMonth: data?.by_month ?? [],
     byIndustry,
-    byStatus: data?.by_status ?? [],
+    byResult: data?.by_result ?? [],
     clientsTouched: data?.clients_touched ?? 0,
     withXdate: data?.with_xdate ?? 0,
   };
