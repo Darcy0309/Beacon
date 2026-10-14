@@ -42,3 +42,23 @@ export function autosLine(l) {
 
 /** "10%", or null. */
 export const subcontractorsLine = (l) => (has(l.subcontractors_pct) ? `${Number(l.subcontractors_pct)}%` : null);
+
+/** A name for the cargo list: trimmed, spaces run together, at most 100 characters; null for none. */
+export const cargoName = (v) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, 100) || null;
+
+/**
+ * The cargo names in a file loaded onto the list: one a line, or the first
+ * column of a CSV (a "Cargo" heading is skipped). Quotes come off.
+ */
+export function cargoNamesFromText(text) {
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .map((line) => {
+      const m = /^\s*"((?:[^"]|"")*)"|^([^,]*)/.exec(line);
+      return cargoName((m?.[1] ?? m?.[2] ?? "").replace(/""/g, '"'));
+    })
+    .filter((v, i) => v && !(i === 0 && /^cargo( types?| name)?$/i.test(v)));
+}
+
+/** "Yes", "No", or null for not known: claims in the last three years. */
+export const yesNo = (v) => (v === true ? "Yes" : v === false ? "No" : null);

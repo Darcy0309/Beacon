@@ -34,6 +34,8 @@ sql(`insert into public.calendar_blocks (project_id, starts_on, ends_on, start_t
 const dir = mkdtempSync(path.join(tmpdir(), "lead-files-"));
 const pdf = path.join(dir, "policy.pdf");
 writeFileSync(pdf, "%PDF-1.4\n% a policy\n");
+const cargoFile = path.join(dir, "cargo.csv");
+writeFileSync(cargoFile, `Cargo\n${TAG} Lumber\n"${TAG} Steel, coiled"\n\n${TAG} lumber\n`);
 
 const browser = await launchBrowser();
 const cookie = cookieHeader(await sessionCookies("sean@beacon.test"));
@@ -59,7 +61,24 @@ try {
   const cardText = await sean.ev(`document.querySelector('[data-contact-card]').innerText`);
   check("where the name stands is its call result, not an old status", /Lead-No Contact/i.test(cardText) && !/X-date|Phone appointment|^New$/im.test(cardText), cardText);
 
+  section("The cargo list, in Settings");
+  const adminPage = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1400, height: 1000 });
+  await adminPage.go("/settings", 5000);
+  await until(() => adminPage.ev(`!!document.querySelector('[data-cargo-import]')`));
+  const doc = await adminPage.send("DOM.getDocument");
+  const input = await adminPage.send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "[data-cargo-import]" });
+  await adminPage.send("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [cargoFile] });
+  check("an administrator loads a list from a file: one a line, the heading and a repeat left out",
+    Boolean(await until(() => sql(`select string_agg(name, '|' order by name) from public.cargo_types where name like ${lit(`${TAG}%`)}`) === `${TAG} Lumber|${TAG} Steel, coiled`)),
+    sql(`select string_agg(name, '|' order by name) from public.cargo_types where name like ${lit(`${TAG}%`)}`));
+  await adminPage.fill('[data-cargo-add] input', `${TAG} Livestock`);
+  await adminPage.click("[data-cargo-add] button[type=submit]");
+  check("…or adds one by name", Boolean(await until(() => adminPage.ev(`!!document.querySelector('[data-cargo-type=${JSON.stringify(`${TAG} Livestock`)}]')`))));
+  await adminPage.click(`[data-cargo-type=${JSON.stringify(`${TAG} Livestock`)}] button`);
+  check("…and takes one off", Boolean(await until(() => sql(`select count(*) from public.cargo_types where name = ${lit(`${TAG} Livestock`)}`) === "0")));
+
   section("The Business tab");
+  await sean.go(`/leads/${lead}`, 5000);
   await sean.click("[data-edit-business]");
   await until(() => sean.ev(`!!document.querySelector('[data-business-form] select[name="location_ownership"]')`));
   await sean.fill('[data-business-form] input[name="location"]', "2");
@@ -73,10 +92,18 @@ try {
   await sean.fill('[data-business-form] input[name="autos"]', "11");
   await sean.ev(`document.querySelectorAll('[data-business-form] input[name="auto_types"][value="vans"], [data-business-form] input[name="auto_types"][value="delivery_trucks"]').forEach((c) => c.click())`);
   await sean.fill('[data-business-form] select[name="travel_radius"]', "100");
+  const cargoChoices = await sean.ev(`[...document.querySelectorAll('[data-business-form] select[name="cargo"] option')].map((o) => o.value)`);
+  check("Cargo picks from the cargo list", cargoChoices.includes(`${TAG} Lumber`) && cargoChoices.includes(`${TAG} Steel, coiled`) && !cargoChoices.includes(`${TAG} Livestock`), JSON.stringify(cargoChoices));
+  await sean.fill('[data-business-form] select[name="cargo"]', `${TAG} Steel, coiled`);
+  await sean.fill('[data-business-form] input[name="dot_number"]', "DOT 1234567");
+  await sean.fill('[data-business-form] input[name="annual_payroll"]', "$1.2M");
+  await sean.fill('[data-business-form] select[name="claims_3yrs"]', "yes");
   check("the SIC code says what it means, from the SIC list", Boolean(await until(() => sean.ev(`(document.querySelector('[data-sic-meaning]')?.textContent ?? '').length > 3`))));
   await sean.click("[data-business-form] button[type=submit]");
   check("its details are saved", Boolean(await until(() => sql(`select location_ownership || '|' || building_acres || '|' || employees_full_time || '|' || array_to_string(auto_types, ',') || '|' || travel_radius from public.leads where id = ${lead}`)
     === "lease|1.50|15|vans,delivery_trucks|100")));
+  check("…with the DOT# (its digits), cargo, annual payroll and claims", sql(`select dot_number || '|' || cargo || '|' || annual_payroll || '|' || claims_3yrs from public.leads where id = ${lead}`)
+    === `1234567|${TAG} Steel, coiled|$1.2M|true`);
   const rows = await until(async () => {
     const r = await sean.ev(`Object.fromEntries([...document.querySelectorAll('[data-tab-panel="business"] .grid')].map((x) => [x.children[0]?.innerText.trim(), x.children[1]?.innerText.trim()]))`);
     return /Lease/.test(r?.Locations ?? "") ? r : null;
@@ -84,13 +111,15 @@ try {
   check("…and read as one line each", rows?.Locations === "2 · Lease · 15 years old, 2 stories, 1.5 acres" && rows.Employees === "20 (15 full-time, 5 part-time)"
     && rows["Sub-contractors"] === "10%" && rows.Autos === "11 · Vans, Delivery trucks · within 100 miles", JSON.stringify(rows));
   check("…with no county (it is on Prospect Info)", rows && !("County" in rows));
+  check("…and the new ones in their places", rows?.["DOT#"] === "1234567" && rows.Cargo === `${TAG} Steel, coiled` && rows["Annual payroll"] === "$1.2M" && rows["Claims last 3 yrs"] === "Yes"
+    && Object.keys(rows).join(",").includes("Autos,DOT#,Cargo,Sales volume,Annual payroll") && Object.keys(rows).join(",").includes("Est. annual premium,Claims last 3 yrs"), JSON.stringify(Object.keys(rows ?? {})));
   await shot("lead-page");
 
   section("Print");
   const printed = await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie } });
   const html = await printed.text();
   check("Print gives the lead sheet the client gets, and opens the print dialog", printed.status === 200 && /Lead sheet/i.test(html) && html.includes(`${TAG} Medford Knife and Tool`)
-    && html.includes("print()") && html.includes("20 (15 full-time, 5 part-time)"), `${printed.status} ${html.slice(0, 120)}`);
+    && html.includes("print()") && html.includes("20 (15 full-time, 5 part-time)") && html.includes("1234567") && html.includes("Claims last 3 yrs"), `${printed.status} ${html.slice(0, 120)}`);
   check("…not to someone signed out", (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { redirect: "manual" })).status !== 200);
 
   section("Policy Files");
@@ -155,6 +184,7 @@ try {
   sql(`delete from public.leads where id = ${lead}`);
   sql(`delete from public.projects where id = ${APPT}`);
   sql(`delete from public.companies where id = ${company}`);
+  sql(`delete from public.cargo_types where name ilike ${lit(`${TAG}%`)}`);
 }
 
 finish("lead page");

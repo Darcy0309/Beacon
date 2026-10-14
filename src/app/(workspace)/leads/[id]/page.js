@@ -35,7 +35,8 @@ import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day
 import { addMonths, daysBetween, monthGrid, monthStart, todayIn } from "@/lib/dates";
 import { apptWhen, fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { autosLine, employeesLine, locationsLine, subcontractorsLine } from "@/lib/business";
+import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
+import { getCargoTypes } from "@/features/cargo/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -182,7 +183,7 @@ export default async function LeadSheet({ params, searchParams }) {
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files] = await Promise.all([
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes] = await Promise.all([
     listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
@@ -190,6 +191,8 @@ export default async function LeadSheet({ params, searchParams }) {
     staff ? getCarrierNames() : [],
     seesInternal ? getAssignableStaff() : [],
     listLeadFiles(await createClient(), lead.id),
+    // The cargo list, for the Business tab's Cargo field.
+    staff ? getCargoTypes() : [],
   ]);
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
@@ -413,7 +416,7 @@ export default async function LeadSheet({ params, searchParams }) {
                     <div>
                       {staff ? (
                         <div className="flex justify-end border-b border-[var(--panel-border)] px-4 py-2">
-                          <BusinessForm lead={r} trigger={<Button size="sm" variant="outline" data-edit-business><Pencil /> Edit</Button>} />
+                          <BusinessForm lead={r} cargoTypes={cargoTypes} trigger={<Button size="sm" variant="outline" data-edit-business><Pencil /> Edit</Button>} />
                         </div>
                       ) : null}
                       <Rows
@@ -424,10 +427,14 @@ export default async function LeadSheet({ params, searchParams }) {
                           ["Employees", employeesLine(r)],
                           ["Sub-contractors", subcontractorsLine(r)],
                           ["Autos", autosLine(r)],
+                          ["DOT#", r.dot_number ? <span className="tabular-nums">{r.dot_number}</span> : null],
+                          ["Cargo", r.cargo],
                           ["Sales volume", r.sales_volume],
+                          ["Annual payroll", r.annual_payroll],
                           ["EIN", r.ein ? <span className="tabular-nums">{r.ein}</span> : null],
                           ["Years in business", r.years_in_business],
                           ["Est. annual premium", r.estimated_annual_premium],
+                          ["Claims last 3 yrs", yesNo(r.claims_3yrs)],
                           ["Professionals", r.professionals],
                           ["Covered employees", r.covered_employees],
                           ["SIC code", sicLabel(r.sic_code, r.sic_description)],

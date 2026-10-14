@@ -29,12 +29,14 @@ async function loadSic() {
  * Edit what a business is (the Business tab; Sean, Oct 2026): its name and
  * phone; its locations and the building (owned or leased, its age, stories
  * and acres); employees, full-time and part-time; sub-contractors as a %;
- * autos, their kinds and how far they travel; sales volume, EIN, years in
- * business, estimated premium, professionals, covered employees; and its
- * SIC code, with what the code means from the SIC list. Only these fields
- * are sent, so nothing else on the lead changes.
+ * autos, their kinds, how far they travel, DOT number and cargo (from the
+ * cargo list, `cargoTypes`); sales volume and annual payroll, EIN, years in
+ * business, estimated premium and claims in the last three years,
+ * professionals, covered employees; and its SIC code, with what the code
+ * means from the SIC list. Only these fields are sent, so nothing else on
+ * the lead changes.
  */
-export default function BusinessForm({ lead, trigger }) {
+export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(updateLead, EMPTY);
@@ -54,6 +56,10 @@ export default function BusinessForm({ lead, trigger }) {
   const errors = state?.fieldErrors ? Object.keys(state.fieldErrors).length : 0;
   const meaning = sic.find((s) => s.code === code.trim())?.description ?? (code.trim() && sic.length ? "Not on the SIC list" : null);
   const types = new Set(state?.values ? [] : lead.auto_types ?? []);
+  // The cargo list, and the lead's own cargo should it have come off the list since.
+  const cargo = dv("cargo", "") ?? "";
+  const cargoOptions = cargo && !cargoTypes.some((t) => t.name === cargo) ? [{ id: "kept", name: cargo }, ...cargoTypes] : cargoTypes;
+  const claims = state?.values ? state.values.claims_3yrs ?? "" : { true: "yes", false: "no" }[String(lead.claims_3yrs)] ?? "";
   const num = (name, label, props = {}) => (
     <Field key={name} label={label} error={fe(name)} hint={props.hint}>
       <Input name={name} inputMode={props.decimal ? "decimal" : "numeric"} defaultValue={dv(name)} maxLength={props.max ?? 9} aria-invalid={invalid(name)} />
@@ -117,6 +123,15 @@ export default function BusinessForm({ lead, trigger }) {
                   {TRAVEL_RADII.map((r) => <option key={r} value={r}>{r} miles</option>)}
                 </Select>
               </Field>
+              <Field label="DOT#" error={fe("dot_number")}>
+                <Input name="dot_number" inputMode="numeric" defaultValue={dv("dot_number")} maxLength={14} aria-invalid={invalid("dot_number")} />
+              </Field>
+              <Field label="Cargo" error={fe("cargo")} hint={cargoTypes.length ? null : "An administrator loads the cargo list in Settings"}>
+                <Select name="cargo" defaultValue={cargo} aria-invalid={invalid("cargo")}>
+                  <option value="">—</option>
+                  {cargoOptions.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
+                </Select>
+              </Field>
               <div className="sm:col-span-2" role="group" aria-label="Kinds of vehicles">
                 <div className="mb-1.5 text-xs font-medium">Kinds of vehicles</div>
                 {/* Sent even when none is ticked, so taking every one off clears them. */}
@@ -135,12 +150,22 @@ export default function BusinessForm({ lead, trigger }) {
             <Field label="Sales volume" error={fe("sales_volume")} hint="e.g. $12.4M">
               <Input name="sales_volume" defaultValue={dv("sales_volume")} maxLength={30} aria-invalid={invalid("sales_volume")} />
             </Field>
+            <Field label="Annual payroll" error={fe("annual_payroll")} hint="e.g. $1.2M">
+              <Input name="annual_payroll" defaultValue={dv("annual_payroll")} maxLength={30} aria-invalid={invalid("annual_payroll")} />
+            </Field>
             <Field label="EIN" error={fe("ein")} hint="Federal employer ID, 9 digits">
               <Input name="ein" inputMode="numeric" placeholder="12-3456789" defaultValue={dv("ein")} maxLength={12} aria-invalid={invalid("ein")} />
             </Field>
             {num("years_in_business", "Years in business", { max: 3 })}
             <Field label="Est. annual premium" error={fe("estimated_annual_premium")}>
               <Input name="estimated_annual_premium" defaultValue={dv("estimated_annual_premium")} maxLength={30} aria-invalid={invalid("estimated_annual_premium")} />
+            </Field>
+            <Field label="Claims last 3 yrs" error={fe("claims_3yrs")}>
+              <Select name="claims_3yrs" defaultValue={claims} aria-invalid={invalid("claims_3yrs")}>
+                <option value="">—</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </Select>
             </Field>
             {num("professionals", "Professionals")}
             {num("covered_employees", "Covered employees")}

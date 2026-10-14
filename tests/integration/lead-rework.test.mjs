@@ -51,6 +51,23 @@ try {
     ["a radius not on the list", { travel_radius: "75" }], ["a building neither owned nor leased", { location_ownership: "rent" }]]) {
     check(`${what} is refused`, Boolean((await sean.sb.from("leads").update(change).eq("id", L)).error));
   }
+  const more = await sean.sb.from("leads").update({ annual_payroll: "$1.2M", dot_number: "1234567", cargo: `${TAG} Lumber`, claims_3yrs: false })
+    .eq("id", L).select("annual_payroll, dot_number, cargo, claims_3yrs").single();
+  check("annual payroll, DOT#, cargo and claims in the last 3 years are saved", !more.error && more.data.annual_payroll === "$1.2M"
+    && more.data.dot_number === "1234567" && more.data.cargo === `${TAG} Lumber` && more.data.claims_3yrs === false, more.error?.message);
+  check("a DOT# that is not digits is refused", Boolean((await sean.sb.from("leads").update({ dot_number: "12-AB" }).eq("id", L)).error));
+
+  section("The cargo list");
+  const added = await admin.sb.from("cargo_types").insert([{ name: `${TAG} Lumber` }, { name: `${TAG} Steel` }]).select("id, name");
+  check("an administrator adds to it", !added.error && added.data.length === 2, added.error?.message);
+  check("…a name once, whatever its case", Boolean((await admin.sb.from("cargo_types").insert({ name: `${TAG} lumber`.toUpperCase() }).select()).error));
+  const read = async (who) => ((await who.sb.from("cargo_types").select("name").like("name", `${TAG}%`)).data ?? []).length;
+  check("managers, agents and clients can read it, to pick from", (await read(sean)) === 2 && (await read(agent)) === 2 && (await read(client)) === 2);
+  await sean.sb.from("cargo_types").insert({ name: `${TAG} Sand` });
+  await sean.sb.from("cargo_types").delete().eq("id", added.data[0].id);
+  check("…but only an administrator changes it", sql(`select count(*) from public.cargo_types where name like ${lit(`${TAG}%`)}`) === "2");
+  check("taking a name off the list leaves the lead's cargo as it is",
+    !(await admin.sb.from("cargo_types").delete().eq("id", added.data[0].id)).error && sql(`select cargo from public.leads where id = ${L}`) === `${TAG} Lumber`);
 
   section("Sending a lead to someone to call");
   const H = lead("Hot Lead Co", APPT, sean.me.id);
@@ -132,6 +149,7 @@ try {
   sql(`delete from public.leads where company_name like ${lit(`${TAG}%`)}`);
   sql(`delete from public.projects where name like ${lit(`${TAG}%`)}`);
   sql(`delete from public.companies where id in (${company}, ${other})`);
+  sql(`delete from public.cargo_types where name ilike ${lit(`${TAG}%`)}`);
 }
 
 finish("lead rework");

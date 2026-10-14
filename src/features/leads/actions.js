@@ -67,6 +67,12 @@ function leadPayload(formData) {
     subcontractors_pct: n(formData, "subcontractors_pct"),
     auto_types: autoTypes(formData),
     travel_radius: s(formData, "travel_radius"),
+    annual_payroll: s(formData, "annual_payroll"),
+    // "DOT# 1234567" or "1,234,567": the digits.
+    dot_number: s(formData, "dot_number")?.replace(/\D/g, "") || null,
+    cargo: s(formData, "cargo"),
+    // Yes or no; blank for not known.
+    claims_3yrs: { yes: true, no: false }[s(formData, "claims_3yrs")] ?? null,
     client_note: s(formData, "client_note"),
     status_id: n(formData, "status_id"),
     project_id: n(formData, "project_id"),

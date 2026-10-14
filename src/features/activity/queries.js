@@ -56,6 +56,8 @@ const ACTION_LABEL = {
   "record.restore": "Restored a deleted record",
   "sign_out.idle": "Signed out after 30 minutes idle",
   "sic.import": "Loaded SIC codes",
+  "cargo.add": "Added cargo types",
+  "cargo.remove": "Took a cargo type off the list",
   "project.rates": "Set a project's pay rates",
   "project.rep_add": "Added a rep to a project",
   "project.rep_remove": "Took a rep off a project",

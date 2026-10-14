@@ -10,7 +10,7 @@ const leadSelect = ({ status = false } = {}) => `
   address, city, state, zip, county, sic_code, description, list_source,
   location, employees, covered_employees, autos, sales_volume, ein, years_in_business, professionals,
   location_ownership, building_age, building_stories, building_acres, employees_full_time, employees_part_time,
-  subcontractors_pct, auto_types, travel_radius,
+  subcontractors_pct, auto_types, travel_radius, annual_payroll, dot_number, cargo, claims_3yrs,
   estimated_annual_premium, client_note, lead_date, import_date,
   date_last_worked, created_at, decision_maker, dm_title, fax,
   contact_mobile, dm_phone, dm_mobile, dm_email,
