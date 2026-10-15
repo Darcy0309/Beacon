@@ -12,7 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { sendLeadEmail } from "@/features/email/actions";
-import { EMAIL_LIMITS } from "@/lib/email";
+import { EMAIL_LIMITS, emailDraft } from "@/lib/email";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -33,7 +33,7 @@ const NOT_READY = {
  * `compact`: a round icon button, for beside an address on the sheet;
  * `primary`: the contact's own, the sheet's main Email button.
  */
-export default function EmailLead({ leadId, company, to, contact, sender, admin, compact = false, primary = false }) {
+export default function EmailLead({ leadId, company, to, contact, sender, admin, signature = "", compact = false, primary = false }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(sendLeadEmail, EMPTY);
@@ -43,10 +43,11 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin,
   const [length, setLength] = useState(null);
 
   const live = state === seen ? { ...EMPTY, values: state.ok ? null : state.values } : state;
-  const { fe, invalid, dv } = formHelpers(live, { to: to ?? "", subject: "", body: "" });
+  const first = String(contact ?? "").trim().split(/\s+/)[0];
+  // Begun for them: the greeting, and their signature for the client they call for (Sean, Oct 2026).
+  const { fe, invalid, dv } = formHelpers(live, { to: to ?? "", subject: "", body: emailDraft(first, signature) });
   const problem = live.error && !live.fieldErrors ? live.error : null;
   const count = length ?? String(dv("body")).length;
-  const first = String(contact ?? "").trim().split(/\s+/)[0];
 
   useEffect(() => {
     setLength(null);

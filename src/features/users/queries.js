@@ -87,11 +87,14 @@ export async function getAccountManagers() {
   ]);
   if (error) throw error;
 
+  // What each holds (Sean, Oct 2026): leads, and apart from them the DB dev names still to call.
   const leadCount = {};
   const apptCount = {};
+  const namesLeft = {};
   for (const w of workload ?? []) {
-    leadCount[w.user_id] = Number(w.lead_count) || 0;
+    leadCount[w.user_id] = Number(w.leads_held) || 0;
     apptCount[w.user_id] = Number(w.appt_count) || 0;
+    namesLeft[w.user_id] = Number(w.names_left) || 0;
   }
 
   return (data ?? []).map((m) => {
@@ -107,6 +110,7 @@ export async function getAccountManagers() {
       clients: new Set(projects.map((p) => p.company_id).filter(Boolean)).size,
       appts: apptCount[m.id] || 0,
       leads: leadCount[m.id] || 0,
+      names: namesLeft[m.id] || 0,
     };
   });
 }

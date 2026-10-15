@@ -79,3 +79,22 @@ export function resendFailure(status, body) {
   const code = status === 401 || (status === 403 && /api key/i.test(reason)) ? "EAUTH" : status >= 500 ? "ECONNECTION" : "EMESSAGE";
   return Object.assign(new Error(reason), { code, response: reason });
 }
+
+/**
+ * How a manager signs an email to a prospect (Sean, Oct 2026): their name,
+ * the client they are calling for, and their work phone with its
+ * extension. Lines with nothing in them are left out.
+ *
+ *   Regards,
+ *   Kristy Wilkes
+ *   Capital Insurance Services – InsurancePros
+ *   (602) 555-0100 ext. 203
+ */
+export function emailSignature({ name, client, phone, ext }) {
+  const tel = [String(phone ?? "").trim() || null, String(ext ?? "").trim() ? `ext. ${String(ext).trim()}` : null].filter(Boolean).join(" ");
+  const lines = [String(name ?? "").trim(), String(client ?? "").trim(), tel].filter(Boolean);
+  return lines.length ? ["Regards,", ...lines].join("\n") : "";
+}
+
+/** A new email's message to begin with: the greeting, room to write, and the signature. */
+export const emailDraft = (first, signature) => `${first ? `Hi ${first},` : "Hi,"}\n\n\n${signature ? `\n${signature}` : ""}`;

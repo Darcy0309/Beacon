@@ -162,8 +162,29 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
             <Field label="Username" error={fe("username")} hint="3–25 letters, numbers, . _ -">
               <Input name="username" defaultValue={dv("username")} maxLength={25} autoCapitalize="off" aria-invalid={invalid("username")} />
             </Field>
-            <Field label="Phone" error={fe("phone")}>
+            <Field label="Work phone" error={fe("phone")} hint="With the extension below, it signs their lead emails">
               <Input name="phone" type="tel" inputMode="tel" placeholder="(602) 555-0100" defaultValue={dv("phone")} aria-invalid={invalid("phone")} />
+            </Field>
+            <Field label="Extension" error={fe("phone_ext")}>
+              <Input name="phone_ext" inputMode="numeric" maxLength={8} placeholder="203" defaultValue={dv("phone_ext")} aria-invalid={invalid("phone_ext")} />
+            </Field>
+            <Field label="Mobile" error={fe("mobile")}>
+              <Input name="mobile" type="tel" inputMode="tel" placeholder="(480) 555-0144" defaultValue={dv("mobile")} aria-invalid={invalid("mobile")} />
+            </Field>
+            <Field label="State" error={fe("state")} hint="Where they work, e.g. AZ">
+              <Input name="state" maxLength={20} placeholder="AZ" defaultValue={dv("state")} aria-invalid={invalid("state")} />
+            </Field>
+            <Field label="Time zone" error={fe("timezone_id")}>
+              <Select name="timezone_id" defaultValue={String(dv("timezone_id", "") ?? "")} aria-invalid={invalid("timezone_id")}>
+                <option value="">—</option>
+                {(options?.timezones ?? []).map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Date of birth" error={fe("birth_date")} hint="A birthday note goes to the team that day">
+              <Input name="birth_date" type="date" defaultValue={dv("birth_date")} aria-invalid={invalid("birth_date")} />
+            </Field>
+            <Field label="Started" error={fe("start_date")} hint="Their hire date: a work anniversary note goes to the team each year">
+              <Input name="start_date" type="date" defaultValue={dv("start_date")} aria-invalid={invalid("start_date")} />
             </Field>
 
             <Field

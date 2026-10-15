@@ -150,7 +150,8 @@ try {
   section("An address the mail server refuses");
   mail.refuse = /^nobody@/;
   d = await openEmail(sean);
-  check("the next email starts fresh", d?.to === DANA && d?.subject === "" && d?.body === "" && !d?.alerts, JSON.stringify(d));
+  // Fresh: begun again with the greeting and the sender's signature, not the last one's message.
+  check("the next email starts fresh", d?.to === DANA && d?.subject === "" && /^Hi \S+,\n/.test(d?.body ?? "") && /Regards,\nSean Fitzgerald/.test(d?.body ?? "") && !d?.alerts, JSON.stringify(d));
   await write(sean, { to: "nobody@capitalins.test", subject: "Quote", body: "Hi," });
   await send(sean);
   d = await until(() => dialog(sean).then((x) => x?.alerts && x));

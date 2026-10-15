@@ -121,6 +121,28 @@ const toProduction = (r) => ({
  * production with their goals.
  * `ranges`: { leads, appts }, each { from, to } (lib/pay tileRange()).
  */
+// A figure over a range from production_report() rows: its total, and a day-by-day series up to today for the sparkline.
+function tallyOf(rows, key, range, today) {
+  const byDay = new Map();
+  for (const r of rows ?? []) byDay.set(r.day, (byDay.get(r.day) ?? 0) + Number(r[key] ?? 0));
+  const days = daysOf(range.from, range.to < today ? range.to : today);
+  return { total: [...byDay.values()].reduce((a, b) => a + b, 0), series: days.map((d) => byDay.get(d) ?? 0) };
+}
+
+/**
+ * The administrator's top tiles (Sean, Oct 2026): the leads and the
+ * appointments the managers developed over each tile's range ({ from, to }),
+ * as the production report counts them: not names or leads imported. Each
+ * { total, series }.
+ */
+export async function getTeamTiles({ today, ranges }) {
+  const supabase = await createClient();
+  const report = (r) => supabase.rpc("production_report", { p_from: r.from, p_to: r.to, p_project_id: null, p_user_id: null });
+  const [leads, appts] = await Promise.all([report(ranges.leads), report(ranges.appts)]);
+  for (const r of [leads, appts]) if (r.error) throw r.error;
+  return { leads: tallyOf(leads.data, "leads", ranges.leads, today), appts: tallyOf(appts.data, "appointments", ranges.appts, today) };
+}
+
 export async function getManagerDashboard({ userId, today, ranges }) {
   const supabase = await createClient();
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
@@ -136,12 +158,7 @@ export async function getManagerDashboard({ userId, today, ranges }) {
   ]);
   for (const r of [leads, appts, calls, assigned, day]) if (r.error) throw r.error;
 
-  const tally = (rows, key, range) => {
-    const byDay = new Map();
-    for (const r of rows ?? []) byDay.set(r.day, (byDay.get(r.day) ?? 0) + Number(r[key] ?? 0));
-    const days = daysOf(range.from, range.to < today ? range.to : today);
-    return { total: [...byDay.values()].reduce((a, b) => a + b, 0), series: days.map((d) => byDay.get(d) ?? 0) };
-  };
+  const tally = (rows, key, range) => tallyOf(rows, key, range, today);
 
   // Active projects, once each, by kind: Lead (database development) or Appointment.
   const active = new Map();
@@ -301,21 +318,23 @@ export async function getDeveloped({ userId = null, from, to, timeZone, kinds = 
  * appointments they set, still to come, wait for confirmation. `owner`:
  * false when an administrator is looking at someone else's.
  */
-export async function getMySchedule({ userId, from, to, today, timeZone, owner = true }) {
+export async function getMySchedule({ userId, from, to, today, timeZone, owner = true, everyone = false }) {
   const supabase = await createClient();
   const [lo, hi] = around({ from, to });
+  // `everyone`: an administrator's calendar, every manager's appointments with who set each (Sean, Oct 2026).
+  const theirs = (q) => (everyone ? q : q.eq("user_id", userId));
   const [appts, reminders, messages, awaiting] = await Promise.all([
-    supabase
+    theirs(supabase
       .from("appointments")
       .select(`id, appt_date, appt_time, duration_min, confirmed_at, qa_status,
         status:appointment_statuses(name),
+        setter:users!appointments_user_id_fkey(first_name, last_name),
         lead:leads(id, company_name, contact_name, status:lead_statuses(code, name),
-          project:projects!leads_project_id_fkey(name, company:companies(name)))`)
-      .eq("user_id", userId)
+          project:projects!leads_project_id_fkey(name, company:companies(name)))`))
       .is("invalid_at", null)
       .gte("appt_date", from)
       .lte("appt_date", to)
-      .limit(1000),
+      .limit(2000),
     supabase
       .from("reminders")
       // With the name's last call result: why the call back (a viable name, an X-date to follow up…).
@@ -336,10 +355,9 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       .order("created_at", { ascending: false })
       .limit(500),
     // Every one still to come that has not been confirmed, whatever month is on show.
-    supabase
+    theirs(supabase
       .from("appointments")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
+      .select("id", { count: "exact", head: true }))
       .is("invalid_at", null)
       .is("confirmed_at", null)
       .gte("appt_date", today),
@@ -356,7 +374,8 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       key: `a${a.id}`, kind: "appointment", id: a.id, day: a.appt_date,
       time: [time, ampm].filter(Boolean).join(" "), clock: a.appt_time, minutes: timeRank(a.appt_time),
       title: lead?.company_name ?? "Appointment",
-      detail: [one(lead?.status)?.name ?? "Appointment", lead?.contact_name, one(one(lead?.project)?.company)?.name].filter(Boolean).join(" · "),
+      detail: [one(lead?.status)?.name ?? "Appointment", lead?.contact_name, one(one(lead?.project)?.company)?.name,
+        everyone && one(a.setter) ? `Set by ${[one(a.setter).first_name, one(a.setter).last_name].filter(Boolean).join(" ")}` : null].filter(Boolean).join(" · "),
       // Confirmed, or still waiting for the confirmation call; QA first if it has not passed.
       badge: a.confirmed_at ? "Confirmed" : a.qa_status === "pending" ? "Pending QA" : waiting ? "Awaiting confirmation" : status,
       tone: a.confirmed_at ? "ok" : waiting ? "warn" : "muted",

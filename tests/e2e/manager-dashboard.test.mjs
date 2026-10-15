@@ -77,7 +77,8 @@ try {
   await admin.go("/", 4000);
   const row = await admin.ev(`document.querySelector('[data-production-row="${SEAN}"]')?.innerText.replace(/\\s+/g, ' ') ?? null`);
   check("Daily Production lists each manager: started, calls, leads and appointments against goal, hours", Boolean(row) && /Sean/.test(row) && /\/ 4/.test(row) && /\/ 2/.test(row), row);
-  check("…the admin's own tiles are unchanged", /Total Leads/i.test(await admin.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent).join(' ')`)));
+  // The administrator's own: what the managers developed (Sean, Oct 2026), not a manager's.
+  check("…the admin's own tiles are the team's", /^Leads Appointments/i.test(await admin.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent).join(' ')`)));
   check("…and the manager's tiles are as tall as theirs", seanHeight === (await tileHeight(admin)), `${seanHeight} vs ${await tileHeight(admin)}`);
 
   section("Creating an account with a temporary password");

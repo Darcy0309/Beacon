@@ -14,6 +14,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
 import { listUsers, getUserStats, USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
+import { getTimeZones } from "@/features/clients/queries";
 import { getPayProfiles, getPayRules } from "@/features/pay/queries";
 import { usd } from "@/lib/pay";
 import { readListParams, pageInfo } from "@/lib/paging";
@@ -29,9 +30,11 @@ const statusTone = { Active: "emerald", Invited: "amber", Disabled: "slate" };
 
 export default async function UsersPage({ searchParams }) {
   const params = readListParams(await searchParams, ["role", "status", "mfa"]);
-  const [{ rows, total }, users, options, payProfiles, payRules, me] = await Promise.all([
-    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(), getCurrentUser(),
+  const [{ rows, total }, users, lookups, payProfiles, payRules, me, timezones] = await Promise.all([
+    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(), getCurrentUser(), getTimeZones(),
   ]);
+  // The time zones a person can be in, as clients have them.
+  const options = { ...lookups, timezones };
   const hourly = payRules.rates.hourly;
 
   // Tiles describe every account; the table shows one page of them.

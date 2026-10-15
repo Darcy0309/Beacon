@@ -20,7 +20,7 @@ import LeadVolumeChart from "@/features/dashboard/components/lead-volume-chart";
 import ProductionChart from "@/features/dashboard/components/production-chart";
 import { chartRange } from "@/lib/production-chart";
 import {
-  getDashboardStats, getDeveloped, getLeadVolume, getManagerDashboard, getManagerUser, getMySchedule, getProduction, getProductionChart,
+  getDashboardStats, getDeveloped, getTeamTiles, getLeadVolume, getManagerDashboard, getManagerUser, getMySchedule, getProduction, getProductionChart,
   getProductionChartOptions, getProductionGoals, getReports, getTeamProduction,
 } from "@/features/dashboard/queries";
 import DailyProductionCard from "@/features/dashboard/components/daily-production";
@@ -34,7 +34,7 @@ import ViewNav from "@/features/dashboard/components/view-nav";
 import { otherParams, readView } from "@/features/dashboard/views";
 import { getPayRules } from "@/features/pay/queries";
 import { addDays, daysBetween, formatIso, formatRange, isIsoDate, monthGrid, monthStart } from "@/lib/dates";
-import { hoursLabel, TILE_PERIODS, tileRange, VIEW_PERIODS } from "@/lib/pay";
+import { hoursLabel, TILE_PERIODS, tileRange, VIEW_PERIODS, viewRange } from "@/lib/pay";
 import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
@@ -126,9 +126,22 @@ export default async function Dashboard({ searchParams }) {
   }
   // An administrator's view of the team: a day (today to begin with) or a pay period, week or month.
   let production = null;
+  // And the top tiles: what the managers developed over a day, the pay period (to begin with), a week or a month.
+  let team = null;
   if (view.audience === "company") {
     const v = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
-    production = { view: v, rows: await getProduction(v.range) };
+    const tp = { tl: VIEW_KEYS.includes(sp?.tl) ? sp.tl : "period", ta: VIEW_KEYS.includes(sp?.ta) ? sp.ta : "period" };
+    const [rows, tiles] = await Promise.all([
+      getProduction(v.range),
+      getTeamTiles({ today: businessToday, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
+    ]);
+    production = { view: v, rows };
+    // The calendar in place of Today's Schedule, as a manager's dashboard has it: every manager's
+    // appointments, and the administrator's own reminders and messages (Sean, Oct 2026).
+    const cm = typeof sp?.cm === "string" && isIsoDate(`${sp.cm}-01`) ? `${sp.cm}-01` : monthStart(businessToday);
+    const grid = monthGrid(cm);
+    const schedule = await getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true });
+    team = { ...tiles, periods: tp, cm, schedule };
   }
 
   // The administrator's chart of what the team developed: a day (by the hour) to two years, everyone or one manager or project.
@@ -228,12 +241,23 @@ export default async function Dashboard({ searchParams }) {
     ];
   } else {
     tiles = [
+      // An administrator: what the managers developed, over the period chosen on each (not the names imported).
+      ...(team ? [
+        { label: "Leads", value: team.leads.total.toLocaleString(), note: "By managers",
+          icon: Target, accent: "var(--neon-cyan)", series: team.leads.series, bars: true,
+          action: <PeriodSwitch param="tl" current={team.periods.tl} params={otherParams(sp, "tl")} options={VIEW_PERIODS} /> },
+        { label: "Appointments", value: team.appts.total.toLocaleString(), note: "By managers",
+          icon: CalendarCheck, accent: "var(--neon-emerald)", series: team.appts.series, bars: true,
+          action: <PeriodSwitch param="ta" current={team.periods.ta} params={otherParams(sp, "ta")} options={VIEW_PERIODS} /> },
+      ] : []),
+      ...(team ? [] : [
       { label: "Total Leads", value: s.totalLeads.toLocaleString(),
         note: s.leadDelta === null ? `${s.leadsNew.toLocaleString()} new this month` : `${s.leadDelta >= 0 ? "+" : ""}${s.leadDelta}% new vs last month`,
         icon: Target, accent: "var(--neon-cyan)", series: s.series.leads },
       { label: "Appointments / Week", value: String(s.apptsThisWeek),
         note: `${s.apptDelta >= 0 ? "+" : ""}${s.apptDelta} vs last week`,
         icon: CalendarCheck, accent: "var(--neon-emerald)", series: s.series.appts },
+      ]),
       // An agent sees their own workload where a manager sees the client count.
       view.myPerformance
         ? { label: "My Appointments", value: String(mine?.appts ?? 0),
@@ -456,7 +480,10 @@ export default async function Dashboard({ searchParams }) {
                 {...viewControls(sp, recentAll.view, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
             </div>
             <div className="space-y-4">
-              {scheduleCard}
+              {team ? (
+                <MySchedule items={team.schedule.items} awaiting={team.schedule.awaiting} month={team.cm} today={businessToday}
+                  params={otherParams(sp, "cm")} allHref="/appointments" stacked />
+              ) : scheduleCard}
               {sideCards}
             </div>
           </div>

@@ -79,19 +79,36 @@ export async function listProjects(params) {
   return { rows: rows.map(toProjectView), total };
 }
 
-/** Whole-table figures for the projects page tiles: a few columns per row, no embeds to speak of. */
+/**
+ * Whole-table figures for the projects page: each project's type, status
+ * and value, and its leads counted as leads (projects_lead_stats(); Sean,
+ * Oct 2026): an appointment project's own, a DB dev project's those it
+ * developed and sent on, and what each still has to call (names on a DB dev
+ * project, leads on an appointment project). `total`: every lead once.
+ */
 export async function getProjectStats() {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("projects")
-    .select("amount_paid, type:project_types(code), status:project_statuses(name), leads!leads_project_id_fkey(count)");
+  const [{ data, error }, stats] = await Promise.all([
+    supabase.from("projects").select("id, amount_paid, type:project_types(code), status:project_statuses(name)"),
+    supabase.rpc("projects_lead_stats"),
+  ]);
   if (error) throw error;
-  return (data ?? []).map((p) => ({
-    type: one(p.type)?.code ?? "—",
-    status: one(p.status)?.name ?? "—",
-    leads: p.leads?.[0]?.count ?? 0,
-    amount: Number(p.amount_paid ?? 0),
-  }));
+  if (stats.error) throw stats.error;
+  const byId = new Map((stats.data ?? []).filter((r) => r.project_id != null).map((r) => [r.project_id, r]));
+  const all = (stats.data ?? []).find((r) => r.project_id == null);
+  const projects = (data ?? []).map((p) => {
+    const type = one(p.type)?.code ?? "—";
+    const s = byId.get(p.id);
+    return {
+      id: p.id,
+      type,
+      status: one(p.status)?.name ?? "—",
+      leads: Number(s?.leads ?? 0),
+      toCall: Number((type === "DBDV" ? s?.names_left : s?.leads_active) ?? 0),
+      amount: Number(p.amount_paid ?? 0),
+    };
+  });
+  return { projects, total: { leads: Number(all?.leads ?? 0), active: Number(all?.leads_active ?? 0), namesLeft: Number(all?.names_left ?? 0) } };
 }
 
 export async function getProject(id) {

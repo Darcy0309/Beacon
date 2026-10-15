@@ -14,6 +14,7 @@ import { mailFailure } from "@/lib/email";
 import { fullName } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { cross, formValues, schemas } from "@/lib/validate";
+import { normalizeState } from "@/lib/csv";
 
 /**
  * An administrator whose own account is active. The role alone is not
@@ -68,6 +69,13 @@ export async function saveUser(prevState, formData) {
     last_name: s(formData, "last_name"),
     email: s(formData, "email")?.toLowerCase(),
     phone: s(formData, "phone"),
+    phone_ext: s(formData, "phone_ext"),
+    mobile: s(formData, "mobile"),
+    // "az" or "Arizona" kept as "AZ".
+    state: normalizeState(s(formData, "state")),
+    timezone_id: n(formData, "timezone_id"),
+    birth_date: s(formData, "birth_date"),
+    start_date: s(formData, "start_date"),
     role: s(formData, "role") || "agent",
     company_id: n(formData, "company_id"),
     username: s(formData, "username"),

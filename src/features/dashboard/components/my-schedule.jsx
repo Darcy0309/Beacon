@@ -118,7 +118,7 @@ function MoveDialog({ item, onClose, onMoved }) {
  *   items     getMySchedule() for the days the month shows
  *   month     the month on show ("YYYY-MM-01"); `params` the rest of the address
  */
-export default function MySchedule({ items, awaiting, month, today, params }) {
+export default function MySchedule({ items, awaiting, month, today, params, allHref = null, stacked = false }) {
   const router = useRouter();
   const grid = useMemo(() => monthGrid(month), [month]);
   const [selected, setSelected] = useState(sameMonth(today, month) ? today : month);
@@ -191,14 +191,23 @@ export default function MySchedule({ items, awaiting, month, today, params }) {
   return (
     <Card data-my-schedule className="flex flex-col">
       <SectionHeader wrap label="Today's Schedule" icon={CalendarClock}
-        action={awaiting ? (
-          <span className="rounded-full border border-amber-400/45 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-amber-400" data-awaiting>
-            {awaiting} awaiting confirmation
+        action={awaiting || allHref ? (
+          <span className="flex items-center gap-3">
+            {awaiting ? (
+              <span className="rounded-full border border-amber-400/45 px-2 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-amber-400" data-awaiting>
+                {awaiting} awaiting confirmation
+              </span>
+            ) : null}
+            {/* Every appointment, with its filters (an administrator's). */}
+            {allHref ? (
+              <Link href={allHref} className="text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary hover:underline" data-schedule-all>All</Link>
+            ) : null}
           </span>
         ) : null} />
-      <div className="grid flex-1 grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      {/* `stacked`: the month above the day's list, in a narrow column (an administrator's dashboard). */}
+      <div className={cn("grid flex-1 grid-cols-1", !stacked && "sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]")} data-stacked={stacked || undefined}>
         {/* The month */}
-        <div className="relative border-b border-[var(--panel-border)] p-4 sm:border-r sm:border-b-0">
+        <div className={cn("relative border-b border-[var(--panel-border)] p-4", !stacked && "sm:border-r sm:border-b-0")}>
           {dragged ? (
             // While dragging: what is moving, and where it would go.
             <div data-drag-banner role="status"

@@ -306,6 +306,13 @@ export const schemas = {
     last_name: [max(40)],
     email: [required("Email is required"), email, max(120)],
     phone: [phone],
+    // More on each person (Sean, Oct 2026): extension, mobile, state, time zone, birthday, start date.
+    phone_ext: [rules.pattern(/^\d{1,8}$/, "An extension is digits only")],
+    mobile: [phone],
+    state: [rules.custom((v) => (!v || normalizeState(v) ? null : "Enter a US state, e.g. AZ"))],
+    timezone_id: [id],
+    birth_date: [date],
+    start_date: [date],
     role: [required("Choose a role"), oneOf(ROLES, "Choose a valid role")],
     status: [oneOf(USER_STATUSES)],
     username: [username],

@@ -38,6 +38,8 @@ import { cn } from "@/lib/utils";
 import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
 import { getCargoTypes } from "@/features/cargo/queries";
 import { backFrom } from "@/lib/back-link";
+import { emailSignature } from "@/lib/email";
+import { one } from "@/lib/server/query-helpers";
 
 export const dynamic = "force-dynamic";
 
@@ -264,9 +266,11 @@ export default async function LeadSheet({ params, searchParams }) {
       ? new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "2-digit", day: "2-digit", year: "numeric", hour: "numeric", minute: "2-digit" })
           .format(new Date(iso))
       : "—";
+  // Signed as the sender: their name, the client this lead is for, and their work phone and extension.
+  const signature = emailSignature({ name: fullName(me), client: one(r.project?.company)?.name, phone: me?.phone, ext: me?.phone_ext });
   const emailButton = (name, primary = false) =>
     canRecord && sender
-      ? (to) => <EmailLead compact primary={primary} leadId={lead.id} company={lead.co} to={to} contact={name} sender={sender} admin={admin} />
+      ? (to) => <EmailLead compact primary={primary} leadId={lead.id} company={lead.co} to={to} contact={name} sender={sender} admin={admin} signature={signature} />
       : null;
   const address = [r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean);
   const website = r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null;

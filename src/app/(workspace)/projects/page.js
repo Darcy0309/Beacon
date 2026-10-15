@@ -25,22 +25,26 @@ export default async function ProjectsPage({ searchParams }) {
   const params = readListParams(await searchParams, ["status", "type", "client", "group"]);
   // ?group=<insurance company id>: the projects of the clients in that agency group.
   if (params.filters.group && !/^[1-9]\d{0,17}$/.test(params.filters.group)) delete params.filters.group;
-  const [{ rows, total }, projects, lookups, offices, clientGroups] = await Promise.all([listProjects(params), getProjectStats(), getLookups(), getOfficeOptions(), getClientGroups()]);
+  const [{ rows, total }, stats, lookups, offices, clientGroups] = await Promise.all([listProjects(params), getProjectStats(), getLookups(), getOfficeOptions(), getClientGroups()]);
+  const { projects } = stats;
+  const statsOf = new Map(projects.map((p) => [p.id, p]));
   const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
   const options = { ...lookups, ...offices };
 
   // Tiles describe every project; the table shows one page of them.
   const active = projects.filter((p) => p.status === "Active").length;
-  const totalLeads = projects.reduce((s, p) => s + p.leads, 0);
+  // Leads, not every name loaded: each once, whichever projects it passed through.
+  const totalLeads = stats.total.leads;
   const contract = projects.reduce((s, p) => s + Number(p.amount ?? 0), 0);
 
   const tiles = [
     { label: "Active Campaigns", value: String(active), note: `${projects.length} total`,
       icon: FolderKanban, accent: "var(--neon-cyan)", series: projects.map((p) => p.leads), bars: true },
-    { label: "Leads Across Campaigns", value: totalLeads.toLocaleString(), note: "on the book",
+    { label: "Leads Across Campaigns", value: totalLeads.toLocaleString(), note: "in the pipeline",
       icon: Target, accent: "var(--neon-emerald)", series: projects.map((p) => p.leads) },
     { label: "Appointment Setting", value: String(projects.filter((p) => p.type === "APPT").length),
-      note: `${projects.filter((p) => p.type === "DBDV").length} database development`,
+      // As the tile's own heading reads.
+      note: <span className="stat-label" data-dbdev-count>{projects.filter((p) => p.type === "DBDV").length} database development</span>,
       icon: Activity, accent: "var(--neon-violet)", series: projects.map((p) => (p.type === "APPT" ? 1 : 0)), bars: true },
     { label: "Contract Value", value: contract ? `$${Math.round(contract / 1000)}k` : "—", note: "across active work",
       icon: DollarSign, accent: "var(--neon-amber)", series: projects.map((p) => Number(p.amount ?? 0)), bars: true },
@@ -63,7 +67,7 @@ export default async function ProjectsPage({ searchParams }) {
             action={<ProjectForm options={options} trigger={<Button size="sm"><Plus /> New project</Button>} />}
           />
           <FilterTable
-            columns={["Project", "Client", "Type", "Leads", "Status", "Manager", { label: "Action", className: "text-right" }]}
+            columns={["Project", "Client", "Type", "Leads", "To call", "Status", "Manager", { label: "Action", className: "text-right" }]}
             filters={[
               { key: "status", label: "Status", options: options.projectStatuses.map((s) => ({ value: s.name, label: s.name })) },
               { key: "type", label: "Type", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
@@ -93,7 +97,11 @@ export default async function ProjectsPage({ searchParams }) {
                     {p.group ? <span className="block text-xs text-muted-foreground" data-project-group>{p.group}</span> : null}
                   </TableCell>
                   <TableCell><ToneBadge tone={typeTone[p.type] ?? "slate"}>{p.type}</ToneBadge></TableCell>
-                  <TableCell className="font-semibold tabular-nums text-primary">{p.leads}</TableCell>
+                  {/* An appointment project's leads; a DB dev project's, those it developed. */}
+                  <TableCell className="font-semibold tabular-nums text-primary" data-project-leads>{(statsOf.get(p.id)?.leads ?? 0).toLocaleString()}</TableCell>
+                  {/* Still to call: names on a DB dev project, leads on an appointment project. */}
+                  <TableCell className="tabular-nums text-muted-foreground" data-project-to-call
+                    title={p.type === "DBDV" ? "Names still to call" : "Leads still to call for an appointment"}>{(statsOf.get(p.id)?.toCall ?? 0).toLocaleString()}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge></TableCell>
                   <TableCell>{p.manager}</TableCell>
                   <TableCell className="text-right">

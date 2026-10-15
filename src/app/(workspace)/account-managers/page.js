@@ -14,6 +14,7 @@ const ACCENTS = ["var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-amber)",
 export default async function AccountManagersPage() {
   const managers = await getAccountManagers();
   const totalLeads = managers.reduce((s, m) => s + m.leads, 0);
+  const totalNames = managers.reduce((s, m) => s + m.names, 0);
   const totalAppts = managers.reduce((s, m) => s + m.appts, 0);
   const totalClients = managers.reduce((s, m) => s + m.clients, 0);
   const maxLeads = Math.max(1, ...managers.map((m) => m.leads));
@@ -26,7 +27,8 @@ export default async function AccountManagersPage() {
       icon: Building2, accent: "var(--neon-emerald)", series: managers.map((m) => m.clients), bars: true },
     { label: "Appointments Set", value: String(totalAppts), note: "by the team",
       icon: CalendarCheck, accent: "var(--neon-amber)", series: managers.map((m) => m.appts) },
-    { label: "Leads Assigned", value: String(totalLeads), note: "in active work",
+    // Leads they hold, not the names they are dealt to call, which are counted apart.
+    { label: "Leads Assigned", value: totalLeads.toLocaleString(), note: `${totalNames.toLocaleString()} names still to call`,
       icon: Target, accent: "var(--neon-violet)", series: managers.map((m) => m.leads) },
   ];
 
@@ -66,10 +68,11 @@ export default async function AccountManagersPage() {
                         <div className="text-xs text-muted-foreground">{m.region} region</div>
                       </div>
                     </div>
-                    <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[var(--panel-border)] pt-4 text-center">
+                    <div className="mt-4 grid grid-cols-4 gap-2 border-t border-[var(--panel-border)] pt-4 text-center">
                       <div><div className="text-lg font-bold tabular-nums" style={{ color: accent }}>{m.clients}</div><div className="eyebrow mt-0.5">Clients</div></div>
                       <div><div className="text-lg font-bold tabular-nums" style={{ color: accent }}>{m.appts}</div><div className="eyebrow mt-0.5">Appts</div></div>
-                      <div><div className="text-lg font-bold tabular-nums" style={{ color: accent }}>{m.leads}</div><div className="eyebrow mt-0.5">Leads</div></div>
+                      <div data-manager-leads><div className="text-lg font-bold tabular-nums" style={{ color: accent }}>{m.leads.toLocaleString()}</div><div className="eyebrow mt-0.5">Leads</div></div>
+                      <div data-manager-names title="DB dev names still to call"><div className="text-lg font-bold tabular-nums" style={{ color: accent }}>{m.names.toLocaleString()}</div><div className="eyebrow mt-0.5">Names</div></div>
                     </div>
                     <div className="mt-3 space-y-1.5 border-t border-[var(--panel-border)] pt-3">
                       <MetricBar label="Leads" value={m.leads} max={maxLeads} color={accent} />
