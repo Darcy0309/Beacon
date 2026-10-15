@@ -15,6 +15,7 @@
 import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
+import { APP_URL } from "../support/env.mjs";
 
 const TAG = `PH ${Date.now()}`;
 const SEAN = Number(sql("select id from public.users where email='sean@beacon.test'"));
@@ -94,6 +95,91 @@ try {
   check("…with the lead named", Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)), await text("[data-phone-lead]"));
   check("…still counted as work for the account manager", Boolean(await until(() => sql(`select count(*) from public.work_activity where user_id = ${SEAN} and kind = 'call' and lead_id = ${lead} and at >= ${lit(startedAt)}`) !== "0", { timeout: 6000 })));
   await sean.click("[data-phone-end]");
+
+  section("A window to move anywhere");
+  // A session of its own: once a call has handed a number to the computer, the test browser's hidden
+  // "open the calling app?" prompt keeps simulated mouse and keys from the page (a person answers it).
+  const mover = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1400, height: 1000 });
+  await mover.go("/work", 5000);
+  const box = () => mover.ev(`(() => { const r = document.querySelector('[data-phone-panel]')?.getBoundingClientRect(); return r ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), placed: document.querySelector('[data-phone-window]')?.hasAttribute('data-placed') ?? false } : null; })()`);
+  // Dragged by any part of the window that is not a button (here, the call's status line), as a person moves it.
+  const dragBy = async (dx, dy, from = "[data-phone-status]") => {
+    const at = await mover.ev(`(() => { const r = document.querySelector(${JSON.stringify(from)}).getBoundingClientRect(); return { x: r.left + 10, y: r.top + r.height / 2 }; })()`);
+    await mover.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
+    await mover.send("Input.dispatchMouseEvent", { type: "mousePressed", x: at.x, y: at.y, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 8; i++) await mover.send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x + (dx * i) / 8, y: at.y + (dy * i) / 8, button: "left", buttons: 1 });
+    await mover.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: at.x + dx, y: at.y + dy, button: "left", clickCount: 1 });
+    await sleep(150);
+  };
+  await mover.click("[data-phone-button]");
+  const docked = await until(async () => { const b = await box(); return b?.w === 320 ? b : null; });
+  check("it opens docked above the phone button", docked && !docked.placed, JSON.stringify(docked));
+  await dragBy(-500, -300);
+  const moved = await box();
+  check("dragged by any part of it, not only its title bar, it moves with the mouse", moved?.placed && Math.abs(moved.x - (docked.x - 500)) <= 2 && Math.abs(moved.y - (docked.y - 300)) <= 2, `${JSON.stringify(docked)} → ${JSON.stringify(moved)}`);
+  const before = await box();
+  await dragBy(-120, -60, '[data-phone-key="5"]');
+  const pressed = await box();
+  check("…but not from a key: the window stays put", pressed.x === before.x && pressed.y === before.y, JSON.stringify({ before, pressed }));
+  await dragBy(-3000, -3000, '[data-phone-bar] .text-sm');
+  const corner = await box();
+  check("…never off the screen", corner?.x === 8 && corner?.y === 8, JSON.stringify(corner));
+  await mover.ev(`document.querySelector('[data-phone-grip]').focus()`);
+  await mover.key("ArrowRight");
+  await mover.key("ArrowDown");
+  check("the arrow keys move it too, from its grip", (await box())?.x === 32 && (await box())?.y === 32, JSON.stringify(await box()));
+  await mover.go("/work", 4000);
+  await mover.click("[data-phone-button]");
+  // Measured once its opening animation (a slight scale) has settled.
+  const again = await until(async () => { const b = await box(); return b?.w === 320 ? b : null; });
+  check("it opens where it was left", again?.placed && again.x === 32 && again.y === 32, JSON.stringify(again ?? await box()));
+  await mover.ev(`document.querySelector('[data-phone-bar]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+  check("double-clicking its bar puts it back in the corner", Boolean(await until(async () => { const b = await box(); return b && !b.placed && b.x === docked.x && b.y === docked.y; })), JSON.stringify(await box()));
+  await dragBy(-200, -100);
+  await mover.click("[data-phone-dock-back]");
+  check("…as does its corner button", Boolean(await until(async () => { const b = await box(); return b && !b.placed; })));
+  check("…and docked there, corner messages move aside again", await mover.ev(`document.documentElement.hasAttribute('data-phone-open')`));
+
+  section("A call coming in: ringing, Answer and Decline");
+  // A session of its own, the desktop notifications allowed and nobody looking at the page, as when it rings unseen.
+  const ringerContext = await browser.newContext({ as: "sean@beacon.test" });
+  const granted = await ringerContext.grant(["notifications"]).then(() => true, () => false);
+  const ringer = await ringerContext.newPage({ width: 1400, height: 1000 });
+  await ringer.go("/work", 5000);
+  await ringer.ev(`document.hasFocus = () => false`);
+  const rtext = (sel) => ringer.ev(`document.querySelector(${JSON.stringify(sel)})?.textContent?.trim() ?? null`);
+  const shown = () => ringer.ev(`navigator.serviceWorker.getRegistration('/').then((r) => r ? r.getNotifications() : []).then((list) => list.filter((n) => n.data?.kind === 'call').map((n) => ({ title: n.title, body: n.body, id: n.data.id, icon: n.icon, actions: (n.actions ?? []).map((a) => a.title), actionIcons: (n.actions ?? []).map((a) => a.icon) })))`);
+  await ringer.click("[data-phone-button]");
+  await ringer.click("[data-phone-test-call]");
+  check("a test call is on its way, with time to look away", Boolean(await ringer.ev(`!!document.querySelector('[data-phone-test-pending]')`)));
+  const ringing = await until(() => ringer.ev(`document.querySelector('[data-phone-ringing]')?.dataset.phoneRinging ?? null`), { timeout: 9000 });
+  check("it rings: Incoming call, the number, Answer and Decline", ringing === "test" && /Incoming call/.test((await rtext("[data-phone-ringing]")) ?? "")
+    && /^\(\d{3}\) \d{3}-\d{4}$/.test((await rtext("[data-phone-caller]")) ?? "") && await ringer.ev(`!!document.querySelector('[data-phone-answer]') && !!document.querySelector('[data-phone-decline]')`), await rtext("[data-phone-ringing]"));
+  check("…the phone button says so", (await rtext("[data-phone-button-ringing]")) === "Incoming");
+  const notes = granted ? await until(async () => { const n = await shown(); return n.length ? n : null; }, { timeout: 4000 }) : null;
+  check("…and on the desktop, with Answer and Decline on it", !granted || (notes?.[0]?.title === "Incoming call (test)" && JSON.stringify(notes[0].actions) === JSON.stringify(["Answer", "Decline"])), JSON.stringify(notes));
+  check("…its own phone icon, and one on each button", !granted || (/\/phone\/call-incoming\.png$/.test(notes?.[0]?.icon ?? "")
+    && /call-answer\.png$/.test(notes[0].actionIcons[0] ?? "") && /call-decline\.png$/.test(notes[0].actionIcons[1] ?? "")), JSON.stringify(notes?.[0]));
+  const icons = await Promise.all(["call-incoming", "call-answer", "call-decline", "call-badge"].map((n) => fetch(`${APP_URL}/phone/${n}.png`).then((r) => r.status === 200 && /image\/png/.test(r.headers.get("content-type") ?? ""))));
+  check("…each served as an image", icons.every(Boolean), JSON.stringify(icons));
+  // Decline pressed on the desktop notification: the worker passes it to the page, as here.
+  await ringer.ev(`navigator.serviceWorker.dispatchEvent(new MessageEvent('message', { data: { type: 'lighthouse:call', action: 'decline', id: ${JSON.stringify(notes?.[0]?.id ?? "")} } }))`);
+  if (!notes) await ringer.click("[data-phone-decline]");
+  check("Decline stops the ringing", Boolean(await until(() => ringer.ev(`!document.querySelector('[data-phone-ringing]')`))));
+  check("…takes the desktop notification away", !granted || Boolean(await until(async () => (await shown()).length === 0)));
+  await ringer.click('[data-phone-tab="recent"]');
+  check("…and is kept under Recent as declined", (await ringer.ev(`document.querySelector('[data-phone-recent-row]')?.dataset.outcome`)) === "declined"
+    && (await ringer.ev(`document.querySelector('[data-phone-recent-row]')?.dataset.dir`)) === "in");
+  await ringer.click('[data-phone-tab="keypad"]');
+  await ringer.click("[data-phone-test-call]");
+  await until(() => ringer.ev(`!!document.querySelector('[data-phone-answer]')`), { timeout: 9000 });
+  await ringer.click("[data-phone-answer]");
+  check("Answer takes the call: timed, as a test", Boolean(await until(async () => /^Test call · 0:0\d$/.test((await rtext("[data-phone-status]")) ?? ""))), await rtext("[data-phone-status]"));
+  await sleep(1100);
+  await ringer.click("[data-phone-end]");
+  await ringer.click('[data-phone-tab="recent"]');
+  check("…kept under Recent as a call taken", (await ringer.ev(`document.querySelector('[data-phone-recent-row]')?.dataset.outcome`)) === "talked"
+    && (await ringer.ev(`document.querySelector('[data-phone-recent-row]')?.dataset.dir`)) === "in");
 
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1400, height: 1000 });

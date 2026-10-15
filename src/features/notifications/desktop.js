@@ -56,6 +56,9 @@ export const desktopSupported = () => typeof window !== "undefined" && "Notifica
 /** "granted", "denied", "default" (not asked yet), or "unsupported". */
 export const desktopPermission = () => (desktopSupported() ? window.Notification.permission : "unsupported");
 
+/** Whether desktop pop-ups may show: the browser allows them and the person has not turned them off in the bell. */
+export const desktopAllowed = () => desktopPermission() === "granted" && store.get(OFF_KEY) !== "1";
+
 /** Whether someone is looking at this tab right now. */
 const inFront = () => document.visibilityState === "visible" && document.hasFocus();
 export const tabInFront = () => typeof document !== "undefined" && inFront();

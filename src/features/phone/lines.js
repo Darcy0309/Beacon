@@ -10,14 +10,17 @@
 // same shape.
 
 /**
- * A line: { id, label, note, can: { mute, hold, tones, record }, call(tel),
- * hangUp(), setMuted(on), setHeld(on), tone(key), setRecording(on) }.
+ * A line: { id, label, note, can: { mute, hold, tones, record, receive },
+ * call(tel), hangUp(), setMuted(on), setHeld(on), tone(key),
+ * setRecording(on), onIncoming(handler) → stop, answer(id), decline(id) }.
+ * `onIncoming`: calls coming in, each { id, number }, to ring the phone.
  */
 export const deviceLine = {
   id: "device",
   label: "Your computer's calling app",
   note: "Calls open in your calling app (PanTerra Streams, when it is your default for phone links). Mute, hold and recording come with the PanTerra connection.",
-  can: { mute: false, hold: false, tones: false, record: false },
+  // Calls coming in ring in the calling app, not here.
+  can: { mute: false, hold: false, tones: false, record: false, receive: false },
   /** Hand the number to the computer: through a frame of its own, so this page never navigates away. */
   call(tel) {
     if (typeof document === "undefined" || !tel) return;
@@ -33,4 +36,9 @@ export const deviceLine = {
   setHeld() {},
   tone() {},
   setRecording() {},
+  onIncoming() {
+    return () => {};
+  },
+  answer() {},
+  decline() {},
 };

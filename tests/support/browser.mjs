@@ -185,7 +185,11 @@ export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 6
         const cookies = [...(await sessionCookies(as))].map(([name, value]) => ({ name, value, domain, path: "/" }));
         await browser.send("Storage.setCookies", { browserContextId, cookies });
       }
-      return { newPage: (options) => openPage(browser, port, browserContextId, options) };
+      return {
+        newPage: (options) => openPage(browser, port, browserContextId, options),
+        // Allow what a person would allow in this session, e.g. grant(["notifications"]).
+        grant: (permissions, origin = APP_URL) => browser.send("Browser.grantPermissions", { permissions, origin, browserContextId }),
+      };
     },
     close() {
       browser.close();

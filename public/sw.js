@@ -41,6 +41,26 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
+
+  // A call coming in (features/phone/incoming.js): Answer and Decline go back to the page that is ringing,
+  // which answers or declines it. Answer, or the notification itself, brings Lighthouse to the front.
+  if (event.notification.data?.kind === "call") {
+    const action = event.action === "answer" || event.action === "decline" ? event.action : "show";
+    const id = event.notification.data.id;
+    event.waitUntil(
+      (async () => {
+        const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        const mine = windows.filter((w) => new URL(w.url).origin === self.location.origin);
+        for (const w of mine) w.postMessage({ type: "lighthouse:call", action, id });
+        if (action !== "decline") {
+          if (mine[0]) await mine[0].focus();
+          else await self.clients.openWindow("/");
+        }
+      })()
+    );
+    return;
+  }
+
   const url = new URL(event.notification.data?.url || "/notifications", self.location.origin).href;
 
   event.waitUntil(
