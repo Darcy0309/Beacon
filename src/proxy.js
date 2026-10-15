@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, AUTH_ID_HEADER, supabaseConfigProblem } from "@/lib/supabase/config";
 import { supabaseFetch } from "@/lib/supabase/fetch";
-import { IDLE_COOKIE, idleExpired, sessionIdOf } from "@/lib/idle";
+import { IDLE_COOKIE, idleExpired, idleLimitOf, sessionIdOf } from "@/lib/idle";
 
 // Open without a session: signing in, the browser's push worker (fetched again
 // by the browser on its own), and push delivery, which the database calls
@@ -119,6 +119,7 @@ export async function proxy(request) {
       url.pathname = "/login";
       url.search = "";
       url.searchParams.set("error", "idle");
+      url.searchParams.set("after", String(idleLimitOf(idle)));
       if (!isPublic && !pathname.startsWith("/api/")) url.searchParams.set("next", pathname);
       const response = NextResponse.redirect(url);
       refreshed.forEach(({ name, value, options }) => response.cookies.set(name, value, options));

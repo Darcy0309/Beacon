@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { IDLE_COOKIE } from "@/lib/idle";
+import { IDLE_CHOICES, IDLE_COOKIE } from "@/lib/idle";
 import { check, currentAppUser, fail, logActivity, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -200,14 +200,16 @@ export async function signOut() {
  * session only, not the person's others. The sign-in page says why, and
  * brings them back to `next` (where they were) once they sign in again.
  */
-export async function signOutIdle(next = "/") {
+export async function signOutIdle(next = "/", minutes = null) {
   const supabase = await createClient();
   await logActivity(supabase, "sign_out.idle");
   await supabase.auth.signOut({ scope: "local" });
   (await cookies()).delete(IDLE_COOKIE);
   revalidatePath("/", "layout");
   const back = safeInternalPath(next, "/");
-  redirect(`/login?error=idle${back !== "/" ? `&next=${encodeURIComponent(back)}` : ""}`);
+  // The time it was, for the sign-in page to say.
+  const after = IDLE_CHOICES.some(([v]) => v && v === Number(minutes)) ? `&after=${Number(minutes)}` : "";
+  redirect(`/login?error=idle${after}${back !== "/" ? `&next=${encodeURIComponent(back)}` : ""}`);
 }
 
 /**

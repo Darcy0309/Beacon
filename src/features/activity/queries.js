@@ -71,6 +71,7 @@ const ACTION_LABEL = {
   "calendar.unblock": "Took blocked time off a calendar",
   "production.goal": "Set production goals",
   "settings.pay": "Changed the pay rules",
+  "settings.idle": "Changed the sign-out after inactivity",
 };
 
 /** An action in words: its label, or its code read as words ("project.rates" -> "Project rates") until it has one. */

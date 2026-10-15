@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/session";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { IDLE_COOKIE, idleCookieValue, idleLimitFor, sessionIdOf } from "@/lib/idle";
 
 export const dynamic = "force-dynamic";
@@ -8,8 +9,9 @@ export const dynamic = "force-dynamic";
 /**
  * The browser says the person is using Lighthouse (IdleGuard, at most once
  * a minute while they are): the time is kept in the idle cookie for this
- * session, which the proxy checks on every request. Returns the limit in
- * minutes, or null for a role without one (the cookie is then removed).
+ * session, with its role's limit from Settings, which the proxy checks on
+ * every request. Returns the limit in minutes, or null for a role without
+ * one (the cookie is then removed).
  */
 export async function POST() {
   const me = await getCurrentUser();
@@ -17,11 +19,14 @@ export async function POST() {
   const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
   const sid = session ? sessionIdOf(session.access_token) : null;
-  const limit = idleLimitFor(me.role);
+  // Read with the server's own key: a client cannot read the settings, but their limit is in them.
+  const reader = createAdminClient() ?? supabase;
+  const { data: security } = await reader.from("app_settings").select("value").eq("key", "security").maybeSingle();
+  const limit = idleLimitFor(me.role, security?.value?.idle_minutes);
 
   const response = NextResponse.json({ limit });
   if (limit && sid) {
-    response.cookies.set(IDLE_COOKIE, idleCookieValue(sid), {
+    response.cookies.set(IDLE_COOKIE, idleCookieValue(sid, Date.now(), limit), {
       httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24,
     });
   } else {

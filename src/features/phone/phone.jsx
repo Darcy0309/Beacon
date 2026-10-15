@@ -209,6 +209,15 @@ export function PhoneProvider({ children, tracked = false }) {
     return () => clearInterval(t);
   }, [active]);
 
+  // A call on, or ringing, is work: nobody is signed out for being on the phone (IdleGuard counts this).
+  useEffect(() => {
+    if (!active && !ringing) return;
+    const say = () => window.dispatchEvent(new Event("lighthouse:activity"));
+    say();
+    const t = setInterval(say, 30_000);
+    return () => clearInterval(t);
+  }, [active, ringing]);
+
   // The lead a full number belongs to, looked up once per number (Row Level Security decides which).
   const dialed = active ? call.number : ringing ? ringing.number : value;
   useEffect(() => {

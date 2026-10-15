@@ -10,10 +10,13 @@
  */
 import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { launchBrowser } from "../support/browser.mjs";
+import { sql } from "../support/db.mjs";
 
 const KEY = "lighthouse-last-activity";
 const minutesAgo = (m) => Date.now() - m * 60_000;
 const browser = await launchBrowser();
+// The security setting as it was, put back after.
+const securityBefore = sql("select coalesce((select value::text from public.app_settings where key = 'security'), '')");
 const idleCookie = async (page) => (await page.send("Network.getCookies", { urls: ["http://localhost:3000/"] })).cookies.find((c) => c.name === "lh_idle");
 
 try {
@@ -55,8 +58,45 @@ try {
   await admin.ev(`localStorage.setItem(${JSON.stringify(KEY)}, ${minutesAgo(45)})`);
   await sleep(2500);
   check("no limit: nothing counts down, and they stay signed in", (await admin.path()) === "/" && !(await admin.ev(`!!document.querySelector('[data-idle-warning]')`)) && !(await idleCookie(admin)));
+
+  section("Each role's time, set in Settings");
+  await admin.go("/settings", 5000);
+  await until(() => admin.ev(`!!document.querySelector('[data-idle-settings] select[name="manager"]')`));
+  await admin.fill('[data-idle-settings] select[name="manager"]', "60");
+  await admin.fill('[data-idle-settings] select[name="agent"]', "0");
+  await admin.click("[data-idle-settings] button[type=submit]");
+  check("an administrator sets an hour for account managers, never for agents",
+    Boolean(await until(() => sql("select value->'idle_minutes'->>'manager' || '|' || (value->'idle_minutes'->>'agent') from public.app_settings where key = 'security'") === "60|0")));
+  const hour = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1280, height: 900 });
+  await hour.go("/", 4000);
+  check("the server keeps the manager's hour with the session", /^\d+\.60\./.test((await until(() => idleCookie(hour)))?.value ?? ""), (await idleCookie(hour))?.value);
+  await hour.ev(`localStorage.setItem(${JSON.stringify(KEY)}, ${minutesAgo(31)})`);
+  await sleep(2500);
+  check("…so 31 minutes untouched is not the end", (await hour.path()) === "/" && !(await hour.ev(`!!document.querySelector('[data-idle-warning]')`)));
+  await hour.ev(`localStorage.setItem(${JSON.stringify(KEY)}, ${minutesAgo(58.5)})`);
+  check("…the warning comes before the hour, saying so",
+    Boolean(await until(async () => /signed out after 1 hour without activity/.test((await hour.ev(`document.querySelector('[data-idle-warning]')?.innerText ?? ''`)) ?? ""))));
+  await hour.click("[data-idle-stay]");
+
+  section("On the phone");
+  await hour.ev(`localStorage.setItem(${JSON.stringify(KEY)}, ${minutesAgo(20)})`);
+  await hour.click("[data-phone-button]");
+  await hour.click("[data-phone-test-call]");
+  await until(() => hour.ev(`!!document.querySelector('[data-phone-answer]')`), { timeout: 9000 });
+  await hour.click("[data-phone-answer]");
+  check("a call on the phone counts as activity", Boolean(await until(() => hour.ev(`Date.now() - Number(localStorage.getItem(${JSON.stringify(KEY)})) < 10000`))));
+  await hour.click("[data-phone-end]");
+
+  section("Never");
+  const agent = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1280, height: 900 });
+  await agent.go("/", 4000);
+  await sleep(1500);
+  await agent.ev(`localStorage.setItem(${JSON.stringify(KEY)}, ${minutesAgo(45)})`);
+  await sleep(2500);
+  check("agents, set to never: nothing counts down, no clock kept", (await agent.path()) === "/" && !(await agent.ev(`!!document.querySelector('[data-idle-warning]')`)) && !(await idleCookie(agent)));
 } finally {
   browser.close();
+  if (securityBefore) sql(`update public.app_settings set value = '${securityBefore.replace(/'/g, "''")}'::jsonb where key = 'security'`);
 }
 
 finish("idle sign-out");

@@ -6,13 +6,14 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { signOutIdle } from "@/features/auth/actions";
-import { IDLE_MINUTES, IDLE_WARNING_MINUTES } from "@/lib/idle";
+import { IDLE_MINUTES, IDLE_WARNING_MINUTES, idleSpan } from "@/lib/idle";
 
 // Shared by every tab: activity in any of them keeps all of them signed in,
 // and signing out in one takes the others to the sign-in page.
 const ACTIVITY_KEY = "lighthouse-last-activity";
 const SIGNED_OUT_KEY = "lighthouse-idle-signed-out";
-const EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "mousemove", "scroll"];
+// "lighthouse:activity": the phone, while a call is on or ringing (no hands on the mouse, but working).
+const EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "mousemove", "scroll", "lighthouse:activity"];
 const PING_EVERY_MS = 60_000;
 
 const readShared = () => {
@@ -30,7 +31,7 @@ const writeShared = (key, value) => {
 const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 /**
- * Signs a manager, agent or client out after 30 minutes without activity
+ * Signs a manager, agent or client out after their role's time without activity (Settings; 30 minutes until set)
  * (lib/idle.js): a pointer, a key, a scroll in any tab counts. Two minutes
  * before, it asks "Still there?" with a countdown; Stay signed in (or any
  * activity) carries on. While they are active it tells the server, at most
@@ -42,19 +43,30 @@ export default function IdleGuard() {
   const pinged = useRef(0);
   const done = useRef(false);
   const [left, setLeft] = useState(null);
+  // The role's limit, as the server says (Settings); null: none, nothing to watch.
+  const [limit, setLimit] = useState(IDLE_MINUTES);
+  const limitRef = useRef(IDLE_MINUTES);
   const [, startLeaving] = useTransition();
 
   const leave = useCallback(() => {
     if (done.current) return;
     done.current = true;
     writeShared(SIGNED_OUT_KEY, Date.now());
-    startLeaving(() => signOutIdle(path));
+    startLeaving(() => signOutIdle(path, limitRef.current));
   }, [path]);
 
   const ping = useCallback(async () => {
     pinged.current = Date.now();
     try {
       const res = await fetch("/api/session/alive", { method: "POST", cache: "no-store" });
+      if (res.ok) {
+        const { limit: minutes } = await res.json().catch(() => ({}));
+        if (minutes === null || Number.isFinite(minutes)) {
+          limitRef.current = minutes;
+          setLimit(minutes);
+          if (minutes === null) setLeft(null);
+        }
+      }
       // The server already ended it (the backstop): go to the sign-in page.
       if (res.redirected || res.status === 401) {
         done.current = true;
@@ -84,8 +96,9 @@ export default function IdleGuard() {
     window.addEventListener("storage", onStorage);
     const tick = () => {
       // The tabs' shared time (every tab writes it), or this tab's own where storage is blocked.
+      if (limitRef.current === null) return; // no limit for this role
       const idle = Date.now() - (readShared() || last.current);
-      const remaining = Math.ceil((IDLE_MINUTES * 60_000 - idle) / 1000);
+      const remaining = Math.ceil((limitRef.current * 60_000 - idle) / 1000);
       if (remaining <= 0) leave();
       else setLeft(remaining <= IDLE_WARNING_MINUTES * 60 ? remaining : null);
     };
@@ -112,7 +125,7 @@ export default function IdleGuard() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><ShieldCheck className="size-5 text-primary" /> Still there?</DialogTitle>
           <DialogDescription>
-            To keep your account safe, you&apos;ll be signed out after {IDLE_MINUTES} minutes without activity.
+            To keep your account safe, you&apos;ll be signed out after {idleSpan(limit)} without activity.
           </DialogDescription>
         </DialogHeader>
         <p className="text-center text-3xl font-bold tabular-nums" aria-live="polite" data-idle-countdown>{left != null ? clock(left) : ""}</p>

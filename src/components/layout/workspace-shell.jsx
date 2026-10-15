@@ -52,7 +52,7 @@ export default function WorkspaceShell({ children }) {
 
   // Time worked counts for the people paid by it: account managers and agents.
   const tracked = (role === "manager" || role === "agent") && user?.status === "active";
-  // Signed out after 30 minutes without activity: everyone but administrators.
+  // Signed out after a time without activity (Settings): everyone but administrators.
   const guarded = Boolean(user) && idleLimitFor(role) != null;
 
   // The phone, for the staff who call: administrators, account managers and agents.

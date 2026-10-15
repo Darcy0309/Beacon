@@ -3,7 +3,8 @@
 /** Workspace settings. */
 
 import { revalidatePath } from "next/cache";
-import { check, fail, ok, s } from "@/lib/server/action-helpers";
+import { check, currentAppUser, fail, logActivity, ok, s } from "@/lib/server/action-helpers";
+import { IDLE_CHOICES, IDLE_ROLES } from "@/lib/idle";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 
@@ -64,4 +65,29 @@ export async function saveSetting(prevState, formData) {
 
   revalidatePath("/settings");
   return ok();
+}
+
+/**
+ * How long each role may be left without activity before it is signed out
+ * (Sean, Oct 2026): account managers, agents and clients, in minutes, 0 for
+ * never. Kept in the security setting (idle_minutes); administrators only.
+ */
+export async function saveIdleSettings(prevState, formData) {
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only an administrator sets this.");
+  const allowed = new Set(IDLE_CHOICES.map(([v]) => v));
+  const minutes = {};
+  for (const [role] of IDLE_ROLES) {
+    const v = Number(formData.get(role));
+    if (!allowed.has(v)) return fail("Choose one of the times offered.");
+    minutes[role] = v;
+  }
+  const { data: current } = await supabase.from("app_settings").select("value").eq("key", "security").maybeSingle();
+  const { error } = await supabase.from("app_settings")
+    .upsert({ key: "security", value: { ...(current?.value ?? {}), idle_minutes: minutes }, updated_at: new Date().toISOString() });
+  if (error) return fail(error);
+  await logActivity(supabase, "settings.idle", { detail: IDLE_ROLES.map(([r]) => `${r} ${minutes[r] || "never"}`).join(", "), userId: me.id });
+  revalidatePath("/settings");
+  return ok(minutes);
 }

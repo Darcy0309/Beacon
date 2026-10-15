@@ -1,4 +1,5 @@
 import { Lock } from "lucide-react";
+import { IDLE_CHOICES, IDLE_MINUTES, idleSpan } from "@/lib/idle";
 import LighthouseBackdrop from "@/components/brand/lighthouse-backdrop";
 import SnowBackdrop from "@/components/brand/snow-backdrop";
 import LighthouseWordmark from "@/components/brand/logo-wordmark";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const NOTICES = {
   link: "That sign-in link has expired or was already used. Ask an administrator for a new invitation.",
   disabled: "This account has been disabled. Contact an administrator.",
-  idle: "You were signed out after 30 minutes without activity, to keep your account safe. Sign in to carry on.",
+  idle: "You were signed out after {after} without activity, to keep your account safe. Sign in to carry on.",
 };
 
 export default async function LoginPage({ searchParams }) {
@@ -19,7 +20,9 @@ export default async function LoginPage({ searchParams }) {
   // Only a path inside the app — never somewhere a link could send people after they sign in.
   const next = safeInternalPath(params?.next, "/");
   // Own keys only: "?error=constructor" must not find Object.prototype.constructor.
-  const notice = Object.hasOwn(NOTICES, params?.error ?? "") ? NOTICES[params.error] : null;
+  // Signed out for inactivity: after the time it was (Settings), in words.
+  const after = IDLE_CHOICES.some(([v]) => v && v === Number(params?.after)) ? idleSpan(Number(params.after)) : idleSpan(IDLE_MINUTES);
+  const notice = Object.hasOwn(NOTICES, params?.error ?? "") ? NOTICES[params.error].replace("{after}", after) : null;
 
   return (
     <div
