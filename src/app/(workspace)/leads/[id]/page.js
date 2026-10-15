@@ -45,10 +45,10 @@ export const dynamic = "force-dynamic";
 
 const ROUND = "flex size-8 shrink-0 items-center justify-center rounded-full text-white transition-all hover:brightness-110 active:scale-95";
 
-/** Call a number: a tel: link (data-lead-id: pressing it starts the call's time for this name). */
-function CallButton({ tel, leadId, label }) {
+/** Call a number: a tel: link (data-lead-id: pressing it starts the call's time for this name; the phone names it by data-lead-name). */
+function CallButton({ tel, leadId, company, label }) {
   return (
-    <a href={tel} data-lead-id={leadId} aria-label={label} className={cn(ROUND, "bg-emerald-500 shadow-[0_0_14px_-6px_var(--neon-emerald)]")}>
+    <a href={tel} data-lead-id={leadId} data-lead-name={company || undefined} aria-label={label} className={cn(ROUND, "bg-emerald-500 shadow-[0_0_14px_-6px_var(--neon-emerald)]")}>
       <Phone className="size-4" />
     </a>
   );
@@ -73,7 +73,7 @@ function Line({ kind, children, action }) {
  * has an Email line, so an address the contact gives on the phone can be
  * typed in and used at once.
  */
-function Person({ who, phone, mobile, email: address, leadId, emailButton, alwaysEmail = false, allLines = false, children }) {
+function Person({ who, phone, mobile, email: address, leadId, company, emailButton, alwaysEmail = false, allLines = false, children }) {
   const label = who.toLowerCase();
   const none = <span className="text-muted-foreground">None on file</span>;
   return (
@@ -85,12 +85,12 @@ function Person({ who, phone, mobile, email: address, leadId, emailButton, alway
         </Line>
       ) : null}
       {phone || allLines ? (
-        <Line kind="Business" action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} label={`Call ${label}, business: ${phone}`} /> : null}>
+        <Line kind="Business" action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} company={company} label={`Call ${label}, business: ${phone}`} /> : null}>
           {phone || none}
         </Line>
       ) : null}
       {mobile || allLines ? (
-        <Line kind="Mobile" action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
+        <Line kind="Mobile" action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} company={company} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
           {mobile || none}
         </Line>
       ) : null}
@@ -350,7 +350,7 @@ export default async function LeadSheet({ params, searchParams }) {
               {r.county ? <div className="text-xs text-muted-foreground" data-county>{/county$/i.test(r.county) ? r.county : `${r.county} County`}</div> : null}
               {website ? <div className="mt-1 text-xs">{website}</div> : null}
               <div className="mt-3">
-                <Line kind="Business phone" action={telHref(r.phone) ? <CallButton tel={telHref(r.phone)} leadId={lead.id} label={`Call the business: ${r.phone}`} /> : null}>
+                <Line kind="Business phone" action={telHref(r.phone) ? <CallButton tel={telHref(r.phone)} leadId={lead.id} company={lead.co} label={`Call the business: ${r.phone}`} /> : null}>
                   {r.phone || <span className="text-muted-foreground">None on file</span>}
                 </Line>
                 {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
@@ -365,7 +365,7 @@ export default async function LeadSheet({ params, searchParams }) {
                   allLines: Boolean(r.contact2_name || r.contact2_phone || r.contact2_mobile || r.contact2_email) }],
               ].map(([who, name, title, ways]) => (
                 <div key={who} className="mt-3">
-                  <Person who={who} phone={ways.phone} mobile={ways.mobile} email={ways.email} leadId={lead.id}
+                  <Person who={who} phone={ways.phone} mobile={ways.mobile} email={ways.email} leadId={lead.id} company={lead.co}
                     alwaysEmail={ways.alwaysEmail} allLines={ways.allLines} emailButton={emailButton(name, ways.primary)}>
                     <div className="eyebrow">{who}</div>
                     <div className="mb-2 mt-1 text-sm">

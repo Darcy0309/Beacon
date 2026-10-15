@@ -10,17 +10,19 @@
 // same shape.
 
 /**
- * A line: { id, label, note, can: { mute, hold, tones, record, receive },
+ * A line: { id, label, note, can: { mute, hold, tones, record, receive, hangUp },
  * call(tel), hangUp(), setMuted(on), setHeld(on), tone(key),
  * setRecording(on), onIncoming(handler) → stop, answer(id), decline(id) }.
  * `onIncoming`: calls coming in, each { id, number }, to ring the phone.
+ * `can.hangUp`: End hangs the call up; without it the call is hung up where
+ * it was made, and End only stops the timer here.
  */
 export const deviceLine = {
   id: "device",
   label: "Your computer's calling app",
   note: "Calls open in your calling app (PanTerra Streams, when it is your default for phone links). Mute, hold and recording come with the PanTerra connection.",
-  // Calls coming in ring in the calling app, not here.
-  can: { mute: false, hold: false, tones: false, record: false, receive: false },
+  // Calls coming in ring in the calling app, not here; and a call is hung up there.
+  can: { mute: false, hold: false, tones: false, record: false, receive: false, hangUp: false },
   /** Hand the number to the computer: through a frame of its own, so this page never navigates away. */
   call(tel) {
     if (typeof document === "undefined" || !tel) return;

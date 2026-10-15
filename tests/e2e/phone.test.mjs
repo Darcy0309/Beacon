@@ -2,11 +2,14 @@
  * The phone in Lighthouse (Oct 2026), with no button of its own: opened by a phone link (or, here, as one opens it), for the
  * staff, opening a keypad. A number pressed or typed (grouped as it grows)
  * finds its lead; Call hands it to the computer's calling app and times the
- * call; End stops it and keeps it under Recent, to call again; the controls
+ * call; Backspace takes a digit off and Clear the whole number; End stops it
+ * (the call is hung up in the calling app, it says), keeps it under Recent,
+ * to call again, and leaves a blank keypad; the controls
  * a PanTerra line will bring (mute, hold, tones, record) are there but off,
  * saying so. A lead's Call button opens the phone on its number and lead,
- * calling, and still counts as an account manager's work. Clients have no
- * phone.
+ * calling, and still counts as an account manager's work; pressed while a
+ * call is still on (End forgotten), it takes over. The phone stays open from
+ * page to page. Clients have no phone.
  *
  * Removes everything it made.
  *
@@ -26,7 +29,11 @@ sql(`insert into public.project_assignments (project_id, ae_user_id) values (${A
 const tail = String(Date.now()).slice(-4);
 const PHONE = `(480) 555-${tail}`;
 const DIGITS = `480555${tail}`;
-const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, project_id, assigned_user_id) values (${lit(`${TAG} Delta Door`)}, 'Dana Reyes', ${lit(PHONE)}, ${APPT}, ${SEAN}) returning id`));
+// Its decision maker's own number: a second Call button on the lead sheet.
+const DM_PHONE = `(602) 555-${tail}`;
+const DM_DIGITS = `602555${tail}`;
+const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, decision_maker, dm_phone, project_id, assigned_user_id)
+  values (${lit(`${TAG} Delta Door`)}, 'Dana Reyes', ${lit(PHONE)}, 'Dale Reyes', ${lit(DM_PHONE)}, ${APPT}, ${SEAN}) returning id`));
 const startedAt = sql("select now()::text");
 
 const browser = await launchBrowser();
@@ -48,7 +55,12 @@ try {
   check("…and the lead it belongs to found", Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)), await text("[data-phone-lead]"));
   await sean.click("[data-phone-backspace]");
   check("Backspace takes the last digit off", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === PHONE.slice(0, -1));
-  await sean.click(`[data-phone-key="${DIGITS.at(-1)}"]`);
+  check("…and Clear sits across from it", await sean.ev(`(() => { const c = document.querySelector('[data-phone-clear]')?.getBoundingClientRect(), n = document.querySelector('[data-phone-number]').getBoundingClientRect(), b = document.querySelector('[data-phone-backspace]').getBoundingClientRect(); return Boolean(c) && c.right <= n.left + 1 && b.left >= n.right - 1; })()`));
+  await sean.click("[data-phone-clear]");
+  check("Clear takes the whole number off, and its lead", await until(() => sean.ev(`document.querySelector('[data-phone-number]').value === '' && !document.querySelector('[data-phone-lead]')
+    && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'idle' && !document.querySelector('[data-phone-clear]') && !document.querySelector('[data-phone-backspace]')`)));
+  for (const k of DIGITS) await sean.click(`[data-phone-key="${k}"]`);
+  check("…ready for the next", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === PHONE && Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)));
 
   section("A call");
   await sean.ev(`window.__dialed = []; new MutationObserver((m) => m.forEach((r) => r.addedNodes.forEach((n) => n.dataset?.phoneDial && window.__dialed.push(n.dataset.phoneDial)))).observe(document.body, { childList: true })`);
@@ -60,10 +72,13 @@ try {
   check("mute, hold, keypad tones and record are there, off until PanTerra connects, and say so",
     JSON.stringify(controls) === JSON.stringify(["mute:true", "hold:true", "tones:true", "record:true"]) && /PanTerra connection/.test((await text("[data-phone-line-note]")) ?? ""), JSON.stringify(controls));
   check("while the call is on, it stays open (there is no button to come back by)", await sean.ev(`!document.querySelector('[data-phone-close]')`));
+  check("…saying to hang up in the calling app: End only stops the timer here", /hang up in your calling app/i.test((await text("[data-phone-hangup-note]")) ?? "")
+    && !(await sean.ev(`!!document.querySelector('[data-phone-clear]')`)), await text("[data-phone-hangup-note]"));
   await sleep(1100);
   await sean.click("[data-phone-end]");
-  check("End stops it", /^Call ended · 0:0\d$/.test((await until(async () => { const t = await text("[data-phone-status]"); return /ended/.test(t ?? "") ? t : null; })) ?? ""));
-  check("…with a way to record its result on the lead", (await sean.ev(`document.querySelector('[data-phone-result]')?.getAttribute('href')`)) === `/leads/${lead}`);
+  check("End stops it, leaving a blank keypad for the next call", Boolean(await until(() => sean.ev(`document.querySelectorAll('[data-phone-key]').length === 12
+    && document.querySelector('[data-phone-number]').value === '' && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'idle'
+    && !document.querySelector('[data-phone-lead]') && !document.querySelector('[data-phone-clear]')`))), await text("[data-phone-status]"));
 
   section("Messages beside it, not over it");
   // A message in the corner (the desktop-notifications prompt shows on signing in) sits left of the open phone.
@@ -92,7 +107,23 @@ try {
   check("opens the phone on its number, calling", Boolean(await until(() => sean.ev(`window.__dialed.includes('tel:+1${DIGITS}') && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'active'`))));
   check("…with the lead named", Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)), await text("[data-phone-lead]"));
   check("…still counted as work for the account manager", Boolean(await until(() => sql(`select count(*) from public.work_activity where user_id = ${SEAN} and kind = 'call' and lead_id = ${lead} and at >= ${lit(startedAt)}`) !== "0", { timeout: 6000 })));
+  // Hung up in the calling app, End forgotten here: the next Call button pressed takes over.
+  await sleep(1100);
+  await sean.click('[data-person="Decision maker"] [data-contact-line="Business"] a[href^="tel:"]');
+  check("another Call button while a call is still on: the first ends, the new one calls", Boolean(await until(() => sean.ev(`window.__dialed.includes('tel:+1${DM_DIGITS}')
+    && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'active' && document.querySelector('[data-phone-number]').value === ${JSON.stringify(DM_PHONE)}`))),
+    JSON.stringify(await sean.ev("window.__dialed")));
   await sean.click("[data-phone-end]");
+  await sean.click('[data-phone-tab="recent"]');
+  const both = await until(() => sean.ev(`[...document.querySelectorAll('[data-phone-recent-row]')].slice(0, 2).map((r) => r.innerText.replace(/\\s+/g, ' '))`).then((r) => (r.length === 2 ? r : null)));
+  check("…both under Recent, the newest first, each with its lead (a decision maker's number too)",
+    (both?.[0] ?? "").includes(DM_PHONE) && (both?.[0] ?? "").includes(`${TAG} Delta Door`) && (both?.[1] ?? "").includes(PHONE), JSON.stringify(both));
+  await sean.click('[data-phone-tab="keypad"]');
+
+  section("From page to page");
+  await sean.click(`a[href="/work"]`, "My projects");
+  check("the phone stays open as the manager moves on", Boolean(await until(async () => (await sean.path()) === "/work" && sean.ev(`!!document.querySelector('[data-phone-panel] [data-phone-keypad]')`), { timeout: 8000 })),
+    await sean.path());
 
   section("A window to move anywhere");
   // A session of its own: once a call has handed a number to the computer, the test browser's hidden

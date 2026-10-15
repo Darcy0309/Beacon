@@ -244,7 +244,7 @@ function AppointmentDialog({ a, onClose }) {
           <DialogFooter>
             {tel ? (
               <Button asChild>
-                <a href={tel} data-lead-id={a.leadId ?? undefined}><Phone /> Call now</a>
+                <a href={tel} data-lead-id={a.leadId ?? undefined} data-lead-name={a.co || undefined}><Phone /> Call now</a>
               </Button>
             ) : (
               // Keep pointer events so the cursor and the reason still show.

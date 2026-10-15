@@ -162,7 +162,7 @@ export default async function ExplorePage({ searchParams }) {
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground" data-last-worked>{l.lastWorked}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
-                    {l.phone ? <a href={`tel:${String(l.phone).replace(/[^\d+]/g, "")}`} data-lead-id={l.id} className="transition-colors hover:text-primary">{l.phone}</a> : "—"}
+                    {l.phone ? <a href={`tel:${String(l.phone).replace(/[^\d+]/g, "")}`} data-lead-id={l.id} data-lead-name={l.co || undefined} className="transition-colors hover:text-primary">{l.phone}</a> : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {l.client}

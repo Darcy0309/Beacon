@@ -109,6 +109,14 @@ export async function searchLeadOptions(q) {
   return (data ?? []).map((l) => ({ id: l.id, co: l.company_name, contact: l.contact_name, city: cityState(l) }));
 }
 
+/** One lead as the pickers and the phone name it ({ id, co, contact, city }), by its id; null when not theirs to see. */
+export async function getLeadOption(id) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("leads").select("id, company_name, contact_name, city, state").eq("id", Number(id)).maybeSingle();
+  if (error) throw error;
+  return data ? { id: data.id, co: data.company_name, contact: data.contact_name, city: cityState(data) } : null;
+}
+
 /**
  * One page of leads for a leads table, searched and filtered in the
  * database. `projectId` narrows it to one project, where it can also be

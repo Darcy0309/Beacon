@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDownRight, CircleDot, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
+  ArrowDownRight, CircleDot, CircleX, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
   PhoneMissed, PhoneOff, PhoneOutgoing, X,
 } from "lucide-react";
 import Link from "@/components/shared/intent-link";
@@ -81,7 +81,9 @@ const PRESSABLE = "button, a, input, textarea, select, label, [role=button]";
  * hands it the number and keeps the time, but cannot hear the call, so mute,
  * hold, tones and recording stay off, and calls coming in ring in Streams,
  * until a PanTerra line connects. A test call shows how a call coming in
- * rings, meanwhile.
+ * rings, meanwhile. Nor can it see such a call end: End (or the next lead's
+ * Call button) stops its timer. A call ended goes under Recent, and the
+ * keypad is blank for the next.
  *
  * `tracked`: an account manager or agent, whose calls count as time worked
  * (the activity tracker counts a phone link pressed; a number dialed here is
@@ -96,7 +98,7 @@ export function PhoneProvider({ children, tracked = false }) {
   const leadRef = useRef(null); // the same, for a missed call recorded later by its timer
   const [checked, setChecked] = useState(null); // the digits whose lookup has answered
   const lookingUp = useRef(null); // the digits being looked up (a ref: setting it must not run the lookup again)
-  const [call, setCall] = useState(null); // { number, lead, startedAt, endedAt, dir, test }
+  const [call, setCall] = useState(null); // the call on: { number, lead, startedAt, dir, test }; none once ended
   const [ringing, setRinging] = useState(null); // a call coming in: { id, number, test }
   const ringingRef = useRef(null);
   const stopRing = useRef(null);
@@ -107,7 +109,7 @@ export function PhoneProvider({ children, tracked = false }) {
   const [controls, setControls] = useState({ muted: false, held: false, recording: false, keys: false });
   const [recent, setRecent] = useState([]);
   const inputRef = useRef(null);
-  const active = Boolean(call && !call.endedAt);
+  const active = Boolean(call);
   // The window: docked in the corner (pos null), or wherever it was dragged; always docked on a small screen.
   const [pos, setPos] = useState(null);
   const [small, setSmall] = useState(false);
@@ -234,11 +236,8 @@ export function PhoneProvider({ children, tracked = false }) {
       .then((r) => (r.ok ? r.json() : { leads: [] }))
       .then(({ leads }) => {
         if (gone) return;
-        setLead((was) => {
-          // A Call button names its lead: keep it if the search found it, else take the first.
-          const named = was?.id ? leads?.find((l) => l.id === was.id) : null;
-          return named ?? (was?.id && !leads?.length ? was : leads?.[0] ?? null);
-        });
+        // A Call button names its lead (kept, whichever of its numbers was called); else the first with the number.
+        setLead((was) => (was?.id ? leads?.find((l) => l.id === was.id) ?? was : leads?.[0] ?? null));
         setChecked(digits);
       })
       .catch(() => {});
@@ -248,6 +247,21 @@ export function PhoneProvider({ children, tracked = false }) {
       lookingUp.current = null;
     };
   }, [dialed, active]);
+
+  // A lead named by its id alone (a Call button's, a call under Recent): its name, from the id.
+  useEffect(() => {
+    if (!lead?.id || lead.co) return;
+    let gone = false;
+    fetch(`/api/lead-options?id=${lead.id}`)
+      .then((r) => (r.ok ? r.json() : { leads: [] }))
+      .then(({ leads }) => {
+        if (!gone && leads?.[0]) setLead((was) => (was?.id === leads[0].id ? leads[0] : was));
+      })
+      .catch(() => {});
+    return () => {
+      gone = true;
+    };
+  }, [lead?.id, lead?.co]);
 
   useEffect(() => {
     leadRef.current = lead;
@@ -277,21 +291,25 @@ export function PhoneProvider({ children, tracked = false }) {
       // A phone link pressed is already reported by the activity tracker; one dialed here is reported now.
       if (!fromLink) report(who?.id);
       setControls({ muted: false, held: false, recording: false, keys: false });
-      setCall({ number: dialable(number), lead: who ?? null, startedAt: Date.now(), endedAt: null, dir: "out" });
+      setCall({ number: dialable(number), lead: who ?? null, startedAt: Date.now(), dir: "out" });
       setNow(Date.now());
     },
     [line, report]
   );
 
+  // End: kept under Recent, then a blank keypad for the next call (Sean, Oct 2026); a lead's Call button calls again.
   const endCall = useCallback(() => {
-    if (!call || call.endedAt) return;
+    if (!call) return;
     if (!call.test) line.hangUp();
     const endedAt = Date.now();
-    setCall((c) => ({ ...c, endedAt }));
     remember({
       number: call.number, leadId: call.lead?.id ?? lead?.id ?? null, co: call.lead?.co ?? lead?.co ?? null,
       at: call.startedAt, ms: endedAt - call.startedAt, dir: call.dir ?? "out", test: call.test || undefined,
     });
+    setCall(null);
+    setValue("");
+    setLead(null);
+    setChecked(null);
   }, [call, lead, line, remember]);
 
   // A call coming in: rings here (and on the desktop) until answered, declined, or missed after RING_MS.
@@ -325,7 +343,7 @@ export function PhoneProvider({ children, tracked = false }) {
     if (!r.test) line.answer(r.id);
     stopRinging(r.id);
     setControls({ muted: false, held: false, recording: false, keys: false });
-    setCall({ number: r.number, lead, startedAt: Date.now(), endedAt: null, dir: "in", test: r.test });
+    setCall({ number: r.number, lead, startedAt: Date.now(), dir: "in", test: r.test });
     setNow(Date.now());
     setTab("keypad");
     setOpen(true);
@@ -335,7 +353,7 @@ export function PhoneProvider({ children, tracked = false }) {
   const ring = useCallback(
     ({ id = Date.now().toString(36), number, test = false }) => {
       // One call at a time: a call coming in during another is left to the line (busy, or its voicemail).
-      if (ringingRef.current || (call && !call.endedAt)) return;
+      if (ringingRef.current || call) return;
       const r = { id: String(id), number: dialable(number), test, at: Date.now() };
       ringingRef.current = r;
       setRinging(r);
@@ -392,15 +410,19 @@ export function PhoneProvider({ children, tracked = false }) {
 
   /** Open the phone on a number (and its lead); `call`: dial it at once. */
   const openPhone = useCallback(
-    ({ number = "", leadId = null, call: dialNow = false, fromLink = false } = {}) => {
-      if (active || ringingRef.current) {
-        // One call at a time: show the one going on, or ringing.
+    ({ number = "", leadId = null, leadName = null, call: dialNow = false, fromLink = false } = {}) => {
+      // One call at a time: show the one ringing, or going on. Except a call in the computer's calling app,
+      // which Lighthouse cannot see end: calling the next lead ends it here, as if End had been pressed.
+      const takeOver = active && dialNow && !line.can.hangUp && !call?.test;
+      if (ringingRef.current || (active && !takeOver)) {
         setOpen(true);
         setTab("keypad");
         return;
       }
+      if (takeOver) endCall();
       const v = dialable(number);
-      const who = leadId ? { id: leadId } : null;
+      // Named at once when the link says whose number it is; else by its id, a moment later.
+      const who = leadId ? { id: leadId, ...(leadName ? { co: leadName } : {}) } : null;
       setValue(v);
       setLead(who);
       setChecked(null);
@@ -408,7 +430,7 @@ export function PhoneProvider({ children, tracked = false }) {
       setOpen(true);
       if (dialNow && v) startCall(v, who, { fromLink });
     },
-    [active, startCall]
+    [active, call, endCall, line, startCall]
   );
 
   // Every phone link in the workspace opens the phone and calls: the number, and the lead it is on.
@@ -418,8 +440,12 @@ export function PhoneProvider({ children, tracked = false }) {
       const a = e.target instanceof Element ? e.target.closest('a[href^="tel:"]') : null;
       if (!a || a.closest("[data-phone-window]")) return;
       e.preventDefault();
-      const leadId = Number(a.closest("[data-lead-id]")?.getAttribute("data-lead-id"));
-      openPhone({ number: numberOfTel(a.getAttribute("href")), leadId: Number.isInteger(leadId) && leadId > 0 ? leadId : null, call: true, fromLink: true });
+      const holder = a.closest("[data-lead-id]");
+      const leadId = Number(holder?.getAttribute("data-lead-id"));
+      openPhone({
+        number: numberOfTel(a.getAttribute("href")), leadId: Number.isInteger(leadId) && leadId > 0 ? leadId : null,
+        leadName: holder?.getAttribute("data-lead-name") || null, call: true, fromLink: true,
+      });
     };
     // Bubbling, after the activity tracker (capturing) has counted the press.
     document.addEventListener("click", onClick);
@@ -431,6 +457,15 @@ export function PhoneProvider({ children, tracked = false }) {
       window.removeEventListener("lighthouse:phone", onOpen);
     };
   }, [openPhone]);
+
+  // Clear (Sean, Oct 2026): the whole number at once, and its lead.
+  const clear = useCallback(() => {
+    if (active) return;
+    setValue("");
+    setLead(null);
+    setChecked(null);
+    inputRef.current?.focus();
+  }, [active]);
 
   const press = useCallback(
     (key) => {
@@ -567,8 +602,14 @@ export function PhoneProvider({ children, tracked = false }) {
                 onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
             ) : (
               <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3">
-                {/* The number, typed or pressed; Enter calls. */}
+                {/* The number, typed or pressed; Enter calls. Clear on its left takes all of it, Backspace on its right a digit. */}
                 <div className="flex items-center gap-1">
+                  {!active && value ? (
+                    <button type="button" onClick={clear} aria-label="Clear the number" title="Clear" data-phone-clear
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                      <CircleX className="size-5" />
+                    </button>
+                  ) : null}
                   <input ref={inputRef} data-phone-number value={formatDial(active ? call.number : value)} readOnly={active}
                     onChange={(e) => setValue(dialable(e.target.value))}
                     onKeyDown={(e) => {
@@ -579,7 +620,8 @@ export function PhoneProvider({ children, tracked = false }) {
                       }
                     }}
                     inputMode="tel" autoComplete="off" placeholder="Enter a number" aria-label="Number to call"
-                    className="min-w-0 flex-1 bg-transparent py-1 text-center text-2xl font-semibold tabular-nums tracking-wide outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground" />
+                    className={cn("min-w-0 flex-1 bg-transparent py-1 text-center font-semibold tabular-nums tracking-wide outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground",
+                      formatDial(active ? call.number : value).length > 14 ? "text-xl" : "text-2xl")} />
                   {!active && value ? (
                     <button type="button" onClick={() => setValue((v) => v.slice(0, -1))} aria-label="Delete the last digit" data-phone-backspace
                       className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -592,12 +634,12 @@ export function PhoneProvider({ children, tracked = false }) {
                 <div className="mt-1 min-h-[2.5rem] text-center text-xs" aria-live="polite">
                   {who?.co ? (
                     <Link href={`/leads/${who.id}`} className="font-medium text-primary hover:underline" data-phone-lead={who.id}>{who.co}</Link>
-                  ) : searchDigits(dialed) && checked === searchDigits(dialed) ? (
+                  ) : !who?.id && searchDigits(dialed) && checked === searchDigits(dialed) ? (
                     <span className="text-muted-foreground" data-phone-lead="">No lead with this number</span>
                   ) : null}
                   {who?.contact ? <span className="text-muted-foreground"> · {who.contact}</span> : null}
-                  <div className={cn("mt-0.5 font-medium tabular-nums", active ? "text-emerald-500" : "text-muted-foreground")} data-phone-status={call ? (active ? "active" : "ended") : "idle"}>
-                    {active ? `${callLabel} · ${callClock(now - call.startedAt)}` : call ? `Call ended · ${callClock(call.endedAt - call.startedAt)}` : "Ready"}
+                  <div className={cn("mt-0.5 font-medium tabular-nums", active ? "text-emerald-500" : "text-muted-foreground")} data-phone-status={active ? "active" : "idle"}>
+                    {active ? `${callLabel} · ${callClock(now - call.startedAt)}` : "Ready"}
                   </div>
                 </div>
 
@@ -645,6 +687,7 @@ export function PhoneProvider({ children, tracked = false }) {
                 <div className="mt-3 flex items-center justify-center gap-4">
                   {active ? (
                     <button type="button" onClick={endCall} aria-label="End the call" data-phone-end
+                      title={line.can.hangUp || call.test ? "End the call" : "End: stops the timer here (hang up in your calling app)"}
                       className="flex size-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_18px_-6px_rgb(244_63_94)] transition-transform hover:scale-105 active:scale-95">
                       <PhoneOff className="size-6" />
                     </button>
@@ -655,11 +698,11 @@ export function PhoneProvider({ children, tracked = false }) {
                     </button>
                   )}
                 </div>
-                {call && !active && (call.lead?.id ?? lead?.id) ? (
-                  // The call over: its result goes on the lead (named when it began, or found while it went on).
-                  <Link href={`/leads/${call.lead?.id ?? lead.id}`} className="mt-3 text-center text-xs font-semibold text-primary hover:underline" data-phone-result>
-                    Record the call&apos;s result on the lead
-                  </Link>
+                {active && !line.can.hangUp && !call.test && call.dir !== "in" ? (
+                  // The call is in the computer's calling app: Lighthouse cannot hang it up there (Sean, Oct 2026).
+                  <p className="mt-2 text-center text-[0.66rem] text-muted-foreground" data-phone-hangup-note>
+                    Hang up in your calling app too. End here, or calling the next lead, stops the timer and keeps the call under Recent.
+                  </p>
                 ) : null}
 
                 {/* How a call coming in rings, until a PanTerra line brings real ones. */}
