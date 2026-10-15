@@ -28,6 +28,8 @@ const FORMS = [
     { name: "Business details", path: `/leads/${LEAD}`, open: (p) => p.ev(`[...document.querySelectorAll('[role=tab]')].find((t) => /^Business/.test(t.textContent.trim()))?.click()`).then(() => sleep(300)).then(() => p.click("[data-edit-business]")) },
     { name: "Coverage", path: `/leads/${LEAD}`, open: (p) => p.ev(`[...document.querySelectorAll('[role=tab]')].find((t) => /^Coverage/.test(t.textContent.trim()))?.click()`).then(() => sleep(300)).then(() => p.click("[data-edit-coverage]")) },
     { name: "Email", path: `/leads/${LEAD}`, open: (p) => p.ev(`document.querySelector('[data-email-lead]')?.click()`) },
+    // The longest of them: the client's profile sheet, from the lead's Project Info tab.
+    { name: "Project Info", path: `/leads/${LEAD}?tab=info`, open: (p) => p.click("[data-tab-panel=info] [data-edit-project-info]") },
   ] : []),
 ];
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for a project's calendar: what is on a day, and what a slot being booked runs into. */
-import { BLOCK_TIMES, blockDays, blockHours, clockOf, dayMarks, eventsOn, minutesOf, slotClashes } from "../../src/lib/project-calendar.js";
+import { BLOCK_TIMES, blockDays, blockHours, blockOn, clockOf, dayMarks, eventsOn, minutesOf, slotClashes, weeklyBlock } from "../../src/lib/project-calendar.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -36,6 +36,20 @@ is("a slot in blocked time says so, with the note", slotClashes({ date: "2026-10
 is("any time on a day blocked whole", slotClashes({ date: "2026-10-23", time: "4:00 PM" }, cal).map((c) => c.kind), ["block"]);
 is("a long one runs into both", slotClashes({ date: "2026-10-20", time: "1:30 PM", duration: 60 }, cal).map((c) => c.kind), ["appointment"]);
 is("no date or time yet: nothing to say", slotClashes({ date: "", time: "10:00 AM" }, cal).length + slotClashes({ date: "2026-10-20", time: "" }, cal).length, 0);
+
+// The client's days to avoid (Project Info): every Monday and Friday, blocked all day, every week.
+const weekly = weeklyBlock({ projectId: 12, days: [5, 1], from: "2026-10-01", to: "2026-10-31" });
+is("days to avoid as one block kept every week", [weekly.id, weekly.weekdays, weekly.weekly, weekly.start, blockDays(weekly), blockHours(weekly)],
+  ["w12", [1, 5], true, null, "Every Mon & Fri", "All day"]);
+is("…none without any days", [weeklyBlock({ projectId: 12, days: [], from: "2026-10-01", to: "2026-10-31" }), weeklyBlock({ projectId: 12, days: null, from: "2026-10-01", to: "2026-10-31" })], [null, null]);
+is("…on those weekdays only", ["2026-10-19", "2026-10-20", "2026-10-23", "2026-10-25", "2026-11-02"].map((d) => blockOn(weekly, d)), [true, false, true, false, false]);
+const avoiding = { appointments: cal.appointments, blocks: [weekly] };
+is("…shaded on the month: each Monday and Friday", Object.entries(dayMarks(avoiding, "2026-10-01", "2026-10-31")).filter(([, m]) => m.blocked).map(([d]) => d),
+  ["2026-10-02", "2026-10-05", "2026-10-09", "2026-10-12", "2026-10-16", "2026-10-19", "2026-10-23", "2026-10-26", "2026-10-30"]);
+is("…in a day's list on a Monday, not on a Tuesday", [eventsOn("2026-10-19", avoiding).map((e) => e.key), eventsOn("2026-10-20", avoiding).map((e) => e.key)], [["bw12"], ["a1", "a2"]]);
+is("…and booking on one says why", slotClashes({ date: "2026-10-23", time: "10:00 AM" }, avoiding).map((c) => c.text),
+  ["No appointments on Fridays (the client's days to avoid, in Project Info)"]);
+is("…several calendars together name theirs", weeklyBlock({ projectId: 3, days: [2], from: "2026-10-01", to: "2026-10-31", project: "Rural Mutual Appts" }).project, "Rural Mutual Appts");
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`);

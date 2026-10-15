@@ -36,6 +36,10 @@ const FORMS = {
   // The three rates are named from RATE_KINDS (name={name}), so only the hidden id is literal here.
   "src/features/projects/components/project-rates-form.jsx": { schema: "projectRates", extra: ["project_id"] },
   "src/features/auth/components/login-form.jsx":       { schema: "login",       extra: ["next", "code"] },  // `code` belongs to the two-factor step
+  // The states, carriers and days to avoid are multi-value, checked in readInfoForm(); the producers' fields are
+  // named from their row (name={`producer_email_${n}`}); the private link's form carries its token.
+  "src/features/project-info/components/project-info-form.jsx": { schema: "projectInfo", extra: ["project_id", "token", "states_licensed", "top_carriers", "avoid_carriers", "avoid_days"] },
+  "src/features/project-info/components/info-link-dialog.jsx":  { schema: "infoLink",    extra: [] },
 };
 
 let failures = 0;

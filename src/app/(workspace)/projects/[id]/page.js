@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download } from "lucide-react";
+import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download, ClipboardList, Pencil, Send } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import ResultBadge from "@/components/shared/result-badge";
@@ -13,6 +13,12 @@ import ProjectRatesForm from "@/features/projects/components/project-rates-form"
 import ProjectTeam from "@/features/projects/components/project-team";
 import XdateMonths from "@/features/reports/components/xdate-months";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import ProjectInfoView from "@/features/project-info/components/project-info-view";
+import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
+import InfoLinkDialog from "@/features/project-info/components/info-link-dialog";
+import { getProjectInfo } from "@/features/project-info/queries";
+import { getCarrierNames } from "@/features/insurance/queries";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { clientSlug } from "@/lib/format";
 import { pageInfo, readListParams } from "@/lib/paging";
@@ -52,7 +58,7 @@ export default async function ProjectDetail({ params, searchParams }) {
   const admin = me?.role === "admin";
   const canManage = admin || me?.role === "manager";
 
-  const [p, overview, team, leads, options, staff, xdates, today, payRules, callResults] = await Promise.all([
+  const [p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers] = await Promise.all([
     getProject(id),
     getProjectOverview(id),
     getProjectTeam(id),
@@ -63,6 +69,8 @@ export default async function ProjectDetail({ params, searchParams }) {
     getBusinessToday(),
     admin ? getPayRules() : null,
     getCallResults(),
+    getProjectInfo(id),
+    admin ? getCarrierNames() : [],
   ]);
   if (!p) notFound();
 
@@ -183,6 +191,22 @@ export default async function ProjectDetail({ params, searchParams }) {
           unassigned={overview.unassigned}
           namesLeft={overview.viableLeft}
         />
+
+        {/* The client's profile sheet (Sean, Oct 2026): what managers read on every lead sheet. The client
+            fills it in from a private link as they come on board, and from their own sign-in after. */}
+        {info ? (
+          <Card id="project-info" data-project-info-card className="overflow-hidden">
+            <SectionHeader wrap label="Project Info" icon={ClipboardList}
+              action={admin ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""}
+                    trigger={<Button size="sm" variant="outline" data-send-project-info><Send /> Send to client</Button>} />
+                  <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />
+                </div>
+              ) : null} />
+            <ProjectInfoView info={info} wide emptyHint="Send the client their link to fill it in, or fill it in here." />
+          </Card>
+        ) : null}
 
         <Card>
           <SectionHeader

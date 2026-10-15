@@ -25,7 +25,7 @@ export async function resendDelivery(formData) {
 
   const result = await deliverLead({ leadId, sentBy: me?.id ?? null, resent: true, origin: await requestOrigin() });
   if (result.error) return fail(result.error);
-  if (!result.addresses) return fail("Its project has no delivery email. Add one on the project first.");
+  if (!result.addresses) return fail("Its project has no delivery email. Add one on the project, or tick a producer for leads in its Project Info.");
   await logActivity(supabase, "lead.deliver", { entity: "lead", entityId: leadId, detail: `${result.sent} sent, ${result.failed} not` });
   revalidatePath(`/leads/${leadId}`);
   return ok(result);

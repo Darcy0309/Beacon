@@ -15,7 +15,8 @@ import ConfirmDialog from "@/components/shared/confirm-dialog";
  * A project calendar's blocked time, in a line: each block still to come
  * (its days, its hours, its note) with a way to take it off, and Block out
  * time. For the Calendar page's toolbar, where the month below shades the
- * same days. `blocks`: getProjectCalendar()'s, from today on. `children`:
+ * same days. The client's days to avoid (every week, from Project Info) show
+ * here too, and are changed there. `blocks`: getProjectCalendar()'s, from today on. `children`:
  * more for the line (Sync my calendar). Without a `projectId` it is several
  * calendars together (a client's): each block names its project, and there
  * is nothing to add or take off until one calendar is chosen.
@@ -49,7 +50,8 @@ export default function BlockedTime({ projectId = null, blocks: every, today, ch
           style={{ borderColor: "color-mix(in srgb, var(--neon-amber) 45%, transparent)", background: "color-mix(in srgb, var(--neon-amber) 8%, transparent)" }}>
           <Ban className="size-3 shrink-0" style={{ color: "var(--neon-amber)" }} />
           <span className="truncate">{blockDays(b)} · {blockHours(b)}{b.note ? ` · ${b.note}` : ""}{b.project ? ` · ${b.project}` : ""}</span>
-          {projectId ? (
+          {/* The client's days to avoid change with their Project Info, not here. */}
+          {projectId && !b.weekly ? (
             <button type="button" onClick={() => setAsking(b)} disabled={removing} aria-label={`Take the block on ${blockDays(b)} off the calendar`} data-remove-block
               className="shrink-0 rounded-full text-muted-foreground transition-colors hover:text-destructive"><X className="size-3" /></button>
           ) : null}

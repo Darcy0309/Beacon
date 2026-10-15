@@ -1,7 +1,7 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, Send, ChevronDown, Mail, Pencil, Phone, PhoneCall, Printer, Repeat } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Pencil, Phone, PhoneCall, Printer, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import Tabs from "@/components/shared/tabs";
@@ -40,6 +40,10 @@ import { getCargoTypes } from "@/features/cargo/queries";
 import { backFrom } from "@/lib/back-link";
 import { emailSignature } from "@/lib/email";
 import { one } from "@/lib/server/query-helpers";
+import ProjectInfoView from "@/features/project-info/components/project-info-view";
+import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
+import { getProjectInfo } from "@/features/project-info/queries";
+import { leadPlace } from "@/lib/project-info";
 
 export const dynamic = "force-dynamic";
 
@@ -186,7 +190,7 @@ export default async function LeadSheet({ params, searchParams }) {
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes] = await Promise.all([
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info] = await Promise.all([
     listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
@@ -196,6 +200,8 @@ export default async function LeadSheet({ params, searchParams }) {
     listLeadFiles(await createClient(), lead.id),
     // The cargo list, for the Business tab's Cargo field.
     staff ? getCargoTypes() : [],
+    // The client's profile sheet for the project (Project Info), at hand while on the phone.
+    r.project?.id ? getProjectInfo(r.project.id) : null,
   ]);
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
@@ -413,7 +419,7 @@ export default async function LeadSheet({ params, searchParams }) {
           <Card className="overflow-hidden">
             <Tabs
               label="About this name"
-              initial={sp?.tab === "files" ? "files" : undefined}
+              initial={["files", "info"].includes(sp?.tab) ? sp.tab : undefined}
               tabs={[
                 {
                   id: "business",
@@ -499,6 +505,23 @@ export default async function LeadSheet({ params, searchParams }) {
                   count: noteCount || null,
                   content: (
                     <LeadNotes leadId={lead.id} clientNote={r.client_note} internalNotes={r.internal_notes} description={r.description} canEdit={staff} showInternal={seesInternal} />
+                  ),
+                },
+                {
+                  // The client's profile sheet (Sean, Oct 2026): the agent and office (its area code is the caller ID
+                  // to call from; its address opens directions to this business), producers, what qualifies an
+                  // appointment. Administrators and the client change it; everyone else reads it.
+                  id: "info",
+                  label: "Project Info",
+                  content: info ? (
+                    <ProjectInfoView
+                      info={info}
+                      toLead={leadPlace(r)}
+                      action={admin ? <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" variant="outline" data-edit-project-info><Pencil /> Edit</Button>} /> : null}
+                      emptyHint={admin ? "Fill it in here, or send the client their link from the project's page." : "An administrator or the client fills it in."}
+                    />
+                  ) : (
+                    <Empty icon={ClipboardList}>{r.project ? "This project's info can't be shown." : "This name is not on a project."}</Empty>
                   ),
                 },
               ]}
@@ -647,7 +670,7 @@ export default async function LeadSheet({ params, searchParams }) {
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--panel-border)] px-4 py-2 text-xs text-muted-foreground">
                           <span>
                             The lead sheet, emailed to the client when a call makes this a lead or an appointment
-                            {r.project?.id ? <> (delivery emails: set on the project)</> : null}.
+                            {r.project?.id ? <> (to the project&apos;s delivery emails, and the producers ticked in Project Info)</> : null}.
                           </span>
                           {canRecord ? <ResendButton leadId={lead.id} /> : null}
                         </div>

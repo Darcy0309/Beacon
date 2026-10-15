@@ -13,6 +13,7 @@ import { PHONE_EXTENSION } from "./format.js";
 import { POLICY_LINES } from "./coverage.js";
 import { parseDeliveryAddresses } from "./delivery.js";
 import { parsePeriodDays } from "./pay.js";
+import { MAX_PRODUCERS, MIN_EMPLOYEES_MAX, QUOTE_MIN_TIMES, QUOTE_TIMES } from "./project-info.js";
 
 const str = (v) => (v == null ? "" : String(v).trim());
 const empty = (v) => str(v) === "";
@@ -283,6 +284,49 @@ export const schemas = {
     timezone_id: [id],
   },
 
+  /**
+   * Project Info (the client profile sheet; Sean, Oct 2026): the agent and
+   * office, the producers (first, last, email, and whether they get leads by
+   * email), and the questions on appointments and the agency. The states,
+   * carriers and days to avoid come as several values each, checked apart.
+   */
+  projectInfo: {
+    contact_name: [max(80)],
+    address: [max(120)],
+    city: [max(60)],
+    state: [stateCode],
+    zip: [zip],
+    phone: [phone],
+    agent_mobile: [phone],
+    agent_email: [mailbox, max(254)],
+    ...Object.fromEntries(Array.from({ length: MAX_PRODUCERS }, (_, i) => i + 1).flatMap((n) => [
+      [`producer_first_${n}`, [max(40)]],
+      [`producer_last_${n}`, [max(40)]],
+      [`producer_email_${n}`, [mailbox, max(254)]],
+      [`producer_leads_${n}`, [oneOf(["", "on"])]],
+    ])),
+    personal_lines: [oneOf(["yes", "no"])],
+    min_employees: [int({ min: 0, max: MIN_EMPLOYEES_MAX })],
+    quote_time: [oneOf(QUOTE_TIMES)],
+    quote_min_time: [oneOf(QUOTE_MIN_TIMES)],
+    wc_mono: [oneOf(["yes", "no"])],
+    wc_min_employees: [int({ min: 0, max: 1000000 })],
+    auto_mono: [oneOf(["yes", "no"])],
+    auto_min_autos: [int({ min: 0, max: 1000000 })],
+    health_only: [oneOf(["yes", "no"])],
+    health_min_lives: [int({ min: 0, max: 1000000 })],
+    special_programs: [max(4000)],
+    value_added: [max(4000)],
+    exclusive_program: [max(4000)],
+    industry_notes: [max(4000)],
+  },
+
+  /** Sending a client the private link to their Project Info. */
+  infoLink: {
+    project_id: [required("Missing project"), id],
+    to: [required("Who should get it?"), mailbox, max(254)],
+  },
+
   /** USD paid per lead, appointment and confirmation on a project. */
   projectRates: {
     lead_rate: [num({ min: 0, max: 10000 })],
@@ -549,6 +593,14 @@ export const cross = {
     if (!errors.start_date && !errors.end_date && values.start_date && values.end_date &&
         values.end_date < values.start_date) {
       errors.end_date = "End date must be on or after the start date";
+    }
+  },
+  /** A producer ticked to get leads by email needs an address to send them to. */
+  projectInfo(values, errors) {
+    for (let n = 1; n <= MAX_PRODUCERS; n++) {
+      if (values[`producer_leads_${n}`] === "on" && !str(values[`producer_email_${n}`]) && !errors[`producer_email_${n}`]) {
+        errors[`producer_email_${n}`] = "Add their email to send them leads";
+      }
     }
   },
   company(values, errors) {

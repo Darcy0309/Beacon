@@ -17,7 +17,7 @@ import {
 import { telHref } from "@/lib/format";
 import LeadFiles from "@/features/leads/components/lead-files";
 import { useRole } from "@/components/layout/role-provider";
-import { blockDays, blockHours } from "@/lib/project-calendar";
+import { blockDays, blockHours, blockOn } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
@@ -46,8 +46,8 @@ const DEFAULT_END_HOUR = 19;
 /** timeRank() yields 1441 for a time it cannot parse; those get their own strip. */
 const UNTIMED = 24 * 60;
 
-// Time blocked out on a project's calendar (calendar_blocks), as getProjectCalendar() shapes it.
-const blocksDay = (b, day) => day >= b.startsOn && day <= b.endsOn;
+// Time blocked out on a project's calendar (calendar_blocks, and the client's days to avoid every week), as getProjectCalendar() shapes it.
+const blocksDay = blockOn;
 // Its note and who blocked it; a busy time from someone's own calendar says only whose.
 const blockNote = (b) => (b.synced ? (b.by ? `${b.by}'s calendar` : "A connected calendar") : [b.note, b.by ? `by ${b.by}` : null].filter(Boolean).join(" · "));
 const blockTitle = (b) => [b.synced ? "Busy" : "Blocked", blockHours(b), blockNote(b), b.project].filter(Boolean).join(" · ");

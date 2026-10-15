@@ -4,7 +4,8 @@
  * functions; days are "YYYY-MM-DD", times of day minutes past midnight.
  */
 
-import { addDays, formatIso } from "./dates.js";
+import { addDays, formatIso, weekdayOf } from "./dates.js";
+import { WEEKDAYS, weekdayList } from "./project-info.js";
 
 /** "9:30 AM", "13:00" or "13:00:00" as minutes past midnight; null when it is not a time. */
 export function minutesOf(time) {
@@ -29,8 +30,29 @@ export const BLOCK_TIMES = Array.from({ length: 31 }, (_, i) => clockOf(360 + i 
 
 /** When a block applies each day: "All day" or "10:00 AM – 1:00 PM". */
 export const blockHours = (b) => (b.start == null ? "All day" : `${clockOf(b.start)} – ${clockOf(b.end)}`);
-/** Its days: "Oct 20" or "Oct 20 – Oct 22". */
-export const blockDays = (b) => (b.startsOn === b.endsOn ? formatIso(b.startsOn, "short") : `${formatIso(b.startsOn, "short")} – ${formatIso(b.endsOn, "short")}`);
+/** Its days: "Oct 20", "Oct 20 – Oct 22", or every week, "Every Mon & Fri". */
+export const blockDays = (b) => (b.weekdays
+  ? `Every ${weekdayList(b.weekdays)}`
+  : b.startsOn === b.endsOn ? formatIso(b.startsOn, "short") : `${formatIso(b.startsOn, "short")} – ${formatIso(b.endsOn, "short")}`);
+
+/** Whether a block covers `day`: within its days and, for one kept every week, on one of its weekdays. */
+export const blockOn = (b, day) => day >= b.startsOn && day <= b.endsOn && (!b.weekdays || b.weekdays.includes(weekdayOf(day)));
+
+/**
+ * The weekdays a client takes no appointments on (Project Info's days to
+ * avoid; Sean, Oct 2026), as one block kept every week from `from` to `to`:
+ * blocked all day, shown with the calendar's other blocked time, taken off
+ * only by changing the Project Info. Null without any days. `project`: the
+ * calendar's name, when several are shown together.
+ */
+export function weeklyBlock({ projectId, days, from, to, project = null }) {
+  const weekdays = WEEKDAYS.map(([d]) => d).filter((d) => (days ?? []).map(Number).includes(d));
+  if (!weekdays.length) return null;
+  return {
+    id: `w${projectId}`, startsOn: from, endsOn: to, start: null, end: null, weekdays, weekly: true,
+    note: "Days to avoid, from Project Info", synced: false, by: null, byClient: false, ...(project ? { project } : {}),
+  };
+}
 
 /**
  * What a calendar has on `day`, in the order of the day: blocked time and
@@ -39,7 +61,7 @@ export const blockDays = (b) => (b.startsOn === b.endsOn ? formatIso(b.startsOn,
 export function eventsOn(day, { appointments = [], blocks = [] }) {
   const out = [];
   for (const b of blocks) {
-    if (day >= b.startsOn && day <= b.endsOn) out.push({ kind: "block", key: `b${b.id}`, start: b.start ?? -1, end: b.end ?? 1440, block: b });
+    if (blockOn(b, day)) out.push({ kind: "block", key: `b${b.id}`, start: b.start ?? -1, end: b.end ?? 1440, block: b });
   }
   for (const a of appointments) {
     if (a.date !== day) continue;
@@ -57,6 +79,7 @@ export function dayMarks({ appointments = [], blocks = [] }, from, to) {
   }
   for (const b of blocks) {
     for (let d = b.startsOn < from ? from : b.startsOn; d <= b.endsOn && d <= to; d = addDays(d, 1)) {
+      if (b.weekdays && !b.weekdays.includes(weekdayOf(d))) continue;
       const m = (marks[d] ||= { appointments: 0, blocked: null });
       m.blocked = b.start == null ? "day" : m.blocked ?? "part";
     }
@@ -77,7 +100,9 @@ export function slotClashes({ date, time, duration = 30, exceptId = null }, cale
   return eventsOn(date, calendar)
     .filter((e) => e.start < end && e.end > start && !(e.kind === "appointment" && e.appointment.id === exceptId))
     .map((e) => (e.kind === "block"
-      ? { kind: "block", text: e.block.synced
+      ? { kind: "block", text: e.block.weekly
+          ? `No appointments on ${weekdayList([weekdayOf(date)], { plural: true })} (the client's days to avoid, in Project Info)`
+          : e.block.synced
           ? `Busy ${e.block.start == null ? "all day" : blockHours(e.block)}${e.block.by ? ` on ${e.block.by}'s calendar` : " on a connected calendar"}`
           : `Blocked out ${e.block.start == null ? "all day" : blockHours(e.block)}${e.block.note ? ` (${e.block.note})` : ""}` }
       : { kind: "appointment", text: `Already booked: ${e.appointment.time}${e.appointment.company ? ` ${e.appointment.company}` : ""}, ${e.appointment.duration ?? 30} min` }));

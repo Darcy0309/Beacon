@@ -3,7 +3,7 @@
 import "server-only";
 import { after } from "next/server";
 import { refreshStaleFeeds } from "@/features/calendar/sync";
-import { minutesOf } from "@/lib/project-calendar";
+import { minutesOf, weeklyBlock } from "@/lib/project-calendar";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -34,7 +34,8 @@ export async function getProjectCalendar({ projectId, from, to }) {
   const { data: calendarId } = await supabase.rpc("calendar_project", { p_project_id: Number(projectId) });
   if (!calendarId) return null;
   const [project, appts, blocks] = await Promise.all([
-    supabase.from("projects").select("id, name").eq("id", calendarId).maybeSingle(),
+    // With the weekdays the client takes no appointments on (its Project Info).
+    supabase.from("projects").select("id, name, profile:project_profiles(avoid_days)").eq("id", calendarId).maybeSingle(),
     supabase.from("appointments")
       .select("id, appt_date, appt_time, duration_min, confirmed_at, lead:leads(id, company_name)")
       .eq("project_id", calendarId).is("invalid_at", null).gte("appt_date", from).lte("appt_date", to).limit(2000),
@@ -49,6 +50,7 @@ export async function getProjectCalendar({ projectId, from, to }) {
   after(() => refreshStaleFeeds(calendarId).catch((err) => console.error("[calendar sync]", err?.message ?? err)));
   if (appts.error) throw appts.error;
   if (blocks.error) throw blocks.error;
+  const weekly = weeklyBlock({ projectId: calendarId, days: one(project.data.profile)?.avoid_days, from, to });
   return {
     projectId: calendarId,
     name: project.data.name,
@@ -58,7 +60,7 @@ export async function getProjectCalendar({ projectId, from, to }) {
       id: a.id, date: a.appt_date, time: a.appt_time, duration: a.duration_min ?? 30, confirmed: Boolean(a.confirmed_at),
       company: one(a.lead)?.company_name ?? null, leadId: one(a.lead)?.id ?? null,
     })),
-    blocks: (blocks.data ?? []).map(shapeBlock),
+    blocks: [...(weekly ? [weekly] : []), ...(blocks.data ?? []).map(shapeBlock)],
   };
 }
 
@@ -71,13 +73,20 @@ export async function getBlocksAcross({ projectIds, from, to }) {
   if (!projectIds?.length) return [];
   const supabase = await createClient();
   // Read in pages, as on one calendar: synced busy times can pass the API's 1,000-row cap, and ordered by
-  // day a single read would drop the latest blocked days.
-  const data = await readAll((first, last) => supabase.from("calendar_blocks")
-    .select(`${BLOCK_COLUMNS}, project_id, project:projects(name)`)
-    .in("project_id", projectIds).lte("starts_on", to).gte("ends_on", from).order("starts_on").order("id").range(first, last));
+  // day a single read would drop the latest blocked days. And each one's days to avoid (Project Info).
+  const [data, profiles] = await Promise.all([
+    readAll((first, last) => supabase.from("calendar_blocks")
+      .select(`${BLOCK_COLUMNS}, project_id, project:projects(name)`)
+      .in("project_id", projectIds).lte("starts_on", to).gte("ends_on", from).order("starts_on").order("id").range(first, last)),
+    supabase.from("project_profiles").select("project_id, avoid_days, project:projects(name)").in("project_id", projectIds),
+  ]);
+  if (profiles.error) throw profiles.error;
   // Personal calendars connected to any of them are read again when they have gone stale, as on one calendar.
   after(() => Promise.all(projectIds.slice(0, 12).map((id) => refreshStaleFeeds(id).catch((err) => console.error("[calendar sync]", err?.message ?? err)))));
-  return (data ?? []).map(shapeBlock);
+  const weekly = (profiles.data ?? [])
+    .map((p) => weeklyBlock({ projectId: p.project_id, days: p.avoid_days, from, to, project: one(p.project)?.name ?? null }))
+    .filter(Boolean);
+  return [...weekly, ...(data ?? []).map(shapeBlock)];
 }
 
 /**

@@ -191,7 +191,7 @@ export default function ProjectForm({ project, options, trigger }) {
 
             {/* Where its leads go: a lead's sheet is emailed here when a call makes it a lead or an appointment. */}
             <Field label="Lead delivery emails" error={fe("email")} className="sm:col-span-2"
-              hint="Each lead and appointment's sheet is emailed here. Separate several with commas.">
+              hint="Each lead and appointment's sheet is emailed here, and to the producers ticked in Project Info. Separate several with commas.">
               <Input name="email" maxLength={500} placeholder="leads@client.com, producer@client.com" defaultValue={dv("email")} aria-invalid={invalid("email")} />
             </Field>
             <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">

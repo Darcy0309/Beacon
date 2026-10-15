@@ -8,11 +8,12 @@
 
 import "server-only";
 import { POLICY_LINES } from "@/lib/coverage";
-import { mailFailure, isReservedAddress, oneLine } from "@/lib/email";
+import { isMailbox, mailFailure, isReservedAddress, oneLine } from "@/lib/email";
 import { APPOINTMENT_NOTICES, deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet, sendsSheet } from "@/lib/delivery";
 import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links";
 import { fileSize, fullName, sicLabel } from "@/lib/format";
 import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
+import { infoProjectOf, producerAddresses } from "@/lib/project-info";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { LINK_DAYS, sheetToken } from "@/lib/server/sheet-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -74,7 +75,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   const projectId = call?.project_id ?? lead.project_id;
   const [{ data: project }, { data: appt }, { data: tz }, { data: sic }, { data: docs }] = await Promise.all([
     projectId
-      ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, company:companies(name)").eq("id", projectId).maybeSingle()
+      ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, appt_project_id, company:companies(name)").eq("id", projectId).maybeSingle()
       : Promise.resolve({ data: null }),
     apptQuery,
     admin.rpc("business_tz"),
@@ -155,9 +156,30 @@ export function appointmentEvent(company, appt, address, timeZone, details) {
 }
 
 /**
- * Send a lead's sheet to its project's delivery addresses and keep a record
- * of each send. `origin`: the app's address, for links. Never throws: what
- * went wrong is kept with the delivery. Returns { sent, failed, addresses }.
+ * Where a project's leads and appointments go: its delivery addresses (the
+ * project form's), and the producers its Project Info ticks to get leads by
+ * email (Sean, Oct 2026; a DB dev project's Project Info is the appointment
+ * project's). Each address once: [{ address, linkOnly }].
+ */
+export async function deliveryAddresses(admin, project) {
+  if (!project) return [];
+  const { list } = parseDeliveryAddresses(project.email, project.delivery_link_only);
+  const { data: info } = await admin.from("project_profiles").select("producers").eq("project_id", infoProjectOf(project)).maybeSingle();
+  // A producer's address as it is: no "_" marks a link for them.
+  const seen = new Set(list.map((a) => a.address.toLowerCase()));
+  for (const address of producerAddresses(info?.producers)) {
+    if (!isMailbox(address) || seen.has(address.toLowerCase())) continue;
+    seen.add(address.toLowerCase());
+    list.push({ address, linkOnly: Boolean(project.delivery_link_only) });
+  }
+  return list;
+}
+
+/**
+ * Send a lead's sheet to its project's delivery addresses (and the
+ * producers ticked in its Project Info) and keep a record of each send.
+ * `origin`: the app's address, for links. Never throws: what went wrong is
+ * kept with the delivery. Returns { sent, failed, addresses }.
  */
 export async function deliverLead({ leadId, callRecordId = null, sentBy = null, resent = false, origin }) {
   const admin = createAdminClient();
@@ -169,7 +191,7 @@ export async function deliverLead({ leadId, callRecordId = null, sentBy = null, 
     const loaded = await loadLeadSheet(admin, leadId, callRecordId, { origin });
     if (!loaded) return { sent: 0, failed: 0, addresses: 0 };
     const { project, rep, sheet } = loaded;
-    const { list } = parseDeliveryAddresses(project?.email, project?.delivery_link_only);
+    const list = await deliveryAddresses(admin, project);
     if (!list.length) return { sent: 0, failed: 0, addresses: 0 };
 
     const { data: settings } = await admin.from("app_settings").select("key, value").in("key", ["mail", "organization"]);

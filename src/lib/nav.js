@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
-  CalendarSearch, Banknote, Clock,
+  CalendarSearch, Banknote, Clock, ClipboardList,
 } from "lucide-react";
 
 export const ROLES = {
@@ -48,6 +48,8 @@ export const navGroups = [
       { href: "/leads", label: "Leads", icon: Target, roles: ["admin", "agent"] },
       { href: "/appointments", label: "Appointments", icon: CalendarDays, roles: ALL },
       { href: "/calendar", label: "Calendar", icon: CalendarRange, roles: ALL },
+      // A client's own profile sheet for each project, to keep up to date (staff read it on the lead sheet).
+      { href: "/project-info", label: "Project Info", icon: ClipboardList, roles: ["client"] },
     ],
   },
   {

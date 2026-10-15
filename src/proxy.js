@@ -6,9 +6,10 @@ import { IDLE_COOKIE, idleExpired, idleLimitOf, sessionIdOf } from "@/lib/idle";
 
 // Open without a session: signing in, the browser's push worker (fetched again
 // by the browser on its own), and push delivery, which the database calls
-// with its own secret (app/api/push/deliver), and a lead sheet's private
-// link, whose signed token says which lead (app/sheet/[token]).
-const PUBLIC_PATHS = ["/login", "/auth", "/setup", "/sw.js", "/api/push/deliver", "/sheet"];
+// with its own secret (app/api/push/deliver), a lead sheet's private link,
+// whose signed token says which lead (app/sheet/[token]), and the private
+// link a client fills in their Project Info from (app/client-profile/[token]).
+const PUBLIC_PATHS = ["/login", "/auth", "/setup", "/sw.js", "/api/push/deliver", "/sheet", "/client-profile"];
 
 /**
  * True when the session has cleared two-factor. The assurance level is a
