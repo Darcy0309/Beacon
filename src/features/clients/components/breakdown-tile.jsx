@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import CountUp from "@/components/shared/count-up";
 
 /**
  * A tile that counts the same things two ways, side by side: the active
@@ -31,7 +32,7 @@ export default function BreakdownTile({ label, icon, accent = "var(--neon-violet
                   {g.rows.map((r) => (
                     <li key={r.label} className="flex items-baseline justify-between gap-2">
                       <span className={cn("min-w-0 truncate", r.none && "text-muted-foreground")} title={r.label}>{r.label}</span>
-                      <strong className="shrink-0 tabular-nums" style={{ color: accent }}>{r.count.toLocaleString()}</strong>
+                      <strong className="shrink-0 tabular-nums" style={{ color: accent }}><CountUp value={r.count.toLocaleString()} /></strong>
                     </li>
                   ))}
                 </ul>

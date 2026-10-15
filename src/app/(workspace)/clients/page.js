@@ -2,6 +2,7 @@ import Link from "@/components/shared/intent-link";
 import { Building2, CalendarCheck, Globe2, Target } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
+import CountUp from "@/components/shared/count-up";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import LinkRow from "@/components/shared/link-row";
@@ -60,7 +61,7 @@ export default async function ClientsPage({ searchParams }) {
               {[["Active", active.length, "var(--neon-emerald)"], ["Paused", paused, "var(--neon-amber)"], ["Completed", completed, "var(--neon-blue)"]].map(([name, n, color]) => (
                 <div key={name} className="flex items-center justify-between gap-2">
                   <dt className="flex items-center gap-1.5 text-muted-foreground"><span className="size-1.5 rounded-full" style={{ background: color }} />{name}</dt>
-                  <dd className="font-semibold tabular-nums">{n.toLocaleString()}</dd>
+                  <dd className="font-semibold tabular-nums"><CountUp value={n.toLocaleString()} /></dd>
                 </div>
               ))}
             </dl>

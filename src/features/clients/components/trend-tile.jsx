@@ -9,6 +9,7 @@ import {
 import { formatRange } from "@/lib/dates";
 import { CHART_RANGES, DAY_AXIS, axisMax, chartPoints } from "@/lib/production-chart";
 import { cn } from "@/lib/utils";
+import CountUp from "@/components/shared/count-up";
 
 const HEIGHT = 132;
 const PAD = { left: 30, right: 10, top: 10, bottom: 20 };
@@ -80,7 +81,8 @@ export default function TrendTile({ label, value, note, icon, accent, data, seri
           </span>
           <span className="stat-label min-w-0 flex-1 pt-0.5" style={{ color: `color-mix(in srgb, ${accent} 68%, var(--foreground))` }}>{label}</span>
         </div>
-        <div className="mt-3 stat-value" style={{ color: accent }} data-trend-value>{value}</div>
+        {/* Counted up as every tile's figure is. */}
+        <div className="mt-3 stat-value" style={{ color: accent }} data-trend-value><CountUp value={value} /></div>
         <div className="mt-1 truncate text-xs text-muted-foreground" title={note}>{note}</div>
         {/* What the chart adds up to, on a line of its own so two tiles side by side stay level. */}
         <div className="mt-1 truncate text-xs text-muted-foreground tabular-nums" data-trend-total>

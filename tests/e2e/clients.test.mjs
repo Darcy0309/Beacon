@@ -7,7 +7,7 @@
  *
  *   node tests/e2e/clients.test.mjs
  */
-import { check, finish, section, until } from "../support/assert.mjs";
+import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
@@ -81,6 +81,25 @@ try {
   const saved = () => sql(`select timezone_id || '|' || coalesce(subscription_start::text, '') || '|' || coalesce(subscription_end::text, '') || '|' || status from public.companies where name = ${lit(NAME)}`);
   check("they are saved on the client", Boolean(await until(() => saved() === `${MST}|2026-01-26|2026-12-31|active`)), saved());
   sql(`update public.companies set status = 'paused', state = 'CA' where id = ${otherClient}`);
+
+  section("The Clients page: its figures count up");
+  // Arriving through the sidebar, the Leads tile's figure sampled as it counts.
+  await admin.go("/leads", 4000);
+  await admin.click("aside a[href='/clients'], nav a[href='/clients']");
+  const counted = [];
+  const began = Date.now();
+  while (Date.now() - began < 3500) {
+    const v = await admin.ev(`document.querySelector('[data-trend-value] [data-count-up]')?.textContent ?? null`);
+    if (v !== null && counted.at(-1) !== v) counted.push(v);
+    await sleep(30);
+  }
+  const lastCount = Number(String(counted.at(-1) ?? "0").replace(/\D/g, ""));
+  check("the Leads and Appointments figures count up to their value, as every tile's do",
+    lastCount === 0 || (counted.length > 2 && counted.slice(0, -1).some((v) => Number(v.replace(/\D/g, "")) < lastCount)), counted.join(" → "));
+  check("…and so do the status and breakdown counts, every one ending visible", await admin.ev(`(() => {
+    const all = [...document.querySelectorAll('[data-client-tiles] [data-count-up]')];
+    return all.length >= 6 && !!document.querySelector('[data-client-statuses] [data-count-up]') && all.every((e) => e.hasAttribute('data-counted') && getComputedStyle(e).visibility === 'visible');
+  })()`));
 
   section("The Clients page: clients in rows");
   await admin.go("/clients", 5000);
