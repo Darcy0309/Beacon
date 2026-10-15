@@ -734,3 +734,15 @@ option {
     animation: none !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   The phone (features/phone): while it is open, a message popping up in the
+   bottom-right corner ("Saved", the desktop-notifications prompt) shows to
+   its left, never over the Call and End buttons. On a phone-sized screen the
+   messages keep their own place across the bottom.
+   --------------------------------------------------------------------------- */
+@media (min-width: 601px) {
+  html[data-phone-open] [data-sonner-toaster][data-x-position="right"][data-y-position="bottom"] {
+    right: calc(var(--offset-right) + 21.5rem);
+  }
+}

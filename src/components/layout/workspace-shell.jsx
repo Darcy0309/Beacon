@@ -15,6 +15,7 @@ import ActivityTracker from "@/features/pay/components/activity-tracker";
 import IdleGuard from "@/features/auth/components/idle-guard";
 import ExpandRowGuard from "@/components/layout/expand-row-guard";
 import { idleLimitFor } from "@/lib/idle";
+import { PhoneProvider } from "@/features/phone/phone";
 
 /**
  * The chrome around every workspace page: sidebar, access checks, and the
@@ -54,7 +55,10 @@ export default function WorkspaceShell({ children }) {
   // Signed out after 30 minutes without activity: everyone but administrators.
   const guarded = Boolean(user) && idleLimitFor(role) != null;
 
-  return (
+  // The phone, for the staff who call: administrators, account managers and agents.
+  const calls = ["admin", "manager", "agent"].includes(role) && user?.status === "active";
+
+  const shell = (
     <div className="flex min-h-svh">
       {tracked ? <ActivityTracker /> : null}
       {guarded ? <IdleGuard /> : null}
@@ -65,6 +69,7 @@ export default function WorkspaceShell({ children }) {
       </div>
     </div>
   );
+  return calls ? <PhoneProvider tracked={tracked}>{shell}</PhoneProvider> : shell;
 }
 
 function AccountDisabled({ email }) {
