@@ -80,7 +80,7 @@ try {
 
   section("On the phone");
   await hour.ev(`localStorage.setItem(${JSON.stringify(KEY)}, ${minutesAgo(20)})`);
-  await hour.click("[data-phone-button]");
+  await hour.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
   await hour.click("[data-phone-test-call]");
   await until(() => hour.ev(`!!document.querySelector('[data-phone-answer]')`), { timeout: 9000 });
   await hour.click("[data-phone-answer]");

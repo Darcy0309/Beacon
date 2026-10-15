@@ -1,5 +1,5 @@
 /**
- * The phone in Lighthouse (Oct 2026): a phone button on every page for the
+ * The phone in Lighthouse (Oct 2026), with no button of its own: opened by a phone link (or, here, as one opens it), for the
  * staff, opening a keypad. A number pressed or typed (grouped as it grows)
  * finds its lead; Call hands it to the computer's calling app and times the
  * call; End stops it and keeps it under Recent, to call again; the controls
@@ -35,9 +35,9 @@ try {
   const text = (sel) => sean.ev(`document.querySelector(${JSON.stringify(sel)})?.textContent?.trim() ?? null`);
   await sean.go("/work", 5000);
 
-  section("The phone button, on every page");
-  check("a phone button for the staff", await sean.ev(`!!document.querySelector('[data-phone-button]')`));
-  await sean.click("[data-phone-button]");
+  section("Opened, with no button of its own");
+  check("no phone button floating over the page", await sean.ev(`!document.querySelector('[data-phone-button]')`));
+  await sean.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
   check("…opening the phone: keypad and number", Boolean(await until(() => sean.ev(`document.querySelectorAll('[data-phone-key]').length === 12 && !!document.querySelector('[data-phone-number]')`))));
   check("…saying how calls go today", /calling app/i.test((await text("[data-phone-line]")) ?? ""), await text("[data-phone-line]"));
   check("…Call off until there is a number", await sean.ev(`document.querySelector('[data-phone-call]').disabled`));
@@ -59,9 +59,7 @@ try {
   const controls = await sean.ev(`[...document.querySelectorAll('[data-phone-control]')].map((b) => b.dataset.phoneControl + ':' + b.disabled)`);
   check("mute, hold, keypad tones and record are there, off until PanTerra connects, and say so",
     JSON.stringify(controls) === JSON.stringify(["mute:true", "hold:true", "tones:true", "record:true"]) && /PanTerra connection/.test((await text("[data-phone-line-note]")) ?? ""), JSON.stringify(controls));
-  await sean.click("[data-phone-close]");
-  check("minimized, the button shows the call's time", /^\d+:\d\d$/.test((await text("[data-phone-timer]")) ?? ""), await text("[data-phone-timer]"));
-  await sean.click("[data-phone-button]");
+  check("while the call is on, it stays open (there is no button to come back by)", await sean.ev(`!document.querySelector('[data-phone-close]')`));
   await sleep(1100);
   await sean.click("[data-phone-end]");
   check("End stops it", /^Call ended · 0:0\d$/.test((await until(async () => { const t = await text("[data-phone-status]"); return /ended/.test(t ?? "") ? t : null; })) ?? ""));
@@ -111,9 +109,9 @@ try {
     await mover.send("Input.dispatchMouseEvent", { type: "mouseReleased", x: at.x + dx, y: at.y + dy, button: "left", clickCount: 1 });
     await sleep(150);
   };
-  await mover.click("[data-phone-button]");
+  await mover.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
   const docked = await until(async () => { const b = await box(); return b?.w === 320 ? b : null; });
-  check("it opens docked above the phone button", docked && !docked.placed, JSON.stringify(docked));
+  check("it opens docked in the corner", docked && !docked.placed, JSON.stringify(docked));
   await dragBy(-500, -300);
   const moved = await box();
   check("dragged by any part of it, not only its title bar, it moves with the mouse", moved?.placed && Math.abs(moved.x - (docked.x - 500)) <= 2 && Math.abs(moved.y - (docked.y - 300)) <= 2, `${JSON.stringify(docked)} → ${JSON.stringify(moved)}`);
@@ -129,7 +127,7 @@ try {
   await mover.key("ArrowDown");
   check("the arrow keys move it too, from its grip", (await box())?.x === 32 && (await box())?.y === 32, JSON.stringify(await box()));
   await mover.go("/work", 4000);
-  await mover.click("[data-phone-button]");
+  await mover.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
   // Measured once its opening animation (a slight scale) has settled.
   const again = await until(async () => { const b = await box(); return b?.w === 320 ? b : null; });
   check("it opens where it was left", again?.placed && again.x === 32 && again.y === 32, JSON.stringify(again ?? await box()));
@@ -149,13 +147,13 @@ try {
   await ringer.ev(`document.hasFocus = () => false`);
   const rtext = (sel) => ringer.ev(`document.querySelector(${JSON.stringify(sel)})?.textContent?.trim() ?? null`);
   const shown = () => ringer.ev(`navigator.serviceWorker.getRegistration('/').then((r) => r ? r.getNotifications() : []).then((list) => list.filter((n) => n.data?.kind === 'call').map((n) => ({ title: n.title, body: n.body, id: n.data.id, icon: n.icon, actions: (n.actions ?? []).map((a) => a.title), actionIcons: (n.actions ?? []).map((a) => a.icon) })))`);
-  await ringer.click("[data-phone-button]");
+  await ringer.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
   await ringer.click("[data-phone-test-call]");
   check("a test call is on its way, with time to look away", Boolean(await ringer.ev(`!!document.querySelector('[data-phone-test-pending]')`)));
   const ringing = await until(() => ringer.ev(`document.querySelector('[data-phone-ringing]')?.dataset.phoneRinging ?? null`), { timeout: 9000 });
   check("it rings: Incoming call, the number, Answer and Decline", ringing === "test" && /Incoming call/.test((await rtext("[data-phone-ringing]")) ?? "")
     && /^\(\d{3}\) \d{3}-\d{4}$/.test((await rtext("[data-phone-caller]")) ?? "") && await ringer.ev(`!!document.querySelector('[data-phone-answer]') && !!document.querySelector('[data-phone-decline]')`), await rtext("[data-phone-ringing]"));
-  check("…the phone button says so", (await rtext("[data-phone-button-ringing]")) === "Incoming");
+  check("…and while it rings, the window cannot be closed", await ringer.ev(`!document.querySelector('[data-phone-close]')`));
   const notes = granted ? await until(async () => { const n = await shown(); return n.length ? n : null; }, { timeout: 4000 }) : null;
   check("…and on the desktop, with Answer and Decline on it", !granted || (notes?.[0]?.title === "Incoming call (test)" && JSON.stringify(notes[0].actions) === JSON.stringify(["Answer", "Decline"])), JSON.stringify(notes));
   check("…its own phone icon, and one on each button", !granted || (/\/phone\/call-incoming\.png$/.test(notes?.[0]?.icon ?? "")
@@ -184,7 +182,9 @@ try {
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1400, height: 1000 });
   await client.go("/", 5000);
-  check("has no phone", await client.ev(`!document.querySelector('[data-phone-button]')`));
+  await client.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
+  await sleep(500);
+  check("has no phone", await client.ev(`!document.querySelector('[data-phone-window]')`));
 } finally {
   browser.close();
   sql(`delete from public.work_activity where lead_id = ${lead}`);

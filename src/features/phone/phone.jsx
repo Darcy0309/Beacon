@@ -2,8 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDownRight, ChevronDown, CircleDot, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
-  PhoneMissed, PhoneOff, PhoneOutgoing,
+  ArrowDownRight, CircleDot, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
+  PhoneMissed, PhoneOff, PhoneOutgoing, X,
 } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import { createClient } from "@/lib/supabase/client";
@@ -67,7 +67,8 @@ const keepRecent = (list) => {
 const PRESSABLE = "button, a, input, textarea, select, label, [role=button]";
 
 /**
- * The phone in Lighthouse (Oct 2026), on every page for the staff: a keypad
+ * The phone in Lighthouse (Oct 2026), for the staff, opened by a phone link
+ * (it has no button of its own) or a call ringing: a keypad
  * and number, the lead the number belongs to, the call with its timer, its
  * controls, the calls made and taken lately, and a call coming in, ringing,
  * to answer or decline here or on the desktop notification. Every phone link
@@ -415,14 +416,20 @@ export function PhoneProvider({ children, tracked = false }) {
     const onClick = (e) => {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       const a = e.target instanceof Element ? e.target.closest('a[href^="tel:"]') : null;
-      if (!a || a.closest("[data-phone-dock], [data-phone-window]")) return;
+      if (!a || a.closest("[data-phone-window]")) return;
       e.preventDefault();
       const leadId = Number(a.closest("[data-lead-id]")?.getAttribute("data-lead-id"));
       openPhone({ number: numberOfTel(a.getAttribute("href")), leadId: Number.isInteger(leadId) && leadId > 0 ? leadId : null, call: true, fromLink: true });
     };
     // Bubbling, after the activity tracker (capturing) has counted the press.
     document.addEventListener("click", onClick);
-    return () => document.removeEventListener("click", onClick);
+    // And anything else that opens it ("lighthouse:phone", with openPhone's options): it has no button of its own.
+    const onOpen = (e) => openPhone(e.detail ?? {});
+    window.addEventListener("lighthouse:phone", onOpen);
+    return () => {
+      document.removeEventListener("click", onClick);
+      window.removeEventListener("lighthouse:phone", onOpen);
+    };
   }, [openPhone]);
 
   const press = useCallback(
@@ -446,7 +453,7 @@ export function PhoneProvider({ children, tracked = false }) {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "Escape") {
         // Only from inside the phone: Escape elsewhere is a dialog's or a menu's.
-        if (t instanceof Element && t.closest("[data-phone-dock], [data-phone-window]")) setOpen(false);
+        if (t instanceof Element && t.closest("[data-phone-window]") && !active && !ringingRef.current) setOpen(false);
         return;
       }
       if (ringingRef.current || t?.hasAttribute?.("data-phone-number")) return; // ringing: its buttons; the number: its own keys
@@ -477,13 +484,13 @@ export function PhoneProvider({ children, tracked = false }) {
         // The phone's window: over the page but not in its way (the page stays usable during a call), dragged
         // anywhere by any part of it that is not a button, docked above the phone button until it is.
         <div data-phone-window data-placed={placed ? "" : undefined}
-          className={cn("fixed z-40 print:hidden", !placed && "bottom-[5.25rem] right-4")}
+          className={cn("fixed z-40 print:hidden", !placed && "bottom-4 right-4")}
           style={placed ? { left: pos.x, top: pos.y } : undefined}>
           <section ref={panelRef} aria-label="Phone" data-phone-panel
             onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
             title={small ? undefined : "Drag anywhere to move it"}
             className={cn("animate-pop-in flex w-[20rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-card shadow-[0_24px_70px_-20px_rgb(0_0_0/0.55)]",
-              placed ? "max-h-[calc(100svh-1rem)]" : "max-h-[calc(100svh-6.5rem)]",
+              placed ? "max-h-[calc(100svh-1rem)]" : "max-h-[calc(100svh-2rem)]",
               !small && "touch-none [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_input]:cursor-text",
               !small && (dragging ? "cursor-grabbing select-none ring-2 ring-primary/40" : "cursor-grab"))}>
             <header onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest(PRESSABLE))) dock(); }}
@@ -514,10 +521,13 @@ export function PhoneProvider({ children, tracked = false }) {
                     <Icon className="size-4" />
                   </button>
                 ))}
-                <button type="button" onClick={() => setOpen(false)} aria-label="Minimize the phone" title="Minimize" data-phone-close
-                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                  <ChevronDown className="size-4" />
-                </button>
+                {/* Closed when no call is on or ringing: it has no button of its own to come back by (Sean, Oct 2026). */}
+                {!active && !ringing ? (
+                  <button type="button" onClick={() => setOpen(false)} aria-label="Close the phone" title="Close" data-phone-close
+                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <X className="size-4" />
+                  </button>
+                ) : null}
               </div>
             </header>
 
@@ -674,17 +684,6 @@ export function PhoneProvider({ children, tracked = false }) {
         </div>
       ) : null}
 
-      <div data-phone-dock className="pointer-events-none fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 print:hidden">
-        {/* The phone button: a call ringing, or going on, shows here. */}
-        <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open}
-          aria-label={ringing ? "A call is coming in: show it" : open ? "Minimize the phone" : active ? "Show the call" : "Open the phone"} data-phone-button
-          className={cn("pointer-events-auto flex h-14 items-center justify-center gap-2 rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95",
-            ringing ? "animate-bounce bg-emerald-500 px-5" : active ? "bg-emerald-500 px-5" : "w-14 bg-primary text-primary-foreground")}>
-          {ringing ? <PhoneIncoming className="size-6" /> : <Phone className={cn("size-6", active && "animate-pulse")} />}
-          {ringing ? <span className="text-sm font-semibold" data-phone-button-ringing>Incoming</span>
-            : active ? <span className="text-sm font-semibold tabular-nums" data-phone-timer>{callClock(now - call.startedAt)}</span> : null}
-        </button>
-      </div>
     </PhoneContext.Provider>
   );
 }
