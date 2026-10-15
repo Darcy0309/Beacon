@@ -12,7 +12,7 @@ const leadSelect = ({ status = false } = {}) => `
   location_ownership, building_age, building_stories, building_acres, employees_full_time, employees_part_time,
   subcontractors_pct, auto_types, travel_radius, annual_payroll, dot_number, cargo, claims_3yrs,
   estimated_annual_premium, client_note, lead_date, import_date,
-  date_last_worked, created_at, decision_maker, dm_title, fax,
+  date_last_worked, updated_at, created_at, decision_maker, dm_title, fax,
   contact_mobile, dm_phone, dm_mobile, dm_email,
   contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email, producer_name,
   stage, call_weight, original_xdate, promoted_at,
@@ -112,10 +112,19 @@ export async function searchLeadOptions(q) {
 /**
  * One page of leads for a leads table, searched and filtered in the
  * database. `projectId` narrows it to one project, where it can also be
- * filtered by rep.
+ * filtered by rep. The Leads page's filters too (Sean, Oct 2026):
+ * `clientId` (its projects' leads) and `worked` ({ from, to }: instants), a
+ * lead last called or changed between them.
  */
-export async function listLeads(params, { projectId } = {}) {
+export async function listLeads(params, { projectId, clientId = null, worked = null } = {}) {
   const supabase = await createClient();
+  let clientProjects = null;
+  if (clientId) {
+    const { data, error } = await supabase.from("projects").select("id").eq("company_id", Number(clientId));
+    if (error) throw error;
+    clientProjects = (data ?? []).map((p) => p.id);
+    if (!clientProjects.length) return { rows: [], total: 0 };
+  }
   const { rows, total } = await runPaged(
     (p) => {
       let query = supabase
@@ -124,6 +133,11 @@ export async function listLeads(params, { projectId } = {}) {
         .order("lead_date", { ascending: false, nullsFirst: false })
         .order("id", { ascending: false });
       if (projectId) query = query.eq("project_id", Number(projectId));
+      if (clientProjects) query = query.in("project_id", clientProjects);
+      if (worked) {
+        const [from, to] = [worked.from.toISOString(), worked.to.toISOString()];
+        query = query.or(`and(date_last_worked.gte.${from},date_last_worked.lt.${to}),and(updated_at.gte.${from},updated_at.lt.${to})`);
+      }
       return paged(query, p, {
         // search_text: company, contact, city, email and phone (also as digits), indexed.
         search: ["search_text"],

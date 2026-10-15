@@ -1,5 +1,6 @@
 import { CalendarClock, CalendarCheck, Clock, CheckCheck } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import { leadHref, listAddress } from "@/lib/back-link";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import AppointmentForm from "@/features/appointments/components/appointment-form";
@@ -167,7 +168,7 @@ export default async function AppointmentsPage({ searchParams }) {
                 <span className="ml-2 text-[0.66rem] font-semibold tabular-nums text-primary">{dayRows.length}</span>
               </div>
               {dayRows.map((a) => (
-                <Appt key={a.id} a={a} href={staff && a.leadId ? `/leads/${a.leadId}` : `/calendar?view=day&d=${a.date}&a=${a.id}`} />
+                <Appt key={a.id} a={a} href={staff && a.leadId ? leadHref(a.leadId, listAddress("/appointments", sp)) : `/calendar?view=day&d=${a.date}&a=${a.id}`} />
               ))}
             </div>
           ))}

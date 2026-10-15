@@ -31,7 +31,8 @@ try {
 
   section("Leads");
   await admin.go(`/leads?q=${encodeURIComponent(TAG)}`, 5000);
-  const link = `[data-lead-link][href="/leads/${lead}"]`;
+  // The lead's page, carrying the list's address for its back link.
+  const link = `[data-lead-link][href^="/leads/${lead}?from="]`;
   check("the company's name is a link to the lead", Boolean(await until(() => href(link))));
   check("…the ⋯ menu still beside it", await admin.ev(`!!document.querySelector(${JSON.stringify(link)}).closest('tr').querySelector('[aria-label^="Actions for"]')`));
   await admin.click(link);

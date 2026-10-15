@@ -37,6 +37,7 @@ import { apptWhen, fullName, mediumDate, shortDate, sicLabel, telHref } from "@/
 import { cn } from "@/lib/utils";
 import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
 import { getCargoTypes } from "@/features/cargo/queries";
+import { backFrom } from "@/lib/back-link";
 
 export const dynamic = "force-dynamic";
 
@@ -232,11 +233,12 @@ export default async function LeadSheet({ params, searchParams }) {
 
   // Whole days from the business's today: the server's clock runs on UTC.
   const daysOut = r.renewal ? daysBetween(today, String(r.renewal).slice(0, 10)) : null;
+  // Back where it was opened from: a call list, else the list (with its filters) that passed itself as ?from=.
   const back = listId
     ? { href: `/work/${listId}`, label: "Back to call list" }
-    : me?.role === "manager"
+    : backFrom(sp?.from) ?? (me?.role === "manager"
       ? { href: "/work", label: "My projects" }
-      : { href: "/leads", label: "Back to leads" };
+      : { href: "/leads", label: "Back to leads" });
 
   // The lead account manager developed the name (database development); the
   // appointment manager holds it once it is promoted to appointment setting.

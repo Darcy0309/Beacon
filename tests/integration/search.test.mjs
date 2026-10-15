@@ -155,6 +155,24 @@ try {
     check("each row carries its call result", row?.result_name === "Lead-No Contact", JSON.stringify(row?.result_name));
     const { data: options } = await admin.sb.rpc("lead_explore_options");
     check("the pickers offer call results, not the old statuses", (options?.results ?? []).some((r) => r.value === "Lead-No Contact") && !("statuses" in (options ?? {})));
+
+    // Viable: still to call for an appointment. One marked Lead-Never Shops is not.
+    const NEVER = lead("Never Shops Roofing", { result_id: result("Lead-Never Shops") });
+    const mine = await explore({});
+    const notViable = mine.rows.filter((r) => r.result_viable === false).length;
+    check("viable leads: the matches whose call result leaves them to call", mine.viable === mine.total - notViable && notViable >= 1 && ids(mine.rows).includes(NEVER), `${mine.viable} of ${mine.total}, ${notViable} not`);
+    const project = (options?.projects ?? []).find((p) => Number(p.value) === projectId);
+    check("the pickers offer the projects with leads, each with how many", project?.label === `${TAG} Plumbers Campaign` && project.count >= 1, JSON.stringify(project));
+    const byProject = await explore({ projects: [String(projectId)] });
+    check("…and filter by project", byProject.total === mine.total && (await explore({ projects: [String(devProjectId)] })).total === 0, `${byProject.total} vs ${mine.total}`);
+    // Called a moment from now (a call is recorded as it is made): later than the record's last change.
+    sql(`update public.leads set date_last_worked = now() + interval '1 hour' where id = ${NEVER}`);
+    const worked = (await explore({})).rows.find((r) => Number(r.id) === NEVER);
+    const later = sql(`select to_json(greatest(date_last_worked, updated_at))::text from public.leads where id = ${NEVER}`).replace(/"/g, "");
+    const called = sql(`select to_json(date_last_worked)::text from public.leads where id = ${NEVER}`).replace(/"/g, "");
+    check("each row says when it was last called or changed, whichever is later",
+      Date.parse(worked?.last_worked) === Date.parse(later) && Date.parse(later) === Date.parse(called) && worked?.project_name === `${TAG} Plumbers Campaign`,
+      JSON.stringify({ last: worked?.last_worked, later, project: worked?.project_name }));
   }
 
   section("Lead Explorer: paging limits");

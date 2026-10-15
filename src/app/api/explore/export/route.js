@@ -32,6 +32,7 @@ const COLUMNS = [
   ["County", (r) => r.county],
   ["SIC", (r) => r.sic_code],
   ["Client", (r) => r.client_name],
+  ["Project", (r) => r.project_name],
   ["Agency Group", (r) => r.agency_group],
   ["Call Result", (r) => r.result_name ?? "Not called yet"],
   // The ultimate X-date, else the soonest policy line's: what the renewal-month filter matches.
@@ -39,6 +40,8 @@ const COLUMNS = [
   ["Ultimate X-Date", (r) => r.ultimate_xdate],
   ["Current Carrier", (r) => r.carrier_name],
   ["Assigned Rep", (r) => r.rep_name],
+  // The day it was last called or changed, on the business's clock.
+  ["Last Worked", (r) => (r.lastWorked === "—" ? "" : r.lastWorked)],
   ["Lead ID", (r) => r.id],
 ];
 

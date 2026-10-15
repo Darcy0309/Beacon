@@ -1,6 +1,7 @@
 import Link from "@/components/shared/intent-link";
 import { Database, Users, CalendarClock, Building2, Download, ListChecks, Map, PieChart } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
+import { leadHref, listAddress } from "@/lib/back-link";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
@@ -59,6 +60,8 @@ function Breakdown({ label, icon, rows, shown = 8, empty = "Nothing to show.", s
 
 export default async function ExplorePage({ searchParams }) {
   const sp = await searchParams;
+  // This page's address with its filters, passed to each lead so its back link returns here.
+  const here = listAddress("/explore", sp);
   const criteria = readCriteria(sp);
   const { page, perPage, q } = readListParams(sp);
   const [options, firstTry] = await Promise.all([getExploreOptions(), exploreLeads(criteria, { page, perPage })]);
@@ -70,7 +73,7 @@ export default async function ExplorePage({ searchParams }) {
     shownPage = 1;
   }
 
-  const { total, rows, byClient, byState, byMonth, byIndustry, byResult, clientsTouched, withXdate } = result;
+  const { total, rows, byClient, byState, byMonth, byIndustry, byResult, clientsTouched, viable } = result;
   const summary = describe(criteria, options);
   const exportHref = `/api/explore/export?${criteriaToParams(criteria).toString()}`;
 
@@ -79,9 +82,10 @@ export default async function ExplorePage({ searchParams }) {
       icon: Database, accent: "var(--neon-cyan)", series: byMonth.map((m) => Number(m.count)), bars: true },
     { label: "Client Accounts", value: String(clientsTouched), note: "hold these leads",
       icon: Users, accent: "var(--neon-emerald)", series: byClient.map((c) => Number(c.count)), bars: true },
-    { label: "With a Renewal Date", value: withXdate.toLocaleString(),
-      note: total ? `${Math.round((withXdate / total) * 100)}% of matches` : "no matches",
-      icon: CalendarClock, accent: "var(--neon-amber)", series: byMonth.map((m) => Number(m.count)) },
+    // Still to call for an appointment: a call result that leaves the lead viable.
+    { label: "Viable Leads", value: viable.toLocaleString(),
+      note: total ? `${Math.round((viable / total) * 100)}% of matches still to call` : "no matches",
+      icon: CalendarClock, accent: "var(--neon-amber)", series: byResult.map((r) => Number(r.count)), bars: true },
     { label: "Industries", value: String(byIndustry.length), note: [...byIndustry].filter((i) => i.code).sort((a, b) => Number(b.count) - Number(a.count))[0]?.label ?? "—",
       icon: Building2, accent: "var(--neon-violet)", series: byIndustry.map((i) => Number(i.count)), bars: true },
   ];
@@ -137,7 +141,7 @@ export default async function ExplorePage({ searchParams }) {
         <Card>
           <SectionHeader label="Matching Leads" icon={ListChecks} />
           <FilterTable
-            columns={["Company", "Contact", "Phone", "Client", "Call result", "Renewal", "Assigned"]}
+            columns={["Company", "Last worked", "Phone", "Client", "Call result", "Renewal", "Assigned"]}
             placeholder="Search within these results…"
             empty="No leads match these criteria."
             query={q}
@@ -151,17 +155,18 @@ export default async function ExplorePage({ searchParams }) {
                     <div className="flex items-center gap-3">
                       <span className="flex size-8 items-center justify-center rounded-lg text-xs font-semibold text-white" style={{ background: l.color }}>{l.initials}</span>
                       <div>
-                        <Link href={`/leads/${l.id}`} className="font-medium transition-colors hover:text-primary">{l.co}</Link>
+                        <Link href={leadHref(l.id, here)} className="font-medium transition-colors hover:text-primary">{l.co}</Link>
                         <div className="text-xs text-muted-foreground">{l.place}</div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>{l.contact}</TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground" data-last-worked>{l.lastWorked}</TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">
                     {l.phone ? <a href={`tel:${String(l.phone).replace(/[^\d+]/g, "")}`} data-lead-id={l.id} className="transition-colors hover:text-primary">{l.phone}</a> : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {l.client}
+                    {l.project ? <span className="block text-xs" data-lead-project>{l.project}</span> : null}
                     {l.group ? <span className="block text-xs" data-lead-group>{l.group}</span> : null}
                   </TableCell>
                   <TableCell><ResultBadge result={l.result} /></TableCell>

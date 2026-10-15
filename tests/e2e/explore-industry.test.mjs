@@ -54,6 +54,18 @@ try {
   const rowCodes = rows.filter((r) => r !== "No SIC code").map((r) => r.split(" – ")[0]);
   check("…in code order, the leads with no code last",
     JSON.stringify(rowCodes) === JSON.stringify([...rowCodes].sort((a, b) => a.replace(/\D/g, "").localeCompare(b.replace(/\D/g, "")) || a.localeCompare(b))) && (!rows.includes("No SIC code") || rows[rows.length - 1] === "No SIC code"), JSON.stringify(rows.slice(0, 10)));
+
+  section("Viable leads, a Project filter, and when each was last worked");
+  const tiles = await admin.ev(`[...document.querySelectorAll('.stat-label')].map((e) => e.textContent.trim())`);
+  check("the third tile is Viable Leads, in place of With a Renewal Date", tiles[2] === "Viable Leads" && !tiles.includes("With a Renewal Date"), JSON.stringify(tiles));
+  const labels = await admin.ev(`[...document.querySelectorAll('button[aria-haspopup="listbox"]')].map((b) => b.previousElementSibling?.textContent.trim())`);
+  // Agency group shows only when some client is in a group, so it is checked where it is there.
+  const after = labels.includes("Agency group") ? ["Project", "Agency group", "Current carrier"] : ["Project", "Current carrier"];
+  check("Project comes after Client, with Agency group beside it, then Current carrier",
+    after.every((l, i) => labels.indexOf(l) === labels.indexOf("Client") + 1 + i), JSON.stringify(labels));
+  const heads = await admin.ev(`[...document.querySelectorAll('th')].map((t) => t.textContent.trim())`);
+  check("the list has Last worked in place of Contact", heads.includes("Last worked") && !heads.includes("Contact"), JSON.stringify(heads));
+  check("…each a date", await admin.ev(`[...document.querySelectorAll('[data-last-worked]')].every((c) => /^(\\d{2}\\/\\d{2}\\/\\d{4}|—)$/.test(c.textContent.trim()))`));
 } finally {
   browser.close();
   sql(`delete from public.leads where id in (${made.join(",")})`);

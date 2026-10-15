@@ -176,7 +176,7 @@ try {
   check("asked for a group, it finds the leads of that group's clients", (explored ?? "").includes(`${NAME} Lead One`) && (explored ?? "").includes(`${NAME} Lead Two`) && !(explored ?? "").includes(`${NAME} Lead Three`), (explored ?? "").slice(0, 300));
   check("…says so in words, and names the group on each lead", new RegExp(`agency group: ${GROUP}`, "i").test(explored ?? "") && (await admin.ev(`[...document.querySelectorAll('[data-lead-group]')].every((e) => e.textContent === ${JSON.stringify(GROUP)}) && document.querySelectorAll('[data-lead-group]').length === 2`)));
   const exported = await admin.ev(`fetch('/api/explore/export?groups=${groupId}').then(async (r) => ({ total: r.headers.get('x-total-count'), text: await r.text() }))`);
-  check("the export keeps to the group and has an Agency Group column", exported.total === "2" && /,Client,Agency Group,/.test(exported.text.split("\r\n")[0]) && exported.text.includes(`,${GROUP},`) && !exported.text.includes("Lead Three"), exported.text.slice(0, 300));
+  check("the export keeps to the group and has an Agency Group column", exported.total === "2" && /,Client,Project,Agency Group,/.test(exported.text.split("\r\n")[0]) && exported.text.includes(`,${GROUP},`) && !exported.text.includes("Lead Three"), exported.text.slice(0, 300));
   check("a made-up group in the address is ignored, not an error", (await admin.go("/explore?groups=abc", 5000), !/Something went wrong/i.test(await admin.text())));
 
   section("A project with its own office");

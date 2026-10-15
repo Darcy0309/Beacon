@@ -5,6 +5,7 @@ import { cache } from "react";
 import { cityState, colorFor, initialsOf, shortDate } from "@/lib/format";
 import { PAGE_SIZE } from "@/lib/paging";
 import { createClient } from "@/lib/supabase/server";
+import { getBusinessTimeZone } from "@/lib/server/business-day";
 
 // SIC codes in their own order: by the digits (1711-04 as 171104, 78102 after 7342-02), a code like another kept apart by how it is written.
 const sicOrder = (a, b) => a.replace(/\D/g, "").localeCompare(b.replace(/\D/g, "")) || a.localeCompare(b);
@@ -46,6 +47,7 @@ export const getExploreOptions = cache(async function getExploreOptions() {
     counties: data?.counties ?? [],
     results: data?.results ?? [],
     clients: data?.clients ?? [],
+    projects: data?.projects ?? [],
     // The agency groups clients are in (insurance companies), each with how many clients.
     groups: data?.groups ?? [],
     carriers: data?.carriers ?? [],
@@ -59,7 +61,12 @@ export const getExploreOptions = cache(async function getExploreOptions() {
  */
 export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } = {}) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("lead_explore", { criteria, page, per_page: perPage });
+  const [{ data, error }, timeZone] = await Promise.all([
+    supabase.rpc("lead_explore", { criteria, page, per_page: perPage }),
+    getBusinessTimeZone(),
+  ]);
+  // The day a lead was last called or changed, on the business's clock: "10/14/2026".
+  const day = new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "numeric" });
   if (error) throw error;
   const byIndustry = await sicLabelled(supabase, data?.by_industry ?? [], "code");
   return {
@@ -77,6 +84,8 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
       client: r.client_name || "—",
       group: r.agency_group || null,
       result: r.result_name ? { id: r.result_id, name: r.result_name, viable: r.result_viable } : null,
+      project: r.project_name || null,
+      lastWorked: r.last_worked ? day.format(new Date(r.last_worked)) : "—",
     })),
     byClient: data?.by_client ?? [],
     byState: data?.by_state ?? [],
@@ -85,5 +94,6 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
     byResult: data?.by_result ?? [],
     clientsTouched: data?.clients_touched ?? 0,
     withXdate: data?.with_xdate ?? 0,
+    viable: data?.viable ?? 0,
   };
 }

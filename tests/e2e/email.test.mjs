@@ -78,7 +78,7 @@ try {
     const line = e?.closest('[data-contact-line]'); const person = e?.closest('[data-person]');
     return { line: line?.dataset.contactLine ?? null, person: person?.dataset.person ?? null, address: line?.innerText.split('\\n')[1] ?? null }; })()`);
   check("an Email button on the lead sheet, beside the contact's address", place.line === "Email" && place.person === "Contact", JSON.stringify(place));
-  check("…next to the Call buttons beside the numbers", await sean.ev(`!!document.querySelector('[data-person="Contact"] [data-contact-line="Business"] a[href^="tel:"]')`));
+  check("…with the Call button by the business's number, in Prospect Info", await sean.ev(`!!document.querySelector('[data-prospect-info] [data-contact-line="Business phone"] a[href^="tel:"]')`));
   await emailsTab(sean);
   check("…and an Emails list in the history, empty so far", /No emails yet/.test(await sean.text()));
   await shot(sean, "email-button");

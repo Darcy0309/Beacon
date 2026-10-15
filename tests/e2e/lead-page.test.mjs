@@ -158,10 +158,16 @@ try {
   section("The appointment date picker shows the project's calendar");
   await sean.ev(`[...document.querySelectorAll('button[aria-pressed]')].find((b) => b.textContent.trim() === 'Appointment')?.click()`);
   await until(() => sean.ev(`!!document.querySelector('input[aria-label="Appointment date"]')`));
-  await sean.click('input[aria-label="Appointment date"]');
+  // A real click, as a person makes it: it moves the cursor into the field (the result just picked put it in
+  // the X-date), where a scripted click would leave it outside the picker and the picker would close.
+  await until(async () => {
+    await sean.mouseClick('input[aria-label="Appointment date"]');
+    await sleep(200);
+    return sean.ev(`!!document.querySelector('[aria-label="Calendar"]')`);
+  }, { timeout: 6000 });
   const blocked = await until(() => sean.ev(`document.querySelector('[data-iso="${tomorrow}"]')?.dataset.blocked ?? null`), { timeout: 8000 });
   check("tomorrow, partly blocked out on the project's calendar, is marked so", blocked === "part",
-    `${blocked} | open: ${await sean.ev(`!!document.querySelector('[aria-label="Calendar"]')`)} | cell: ${await sean.ev(`document.querySelector('[data-iso="${tomorrow}"]')?.getAttribute('aria-label') ?? 'none'`)} | first: ${await sean.ev(`document.querySelector('[data-iso]')?.dataset.iso ?? 'none'`)}`);
+    `${blocked} | input: ${await sean.ev(`!!document.querySelector('input[aria-label="Appointment date"]')`)} | dialogs: ${await sean.ev(`document.querySelectorAll('[role=dialog]').length`)} | open: ${await sean.ev(`!!document.querySelector('[aria-label="Calendar"]')`)} | cell: ${await sean.ev(`document.querySelector('[data-iso="${tomorrow}"]')?.getAttribute('aria-label') ?? 'none'`)} | first: ${await sean.ev(`document.querySelector('[data-iso]')?.dataset.iso ?? 'none'`)}`);
   await sean.hover(`[data-iso="${tomorrow}"]`);
   const told = await until(() => sean.ev(`(document.querySelector('[data-picker-day]')?.innerText ?? '').includes('Staff meeting') ? document.querySelector('[data-picker-day]').innerText : null`));
   check("…and pointing at it says which hours, and why", /Blocked · 10:00 AM – 1:00 PM · Staff meeting/.test(told ?? ""), told);
