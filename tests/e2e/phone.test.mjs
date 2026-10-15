@@ -130,7 +130,8 @@ try {
   // "open the calling app?" prompt keeps simulated mouse and keys from the page (a person answers it).
   const mover = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1400, height: 1000 });
   await mover.go("/work", 5000);
-  const box = () => mover.ev(`(() => { const r = document.querySelector('[data-phone-panel]')?.getBoundingClientRect(); return r ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), placed: document.querySelector('[data-phone-window]')?.hasAttribute('data-placed') ?? false } : null; })()`);
+  // `full`: its opening animation (a slight scale) has settled, the box as wide as the window is laid out.
+  const box = () => mover.ev(`(() => { const el = document.querySelector('[data-phone-panel]'); const r = el?.getBoundingClientRect(); return r ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), full: Math.round(r.width) === el.offsetWidth, placed: document.querySelector('[data-phone-window]')?.hasAttribute('data-placed') ?? false } : null; })()`);
   // Dragged by any part of the window that is not a button (here, the call's status line), as a person moves it.
   const dragBy = async (dx, dy, from = "[data-phone-status]") => {
     const at = await mover.ev(`(() => { const r = document.querySelector(${JSON.stringify(from)}).getBoundingClientRect(); return { x: r.left + 10, y: r.top + r.height / 2 }; })()`);
@@ -141,7 +142,7 @@ try {
     await sleep(150);
   };
   await mover.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
-  const docked = await until(async () => { const b = await box(); return b?.w === 320 ? b : null; });
+  const docked = await until(async () => { const b = await box(); return b?.full ? b : null; });
   check("it opens docked in the corner", docked && !docked.placed, JSON.stringify(docked));
   await dragBy(-500, -300);
   const moved = await box();
@@ -160,7 +161,7 @@ try {
   await mover.go("/work", 4000);
   await mover.ev(`window.dispatchEvent(new CustomEvent('lighthouse:phone'))`);
   // Measured once its opening animation (a slight scale) has settled.
-  const again = await until(async () => { const b = await box(); return b?.w === 320 ? b : null; });
+  const again = await until(async () => { const b = await box(); return b?.full ? b : null; });
   check("it opens where it was left", again?.placed && again.x === 32 && again.y === 32, JSON.stringify(again ?? await box()));
   await mover.ev(`document.querySelector('[data-phone-bar]').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
   check("double-clicking its bar puts it back in the corner", Boolean(await until(async () => { const b = await box(); return b && !b.placed && b.x === docked.x && b.y === docked.y; })), JSON.stringify(await box()));

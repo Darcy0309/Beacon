@@ -521,208 +521,219 @@ export function PhoneProvider({ children, tracked = false }) {
         <div data-phone-window data-placed={placed ? "" : undefined}
           className={cn("fixed z-40 print:hidden", !placed && "bottom-4 right-4")}
           style={placed ? { left: pos.x, top: pos.y } : undefined}>
-          <section ref={panelRef} aria-label="Phone" data-phone-panel
+          {/* Made to look like a phone, so it stands out over the page (Sean, Oct 2026; globals.css): its side buttons. */}
+          <span aria-hidden className="phone-side-key phone-side-key-left top-[5.5rem] h-7" />
+          <span aria-hidden className="phone-side-key phone-side-key-left top-[8.75rem] h-12" />
+          <span aria-hidden className="phone-side-key phone-side-key-left top-[12.25rem] h-12" />
+          <span aria-hidden className="phone-side-key phone-side-key-right top-[9.5rem] h-16" />
+          <section ref={panelRef} aria-label="Phone" data-phone-panel data-call={ringing ? "ringing" : active ? "active" : undefined}
+            data-dragging={dragging || undefined}
             onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
             title={small ? undefined : "Drag anywhere to move it"}
-            className={cn("animate-pop-in flex w-[20rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-[var(--panel-border)] bg-card shadow-[0_24px_70px_-20px_rgb(0_0_0/0.55)]",
+            className={cn("phone-device animate-pop-in flex w-[21rem] max-w-[calc(100vw-2rem)] flex-col",
               placed ? "max-h-[calc(100svh-1rem)]" : "max-h-[calc(100svh-2rem)]",
               !small && "touch-none [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_input]:cursor-text",
-              !small && (dragging ? "cursor-grabbing select-none ring-2 ring-primary/40" : "cursor-grab"))}>
-            <header onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest(PRESSABLE))) dock(); }}
-              data-phone-bar title={small ? undefined : "Drag anywhere to move · double-click here to put it back in the corner"}
-              className="flex items-center justify-between gap-2 border-b border-[var(--panel-border)] px-3 py-2.5">
-              <div className="flex min-w-0 items-center gap-2">
-                {!small ? (
-                  <button type="button" onKeyDown={onGripKey} aria-label="Move the phone: use the arrow keys" title="Drag the window to move it, or use the arrow keys here" data-phone-grip
-                    className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                    <GripHorizontal className="size-4" />
-                  </button>
-                ) : null}
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold">Phone</div>
-                  <div className="truncate text-[0.66rem] text-muted-foreground" title={line.note} data-phone-line={line.id}>{line.label}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                {placed ? (
-                  <button type="button" onClick={dock} aria-label="Put the phone back in the corner" title="Back to the corner" data-phone-dock-back
-                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                    <ArrowDownRight className="size-4" />
-                  </button>
-                ) : null}
-                {[["keypad", "Keypad", Grid3x3], ["recent", "Recent", Clock]].map(([k, label, Icon]) => (
-                  <button key={k} type="button" onClick={() => setTab(k)} aria-pressed={tab === k} aria-label={label} title={label} data-phone-tab={k}
-                    className={cn("rounded-md p-1.5 transition-colors", tab === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-                    <Icon className="size-4" />
-                  </button>
-                ))}
-                {/* Closed when no call is on or ringing: it has no button of its own to come back by (Sean, Oct 2026). */}
-                {!active && !ringing ? (
-                  <button type="button" onClick={() => setOpen(false)} aria-label="Close the phone" title="Close" data-phone-close
-                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                    <X className="size-4" />
-                  </button>
-                ) : null}
-              </div>
-            </header>
-
-            {ringing ? (
-              // A call coming in: who, and Answer or Decline.
-              <div className="flex flex-col items-center px-4 pb-6 pt-5 text-center" data-phone-ringing={ringing.test ? "test" : ""} aria-live="assertive">
-                <span className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-emerald-500">
-                  <PhoneIncoming className="size-3.5 animate-pulse" /> Incoming call{ringing.test ? " · test" : ""}
-                </span>
-                <div className="mt-3 text-2xl font-semibold tabular-nums" data-phone-caller>{formatDial(ringing.number)}</div>
-                <div className="mt-1 min-h-[1.25rem] text-xs">
-                  {lead?.co ? (
-                    <Link href={`/leads/${lead.id}`} className="font-medium text-primary hover:underline" data-phone-lead={lead.id}>{lead.co}</Link>
-                  ) : checked === searchDigits(ringing.number) && searchDigits(ringing.number) ? (
-                    <span className="text-muted-foreground" data-phone-lead="">No lead with this number</span>
-                  ) : null}
-                  {lead?.contact ? <span className="text-muted-foreground"> · {lead.contact}</span> : null}
-                </div>
-                <div className="mt-6 flex items-start justify-center gap-12">
-                  <button type="button" onClick={decline} aria-label="Decline the call" data-phone-decline className="group flex flex-col items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <span className="flex size-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_18px_-6px_rgb(244_63_94)] transition-transform group-hover:scale-105 group-active:scale-95">
-                      <PhoneOff className="size-6" />
-                    </span>
-                    Decline
-                  </button>
-                  <button type="button" onClick={answer} aria-label="Answer the call" data-phone-answer className="group flex flex-col items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                    <span className="flex size-14 animate-pulse items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] transition-transform group-hover:scale-105 group-active:scale-95">
-                      <Phone className="size-6" />
-                    </span>
-                    Answer
-                  </button>
-                </div>
-                {ringing.test ? <p className="mt-4 text-[0.66rem] text-muted-foreground">A test: nobody is on the line.</p> : null}
-              </div>
-            ) : tab === "recent" ? (
-              <Recent list={recent} disabled={active} onPick={(r) => { setValue(r.number); setLead(r.leadId ? { id: r.leadId, co: r.co } : null); setChecked(null); setTab("keypad"); }}
-                onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
-            ) : (
-              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3">
-                {/* The number, typed or pressed; Enter calls. Clear on its left takes all of it, Backspace on its right a digit. */}
-                <div className="flex items-center gap-1">
-                  {!active && value ? (
-                    <button type="button" onClick={clear} aria-label="Clear the number" title="Clear" data-phone-clear
-                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                      <CircleX className="size-5" />
+              !small && (dragging ? "cursor-grabbing select-none" : "cursor-grab"))}>
+            {/* The screen: the camera's island at its top (a green light while a call is on), the home bar at its foot. */}
+            <div className="phone-screen flex min-h-0 flex-1 flex-col" data-phone-screen>
+              <div aria-hidden className="phone-island" data-live={active || ringing ? "" : undefined} />
+              <header onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest(PRESSABLE))) dock(); }}
+                data-phone-bar title={small ? undefined : "Drag anywhere to move · double-click here to put it back in the corner"}
+                className="flex items-center justify-between gap-2 border-b border-[var(--panel-border)] px-3 pb-2 pt-1.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  {!small ? (
+                    <button type="button" onKeyDown={onGripKey} aria-label="Move the phone: use the arrow keys" title="Drag the window to move it, or use the arrow keys here" data-phone-grip
+                      className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                      <GripHorizontal className="size-4" />
                     </button>
                   ) : null}
-                  <input ref={inputRef} data-phone-number value={formatDial(active ? call.number : value)} readOnly={active}
-                    onChange={(e) => setValue(dialable(e.target.value))}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        if (active) endCall();
-                        else if (value) startCall(value, lead);
-                      }
-                    }}
-                    inputMode="tel" autoComplete="off" placeholder="Enter a number" aria-label="Number to call"
-                    className={cn("min-w-0 flex-1 bg-transparent py-1 text-center font-semibold tabular-nums tracking-wide outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground",
-                      formatDial(active ? call.number : value).length > 14 ? "text-xl" : "text-2xl")} />
-                  {!active && value ? (
-                    <button type="button" onClick={() => setValue((v) => v.slice(0, -1))} aria-label="Delete the last digit" data-phone-backspace
-                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                      <Delete className="size-5" />
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Whose number it is, and where the call stands. */}
-                <div className="mt-1 min-h-[2.5rem] text-center text-xs" aria-live="polite">
-                  {who?.co ? (
-                    <Link href={`/leads/${who.id}`} className="font-medium text-primary hover:underline" data-phone-lead={who.id}>{who.co}</Link>
-                  ) : !who?.id && searchDigits(dialed) && checked === searchDigits(dialed) ? (
-                    <span className="text-muted-foreground" data-phone-lead="">No lead with this number</span>
-                  ) : null}
-                  {who?.contact ? <span className="text-muted-foreground"> · {who.contact}</span> : null}
-                  <div className={cn("mt-0.5 font-medium tabular-nums", active ? "text-emerald-500" : "text-muted-foreground")} data-phone-status={active ? "active" : "idle"}>
-                    {active ? `${callLabel} · ${callClock(now - call.startedAt)}` : "Ready"}
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">Phone</div>
+                    <div className="truncate text-[0.66rem] text-muted-foreground" title={line.note} data-phone-line={line.id}>{line.label}</div>
                   </div>
                 </div>
+                <div className="flex items-center gap-1">
+                  {placed ? (
+                    <button type="button" onClick={dock} aria-label="Put the phone back in the corner" title="Back to the corner" data-phone-dock-back
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                      <ArrowDownRight className="size-4" />
+                    </button>
+                  ) : null}
+                  {[["keypad", "Keypad", Grid3x3], ["recent", "Recent", Clock]].map(([k, label, Icon]) => (
+                    <button key={k} type="button" onClick={() => setTab(k)} aria-pressed={tab === k} aria-label={label} title={label} data-phone-tab={k}
+                      className={cn("rounded-md p-1.5 transition-colors", tab === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                      <Icon className="size-4" />
+                    </button>
+                  ))}
+                  {/* Closed when no call is on or ringing: it has no button of its own to come back by (Sean, Oct 2026). */}
+                  {!active && !ringing ? (
+                    <button type="button" onClick={() => setOpen(false)} aria-label="Close the phone" title="Close" data-phone-close
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  ) : null}
+                </div>
+              </header>
 
-                {active && !controls.keys ? (
-                  // During a call: what the line can do; the rest off, saying why.
-                  <div className="mt-2 grid grid-cols-4 gap-2" data-phone-controls>
-                    {[["mute", "Mute", MicOff, "muted"], ["hold", "Hold", Pause, "held"], ["tones", "Keypad", Grid3x3, "keys"], ["record", "Record", CircleDot, "recording"]].map(([cap, label, Icon, key]) => {
-                      const can = line.can[cap];
-                      const on = controls[key];
-                      return (
-                        <button key={cap} type="button" disabled={!can} aria-pressed={can ? on : undefined} data-phone-control={cap}
-                          title={can ? label : `${label}: comes with the PanTerra connection`}
-                          onClick={() => {
-                            setControls((c) => ({ ...c, [key]: !c[key] }));
-                            if (cap === "mute") line.setMuted(!on);
-                            if (cap === "hold") line.setHeld(!on);
-                            if (cap === "record") line.setRecording(!on);
-                          }}
-                          className={cn("flex flex-col items-center gap-1 rounded-xl py-2 text-[0.66rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-                            on ? (cap === "record" ? "bg-rose-500/15 text-rose-500" : "bg-primary/15 text-primary") : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
-                          <Icon className={cn("size-5", cap === "record" && on && "animate-pulse")} />
-                          {label}
-                        </button>
-                      );
-                    })}
-                    {!line.can.record ? (
-                      <p className="col-span-4 text-center text-[0.66rem] text-muted-foreground" data-phone-line-note>
-                        Mute, hold, keypad tones and recording come with the PanTerra connection.
-                      </p>
+              {ringing ? (
+                // A call coming in: who, and Answer or Decline.
+                <div className="flex flex-col items-center px-4 pb-6 pt-5 text-center" data-phone-ringing={ringing.test ? "test" : ""} aria-live="assertive">
+                  <span className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-emerald-500">
+                    <PhoneIncoming className="size-3.5 animate-pulse" /> Incoming call{ringing.test ? " · test" : ""}
+                  </span>
+                  <div className="mt-3 text-2xl font-semibold tabular-nums" data-phone-caller>{formatDial(ringing.number)}</div>
+                  <div className="mt-1 min-h-[1.25rem] text-xs">
+                    {lead?.co ? (
+                      <Link href={`/leads/${lead.id}`} className="font-medium text-primary hover:underline" data-phone-lead={lead.id}>{lead.co}</Link>
+                    ) : checked === searchDigits(ringing.number) && searchDigits(ringing.number) ? (
+                      <span className="text-muted-foreground" data-phone-lead="">No lead with this number</span>
+                    ) : null}
+                    {lead?.contact ? <span className="text-muted-foreground"> · {lead.contact}</span> : null}
+                  </div>
+                  <div className="mt-6 flex items-start justify-center gap-12">
+                    <button type="button" onClick={decline} aria-label="Decline the call" data-phone-decline className="group flex flex-col items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <span className="flex size-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_18px_-6px_rgb(244_63_94)] transition-transform group-hover:scale-105 group-active:scale-95">
+                        <PhoneOff className="size-6" />
+                      </span>
+                      Decline
+                    </button>
+                    <button type="button" onClick={answer} aria-label="Answer the call" data-phone-answer className="group flex flex-col items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                      <span className="flex size-14 animate-pulse items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] transition-transform group-hover:scale-105 group-active:scale-95">
+                        <Phone className="size-6" />
+                      </span>
+                      Answer
+                    </button>
+                  </div>
+                  {ringing.test ? <p className="mt-4 text-[0.66rem] text-muted-foreground">A test: nobody is on the line.</p> : null}
+                </div>
+              ) : tab === "recent" ? (
+                <Recent list={recent} disabled={active} onPick={(r) => { setValue(r.number); setLead(r.leadId ? { id: r.leadId, co: r.co } : null); setChecked(null); setTab("keypad"); }}
+                  onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3">
+                  {/* The number, typed or pressed; Enter calls. Clear on its left takes all of it, Backspace on its right a digit. */}
+                  <div className="flex items-center gap-1">
+                    {!active && value ? (
+                      <button type="button" onClick={clear} aria-label="Clear the number" title="Clear" data-phone-clear
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                        <CircleX className="size-5" />
+                      </button>
+                    ) : null}
+                    <input ref={inputRef} data-phone-number value={formatDial(active ? call.number : value)} readOnly={active}
+                      onChange={(e) => setValue(dialable(e.target.value))}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (active) endCall();
+                          else if (value) startCall(value, lead);
+                        }
+                      }}
+                      inputMode="tel" autoComplete="off" placeholder="Enter a number" aria-label="Number to call"
+                      className={cn("min-w-0 flex-1 bg-transparent py-1 text-center font-semibold tabular-nums tracking-wide outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground",
+                        formatDial(active ? call.number : value).length > 14 ? "text-xl" : "text-2xl")} />
+                    {!active && value ? (
+                      <button type="button" onClick={() => setValue((v) => v.slice(0, -1))} aria-label="Delete the last digit" data-phone-backspace
+                        className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                        <Delete className="size-5" />
+                      </button>
                     ) : null}
                   </div>
-                ) : (
-                  <div className="mt-2 grid grid-cols-3 gap-2" data-phone-keypad>
-                    {KEYS.map(([k, letters]) => (
-                      <button key={k} type="button" onClick={() => press(k)} aria-label={k} data-phone-key={k} disabled={active && !line.can.tones}
-                        className="flex h-14 flex-col items-center justify-center rounded-full border border-[var(--panel-border)] bg-background/40 transition-colors hover:border-primary/40 hover:bg-primary/10 active:scale-95 disabled:opacity-40">
-                        <span className="text-xl font-semibold leading-none tabular-nums">{k}</span>
-                        <span className="mt-0.5 h-3 text-[0.55rem] font-semibold tracking-[0.18em] text-muted-foreground">{letters}</span>
-                      </button>
-                    ))}
+
+                  {/* Whose number it is, and where the call stands. */}
+                  <div className="mt-1 min-h-[2.5rem] text-center text-xs" aria-live="polite">
+                    {who?.co ? (
+                      <Link href={`/leads/${who.id}`} className="font-medium text-primary hover:underline" data-phone-lead={who.id}>{who.co}</Link>
+                    ) : !who?.id && searchDigits(dialed) && checked === searchDigits(dialed) ? (
+                      <span className="text-muted-foreground" data-phone-lead="">No lead with this number</span>
+                    ) : null}
+                    {who?.contact ? <span className="text-muted-foreground"> · {who.contact}</span> : null}
+                    <div className={cn("mt-0.5 font-medium tabular-nums", active ? "text-emerald-500" : "text-muted-foreground")} data-phone-status={active ? "active" : "idle"}>
+                      {active ? `${callLabel} · ${callClock(now - call.startedAt)}` : "Ready"}
+                    </div>
                   </div>
-                )}
 
-                {/* Call, or end the call. */}
-                <div className="mt-3 flex items-center justify-center gap-4">
-                  {active ? (
-                    <button type="button" onClick={endCall} aria-label="End the call" data-phone-end
-                      title={line.can.hangUp || call.test ? "End the call" : "End: stops the timer here (hang up in your calling app)"}
-                      className="flex size-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_18px_-6px_rgb(244_63_94)] transition-transform hover:scale-105 active:scale-95">
-                      <PhoneOff className="size-6" />
-                    </button>
+                  {active && !controls.keys ? (
+                    // During a call: what the line can do; the rest off, saying why.
+                    <div className="mt-2 grid grid-cols-4 gap-2" data-phone-controls>
+                      {[["mute", "Mute", MicOff, "muted"], ["hold", "Hold", Pause, "held"], ["tones", "Keypad", Grid3x3, "keys"], ["record", "Record", CircleDot, "recording"]].map(([cap, label, Icon, key]) => {
+                        const can = line.can[cap];
+                        const on = controls[key];
+                        return (
+                          <button key={cap} type="button" disabled={!can} aria-pressed={can ? on : undefined} data-phone-control={cap}
+                            title={can ? label : `${label}: comes with the PanTerra connection`}
+                            onClick={() => {
+                              setControls((c) => ({ ...c, [key]: !c[key] }));
+                              if (cap === "mute") line.setMuted(!on);
+                              if (cap === "hold") line.setHeld(!on);
+                              if (cap === "record") line.setRecording(!on);
+                            }}
+                            className={cn("flex flex-col items-center gap-1 rounded-xl py-2 text-[0.66rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+                              on ? (cap === "record" ? "bg-rose-500/15 text-rose-500" : "bg-primary/15 text-primary") : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                            <Icon className={cn("size-5", cap === "record" && on && "animate-pulse")} />
+                            {label}
+                          </button>
+                        );
+                      })}
+                      {!line.can.record ? (
+                        <p className="col-span-4 text-center text-[0.66rem] text-muted-foreground" data-phone-line-note>
+                          Mute, hold, keypad tones and recording come with the PanTerra connection.
+                        </p>
+                      ) : null}
+                    </div>
                   ) : (
-                    <button type="button" onClick={() => startCall(value, lead)} disabled={!telOf(value)} aria-label="Call" data-phone-call
-                      className="flex size-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] transition-transform hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-40">
-                      <Phone className="size-6" />
-                    </button>
+                    <div className="mt-2 grid grid-cols-3 gap-2" data-phone-keypad>
+                      {KEYS.map(([k, letters]) => (
+                        <button key={k} type="button" onClick={() => press(k)} aria-label={k} data-phone-key={k} disabled={active && !line.can.tones}
+                          className="flex h-14 flex-col items-center justify-center rounded-full border border-[var(--panel-border)] bg-background/40 transition-colors hover:border-primary/40 hover:bg-primary/10 active:scale-95 disabled:opacity-40">
+                          <span className="text-xl font-semibold leading-none tabular-nums">{k}</span>
+                          <span className="mt-0.5 h-3 text-[0.55rem] font-semibold tracking-[0.18em] text-muted-foreground">{letters}</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </div>
-                {active && !line.can.hangUp && !call.test && call.dir !== "in" ? (
-                  // The call is in the computer's calling app: Lighthouse cannot hang it up there (Sean, Oct 2026).
-                  <p className="mt-2 text-center text-[0.66rem] text-muted-foreground" data-phone-hangup-note>
-                    Hang up in your calling app too. End here, or calling the next lead, stops the timer and keeps the call under Recent.
-                  </p>
-                ) : null}
 
-                {/* How a call coming in rings, until a PanTerra line brings real ones. */}
-                {!active && !line.can.receive ? (
-                  <div className="mt-3 border-t border-[var(--panel-border)] pt-2 text-center text-[0.66rem] text-muted-foreground">
-                    {testIn ? (
-                      <span data-phone-test-pending>
-                        A test call rings in a few seconds: look at another window to see it on the desktop too.{" "}
-                        <button type="button" onClick={cancelTest} className="font-semibold text-primary hover:underline">Cancel</button>
-                      </span>
+                  {/* Call, or end the call. */}
+                  <div className="mt-3 flex items-center justify-center gap-4">
+                    {active ? (
+                      <button type="button" onClick={endCall} aria-label="End the call" data-phone-end
+                        title={line.can.hangUp || call.test ? "End the call" : "End: stops the timer here (hang up in your calling app)"}
+                        className="flex size-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_18px_-6px_rgb(244_63_94)] transition-transform hover:scale-105 active:scale-95">
+                        <PhoneOff className="size-6" />
+                      </button>
                     ) : (
-                      <span>
-                        Calls coming in ring in your calling app for now.{" "}
-                        <button type="button" onClick={testCall} className="font-semibold text-primary hover:underline" data-phone-test-call>Try a test call</button>
-                      </span>
+                      <button type="button" onClick={() => startCall(value, lead)} disabled={!telOf(value)} aria-label="Call" data-phone-call
+                        className="flex size-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-[0_0_18px_-6px_var(--neon-emerald)] transition-transform hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-40">
+                        <Phone className="size-6" />
+                      </button>
                     )}
                   </div>
-                ) : null}
-              </div>
-            )}
+                  {active && !line.can.hangUp && !call.test && call.dir !== "in" ? (
+                    // The call is in the computer's calling app: Lighthouse cannot hang it up there (Sean, Oct 2026).
+                    <p className="mt-2 text-center text-[0.66rem] text-muted-foreground" data-phone-hangup-note>
+                      Hang up in your calling app too. End here, or calling the next lead, stops the timer and keeps the call under Recent.
+                    </p>
+                  ) : null}
+
+                  {/* How a call coming in rings, until a PanTerra line brings real ones. */}
+                  {!active && !line.can.receive ? (
+                    <div className="mt-3 border-t border-[var(--panel-border)] pt-2 text-center text-[0.66rem] text-muted-foreground">
+                      {testIn ? (
+                        <span data-phone-test-pending>
+                          A test call rings in a few seconds: look at another window to see it on the desktop too.{" "}
+                          <button type="button" onClick={cancelTest} className="font-semibold text-primary hover:underline">Cancel</button>
+                        </span>
+                      ) : (
+                        <span>
+                          Calls coming in ring in your calling app for now.{" "}
+                          <button type="button" onClick={testCall} className="font-semibold text-primary hover:underline" data-phone-test-call>Try a test call</button>
+                        </span>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+              <div aria-hidden className="phone-home-bar" />
+            </div>
           </section>
         </div>
       ) : null}
