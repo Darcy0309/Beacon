@@ -97,6 +97,8 @@ try {
   await sean.fill('[role=dialog] input[aria-label="Ultimate XDate"]', "01/01/2028");
   await sean.ev("document.activeElement.blur()");
   await until(() => sean.ev(`document.querySelector('[role=dialog] input[name="ultimate_xdate"]')?.value === "2028-01-01"`));
+  // Apply is off until the date is in: clicked once it is on.
+  await until(() => sean.ev(`document.querySelector('[role=dialog] [data-apply-date]')?.disabled === false`));
   await sean.click("[role=dialog] [data-apply-date]");
   const dates = await until(() => sean.ev(`["pkg_xdate", "wc_xdate", "auto_xdate", "health_xdate"].map((n) => document.querySelector('[role=dialog] input[name="' + n + '"]')?.value)`)
     .then((d) => d[0] === "2028-01-01" && d));

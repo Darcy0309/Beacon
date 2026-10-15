@@ -86,7 +86,8 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin,
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-xl">
+      {/* One scroll bar: the fields scroll, the title and the buttons stay put. */}
+      <DialogContent className="max-w-xl overflow-y-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle>Email {company}</DialogTitle>
           <DialogDescription>

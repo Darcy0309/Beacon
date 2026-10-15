@@ -75,12 +75,13 @@ export default function LeadForm({ lead, options, trigger }) {
           )}
         </DialogTrigger>
       )}
-      <DialogContent className="max-w-2xl" onCloseAutoFocus={onCloseAutoFocus}>
+      {/* One scroll bar: the fields scroll, the title and the buttons stay put. */}
+      <DialogContent className="max-w-2xl overflow-y-hidden" onCloseAutoFocus={onCloseAutoFocus}>
         <DialogHeader>
           <DialogTitle>{isEdit ? `Edit ${lead.company_name}` : "New lead"}</DialogTitle>
         </DialogHeader>
 
-        <form action={formAction} noValidate className="flex min-h-0 flex-col gap-4">
+        <form action={formAction} noValidate className="flex min-h-0 flex-1 flex-col gap-4">
           {isEdit && <input type="hidden" name="id" value={lead.id} />}
 
           {errorCount > 0 && (
@@ -89,7 +90,7 @@ export default function LeadForm({ lead, options, trigger }) {
             </p>
           )}
 
-          <div className="-mr-1 grid max-h-[55svh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div className="-mr-1 grid min-h-0 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
             <Field label="Company name" required error={fe("company_name")} className="sm:col-span-2">
               <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} autoFocus />
             </Field>

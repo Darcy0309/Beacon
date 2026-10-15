@@ -75,7 +75,8 @@ export default function CoverageForm({ leadId, company, coverage, carriers }) {
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" data-edit-coverage><Pencil /> Edit coverage</Button>
       </DialogTrigger>
-      <DialogContent className="max-w-3xl">
+      {/* One scroll bar: the coverage scrolls, the title and the buttons stay put. */}
+      <DialogContent className="max-w-3xl overflow-y-hidden">
         <DialogHeader className="shrink-0">
           <DialogTitle>Coverage for {company}</DialogTitle>
           <DialogDescription>Type a carrier and pick it from the list, so every name is spelled the same way.</DialogDescription>

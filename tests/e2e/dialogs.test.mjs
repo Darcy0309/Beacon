@@ -1,7 +1,8 @@
 /**
  * Every form dialog fits the screen: on a short laptop screen and on a
  * phone, Save and Cancel are inside the box and can be clicked, the fields
- * scrolling above them when there are more than fit.
+ * scrolling above them when there are more than fit, with one scroll bar
+ * (never the box and its fields both).
  *
  * Opens the longest forms and changes nothing.
  *
@@ -12,6 +13,8 @@ import { sql } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
 const SEAN = sql("select first_name || ' ' || last_name from public.users where email = 'sean@beacon.test'") || "Sean Fitzgerald";
+// A lead with an email address on file, for the lead page's own forms.
+const LEAD = sql("select id from public.leads where deleted_at is null and email is not null and project_id is not null order by id limit 1");
 
 const FORMS = [
   { name: "Edit user", path: "/users", open: (p) => p.pointer(`button[aria-label="Actions for ${SEAN}"]`).then(() => sleep(300)).then(() => p.menuItem("Edit")) },
@@ -20,6 +23,12 @@ const FORMS = [
   { name: "New lead", path: "/leads", open: (p) => p.click("button", "New lead") },
   { name: "New appointment", path: "/appointments", open: (p) => p.click("button", "New appointment") },
   { name: "Add carrier", path: "/insurance-companies", open: (p) => p.click("[data-add-carrier]") },
+  ...(LEAD ? [
+    { name: "Prospect Info", path: `/leads/${LEAD}`, open: (p) => p.click("[data-edit-prospect]") },
+    { name: "Business details", path: `/leads/${LEAD}`, open: (p) => p.ev(`[...document.querySelectorAll('[role=tab]')].find((t) => /^Business/.test(t.textContent.trim()))?.click()`).then(() => sleep(300)).then(() => p.click("[data-edit-business]")) },
+    { name: "Coverage", path: `/leads/${LEAD}`, open: (p) => p.ev(`[...document.querySelectorAll('[role=tab]')].find((t) => /^Coverage/.test(t.textContent.trim()))?.click()`).then(() => sleep(300)).then(() => p.click("[data-edit-coverage]")) },
+    { name: "Email", path: `/leads/${LEAD}`, open: (p) => p.ev(`document.querySelector('[data-email-lead]')?.click()`) },
+  ] : []),
 ];
 
 // Where the box, its footer and the submit button are, and whether the button is what a click there would hit.
@@ -31,7 +40,13 @@ const MEASURE = `(() => {
   const b = box.getBoundingClientRect(), s = save.getBoundingClientRect();
   const hit = document.elementFromPoint(s.x + s.width / 2, s.y + s.height / 2);
   return { inside: s.top >= b.top && s.bottom <= b.bottom + 0.5, onScreen: b.top >= 0 && b.bottom <= innerHeight,
-           clickable: Boolean(hit && save.contains(hit)), scrolls: box.scrollHeight > box.clientHeight + 1,
+           clickable: Boolean(hit && save.contains(hit)),
+           // The box itself scrolls (where its fields do not scroll on their own).
+           scrolls: /auto|scroll/.test(getComputedStyle(box).overflowY) && box.scrollHeight > box.clientHeight + 1,
+           // Every part of the box that scrolls just now: the box, or the fields inside it. Not a list that
+           // drops down over the form (a picker's suggestions): that is a pop-up, not a second scroll bar.
+           scrollers: [box, ...box.querySelectorAll('*')].filter((e) => /auto|scroll/.test(getComputedStyle(e).overflowY)
+             && !/absolute|fixed/.test(getComputedStyle(e).position) && e.scrollHeight > e.clientHeight + 1).length,
            box: [Math.round(b.top), Math.round(b.bottom)], save: [Math.round(s.top), Math.round(s.bottom)] };
 })()`;
 
@@ -50,6 +65,7 @@ try {
       const m = (await until(async () => { const x = await page.ev(MEASURE); return x?.onScreen && x.inside ? x : null; }, { timeout: 3000 })) ?? (await page.ev(MEASURE));
       check(`${form.name}: Save is inside the box, on screen and clickable${m?.scrolls ? " (the fields scroll)" : ""}`,
         Boolean(m?.inside && m.onScreen && m.clickable), JSON.stringify(m));
+      check(`…with one scroll bar at most`, (m?.scrollers ?? 0) <= 1, JSON.stringify(m));
       if (m?.scrolls) {
         await page.ev(`document.querySelector('[data-dialog-content]').scrollTop = 1e6`);
         await sleep(150);

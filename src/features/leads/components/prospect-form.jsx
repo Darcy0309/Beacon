@@ -50,19 +50,20 @@ export default function ProspectForm({ lead, trigger }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-w-2xl">
+      {/* One scroll bar: the fields scroll, the title and the buttons stay put. */}
+      <DialogContent className="max-w-2xl overflow-y-hidden">
         <DialogHeader>
           <DialogTitle>Edit prospect info</DialogTitle>
           <DialogDescription>{lead.company_name}: where it is and who to reach.</DialogDescription>
         </DialogHeader>
-        <form action={formAction} noValidate className="flex min-h-0 flex-col gap-4" data-prospect-form>
+        <form action={formAction} noValidate className="flex min-h-0 flex-1 flex-col gap-4" data-prospect-form>
           <input type="hidden" name="id" value={lead.id} />
           {errors ? (
             <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">
               {errors === 1 ? "One field needs attention." : `${errors} fields need attention.`}
             </p>
           ) : null}
-          <div className="-mr-1 grid max-h-[60svh] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+          <div className="-mr-1 grid min-h-0 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
             <Field label="Company name" required error={fe("company_name")} className="sm:col-span-2">
               <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} autoFocus />
             </Field>
