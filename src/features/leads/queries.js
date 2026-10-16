@@ -121,10 +121,11 @@ export async function getLeadOption(id) {
  * One page of leads for a leads table, searched and filtered in the
  * database. `projectId` narrows it to one project, where it can also be
  * filtered by rep. The Leads page's filters too (Sean, Oct 2026):
- * `clientId` (its projects' leads) and `worked` ({ from, to }: instants), a
- * lead last called or changed between them.
+ * `clientId` (its projects' leads), `worked` ({ from, to }: instants), a
+ * lead last called or changed between them, and `resultIds`, a lead on any
+ * of those call results.
  */
-export async function listLeads(params, { projectId, clientId = null, worked = null } = {}) {
+export async function listLeads(params, { projectId, clientId = null, worked = null, resultIds = [] } = {}) {
   const supabase = await createClient();
   let clientProjects = null;
   if (clientId) {
@@ -142,6 +143,7 @@ export async function listLeads(params, { projectId, clientId = null, worked = n
         .order("id", { ascending: false });
       if (projectId) query = query.eq("project_id", Number(projectId));
       if (clientProjects) query = query.in("project_id", clientProjects);
+      if (resultIds.length) query = query.in("result_id", resultIds.map(Number));
       if (worked) {
         const [from, to] = [worked.from.toISOString(), worked.to.toISOString()];
         query = query.or(`and(date_last_worked.gte.${from},date_last_worked.lt.${to}),and(updated_at.gte.${from},updated_at.lt.${to})`);

@@ -21,6 +21,7 @@ import { appointmentSpan } from "@/lib/appointment-links";
 import { addDays, daysBetween, formatRange, isIsoDate } from "@/lib/dates";
 import { leadHref, listAddress } from "@/lib/back-link";
 import { getBusinessTimeZone } from "@/lib/server/business-day";
+import { orderResults } from "@/lib/result-order";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,10 @@ export default async function LeadsPage({ searchParams }) {
   // client, project and the days a lead was last called or changed.
   const params = readListParams(sp, ["result", "rep"]);
   const id = (v) => (typeof v === "string" && /^[1-9]\d{0,17}$/.test(v) ? v : "");
-  for (const key of ["result", "rep"]) if (params.filters[key] && !id(params.filters[key])) delete params.filters[key];
+  if (params.filters.rep && !id(params.filters.rep)) delete params.filters.rep;
+  // Call results: several at once ("23,24,25"; Sean, Oct 2026), filtered apart from the table's one-value facets.
+  const resultIds = [...new Set(String(params.filters.result ?? "").split(",").filter(id))].slice(0, 60);
+  delete params.filters.result;
   const chosen = { client: id(sp?.client), project: id(sp?.project) };
   const timeZone = await getBusinessTimeZone();
   let range = null;
@@ -43,12 +47,12 @@ export default async function LeadsPage({ searchParams }) {
     range = { from, to, worked: { from: appointmentSpan(from, "12:00 AM", 0, timeZone).start, to: appointmentSpan(addDays(to, 1), "12:00 AM", 0, timeZone).start } };
   }
   const [{ rows, total }, summary, options, results, filters] = await Promise.all([
-    listLeads(params, { projectId: chosen.project || undefined, clientId: chosen.client || null, worked: range?.worked ?? null }),
+    listLeads(params, { projectId: chosen.project || undefined, clientId: chosen.client || null, worked: range?.worked ?? null, resultIds }),
     getLeadCounts(), getLookups(), getCallResults(), getAppointmentFilters(),
   ]);
   const projectOptions = chosen.client ? filters.projects.filter((p) => String(p.clientId) === chosen.client) : filters.projects;
   const managerOptions = filters.managers;
-  const filtered = Boolean(range || chosen.client || chosen.project || params.filters.rep || params.filters.result || params.q);
+  const filtered = Boolean(range || chosen.client || chosen.project || params.filters.rep || resultIds.length || params.q);
   // This list's address, for each lead's back link; and what the date filter's form carries along.
   const here = listAddress("/leads", sp);
   const kept = Object.entries(sp ?? {}).filter(([k, v]) => !["from", "to", "page"].includes(k) && typeof v === "string");
@@ -58,8 +62,11 @@ export default async function LeadsPage({ searchParams }) {
     const at = [raw?.date_last_worked, raw?.updated_at].filter(Boolean).map((v) => Date.parse(v)).sort((a, b) => b - a)[0];
     return at ? day.format(new Date(at)) : "—";
   };
-  // Filtered by call result, each stage's results under its name.
-  const resultOptions = results.map((r) => ({ value: String(r.id), label: `${r.name} (${r.project_type === "APPT" ? "Appt" : "DB dev"})` }));
+  // Filtered by call result, several at once, in the order Sean's sheet lists them, each stage's under its name.
+  const resultOptions = orderResults(results).map((r) => ({
+    value: String(r.id), label: `${r.name} (${r.project_type === "APPT" ? "Appt" : "DB dev"})`,
+    group: r.project_type === "APPT" ? "Appointment setting" : "DB dev",
+  }));
 
   return (
     <>
@@ -90,11 +97,11 @@ export default async function LeadsPage({ searchParams }) {
           </div>
           <FilterTable
             columns={["Company", "Contact", "Phone", "Call result", "Last worked", "X-Date", "Assigned", { label: "Action", className: "text-right" }]}
-            filters={[{ key: "result", label: "Call result", kind: "select", options: resultOptions }]}
+            filters={[{ key: "result", label: "Call result", kind: "multi", options: resultOptions }]}
             placeholder="Search leads…"
             empty={filtered ? "No leads match these filters." : "No leads yet."}
             query={params.q}
-            selected={params.filters}
+            selected={{ ...params.filters, ...(resultIds.length ? { result: resultIds.join(",") } : {}) }}
             paging={pageInfo(total, params.page, params.perPage)}
             rows={rows.map((l) => ({
               id: l.id,

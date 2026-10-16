@@ -25,6 +25,12 @@ const lead = (name, proj, rep) => Number(sql(`insert into public.leads (company_
 const A = lead("Alpha Roofing", P1, SEAN);
 const B = lead("Bravo Glass", P2, MIKE);
 const C = lead("Charlie Plumbing", P3, SEAN);
+// Each on a call result of its own, for the call result filter's several at once.
+const resultOf = (name) => Number(sql(`select id from public.call_results where project_type = 'APPT' and name = ${lit(name)}`));
+const [EMAIL, BRANCH, INVALID] = [resultOf("Lead-Email"), resultOf("Lead-Branch"), resultOf("Lead-Invalid")];
+sql(`update public.leads set result_id = ${EMAIL} where id = ${A}`);
+sql(`update public.leads set result_id = ${BRANCH} where id = ${B}`);
+sql(`update public.leads set result_id = ${INVALID} where id = ${C}`);
 // Called back in March: the one the days filter finds (each was changed just now, when made).
 sql(`update public.leads set date_last_worked = '2026-03-10 18:00:00+00' where id = ${A}`);
 sql(`insert into public.appointments (lead_id, user_id, project_id, appt_date, appt_time, status_id, qa_status)
@@ -59,6 +65,20 @@ try {
   check("by project", JSON.stringify(byProject) === JSON.stringify([`${TAG} Bravo Glass`]), JSON.stringify(byProject));
   const byManager = await list(`&rep=${SEAN}`, (r) => r.length === 2);
   check("by manager", has(byManager, "Alpha Roofing") && has(byManager, "Charlie Plumbing") && !has(byManager, "Bravo Glass"), JSON.stringify(byManager));
+  // Call results, several at once (Sean, Oct 2026), in his sheet's order, ticked in a drop-down.
+  await list("", (r) => r.length === 3);
+  await admin.click('[data-multi-facet="result"] button');
+  const order = await until(() => admin.ev(`[...document.querySelectorAll('[data-multi-facet="result"] [role=option]')].map((o) => o.textContent.trim())`).then((o) => (o?.length ? o : null)));
+  check("the call results in the sheet's order: appointments first, then Lead-No Contact on, then DB dev",
+    order?.[0] === "Appointment (Appt)" && order?.indexOf("Lead-No Contact (Appt)") === 4 && order?.indexOf("Lead-Disco# (Appt)") < order?.findIndex((o) => /\(DB dev\)$/.test(o)), JSON.stringify(order?.slice(0, 6)));
+  await admin.click(`[data-multi-facet="result"] [data-option="${EMAIL}"]`);
+  await until(async () => (await admin.url()).includes(`result=${EMAIL}`));
+  await admin.click(`[data-multi-facet="result"] [data-option="${BRANCH}"]`);
+  const two = await until(async () => { const r = await shown(); return (await admin.url()).includes("result=") && r.length === 2 ? r : null; }, { timeout: 8000 });
+  check("two picked: leads on either", has(two ?? [], "Alpha Roofing") && has(two ?? [], "Bravo Glass") && !has(two ?? [], "Charlie Plumbing"), `${await admin.url()} ${JSON.stringify(two ?? await shown())}`);
+  check("…the list saying how many", /2 selected/.test((await admin.ev(`document.querySelector('[data-multi-facet="result"] button').innerText`)) ?? ""));
+  const three = await list(`&result=${EMAIL},${BRANCH},${INVALID}`, (r) => r.length === 3);
+  check("…and from the address, all three", three.length === 3, JSON.stringify(three));
   const byDays = await list(`&from=2026-03-01&to=2026-03-31`, (r) => r.length === 1);
   check("by the days last called or changed", JSON.stringify(byDays) === JSON.stringify([`${TAG} Alpha Roofing`]), JSON.stringify(byDays));
   // Called in March, but changed since (when the test set that): the later of the two shows.

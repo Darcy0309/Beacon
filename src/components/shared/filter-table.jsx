@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "@/components/shared/intent-link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, X, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, X, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { matchesAll, searchWords } from "@/lib/search-words";
@@ -40,7 +40,10 @@ import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
  *   what the other pages hold.
  *
  * A facet with up to CHIP_LIMIT options renders as a chip row, larger ones
- * fall back to a select; set `kind: "chips" | "select"` to force one.
+ * fall back to a select; set `kind: "chips" | "select"` to force one, or
+ * "multi" for a drop-down of checkboxes where several can be picked (kept as
+ * "a,b,c" in its URL parameter; server mode only; an option's `group` heads
+ * its part of the list).
  * `searchable={false}` drops the search box, for a list that cannot be searched.
  */
 const CHIP_LIMIT = 6;
@@ -242,6 +245,8 @@ export default function FilterTable({
 function FacetGroup({ group, value, onChange }) {
   if (group.options.length === 0) return null;
 
+  if (group.kind === "multi") return <MultiFacet group={group} value={value} onChange={onChange} />;
+
   if (group.kind === "select") {
     return (
       <label className="flex items-center gap-2">
@@ -273,6 +278,81 @@ function FacetGroup({ group, value, onChange }) {
           {o.count != null ? <span className="ml-1.5 tabular-nums opacity-60">{o.count}</span> : null}
         </Chip>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Several options at once (Sean, Oct 2026: the call results a lead list
+ * shows): a button saying what is picked, opening a list of checkboxes, each
+ * group under its heading. Picked values go out as "a,b,c". Closes on a
+ * click outside or Escape.
+ */
+function MultiFacet({ group, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  const picked = useMemo(() => new Set(String(value || "").split(",").filter(Boolean)), [value]);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e) => !box.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc);
+    };
+  }, [open]);
+  // In the list's own order, so the address reads the same however they were ticked.
+  const set = (next) => onChange(group.options.filter((o) => next.has(String(o.value))).map((o) => o.value).join(","));
+  const toggle = (v) => {
+    const next = new Set(picked);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    set(next);
+  };
+  const summary = picked.size === 0 ? "All"
+    : picked.size === 1 ? group.options.find((o) => picked.has(String(o.value)))?.label ?? "1 selected"
+    : `${picked.size} selected`;
+
+  return (
+    <div className="relative flex items-center gap-2" ref={box} data-multi-facet={group.key}>
+      <span className="eyebrow">{group.label}</span>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="listbox" aria-label={`Filter by ${group.label}: ${summary}`}
+        className={cn("flex h-8 min-w-36 max-w-64 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors",
+          picked.size ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
+        <span className="flex-1 truncate text-left">{summary}</span>
+        <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open ? (
+        <div role="listbox" aria-multiselectable aria-label={group.label}
+          className="absolute left-0 top-full z-30 mt-1 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border bg-card shadow-xl">
+          <div className="max-h-80 overflow-y-auto p-1">
+            {group.options.map((o, i) => {
+              const on = picked.has(String(o.value));
+              const heading = o.group && o.group !== group.options[i - 1]?.group ? o.group : null;
+              return (
+                <Fragment key={o.value}>
+                  {heading ? <div className="eyebrow px-2 pb-1 pt-2">{heading}</div> : null}
+                  <button type="button" role="option" aria-selected={on} onClick={() => toggle(String(o.value))} data-option={o.value}
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/60">
+                    <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", on ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                      {on ? <Check className="size-3" /> : null}
+                    </span>
+                    <span className="flex-1">{o.label}</span>
+                  </button>
+                </Fragment>
+              );
+            })}
+          </div>
+          {picked.size ? (
+            <button type="button" onClick={() => set(new Set())}
+              className="w-full border-t border-[var(--panel-border)] px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary">
+              Clear {group.label.toLowerCase()}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
