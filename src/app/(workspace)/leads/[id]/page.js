@@ -44,6 +44,8 @@ import ProjectInfoView from "@/features/project-info/components/project-info-vie
 import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
 import { getProjectInfo } from "@/features/project-info/queries";
 import { leadPlace } from "@/lib/project-info";
+import HoldNotice from "@/features/delivery/components/hold-notice";
+import { getLeadHold } from "@/features/delivery/hold-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -190,7 +192,7 @@ export default async function LeadSheet({ params, searchParams }) {
   // Working a call list: where the list stands. And whether the caller is on
   // this name's project, which (like being its rep) lets them record on it.
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info] = await Promise.all([
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold] = await Promise.all([
     listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
     listId ? getWorkProject(listId) : null,
     r.project && staff ? getWorkProject(r.project.id) : null,
@@ -202,6 +204,8 @@ export default async function LeadSheet({ params, searchParams }) {
     staff ? getCargoTypes() : [],
     // The client's profile sheet for the project (Project Info), at hand while on the phone.
     r.project?.id ? getProjectInfo(r.project.id) : null,
+    // Held back from the client by QA: its manager (or an administrator) fixes it and says so here.
+    seesInternal ? getLeadHold(lead.id) : null,
   ]);
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
@@ -531,6 +535,7 @@ export default async function LeadSheet({ params, searchParams }) {
           {/* Right: a call-back reminder, then the call result buttons. */}
           {/* Pinned beside the sheet; with the calendar under it, it scrolls on its own on a short screen. */}
           <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1">
+            {hold?.status === "failed" ? <HoldNotice hold={hold} /> : null}
             {seesInternal && people.length ? <SendLead leadId={lead.id} company={lead.co} people={people} /> : null}
             {canRecord ? (
               <ReminderCard

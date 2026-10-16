@@ -1,4 +1,4 @@
-import { ClipboardCheck, Gauge, CheckCheck, AlertTriangle, CalendarCheck } from "lucide-react";
+import { ClipboardCheck, CalendarCheck, Inbox, Ban, Send } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatTile from "@/components/shared/stat-tile";
@@ -9,6 +9,11 @@ import FilterTable from "@/components/shared/filter-table";
 import { listQaCalls, getQaQueue, QA_RESULT_OPTIONS } from "@/features/qa/queries";
 import QaQueue from "@/features/qa/components/qa-queue";
 import { getCurrentUser } from "@/lib/server/session";
+import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
+import { appointmentSpan } from "@/lib/appointment-links";
+import { hourLabel, nextClearing, ZONES } from "@/lib/delivery-schedule";
+import HeldDeliveries from "@/features/delivery/components/held-deliveries";
+import { getHeldDeliveries } from "@/features/delivery/hold-queries";
 import { readListParams, pageInfo } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
@@ -18,35 +23,48 @@ const scoreColor = (s) => (s >= 85 ? "var(--neon-emerald)" : s >= 70 ? "var(--ne
 
 export default async function QaPage({ searchParams }) {
   const params = readListParams(await searchParams, ["result", "rep"]);
-  const [{ rows, total, stats: calls, reps }, queue, me] = await Promise.all([listQaCalls(params), getQaQueue(), getCurrentUser()]);
+  const [{ rows, total, reps }, queue, me, today, tz] = await Promise.all([listQaCalls(params), getQaQueue(), getCurrentUser(), getBusinessToday(), getBusinessTimeZone()]);
+  // What waits to go to clients (administrators: they send it).
+  const admin = me?.role === "admin";
+  const held = admin ? await getHeldDeliveries({ since: appointmentSpan(today, "12:00 AM", 0, tz).start.toISOString() }) : null;
+  const waiting = held?.rows.filter((r) => r.status !== "failed") ?? [];
+  const heldBack = held?.rows.filter((r) => r.status === "failed") ?? [];
 
-  // Tiles score every reviewed call; the table shows one page of them.
-  const avg = calls.length ? Math.round(calls.reduce((s, c) => s + c.score, 0) / calls.length) : 0;
-  const passed = calls.filter((c) => c.result === "Passed").length;
-  const review = calls.filter((c) => c.result === "Review").length;
-  const failed = calls.filter((c) => c.result === "Failed").length;
-  const scores = calls.map((c) => c.score).reverse();
+  // How each kind goes out, and when the schedule next clears what is held.
+  const st = held?.settings;
+  const mode = (m) => (m === "hold" ? "held for QA" : "sent immediately");
+  const summary = st
+    ? `Leads: ${mode(st.leads)} · Appointments: ${mode(st.appointments)} · ${st.every
+      ? `held ones go every ${st.every === 1 ? "hour" : `${st.every} hours`}, ${hourLabel(st.from)}–${hourLabel(st.to)} ${ZONES.find(([z]) => z === st.zone)?.[1] ?? ""}; next ${nextClearing(st)}.`
+      : "held ones go only when sent from here."}`
+    : "";
 
-  const tiles = [
-    { label: "Calls Scored", value: String(calls.length), note: "recent reviews",
-      icon: ClipboardCheck, accent: "var(--neon-cyan)", series: scores, bars: true },
-    { label: "Average Score", value: String(avg), note: "out of 100",
-      icon: Gauge, accent: "var(--neon-amber)", series: scores },
-    { label: "Passed", value: String(passed), note: `${calls.length ? Math.round((passed / calls.length) * 100) : 0}% pass rate`,
-      icon: CheckCheck, accent: "var(--neon-emerald)", series: calls.map((c) => (c.result === "Passed" ? 1 : 0)).reverse(), bars: true },
-    { label: "Needs Attention", value: String(review + failed), note: `${review} review · ${failed} failed`,
-      icon: AlertTriangle, accent: "var(--neon-rose)", series: calls.map((c) => (c.result !== "Passed" ? 1 : 0)).reverse(), bars: true },
-  ];
+  const tiles = admin
+    ? [
+        { label: "Waiting to Send", value: String(waiting.length), note: "held for QA", icon: Inbox, accent: "var(--neon-cyan)" },
+        { label: "Held Back", value: String(heldBack.length), note: "waiting for the manager", icon: Ban, accent: "var(--neon-rose)" },
+        { label: "Sent Today", value: String(held.sentToday), note: "leads & appointments to clients", icon: Send, accent: "var(--neon-emerald)" },
+        { label: "Appointments in QA", value: String(queue.length), note: "waiting for pass or fail", icon: CalendarCheck, accent: "var(--neon-amber)" },
+      ]
+    : [{ label: "Appointments in QA", value: String(queue.length), note: "waiting for pass or fail", icon: CalendarCheck, accent: "var(--neon-amber)" }];
 
   return (
     <>
-      <Topbar title="Quality QA" sub={`${calls.length} scored call reviews · avg ${avg}`} />
+      <Topbar title="Quality QA" sub={admin ? `${waiting.length} waiting to go to clients · ${queue.length} appointments in QA` : `${queue.length} appointments in QA`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
           {tiles.map((t, i) => (
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
+
+        {held ? (
+          <Card id="waiting-to-send">
+            <SectionHeader label="Waiting to Send to Clients" icon={Inbox}
+              action={held.rows.length ? <span className="text-[0.66rem] font-semibold text-amber-300">{held.rows.length} held</span> : null} />
+            <HeldDeliveries rows={held.rows} summary={summary} />
+          </Card>
+        ) : null}
 
         <Card>
           <SectionHeader

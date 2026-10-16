@@ -9,6 +9,7 @@ import { mailServerInfo } from "@/lib/server/mail";
 import SicCodesCard from "@/features/sic/components/sic-codes-card";
 import CargoTypesCard from "@/features/cargo/components/cargo-types-card";
 import IdleSettings from "@/features/settings/components/idle-settings";
+import DeliverySettings from "@/features/settings/components/delivery-settings";
 import { getCargoTypes } from "@/features/cargo/queries";
 import DeletedRecordsCard from "@/features/trash/components/deleted-records-card";
 import { getDeletedRecords } from "@/features/trash/queries";
@@ -30,6 +31,7 @@ export default async function SettingsPage() {
       <Topbar title="Settings" sub="Branding, security, email, pay and time" />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <SettingsForm settings={settings} mailServer={mailServerInfo()} />
+        <DeliverySettings value={settings.delivery} />
         <IdleSettings minutes={settings.security?.idle_minutes} />
         <PayRulesForm rules={payRules} />
         <PaySchedule periods={payRules.time.schedule} today={today} editable />

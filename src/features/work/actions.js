@@ -7,6 +7,9 @@ import { revalidatePath } from "next/cache";
 import { check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { cleanCriteria } from "@/lib/call-list-filter";
 import { deliverLead } from "@/features/delivery/server";
+import { holdDelivery, holdKind, readDeliverySettings } from "@/features/delivery/holds";
+import { holds } from "@/lib/delivery-schedule";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { APPOINTMENT_NOTICES, sendsSheet } from "@/lib/delivery";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
@@ -47,7 +50,7 @@ export async function recordCallResult(prevState, formData) {
   const supabase = await createClient();
   const leadId = Number(values.lead_id);
 
-  const { data: result } = await supabase.from("call_results").select("effect, delivers").eq("id", Number(values.result_id)).maybeSingle();
+  const { data: result } = await supabase.from("call_results").select("name, effect, delivers").eq("id", Number(values.result_id)).maybeSingle();
   const missing = (NEEDS[result?.effect] ?? []).filter(([field]) => !values[field]);
   if (missing.length) {
     return fail(
@@ -90,9 +93,22 @@ export async function recordCallResult(prevState, formData) {
   // A lead or an appointment goes to the client: its sheet, emailed to the
   // project's delivery addresses, once the rep has moved on. So does news of
   // the appointment: confirmed, or cancelled (marked invalid).
+  // Unless Settings › Delivery holds that kind in QA (Sean, Oct 2026): then it waits there, for an
+  // administrator or the next clearing.
   if (sendsSheet(result)) {
-    const [me, origin] = await Promise.all([currentAppUser(supabase), requestOrigin()]);
-    after(() => deliverLead({ leadId, callRecordId: data.call_record_id, sentBy: me?.id ?? null, origin }));
+    const [me, origin, settings] = await Promise.all([currentAppUser(supabase), requestOrigin(), readDeliverySettings(supabase)]);
+    const admin = holds(settings, holdKind(result)) ? createAdminClient() : null;
+    if (admin) {
+      try {
+        await holdDelivery(admin, { leadId, callRecordId: data.call_record_id, result, userId: me?.id ?? null });
+      } catch (err) {
+        // Held nowhere: sent, rather than lost.
+        console.error("[call result] not held, sent", leadId, err?.message ?? err);
+        after(() => deliverLead({ leadId, callRecordId: data.call_record_id, sentBy: me?.id ?? null, origin }));
+      }
+    } else {
+      after(() => deliverLead({ leadId, callRecordId: data.call_record_id, sentBy: me?.id ?? null, origin }));
+    }
   }
 
   // The next name: on the list the rep came from, if there is one.
