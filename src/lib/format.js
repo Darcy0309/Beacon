@@ -141,3 +141,11 @@ export const mediumDate = (v) => {
   if (Number.isNaN(d.getTime())) return "—";
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 };
+
+/**
+ * What kind of appointment it is, as its call result says (Sean, Oct 2026):
+ * Appointment, Appointment-Phone or Appointment-Confirmed, from the lead's
+ * result while that is one of them; else by whether it was confirmed.
+ */
+export const appointmentKind = (resultName, confirmed = false) =>
+  /^Appointment(-Phone|-Confirmed)?$/i.test(String(resultName ?? "").trim()) ? String(resultName).trim() : confirmed ? "Appointment-Confirmed" : "Appointment";

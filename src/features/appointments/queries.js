@@ -1,36 +1,30 @@
 /** Appointments and the calendar. */
 
 import "server-only";
-import { cityState, colorFor, initialsOf, isoDay, longDate, shortName, splitTime, timeRank } from "@/lib/format";
+import { appointmentKind, cityState, colorFor, initialsOf, isoDay, longDate, shortName, splitTime, timeRank } from "@/lib/format";
 import { addDays } from "@/lib/dates";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
-// Accent bar per lead status, matching the palette used across the UI.
-const BAR = {
-  appt: "bg-emerald-500",
-  survey: "bg-violet-500",
-  hot: "bg-rose-500",
-  xdate: "bg-sky-500",
-  profile: "bg-amber-500",
-  new: "bg-slate-400",
-};
+// Accent bar per kind of appointment (its call result), matching the palette used across the UI.
+const BAR = { "Appointment-Confirmed": "bg-emerald-500", "Appointment-Phone": "bg-sky-500", Appointment: "bg-violet-500" };
 
 const APPT_SELECT = `
-  id, appt_date, appt_time, duration_min, rep_name,
+  id, appt_date, appt_time, duration_min, rep_name, confirmed_at,
   status:appointment_statuses(id, name),
   user:users!appointments_user_id_fkey(id, first_name, last_name),
   lead:leads(
     id, company_name, contact_name, contact_title, phone, email, city, state, client_note,
-    status:lead_statuses(code, name),
+    result:call_results(name),
     project:projects!leads_project_id_fkey(id, name, company:companies(id, name))
   )
 `;
 
 function toApptView(a) {
   const lead = one(a.lead);
-  const leadStatus = lead ? one(lead.status) : null;
+  // Its kind as its call result says (Appointment, Appointment-Phone, Appointment-Confirmed), not the old system's status.
+  const kind = appointmentKind(one(lead?.result)?.name, Boolean(a.confirmed_at));
   const user = one(a.user);
   const rep = a.rep_name || shortName(user);
   const { time, ampm } = splitTime(a.appt_time);
@@ -41,13 +35,13 @@ function toApptView(a) {
     time,
     ampm,
     co: lead?.company_name ?? "—",
-    detail: [leadStatus?.name, lead?.contact_name, `${a.duration_min ?? 30} min`]
+    detail: [kind, lead?.contact_name, `${a.duration_min ?? 30} min`]
       .filter(Boolean)
       .join(" · "),
     rep,
     repI: initialsOf(rep),
     repC: colorFor(rep),
-    bar: BAR[leadStatus?.code] ?? BAR.new,
+    bar: BAR[kind] ?? BAR.Appointment,
     leadId: lead?.id ?? null,
     appt_time: a.appt_time,
     status: one(a.status)?.name ?? "—",
@@ -60,8 +54,7 @@ function toApptView(a) {
     phone: lead?.phone ?? null,
     email: lead?.email ?? null,
     location: cityState(lead),
-    leadStatus: leadStatus?.name ?? null,
-    statusCode: leadStatus?.code ?? "new",
+    kind,
     project: one(lead?.project)?.name ?? null,
     client: one(one(lead?.project)?.company)?.name ?? null,
     // What the client is told about it, written as it was set.

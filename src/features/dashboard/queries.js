@@ -3,7 +3,7 @@
 import "server-only";
 import { shapeReps } from "@/features/users/queries";
 import { addDays, todayIn } from "@/lib/dates";
-import { cityState, shortDate, splitTime, timeRank } from "@/lib/format";
+import { appointmentKind, cityState, shortDate, splitTime, timeRank } from "@/lib/format";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
@@ -331,7 +331,7 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       .select(`id, appt_date, appt_time, duration_min, confirmed_at, qa_status,
         status:appointment_statuses(name),
         setter:users!appointments_user_id_fkey(first_name, last_name),
-        lead:leads(id, company_name, contact_name, status:lead_statuses(code, name),
+        lead:leads(id, company_name, contact_name, result:call_results(name),
           project:projects!leads_project_id_fkey(name, company:companies(name)))`))
       .is("invalid_at", null)
       .gte("appt_date", from)
@@ -376,7 +376,7 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       key: `a${a.id}`, kind: "appointment", id: a.id, day: a.appt_date,
       time: [time, ampm].filter(Boolean).join(" "), clock: a.appt_time, minutes: timeRank(a.appt_time),
       title: lead?.company_name ?? "Appointment",
-      detail: [one(lead?.status)?.name ?? "Appointment", lead?.contact_name, one(one(lead?.project)?.company)?.name,
+      detail: [appointmentKind(one(lead?.result)?.name, Boolean(a.confirmed_at)), lead?.contact_name, one(one(lead?.project)?.company)?.name,
         everyone && one(a.setter) ? `Set by ${[one(a.setter).first_name, one(a.setter).last_name].filter(Boolean).join(" ")}` : null].filter(Boolean).join(" · "),
       // Confirmed, or still waiting for the confirmation call; QA first if it has not passed.
       badge: a.confirmed_at ? "Confirmed" : a.qa_status === "pending" ? "Pending QA" : waiting ? "Awaiting confirmation" : status,
