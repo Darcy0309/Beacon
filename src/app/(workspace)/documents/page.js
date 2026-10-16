@@ -1,7 +1,8 @@
-import { FileText, Files, HardDrive, Building2 } from "lucide-react";
+import { Eye, FileText, Files, HardDrive, Building2 } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import RowActions from "@/components/shared/row-actions";
+import FileViewer, { FileLink } from "@/components/shared/file-viewer";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
@@ -64,28 +65,35 @@ export default async function DocumentsPage({ searchParams }) {
             query={params.q}
             selected={params.filters}
             paging={pageInfo(total, params.page, params.perPage)}
-            rows={rows.map((d) => ({
-              id: d.id,
-              node: (
-                <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <FileText className="size-4 shrink-0 text-primary" />
-                      {d.href ? (
-                        <a href={d.href} target="_blank" rel="noopener" className="font-medium transition-colors hover:text-primary hover:underline" data-document-link>{d.name}</a>
-                      ) : (
-                        <span className="font-medium">{d.name}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell><ToneBadge tone={typeTone[d.type] ?? "slate"}>{d.type}</ToneBadge></TableCell>
-                  <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>
-                  <TableCell className="tabular-nums text-muted-foreground">{d.size}</TableCell>
-                  <TableCell className="text-muted-foreground">{d.date}</TableCell>
-                  <TableCell className="text-right"><RowActions name={d.name} id={d.id} href={d.href ?? undefined} onDelete={canDelete ? deleteDocument : undefined} /></TableCell>
-                </TableRow>
-              ),
-            }))}
+            rows={rows.map((d) => {
+              // A file kept with a lead opens in Lighthouse's viewer (a PDF, a picture), from its name or the row's menu.
+              const file = d.href ? { id: d.id, name: d.name, type: d.type === "—" ? null : d.type, about: [d.type, d.size, d.date, d.client].filter((v) => v && v !== "—").join(" · ") } : null;
+              return {
+                id: d.id,
+                node: (
+                  <TableRow>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <FileText className="size-4 shrink-0 text-primary" />
+                        {file ? (
+                          <FileLink file={file} className="font-medium transition-colors hover:text-primary hover:underline" data-document-link>{d.name}</FileLink>
+                        ) : (
+                          <span className="font-medium">{d.name}</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell><ToneBadge tone={typeTone[d.type] ?? "slate"}>{d.type}</ToneBadge></TableCell>
+                    <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">{d.size}</TableCell>
+                    <TableCell className="text-muted-foreground">{d.date}</TableCell>
+                    <TableCell className="text-right">
+                      <RowActions name={d.name} id={d.id} onDelete={canDelete ? deleteDocument : undefined}
+                        forms={file ? [{ key: "view", label: "View", icon: <Eye />, element: <FileViewer file={file} /> }] : []} />
+                    </TableCell>
+                  </TableRow>
+                ),
+              };
+            })}
           />
         </Card>
       </div>

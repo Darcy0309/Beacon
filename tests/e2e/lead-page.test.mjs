@@ -133,8 +133,25 @@ try {
   check("…and listed there, by whom and when", Boolean(await until(() => sean.ev(`(document.querySelector('[data-file="${fileId}"]')?.innerText ?? '').includes('policy.pdf')`))));
   const opened = await fetch(`${APP_URL}/api/files/${fileId}`, { headers: { cookie }, redirect: "manual" });
   check("…opened through a short-lived link", opened.status === 307 || opened.status === 302 || opened.status === 303, String(opened.status));
+  const shown = await fetch(opened.headers.get("location") ?? "about:blank").catch(() => null);
+  check("…a PDF shown in the browser, not downloaded", !/download=/.test(opened.headers.get("location") ?? "") && shown?.headers.get("content-type") === "application/pdf"
+    && !/attachment/i.test(shown?.headers.get("content-disposition") ?? ""), `${opened.headers.get("location")} · ${shown?.headers.get("content-disposition")}`);
+  const saved = await fetch(`${APP_URL}/api/files/${fileId}?download=1`, { headers: { cookie }, redirect: "manual" });
+  check("…and downloaded, under its own name, when asked", /download=policy\.pdf/.test(saved.headers.get("location") ?? ""), saved.headers.get("location"));
+  await sean.click(`[data-file="${fileId}"] [data-file-open]`);
+  const viewer = `[data-file-viewer="${fileId}"]`;
+  check("its name opens it in Lighthouse's viewer", Boolean(await until(() => sean.ev(`document.querySelector('${viewer} iframe[data-file-frame]')?.getAttribute('src') === '/api/files/${fileId}'`))));
+  check("…with Open in new tab and Download beside it", (await sean.ev(`[document.querySelector('${viewer} [data-file-open-tab]')?.getAttribute('href'), document.querySelector('${viewer} [data-file-open-tab]')?.target,
+    document.querySelector('${viewer} [data-file-download]')?.getAttribute('href')].join(' ')`)) === `/api/files/${fileId} _blank /api/files/${fileId}?download=1`);
+  await shot("file-viewer");
+  await sean.click(`${viewer} button`, "Close");
+  check("…and closes back to the lead", Boolean(await until(() => sean.ev(`!document.querySelector('${viewer}')`))));
+  check("the download button downloads it", (await sean.ev(`document.querySelector('[data-file="${fileId}"] [data-file-download]')?.getAttribute('href')`)) === `/api/files/${fileId}?download=1`);
   const printedAgain = await (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie } })).text();
-  check("…and in the sheet the client gets, as a link", /Policy files/i.test(printedAgain) && new RegExp(`/sheet/[^"]+/files/${fileId}`).test(printedAgain));
+  const sheetFile = printedAgain.match(new RegExp(`https?://[^"]+/sheet/[^"]+/files/${fileId}`))?.[0];
+  check("…and in the sheet the client gets, as a link", /Policy files/i.test(printedAgain) && Boolean(sheetFile));
+  const fromSheet = sheetFile ? await fetch(sheetFile.replace(/^https?:\/\/[^/]+/, APP_URL), { redirect: "manual" }) : null;
+  check("…which opens the PDF in the client's browser too", Boolean(fromSheet?.headers.get("location")) && !/download=/.test(fromSheet.headers.get("location")), fromSheet?.headers.get("location"));
 
   section("Send to a manager");
   await sean.click("[data-send-lead]");

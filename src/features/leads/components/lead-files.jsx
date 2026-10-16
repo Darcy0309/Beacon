@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { Download, FileText, Loader2, Paperclip, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
+import { FileLink } from "@/components/shared/file-viewer";
+import { fileHref } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
 import { recordLeadFile } from "@/features/leads/actions";
 import { deleteDocument } from "@/features/documents/actions";
@@ -15,6 +17,8 @@ const MAX_MB = 25;
 const ACCEPT = ".pdf,image/*,.doc,.docx,.xls,.xlsx,.txt,.csv,.eml,.msg";
 
 const when = (iso) => new Date(iso).toLocaleDateString("en-US", { weekday: "short", month: "2-digit", day: "2-digit", year: "numeric" });
+// A file's kind, size, when it was added and by whom.
+const about = (f) => [f.type, f.size, when(f.at), f.by ? `by ${f.by}${f.byClient ? " (client)" : ""}` : null].filter(Boolean).join(" · ");
 // A stored name with nothing in it that a path cannot hold.
 const safe = (name) => name.normalize("NFKD").replace(/[^\w.-]+/g, "_").replace(/^_+|_+$/g, "").slice(-120) || "file";
 
@@ -22,8 +26,10 @@ const safe = (name) => name.normalize("NFKD").replace(/[^\w.-]+/g, "_").replace(
  * Policy Files (Sean, Oct 2026): the files a prospect sends (policies, dec
  * pages, photos) kept with the lead, for the lead page and an appointment.
  * Anyone who can see the lead adds them: straight from the browser to the
- * lead's own folder in storage, then a row to say so. Opening one asks the
- * server for a short-lived link. They go to the client with the lead sheet.
+ * lead's own folder in storage, then a row to say so. Its name opens it in
+ * Lighthouse's viewer (a PDF, a picture), its button downloads it; either
+ * asks the server for a short-lived link. They go to the client with the
+ * lead sheet.
  *
  *   initial    listLeadFiles(); without it, the list is read when shown
  *   canDelete  administrators, managers and agents (a delete only hides it)
@@ -60,7 +66,8 @@ export default function LeadFiles({ leadId, initial = null, canDelete = false, c
     let added = 0;
     for (const [i, file] of chosen.filter((f) => f.size <= MAX_MB * 1024 * 1024).entries()) {
       setBusy(`Adding ${file.name}${chosen.length > 1 ? ` (${i + 1} of ${chosen.length})` : ""}…`);
-      const path = `lead/${leadId}/${crypto.randomUUID()}-${safe(file.name)}`;
+      // In a folder of its own, under its own name: what the browser's PDF viewer shows, and saves it as.
+      const path = `lead/${leadId}/${crypto.randomUUID()}/${safe(file.name)}`;
       const { error } = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined, upsert: false });
       if (error) {
         toast.error(`${file.name}: ${/mime|type/i.test(error.message) ? "that kind of file can't be added" : error.message}`);
@@ -115,12 +122,12 @@ export default function LeadFiles({ leadId, initial = null, canDelete = false, c
             <li key={f.id} data-file={f.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
               <FileText className="size-4 shrink-0 text-primary" aria-hidden />
               <div className="min-w-0 flex-1">
-                <a href={`/api/files/${f.id}`} target="_blank" rel="noreferrer" className="block truncate font-medium hover:text-primary hover:underline" title={f.name}>{f.name}</a>
-                <div className="truncate text-xs text-muted-foreground">
-                  {[f.type, f.size, when(f.at), f.by ? `by ${f.by}${f.byClient ? " (client)" : ""}` : null].filter(Boolean).join(" · ")}
-                </div>
+                <FileLink file={{ id: f.id, name: f.name, type: f.type, about: about(f) }} className="block truncate font-medium hover:text-primary hover:underline" title={f.name} data-file-open>
+                  {f.name}
+                </FileLink>
+                <div className="truncate text-xs text-muted-foreground">{about(f)}</div>
               </div>
-              <a href={`/api/files/${f.id}`} target="_blank" rel="noreferrer" aria-label={`Download ${f.name}`} className="rounded p-1 text-muted-foreground transition-colors hover:text-primary"><Download className="size-4" /></a>
+              <a href={fileHref(f.id, { download: true })} aria-label={`Download ${f.name}`} title="Download" className="rounded p-1 text-muted-foreground transition-colors hover:text-primary" data-file-download><Download className="size-4" /></a>
               {canDelete ? (
                 <button type="button" onClick={() => setAsking(f)} aria-label={`Take ${f.name} off the lead`} className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive" data-remove-file>
                   <Trash2 className="size-4" />

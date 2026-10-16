@@ -9,7 +9,7 @@
  *
  *   node tests/run.mjs tests/e2e/name-links.test.mjs
  */
-import { check, finish, section, until } from "../support/assert.mjs";
+import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
@@ -52,6 +52,14 @@ try {
   check("an account manager's name opens their dashboard", /^\/\?view=\d+$/.test((await until(() => href("[data-manager-link]"))) ?? ""));
   await admin.go(`/documents?q=${encodeURIComponent(TAG)}`, 5000);
   check("a policy file's name opens the file", (await until(() => href("[data-document-link]"))) === `/api/files/${doc}`);
+  await admin.click("[data-document-link]");
+  check("…in Lighthouse's viewer, not a download", Boolean(await until(() => admin.ev(`document.querySelector('[data-file-viewer="${doc}"] iframe[data-file-frame]')?.getAttribute('src') === '/api/files/${doc}'`))));
+  await admin.click(`[data-file-viewer="${doc}"] button`, "Close");
+  await until(() => admin.ev(`!document.querySelector('[data-file-viewer]')`));
+  await admin.pointer(`button[aria-label="Actions for ${TAG} policy.pdf"]`);
+  await sleep(400);
+  await admin.menuItem("View");
+  check("…and from the row's menu, View", Boolean(await until(() => admin.ev(`!!document.querySelector('[data-file-viewer="${doc}"] iframe[data-file-frame]')`))));
   await admin.go(`/imports?q=${encodeURIComponent(TAG)}`, 5000);
   check("an import's project opens the project", !batch || (await until(() => href("[data-import-project]"))) === `/projects/${project}`);
   await admin.go(`/activity?q=${encodeURIComponent(TAG)}`, 5000);
