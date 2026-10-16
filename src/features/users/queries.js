@@ -1,6 +1,7 @@
 /** People: user accounts, account managers, reps and their workload. */
 
 import "server-only";
+import { addDays } from "@/lib/dates";
 import { colorFor, fullName, initialsOf, shortName, timeAgo } from "@/lib/format";
 import { one, paged, runPaged } from "@/lib/server/query-helpers";
 import { getCurrentUser } from "@/lib/server/session";
@@ -74,6 +75,59 @@ export async function getUserStats() {
 }
 
 /** Account managers with their workload. */
+/**
+ * The Account Managers page over days chosen (Sean, Oct 2026; { from, to },
+ * `today` the business's): per manager, the leads they developed and the
+ * appointments they set (as the production report counts them, as the
+ * dashboard does), the leads at appointment setting they called (each once),
+ * and the appointments they set and leads they developed that were marked
+ * invalid; and the team's, a day at a time up to today, for the tiles' lines.
+ */
+export async function getManagerPeriod({ from, to, today }) {
+  const supabase = await createClient();
+  const [report, stats] = await Promise.all([
+    supabase.rpc("production_report", { p_from: from, p_to: to, p_project_id: null, p_user_id: null }),
+    supabase.rpc("manager_period_stats", { p_from: from, p_to: to }),
+  ]);
+  if (report.error) throw report.error;
+  if (stats.error) throw stats.error;
+  const byUser = new Map();
+  const person = (id) => {
+    if (!byUser.has(id)) byUser.set(id, { developed: 0, appts: 0, called: 0, invalidAppts: 0, invalidLeads: 0 });
+    return byUser.get(id);
+  };
+  const days = [];
+  for (let d = from; d <= (to < today ? to : today); d = addDays(d, 1)) days.push(d);
+  const at = new Map(days.map((d, i) => [d, i]));
+  const line = () => days.map(() => 0);
+  const series = { developed: line(), appts: line(), called: line(), invalidAppts: line(), invalidLeads: line() };
+  const add = (key, day, n) => {
+    const i = at.get(day);
+    if (i !== undefined) series[key][i] += n;
+  };
+  for (const r of report.data ?? []) {
+    const p = person(r.user_id);
+    p.developed += Number(r.leads) || 0;
+    p.appts += Number(r.appointments) || 0;
+    add("developed", r.day, Number(r.leads) || 0);
+    add("appts", r.day, Number(r.appointments) || 0);
+  }
+  for (const r of stats.data ?? []) {
+    if (r.day == null) {
+      // All the days together: a lead called on several of them, once.
+      const p = person(r.user_id);
+      p.called = Number(r.leads_called) || 0;
+      p.invalidAppts = Number(r.appts_invalid) || 0;
+      p.invalidLeads = Number(r.leads_invalid) || 0;
+    } else {
+      add("called", r.day, Number(r.leads_called) || 0);
+      add("invalidAppts", r.day, Number(r.appts_invalid) || 0);
+      add("invalidLeads", r.day, Number(r.leads_invalid) || 0);
+    }
+  }
+  return { byUser, series };
+}
+
 export async function getAccountManagers() {
   const supabase = await createClient();
   // Workload comes pre-counted from the user_workload view.

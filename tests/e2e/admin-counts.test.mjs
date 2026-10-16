@@ -5,7 +5,7 @@
  *   Projects          Leads Across Campaigns counts leads, "in the
  *                     pipeline"; a project's Leads are leads, with what it
  *                     still has to call beside them
- *   Account Managers  leads held apart from the names still to call
+ *   Account Managers  leads held apart from the leads called
  *   Dashboard         Leads and Appointments developed by the managers, by
  *                     day, pay period, week or month; the managers' calendar
  *                     in place of Today's Schedule, with All
@@ -50,8 +50,9 @@ try {
 
   section("Account Managers");
   await admin.go("/account-managers", 5000);
-  const assigned = await until(() => tile("Leads Assigned"));
-  check("leads held, and the names still to call counted apart", /names still to call/i.test(assigned ?? "") && await admin.ev(`!!document.querySelector('[data-manager-names]') && !!document.querySelector('[data-manager-leads]')`), assigned);
+  const called = await until(() => tile("Leads Called"));
+  check("leads held now, and the leads called over the days counted apart", /leads held now/i.test(called ?? "")
+    && await admin.ev(`!!document.querySelector('[data-manager-figure="leads"]') && !!document.querySelector('[data-manager-figure="called"]') && !document.querySelector('[data-manager-names]')`), called);
 
   section("Dashboard");
   await admin.go("/", 6000);

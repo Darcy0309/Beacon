@@ -18,11 +18,11 @@ const step = "flex size-6 items-center justify-center rounded-md text-muted-fore
  * any day; "Today" comes back. The day lives in the address (`dateParam`),
  * with the rest of `params` kept. `prev`/`next`: the day to go to, or null.
  */
-export default function ViewNav({ params, dateParam, anchor, label, prev, next, today, showsToday, name }) {
+export default function ViewNav({ params, dateParam, anchor, label, prev, next, today, showsToday, name, base = "/" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => monthStart(anchor));
-  const href = (day) => dashboardHref(params, { [dateParam]: day });
+  const href = (day) => dashboardHref(params, { [dateParam]: day }, base);
 
   return (
     <div className="flex items-center gap-0.5" data-view-nav={dateParam}>

@@ -2,25 +2,26 @@ import Link from "@/components/shared/intent-link";
 import { TILE_PERIODS } from "@/lib/pay";
 import { cn } from "@/lib/utils";
 
-/** The dashboard's address with `changes` made, the rest of `params` kept. */
-export function dashboardHref(params, changes) {
+/** The dashboard's address (or `base`'s, another page's) with `changes` made, the rest of `params` kept. */
+export function dashboardHref(params, changes, base = "/") {
   const q = new URLSearchParams({ ...params, ...changes });
-  return `/?${q.toString()}`;
+  return `${base}?${q.toString()}`;
 }
 
 /**
  * Pay period · Week · Month on a dashboard tile or card (`options`, from
  * lib/pay): which days it counts. A link each, so the choice lives in the
- * address (`param`) and the other tiles keep theirs (`params`).
+ * address (`param`) and the other tiles keep theirs (`params`). `base`: the
+ * page it is on, when not the dashboard.
  */
-export default function PeriodSwitch({ param, current, params = {}, options = TILE_PERIODS }) {
+export default function PeriodSwitch({ param, current, params = {}, options = TILE_PERIODS, base = "/" }) {
   return (
     // No taller than the line of text it sits on, so the tile is as tall as every other.
     <span className="-my-0.5 inline-flex rounded-md border border-[var(--panel-border)] bg-background/40 p-px" data-period-switch={param}>
       {options.map(([key, label]) => (
         <Link
           key={key}
-          href={dashboardHref(params, { [param]: key })}
+          href={dashboardHref(params, { [param]: key }, base)}
           scroll={false}
           aria-current={current === key ? "true" : undefined}
           className={cn(
