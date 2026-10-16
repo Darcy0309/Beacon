@@ -46,13 +46,14 @@ export default function RecentDevelopedCard({ rows, view, kind, kindSwitch, swit
       </div>
       <FilterTable
         columns={["Company", "Client", "Project", "Call result", "Ultimate X-Date", "Manager", "Created"]}
-        filters={[{ key: "manager", label: "Manager" }]}
+        // By manager and by project (Sean, Oct 2026): each with the ones that have something in these days.
+        filters={[{ key: "manager", label: "Manager" }, { key: "project", label: "Project" }]}
         placeholder="Search company, phone, client, manager…"
         empty={today ? `No ${NOUN[kind]} developed yet today.` : `No ${NOUN[kind]} developed in these days.`}
         rows={rows.map((r) => ({
           id: r.id,
           search: `${r.company} ${r.phone ?? ""} ${(r.phone ?? "").replace(/\D/g, "")} ${r.contact ?? ""} ${r.client} ${r.project} ${r.manager} ${r.result?.name ?? ""} ${r.type}`,
-          facets: { manager: r.manager },
+          facets: { manager: r.manager, project: r.project },
           node: (
             <TableRow data-developed-row={r.id} data-kind={r.kind}>
               <TableCell>
