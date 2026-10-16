@@ -49,6 +49,13 @@ function MonthDayPick({ value, onChange, label }) {
   );
 }
 
+// What an empty filter says, and why when pointed at.
+const DEVELOPED_WHY = "Names get a year developed and a developer when a manager develops them into leads, which moves them to the appointment project. Filter its call list by these.";
+const NONE = {
+  year: { text: "No developed leads here", why: DEVELOPED_WHY },
+  developer: { text: "No developed leads here", why: DEVELOPED_WHY },
+};
+
 /** Choose any of a criterion's values (searchable), each with how many names have it. */
 function Values({ field, options, chosen, onChange }) {
   const [q, setQ] = useState("");
@@ -59,13 +66,16 @@ function Values({ field, options, chosen, onChange }) {
   const set = new Set(chosen);
   const toggle = (v) => onChange(set.has(v) ? chosen.filter((x) => x !== v) : [...chosen, v]);
   const first = options.find((o) => String(o.value) === chosen[0])?.label ?? chosen[0];
+  // Nothing on the list has it: said plainly (a DB dev list's names are not developed yet, so they have no
+  // year developed or developer; those filters are for an appointment project's list), not a dead box.
+  const none = NONE[field.key] ?? { text: "None on this list", why: "No name on this list has one." };
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" disabled={!options.length} data-values={field.key}
-          className="flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background/60 px-2.5 text-left text-sm transition-colors hover:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50">
+        <button type="button" disabled={!options.length} data-values={field.key} title={options.length ? undefined : none.why}
+          className="flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background/60 px-2.5 text-left text-sm transition-colors hover:border-primary/40 disabled:cursor-default disabled:opacity-50">
           <span className={cn("truncate", !chosen.length && "text-muted-foreground")}>
-            {chosen.length ? (chosen.length === 1 ? first : `${first} +${chosen.length - 1}`) : options.length ? "Any" : "None on this list"}
+            {chosen.length ? (chosen.length === 1 ? first : `${first} +${chosen.length - 1}`) : options.length ? "Any" : none.text}
           </span>
           <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
         </button>
