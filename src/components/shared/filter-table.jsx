@@ -3,10 +3,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "@/components/shared/intent-link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, X, Check, ChevronDown, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, X, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { matchesAll, searchWords } from "@/lib/search-words";
+import { csvLine } from "@/lib/lead-export";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
@@ -45,6 +46,8 @@ import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
  * "a,b,c" in its URL parameter; server mode only; an option's `group` heads
  * its part of the list).
  * `searchable={false}` drops the search box, for a list that cannot be searched.
+ * `exportCsv` ({ name, header }, client mode): an Export CSV button saving
+ * the rows as filtered just then, each row's `csv` cells under `header`.
  */
 const CHIP_LIMIT = 6;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -60,6 +63,7 @@ export default function FilterTable({
   selected,
   paging,
   searchable = true,
+  exportCsv = null,
 }) {
   const server = Boolean(paging);
   const router = useRouter();
@@ -170,6 +174,16 @@ export default function FilterTable({
       });
 
   const active = terms.length > 0 || Object.values(picked).some(Boolean);
+  // The rows as filtered now, saved as a CSV (a byte-order mark first, so Excel reads it as UTF-8).
+  const download = () => {
+    const text = [exportCsv.header, ...shown.map((r) => r.csv ?? [])].map(csvLine).join("\r\n");
+    const url = URL.createObjectURL(new Blob([`\ufeff${text}\r\n`], { type: "text/csv;charset=utf-8" }));
+    const a = Object.assign(document.createElement("a"), { href: url, download: exportCsv.name });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
   const heads = columns.map((c) => (typeof c === "string" ? { label: c } : c));
 
   let summary;
@@ -201,6 +215,13 @@ export default function FilterTable({
 
         <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
           <span className="tabular-nums" aria-live="polite">{summary}</span>
+          {exportCsv && !server ? (
+            <button type="button" onClick={download} disabled={shown.length === 0} data-export-csv
+              title={`The ${shown.length.toLocaleString()} row${shown.length === 1 ? "" : "s"} shown, as a CSV`}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] transition-colors hover:border-primary/40 hover:text-primary disabled:pointer-events-none disabled:opacity-40">
+              <Download className="size-3.5" /> Export CSV
+            </button>
+          ) : null}
           {active ? (
             <button
               type="button"

@@ -263,7 +263,7 @@ export async function getDeveloped({ userId = null, from, to, timeZone, kinds = 
   const data = await readAll((first, last) => {
     let q = supabase
       .from("pay_events")
-      .select(`id, kind, created_at,
+      .select(`id, kind, created_at, amount,
         user:users!pay_events_user_id_fkey(id, first_name, last_name),
         project:projects(id, name, company:companies(id, name)),
         lead:leads(id, company_name, contact_name, phone, city, state, result:call_results(id, name, viable), insurance:insurance_details(ultimate_xdate)),
@@ -292,6 +292,8 @@ export async function getDeveloped({ userId = null, from, to, timeZone, kinds = 
         time: clock(e.created_at, timeZone),
         type: developedType(e.kind, one(call?.result)?.name ?? call?.call_result),
         kind: e.kind,
+        // What it paid the manager (USD), for the export kept as backup for their pay.
+        amount: e.amount != null ? Number(e.amount) : null,
         client: one(project?.company)?.name ?? "—",
         project: project?.name ?? "—",
         projectId: project?.id ?? null,

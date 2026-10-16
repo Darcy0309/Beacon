@@ -61,6 +61,16 @@ try {
     if (!chip) return false; chip.click(); return true; })()`);
   const one = await until(async () => { const r = await rows(); return r.length === 1 ? r : null; });
   check("a Project filter: that project's alone", byProject && one && has(one, "Glass"), JSON.stringify(one ?? await rows()));
+  // Export CSV: what is shown, as filtered (the file read as the page makes it).
+  await admin.ev(`window.__csv = null; window.__csvName = null; const make = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (b) => { b.text().then((t) => { window.__csv = t; }); return make(b); };
+    const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.download) { window.__csvName = this.download; return; } return click.call(this); };`);
+  await admin.click("[data-recent-developed] [data-export-csv]");
+  const csv = await until(() => admin.ev("window.__csv"));
+  const lines = (csv ?? "").replace(/^\ufeff/, "").trim().split(/\r\n/);
+  check("Export CSV: the rows as filtered, with each one's pay", lines.length === 2 && lines[0].startsWith("Date,Time,Type,Manager,Company")
+    && lines[1].includes(`${TAG} Glass`) && lines[1].includes(`${TAG} Other DBDev`) && lines[1].endsWith(",10.00"), JSON.stringify(lines));
+  check("…named for what and which days", /^Leads-and-appointments_\d{4}-\d{2}-\d{2}\.csv$/.test((await admin.ev("window.__csvName")) ?? ""), await admin.ev("window.__csvName"));
   await admin.go("/", 4000);
 
   section("Leads, appointments or both");

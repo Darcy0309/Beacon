@@ -13,6 +13,14 @@ export const RECENT_KINDS = [["both", "Both"], ["lead", "Leads"], ["appointment"
 
 const NOUN = { both: "leads & appointments", lead: "leads", appointment: "appointments" };
 
+const EXPORT_HEADER = ["Date", "Time", "Type", "Manager", "Company", "Contact", "Phone", "City", "Client", "Project", "Call result", "Ultimate X-Date", "Pay (USD)"];
+/** "Leads-and-appointments_2026-10-01_to_2026-10-15.csv": what and which days. */
+const exportName = (view, kind) => {
+  const what = { both: "Leads-and-appointments", lead: "Leads", appointment: "Appointments" }[kind] ?? "Developed";
+  const { from, to } = view.range;
+  return `${what}_${from}${to !== from ? `_to_${to}` : ""}.csv`;
+};
+
 /**
  * Recent Leads & Appointments on the administrator's dashboard: what every
  * manager developed on a day (today by default), a week, a pay period or
@@ -48,12 +56,16 @@ export default function RecentDevelopedCard({ rows, view, kind, kindSwitch, swit
         columns={["Company", "Client", "Project", "Call result", "Ultimate X-Date", "Manager", "Created"]}
         // By manager and by project (Sean, Oct 2026): each with the ones that have something in these days.
         filters={[{ key: "manager", label: "Manager" }, { key: "project", label: "Project" }]}
+        // What is shown, filtered, as a CSV (Sean, Oct 2026): a manager's backup for their production and pay.
+        exportCsv={{ name: exportName(view, kind), header: EXPORT_HEADER }}
         placeholder="Search company, phone, client, manager…"
         empty={today ? `No ${NOUN[kind]} developed yet today.` : `No ${NOUN[kind]} developed in these days.`}
         rows={rows.map((r) => ({
           id: r.id,
           search: `${r.company} ${r.phone ?? ""} ${(r.phone ?? "").replace(/\D/g, "")} ${r.contact ?? ""} ${r.client} ${r.project} ${r.manager} ${r.result?.name ?? ""} ${r.type}`,
           facets: { manager: r.manager, project: r.project },
+          csv: [r.day, r.time, r.type, r.manager, r.company, r.contact ?? "", r.phone ?? "", r.location === "—" ? "" : r.location,
+            r.client, r.project, r.result?.name ?? "", r.xdate === "—" ? "" : r.xdate, r.amount != null ? r.amount.toFixed(2) : ""],
           node: (
             <TableRow data-developed-row={r.id} data-kind={r.kind}>
               <TableCell>
