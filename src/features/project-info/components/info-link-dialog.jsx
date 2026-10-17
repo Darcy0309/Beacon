@@ -17,16 +17,17 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * come on board (Sean, Oct 2026): emailed from here, or copied to send
  * yourself. It works without signing in for its 30 days and saves straight
  * to the project. Stop earlier links makes a new link: every one sent
- * before stops working. `defaultTo`: the agent's or the client's address.
+ * before stops working. `defaultTo`: the agent's or the client's address;
+ * `defaultName`: who the email says Hi to (the agent's name).
  */
-export default function InfoLinkDialog({ projectId, defaultTo = "", trigger }) {
+export default function InfoLinkDialog({ projectId, defaultTo = "", defaultName = "", trigger }) {
   const [open, setOpen] = useState(false);
   const [link, setLink] = useState(null); // { url, days }
   const [loading, startLoading] = useTransition();
   const [resetting, startResetting] = useTransition();
   const [asking, setAsking] = useState(false);
   const [state, action, pending] = useActionState(sendInfoLink, EMPTY);
-  const { fe, invalid, dv } = formHelpers(state, { to: defaultTo });
+  const { fe, invalid, dv } = formHelpers(state, { to: defaultTo, name: defaultName });
   const input = useRef(null);
   const handled = useRef(null);
 
@@ -85,9 +86,14 @@ export default function InfoLinkDialog({ projectId, defaultTo = "", trigger }) {
         </DialogHeader>
         <form action={action} noValidate className="flex flex-col gap-4">
           <input type="hidden" name="project_id" value={projectId} />
-          <Field label="Email it to" required error={fe("to")}>
-            <Input name="to" type="email" defaultValue={dv("to")} maxLength={254} aria-invalid={invalid("to")} placeholder="agent@agency.com" autoFocus />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Their name" error={fe("name")} hint="The email starts Hi and this name.">
+              <Input name="name" defaultValue={dv("name")} maxLength={120} aria-invalid={invalid("name")} placeholder="Josh" autoComplete="off" />
+            </Field>
+            <Field label="Email it to" required error={fe("to")}>
+              <Input name="to" type="email" defaultValue={dv("to")} maxLength={254} aria-invalid={invalid("to")} placeholder="agent@agency.com" autoFocus />
+            </Field>
+          </div>
           <Field label="Or copy the link to send yourself">
             <div className="flex gap-2">
               <Input ref={input} readOnly value={link?.url ?? (loading ? "Making the link…" : "")} onFocus={(e) => e.target.select()}

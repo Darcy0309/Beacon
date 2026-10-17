@@ -56,16 +56,19 @@ export async function getWorkProject(id) {
 /** One page of a rep's call list, in the order they should call it. */
 export async function getCallList(projectId, { page = 1, perPage = 50, q = "", rep = null, filtered = true } = {}) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("call_list", {
+  // The database gives at most 500 a call: a longer page is read 500 at a time, together.
+  const reads = await Promise.all(Array.from({ length: Math.ceil(perPage / 500) }, (_, i) => supabase.rpc("call_list", {
     p_project_id: Number(projectId),
     p_rep: rep,
-    p_limit: perPage,
-    p_offset: (page - 1) * perPage,
+    p_limit: Math.min(500, perPage - i * 500),
+    p_offset: (page - 1) * perPage + i * 500,
     p_search: q || null,
     // Through the caller's filter for the project, unless asked not to.
     p_filtered: filtered,
-  });
-  if (error) throw error;
+  })));
+  const failed = reads.find((r) => r.error);
+  if (failed) throw failed.error;
+  const data = reads.flatMap((r) => r.data ?? []);
   const rows = (data ?? []).map((r, i) => ({
     id: r.id,
     position: (page - 1) * perPage + i + 1,

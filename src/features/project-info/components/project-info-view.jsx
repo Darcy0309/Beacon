@@ -51,7 +51,8 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
   const officeHref = directions ?? mapLink(office);
   const anything = hasProfile(info) || office || info.contact_name || info.phone;
   const shared = info.asked_id !== info.project_id
-    ? `From ${info.project_name}, the appointment project this one promotes to.`
+    ? `Shared with ${info.project_name}, the appointment project this one is tied to.`
+    : info.own && info.tied_name ? `This project's own, apart from ${info.tied_name}'s.`
     : info.shared_with?.length ? `Also used by ${info.shared_with.join(", ")}.` : null;
   const stamp = info.updated_at
     ? `Updated ${mediumDate(info.updated_at)}${info.updated_via === "link" ? " by the client, from their link"

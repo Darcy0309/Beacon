@@ -164,7 +164,9 @@ export function appointmentEvent(company, appt, address, timeZone, details) {
 export async function deliveryAddresses(admin, project) {
   if (!project) return [];
   const { list } = parseDeliveryAddresses(project.email, project.delivery_link_only);
-  const { data: info } = await admin.from("project_profiles").select("producers").eq("project_id", infoProjectOf(project)).maybeSingle();
+  // Its Project Info: the appointment project's it is tied to, unless it keeps its own.
+  const { data: rows } = await admin.from("project_profiles").select("project_id, own, producers").in("project_id", [...new Set([project.id, infoProjectOf(project)])]);
+  const info = rows?.find((r) => r.project_id === project.id && (r.own || !project.appt_project_id)) ?? rows?.find((r) => r.project_id === infoProjectOf(project));
   // A producer's address as it is: no "_" marks a link for them.
   const seen = new Set(list.map((a) => a.address.toLowerCase()));
   for (const address of producerAddresses(info?.producers)) {

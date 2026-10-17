@@ -22,10 +22,12 @@ const PROFILE_COLUMNS = `project_id, agent_mobile, agent_email, states_licensed,
   editor:users(first_name, last_name, role)`;
 
 /**
- * The project whose Project Info `projectId` shows ({ id, name, asked }):
- * the appointment project a DB dev project promotes to, else its own; the
- * project itself should that one be gone. Null when the project is not
- * there (or, read as the signed-in person, not theirs to see).
+ * The project whose Project Info `projectId` shows ({ id, name, asked, own,
+ * tied }): the appointment project a DB dev project is tied to (`tied`),
+ * one sheet for them all, unless the DB dev project keeps its own (`own`;
+ * Sean, Oct 2026); else its own. The project itself should the appointment
+ * project be gone. Null when the project is not there (or, read as the
+ * signed-in person, not theirs to see).
  */
 export async function resolveInfoProject(db, projectId) {
   const { data: asked, error } = await db.from("projects").select("id, name, appt_project_id")
@@ -33,10 +35,14 @@ export async function resolveInfoProject(db, projectId) {
   if (error) throw error;
   if (!asked) return null;
   if (asked.appt_project_id) {
-    const { data: appt } = await db.from("projects").select("id, name").eq("id", asked.appt_project_id).is("deleted_at", null).maybeSingle();
-    if (appt) return { id: appt.id, name: appt.name, asked };
+    const [{ data: appt }, { data: mine }] = await Promise.all([
+      db.from("projects").select("id, name").eq("id", asked.appt_project_id).is("deleted_at", null).maybeSingle(),
+      db.from("project_profiles").select("own").eq("project_id", asked.id).maybeSingle(),
+    ]);
+    if (appt && !mine?.own) return { id: appt.id, name: appt.name, asked, own: false, tied: appt };
+    if (appt) return { id: asked.id, name: asked.name, asked, own: true, tied: appt };
   }
-  return { id: asked.id, name: asked.name, asked };
+  return { id: asked.id, name: asked.name, asked, own: false, tied: null };
 }
 
 /**
@@ -54,7 +60,7 @@ export async function loadProjectInfo(db, projectId) {
     db.from("projects").select("id, name, contact_name, contact_title, phone, address, city, state, zip, company:companies(id, name, email)")
       .eq("id", target.id).maybeSingle(),
     db.from("project_profiles").select(PROFILE_COLUMNS).eq("project_id", target.id).maybeSingle(),
-    db.from("projects").select("id, name").eq("appt_project_id", target.id).is("deleted_at", null).order("name"),
+    db.from("projects").select("id, name, profile:project_profiles(own)").eq("appt_project_id", target.id).is("deleted_at", null).order("name"),
   ]);
   if (error) throw error;
   if (profileError) throw profileError;
@@ -67,7 +73,12 @@ export async function loadProjectInfo(db, projectId) {
     project_name: project.name,
     asked_id: target.asked.id,
     asked_name: target.asked.name,
-    shared_with: (sharing ?? []).map((s) => s.name),
+    // The tied DB dev projects that use this sheet (not the ones keeping their own).
+    shared_with: (sharing ?? []).filter((x) => !one(x.profile)?.own).map((x) => x.name),
+    // A tied DB dev project: whether it keeps its own, and the appointment project it is tied to.
+    own: target.own,
+    tied_id: target.tied?.id ?? null,
+    tied_name: target.tied?.name ?? null,
     client_name: company?.name ?? null,
     client_email: company?.email ?? null,
     contact_name: project.contact_name, contact_title: project.contact_title, phone: project.phone,
@@ -197,4 +208,54 @@ export async function writeProjectInfo(admin, projectId, { office, profile }, { 
   if (error) return error.message;
   const { error: officeError } = await admin.from("projects").update(office).eq("id", projectId);
   return officeError ? officeError.message : null;
+}
+
+// What a Project Info sheet holds (not who changed it, nor its link's key).
+const SHEET = ["agent_mobile", "agent_email", "states_licensed", "producers", "top_carriers", "avoid_carriers", "avoid_days", "special_programs",
+  "personal_lines", "min_employees", "quote_time", "quote_min_time", "wc_mono", "wc_min_employees", "auto_mono", "auto_min_autos",
+  "health_only", "health_min_lives", "value_added", "exclusive_program", "industry_notes"];
+const OFFICE = ["contact_name", "contact_title", "phone", "address", "city", "state", "zip"];
+const sheetOf = (row) => Object.fromEntries(SHEET.map((k) => [k, row?.[k] ?? null]).filter(([, v]) => v != null));
+const filled = (row) => Object.entries(sheetOf(row)).some(([, v]) => !(Array.isArray(v) && v.length === 0));
+
+/**
+ * A tied DB dev project keeps its own Project Info (`own`), starting from a
+ * copy of the shared one (and the appointment project's office where its
+ * own is blank); or (`own` false) uses the shared one again, its own kept
+ * aside. With the server's role. Returns what went wrong, or null.
+ */
+export async function setOwnInfo(admin, projectId, own) {
+  const { data: p } = await admin.from("projects").select("id, appt_project_id, " + OFFICE.join(", ")).eq("id", projectId).maybeSingle();
+  if (!p?.appt_project_id) return "Only a project tied to an appointment project shares its Project Info.";
+  if (!own) {
+    const { error } = await admin.from("project_profiles").update({ own: false }).eq("project_id", projectId);
+    return error?.message ?? null;
+  }
+  const [{ data: shared }, { data: appt }] = await Promise.all([
+    admin.from("project_profiles").select(SHEET.join(", ")).eq("project_id", p.appt_project_id).maybeSingle(),
+    admin.from("projects").select(OFFICE.join(", ")).eq("id", p.appt_project_id).maybeSingle(),
+  ]);
+  const { error } = await admin.from("project_profiles").upsert({ project_id: projectId, ...sheetOf(shared), own: true }, { onConflict: "project_id" });
+  if (error) return error.message;
+  const office = Object.fromEntries(OFFICE.filter((k) => !p[k] && appt?.[k]).map((k) => [k, appt[k]]));
+  if (Object.keys(office).length) {
+    const { error: officeError } = await admin.from("projects").update(office).eq("id", projectId);
+    if (officeError) return officeError.message;
+  }
+  return null;
+}
+
+/**
+ * A DB dev project just tied to an appointment project, whatever order they
+ * were made in: Project Info filled in on the DB dev project goes to the
+ * appointment project when that one has none yet, so the shared sheet is
+ * not empty. With the server's role.
+ */
+export async function carryInfoOnTie(admin, dbdevId, apptId) {
+  const { data: rows } = await admin.from("project_profiles").select(`project_id, own, ${SHEET.join(", ")}`).in("project_id", [dbdevId, apptId]);
+  const mine = rows?.find((r) => r.project_id === dbdevId);
+  const theirs = rows?.find((r) => r.project_id === apptId);
+  if (!mine || mine.own || !filled(mine) || filled(theirs)) return;
+  const { error } = await admin.from("project_profiles").upsert({ project_id: apptId, ...sheetOf(mine) }, { onConflict: "project_id" });
+  if (error) console.error("[project info] not carried over", dbdevId, apptId, error.message);
 }

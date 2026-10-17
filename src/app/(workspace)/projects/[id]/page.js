@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import ProjectInfoView from "@/features/project-info/components/project-info-view";
 import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
 import InfoLinkDialog from "@/features/project-info/components/info-link-dialog";
+import OwnInfoSwitch from "@/features/project-info/components/own-info-switch";
 import { getProjectInfo } from "@/features/project-info/queries";
 import { getCarrierNames } from "@/features/insurance/queries";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -199,7 +200,9 @@ export default async function ProjectDetail({ params, searchParams }) {
             <SectionHeader wrap label="Project Info" icon={ClipboardList}
               action={admin ? (
                 <div className="flex flex-wrap items-center gap-2">
-                  <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""}
+                  {/* Tied to an appointment project: one sheet for them all, or its own (Sean, Oct 2026). */}
+                  {info.tied_id ? <OwnInfoSwitch projectId={p.id} own={info.own} tiedName={info.tied_name} /> : null}
+                  <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""} defaultName={info.contact_name ?? ""}
                     trigger={<Button size="sm" variant="outline" data-send-project-info><Send /> Send to client</Button>} />
                   <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />
                 </div>

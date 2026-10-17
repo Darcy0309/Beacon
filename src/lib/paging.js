@@ -3,7 +3,7 @@
 // back button works. These helpers are shared by the server pages that read
 // the URL and the client filter bar that writes it.
 
-export const PAGE_SIZES = [10, 20, 50, 100];
+export const PAGE_SIZES = [10, 20, 50, 100, 200, 500];
 export const PAGE_SIZE = 10;
 
 /**

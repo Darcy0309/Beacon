@@ -47,15 +47,19 @@ export async function getXdatesByMonth({ projectId = null, companyId = null } = 
 /** One page of the names behind a number in the X-dates report. */
 export async function getXdateMonthLeads({ month, bucket = null, projectId = null, companyId = null, page = 1, perPage = 20 }) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("xdate_month_leads", {
+  // The database gives at most 100 a call: a longer page is read 100 at a time, together.
+  const start = (page - 1) * perPage;
+  const reads = await Promise.all(Array.from({ length: Math.ceil(perPage / 100) }, (_, i) => supabase.rpc("xdate_month_leads", {
     p_month: month,
     p_bucket: bucket,
     p_project_id: projectId,
     p_company_id: companyId,
-    p_limit: perPage,
-    p_offset: (page - 1) * perPage,
-  });
-  if (error) throw error;
+    p_limit: Math.min(100, perPage - i * 100),
+    p_offset: start + i * 100,
+  })));
+  const failed = reads.find((r) => r.error);
+  if (failed) throw failed.error;
+  const data = reads.flatMap((r) => r.data ?? []);
   const rows = (data ?? []).map((l) => ({
     id: l.id,
     company: l.company_name ?? "—",

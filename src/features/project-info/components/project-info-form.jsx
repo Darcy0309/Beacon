@@ -143,7 +143,7 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
           </Field>
         </div>
         <Field label="States licensed" error={fe("states_licensed")} className="sm:col-span-2">
-          <PickList name="states_licensed" label="States licensed" options={US_STATES} value={states} onChange={setStates} sorted placeholder="Add a state…" empty="No states chosen yet" />
+          <PickList name="states_licensed" label="States licensed" options={US_STATES} value={states} onChange={setStates} sorted columns placeholder="Add a state…" empty="No states chosen yet" />
         </Field>
       </Group>
 
@@ -178,7 +178,7 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
       </Group>
 
       <Group title="Carriers" icon={Landmark} group="carriers"
-        hint={carriers.length ? "Pick each one from the list; it is added to the box." : "The carrier list is empty: an administrator loads it under Insurance Cos."}>
+        hint={carriers.length ? "Pick each one from the drop-down, or open the Check list to tick several at once." : "The carrier list is empty: an administrator loads it under Insurance Cos."}>
         <Field label="Top carriers you will use" error={fe("top_carriers")} className="sm:col-span-2">
           <PickList name="top_carriers" label="Top carriers you will use" options={carriers} value={top} onChange={setTop} placeholder="Add a carrier…" invalid={invalid("top_carriers")} />
         </Field>

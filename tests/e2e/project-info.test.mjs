@@ -84,6 +84,21 @@ try {
   check("Edit opens the form", Boolean(await inDialog(admin, "[data-project-info-form]")));
   await admin.fill('[data-dialog-content] input[name="agent_mobile"]', "715-555-0101");
   await admin.fill('[data-dialog-content] input[name="agent_email"]', AGENT_EMAIL);
+  // The check list: all at once, then take some off (clients licensed in 20+ states, or all).
+  const states = '[data-dialog-content] [data-pick-list="states_licensed"]';
+  await admin.click(`${states} [data-pick-open]`);
+  await admin.click(`${states} [data-pick-all]`);
+  check("Check list › Select all: every state", (await chips(admin, "states_licensed")).length === 51, String((await chips(admin, "states_licensed")).length));
+  await admin.click(`${states} [data-pick-option="TX"] input`);
+  check("…untick one to take it off", (await chips(admin, "states_licensed")).length === 50 && !(await chips(admin, "states_licensed")).includes("TX"));
+  await admin.click(`${states} [data-pick-clear]`);
+  await admin.fill(`${states} [data-pick-find]`, "w");
+  await admin.click(`${states} [data-pick-all]`);
+  check("…find, then Select all picks only those shown", JSON.stringify(await chips(admin, "states_licensed")) === '["WA","WI","WV","WY"]', JSON.stringify(await chips(admin, "states_licensed")));
+  await admin.click(`${states} [data-pick-clear]`);
+  await admin.ev(`[...document.querySelectorAll('${states} [data-pick-panel] button')].find((b) => b.textContent.trim() === "Done").click()`);
+  check("…Clear takes them off, Done closes it", (await chips(admin, "states_licensed")).length === 0
+    && Boolean(await until(() => admin.ev(`!document.querySelector('${states} [data-pick-panel]')`))));
   await pick(admin, "states_licensed", "WI");
   await pick(admin, "states_licensed", "MN");
   check("states are picked into the box, A to Z", JSON.stringify(await chips(admin, "states_licensed")) === '["MN","WI"]', JSON.stringify(await chips(admin, "states_licensed")));
@@ -136,7 +151,26 @@ try {
   await shot(admin, "project-info-card");
   check("the card reads it back", t.includes("Mondays & Fridays") && t.includes("Yes · 10+ employees") && t.includes(`${CARRIERS[0]}, ${CARRIERS[1]}`) && /Updated .* by /.test(t));
   t = await open(admin, `/projects/${DBDV}`);
-  check("the DB dev project shows its appointment project's", t.includes(`From ${TAG} Appts, the appointment project this one promotes to.`) && t.includes("Mondays & Fridays"));
+  check("the DB dev project shows its appointment project's", t.includes(`Shared with ${TAG} Appts, the appointment project this one is tied to.`) && t.includes("Mondays & Fridays"));
+
+  section("A tied project that needs to differ keeps its own");
+  const own = () => JSON.parse(sql(`select coalesce(row_to_json(t)::text, 'null') from (select own, avoid_days, top_carriers from public.project_profiles where project_id = ${DBDV}) t`) || "null");
+  await admin.click('[data-own-info="shared"]');
+  check("Keep its own: a copy of the shared one to start from", Boolean(await until(() => own()?.own === true))
+    && JSON.stringify(own()?.avoid_days) === "[1,5]" && JSON.stringify(own()?.top_carriers) === JSON.stringify(CARRIERS.slice(0, 2)), JSON.stringify(own()));
+  sql(`update public.project_profiles set avoid_days = '{3}' where project_id = ${DBDV}`);
+  t = await open(admin, `/projects/${DBDV}`);
+  check("…it shows its own, apart from the appointment project's", t.includes(`This project's own, apart from ${TAG} Appts's.`) && t.includes("Wednesdays") && !t.includes("Mondays & Fridays"));
+  check("…and the appointment project's is untouched", JSON.stringify(profile()?.avoid_days) === "[1,5]");
+  const ownDays = await admin.ev(`fetch('/api/project-calendar?project=${DBDV}&from=2026-11-01&to=2026-11-30').then((r) => r.json()).then((c) => c.blocks.find((b) => b.weekly)?.weekdays)`);
+  const apptDays = await admin.ev(`fetch('/api/project-calendar?project=${APPT}&from=2026-11-01&to=2026-11-30').then((r) => r.json()).then((c) => c.blocks.find((b) => b.weekly)?.weekdays)`);
+  check("…its calendar blocks its own days to avoid, the appointment project's its own", JSON.stringify([ownDays, apptDays]) === "[[3],[1,5]]", JSON.stringify([ownDays, apptDays]));
+  await admin.ev(`document.querySelector('[data-project-info-card]').scrollIntoView({ block: 'start' })`);
+  await shot(admin, "project-info-own");
+  await admin.click('[data-own-info="own"]');
+  check("Use the shared one: back on the appointment project's", Boolean(await until(() => own()?.own === false)));
+  t = await open(admin, `/projects/${DBDV}`);
+  check("…shown again", t.includes(`Shared with ${TAG} Appts`) && t.includes("Mondays & Fridays"));
 
   section("A manager reads it on the lead sheet");
   t = await open(sean, `/leads/${LEAD}?tab=info`);
@@ -180,6 +214,8 @@ try {
   check("the dialog makes the link", /\/client-profile\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(firstLink ?? ""), firstLink);
   await shot(admin, "project-info-link-dialog");
   check("…to the agent's email by default", (await admin.ev(`document.querySelector('[data-info-link-dialog] input[name="to"]').value`)) === AGENT_EMAIL);
+  check("…saying Hi to the agent by name", (await admin.ev(`document.querySelector('[data-info-link-dialog] input[name="name"]').value`)) === "Josh Huray");
+  await admin.fill('[data-info-link-dialog] input[name="name"]', "Josh");
   await admin.click("[data-send-info-link]");
   check("sent", /Project Info link sent/.test(await admin.waitToast(/Project Info link sent/, 15000)), await admin.toasts());
   const email = await until(() => sent(AGENT_EMAIL)[0], { timeout: 15000 });
@@ -188,6 +224,9 @@ try {
   const emailed = body.match(/https?:\/\/[^\s"<>]+\/client-profile\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/)?.[0] ?? null;
   check("the email asks them to fill it in, with their link", email?.headers.subject === `Your Project Info for ${TAG} Appts` && Boolean(emailed)
     && body.includes("Fill in your Project Info") && body.includes("15561 Railroad St, Hayward, WI 54843"), `${email?.headers.subject} ${emailed}`);
+  const sender = sql("select trim(concat_ws(' ', first_name, last_name)) from public.users where email = 'admin@beacon.test'");
+  check("…Hi to the name given, from the sender by name, never their email", body.includes("Hi Josh,") && body.includes(sender ? `${sender} at Signature Marketing has set up` : "\nSignature Marketing has set up") && !body.includes("admin@beacon.test at"),
+    body.match(/Hi[^\n<]*/)?.[0]);
   firstLink = emailed ?? firstLink;
   // Replies go to the administrator who sent it, when theirs is an address mail can reach (the seeded one's is not).
   check("…from the company's address", /alerts@signaturemktg\.net/.test(email?.headers.from ?? "") && !email?.headers["reply-to"], `${email?.headers.from} / ${email?.headers["reply-to"]}`);

@@ -33,7 +33,8 @@ export async function getProjectCalendar({ projectId, from, to }) {
   const supabase = await createClient();
   const { data: calendarId } = await supabase.rpc("calendar_project", { p_project_id: Number(projectId) });
   if (!calendarId) return null;
-  const [project, appts, blocks] = await Promise.all([
+  const asked = Number(projectId);
+  const [project, appts, blocks, mine] = await Promise.all([
     // With the weekdays the client takes no appointments on (its Project Info).
     supabase.from("projects").select("id, name, profile:project_profiles(avoid_days)").eq("id", calendarId).maybeSingle(),
     supabase.from("appointments")
@@ -44,13 +45,18 @@ export async function getProjectCalendar({ projectId, from, to }) {
       .select(BLOCK_COLUMNS)
       .eq("project_id", calendarId).lte("starts_on", to).gte("ends_on", from).order("starts_on").order("id").range(first, last))
       .then((data) => ({ data }), (error) => ({ error })),
+    // A DB dev project keeping its own Project Info: opened from it, its own days to avoid.
+    asked !== calendarId
+      ? supabase.from("project_profiles").select("own, avoid_days").eq("project_id", asked).maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
   if (!project.data) return null;
   // Personal calendars connected to this one are read again, once this answer has gone, when they have gone stale.
   after(() => refreshStaleFeeds(calendarId).catch((err) => console.error("[calendar sync]", err?.message ?? err)));
   if (appts.error) throw appts.error;
   if (blocks.error) throw blocks.error;
-  const weekly = weeklyBlock({ projectId: calendarId, days: one(project.data.profile)?.avoid_days, from, to });
+  const avoid = mine.data?.own ? mine.data.avoid_days : one(project.data.profile)?.avoid_days;
+  const weekly = weeklyBlock({ projectId: calendarId, days: avoid, from, to });
   return {
     projectId: calendarId,
     name: project.data.name,

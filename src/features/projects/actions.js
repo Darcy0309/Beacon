@@ -5,6 +5,8 @@
 import { revalidatePath } from "next/cache";
 import { check, deleteRow, fail, idFrom, logActivity, n, ok, onlySubmitted, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { carryInfoOnTie } from "@/features/project-info/server";
 import { cross, formValues, schemas } from "@/lib/validate";
 
 export async function saveProject(prevState, formData) {
@@ -38,10 +40,14 @@ export async function saveProject(prevState, formData) {
     zip: s(formData, "zip"),
     timezone_id: n(formData, "timezone_id"),
   };
-  const { error } = id
-    ? await supabase.from("projects").update(onlySubmitted(formData, payload)).eq("id", id)
-    : await supabase.from("projects").insert(payload);
+  const { data: saved, error } = id
+    ? await supabase.from("projects").update(onlySubmitted(formData, payload)).eq("id", id).select("id").maybeSingle()
+    : await supabase.from("projects").insert(payload).select("id").maybeSingle();
   if (error) return fail(error, null, formValues(formData, Object.keys(schemas.project)));
+  // Tied to an appointment project, whichever was made first: Project Info filled in here goes to the shared sheet
+  // when that one has none yet (Sean, Oct 2026).
+  const admin = payload.appt_project_id && saved?.id ? createAdminClient() : null;
+  if (admin) await carryInfoOnTie(admin, saved.id, payload.appt_project_id);
 
   await logActivity(supabase, id ? "project.update" : "project.create", { entity: "project", entityId: id ?? null });
   // A project's office shows on its page, its call lists and its lead sheets.

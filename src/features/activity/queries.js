@@ -69,6 +69,8 @@ const ACTION_LABEL = {
   "settings.delivery": "Changed how leads and appointments go to clients",
   "project.info_link": "Sent a client their Project Info link",
   "project.info_link_reset": "Stopped a project's earlier Project Info links",
+  "project.info_own": "Gave a tied project its own Project Info",
+  "project.info_shared": "Shared a tied project's Project Info again",
   "appointment.qa_pass": "Passed an appointment in QA",
   "appointment.qa_fail": "Failed an appointment in QA",
   "appointment.moved": "Moved an appointment",

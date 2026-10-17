@@ -325,6 +325,7 @@ export const schemas = {
   infoLink: {
     project_id: [required("Missing project"), id],
     to: [required("Who should get it?"), mailbox, max(254)],
+    name: [max(120)],
   },
 
   /** USD paid per lead, appointment and confirmation on a project. */

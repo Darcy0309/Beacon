@@ -17,7 +17,7 @@ import { mailServer, sendMail } from "@/lib/server/mail";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
-import { carrierNames, infoByLink, keptCarriers, loadProjectInfo, readInfoForm, resolveInfoProject, writeProjectInfo } from "./server";
+import { carrierNames, infoByLink, keptCarriers, loadProjectInfo, readInfoForm, resolveInfoProject, setOwnInfo, writeProjectInfo } from "./server";
 
 const NOT_YOURS = "Only an administrator or the client can change Project Info.";
 
@@ -152,16 +152,20 @@ export async function sendInfoLink(prevState, formData) {
   const url = await linkFor(info.project_id, await linkKey(admin, info.project_id));
   if (!url) return fail("A link could not be made: the server has no secret to sign it with.", null, values);
 
-  const who = fullName(me) || org;
+  // The sender by name ("Sean Fipps at Signature Marketing"); without one, just the company, never an email address.
+  const { data: sender } = await supabase.from("users").select("first_name, last_name").eq("id", me.id).maybeSingle();
+  const named = [sender?.first_name, sender?.last_name].filter(Boolean).join(" ").trim();
+  const who = named || org;
+  const greeting = `Hi${values.name ? ` ${oneLine(values.name)}` : ""},`;
   const project = info.project_name;
   const subject = oneLine(`Your Project Info for ${project}`);
-  const intro = `${who} at ${org} has set up your project, ${project}${info.client_name ? ` for ${info.client_name}` : ""}, in Lighthouse.`;
+  const intro = `${named ? `${named} at ${org}` : org} has set up your project, ${project}${info.client_name ? ` for ${info.client_name}` : ""}, in Lighthouse.`;
   const ask = "Please fill in your Project Info: your agent and office, the producers taking appointments (and who should get each lead and appointment by email), the carriers you write with and those you can't compete with, the days to keep appointments off, and what qualifies an appointment. Our account managers read it on every call they make for you.";
   const after = `The link works for ${INFO_LINK_DAYS} days, without signing in. Once you have your Lighthouse sign-in, you can change it any time under Project Info.`;
   const office = addressLine(info);
-  const text = `Hi,\n\n${intro}\n\n${ask}\n\nFill in your Project Info: ${url}\n\n${after}${office ? `\n\nThe office we have on file: ${office}` : ""}\n\n${org}`;
+  const text = `${greeting}\n\n${intro}\n\n${ask}\n\nFill in your Project Info: ${url}\n\n${after}${office ? `\n\nThe office we have on file: ${office}` : ""}\n\n${org}`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111827;line-height:1.5">
-<p>Hi,</p><p>${esc(intro)}</p><p>${esc(ask)}</p>
+<p>${esc(greeting)}</p><p>${esc(intro)}</p><p>${esc(ask)}</p>
 <p><a href="${esc(url)}" style="display:inline-block;background:#0891b2;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px">Fill in your Project Info</a></p>
 <p style="color:#374151;font-size:14px">${esc(after)}</p>
 ${office ? `<p style="color:#6b7280;font-size:13px">The office we have on file: ${esc(office)}</p>` : ""}
@@ -174,4 +178,27 @@ ${office ? `<p style="color:#6b7280;font-size:13px">The office we have on file: 
   }
   await logActivity(supabase, "project.info_link", { entity: "project", entityId: info.project_id, detail: `${project} · to ${values.to}`, userId: me.id });
   return ok({ to: values.to, url });
+}
+
+/**
+ * A tied DB dev project: keep its own Project Info (own=1; a copy of the
+ * shared one to start from), or use the appointment project's again (own=0).
+ * Administrators.
+ */
+export async function setProjectInfoOwn(formData) {
+  const projectId = idFrom(formData, "project_id");
+  const own = formData.get("own") === "1";
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me || me.status !== "active" || me.role !== "admin") return fail("Only an administrator can change this.");
+  const { data: project } = projectId ? await supabase.from("projects").select("id, name").eq("id", projectId).maybeSingle() : { data: null };
+  if (!project) return fail("That project no longer exists.");
+  const admin = createAdminClient();
+  if (!admin) return fail(ADMIN_UNAVAILABLE);
+  const problem = await setOwnInfo(admin, project.id, own);
+  if (problem) return fail(problem);
+  await logActivity(supabase, own ? "project.info_own" : "project.info_shared", { entity: "project", entityId: project.id, detail: project.name, userId: me.id });
+  refresh(project.id);
+  revalidatePath("/projects", "layout");
+  return ok({ own });
 }
