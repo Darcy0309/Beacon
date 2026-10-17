@@ -62,7 +62,14 @@ export default async function QaPage({ searchParams }) {
           <Card id="waiting-to-send">
             <SectionHeader label="Waiting to Send to Clients" icon={Inbox}
               action={held.rows.length ? <span className="text-[0.66rem] font-semibold text-amber-300">{held.rows.length} held</span> : null} />
-            <HeldDeliveries rows={held.rows} summary={summary} />
+            {held.missing ? (
+              <p className="px-5 py-6 text-sm text-amber-500" data-held-missing>
+                Holding leads and appointments for QA isn&apos;t set up on the database yet (migration 20261118100000_delivery_holds.sql).
+                Until it is, everything goes to clients straight away.
+              </p>
+            ) : (
+              <HeldDeliveries rows={held.rows} summary={summary} />
+            )}
           </Card>
         ) : null}
 

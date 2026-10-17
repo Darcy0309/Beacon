@@ -24,6 +24,8 @@ export async function getHeldDeliveries({ since }) {
     readDeliverySettings(supabase),
     supabase.from("lead_deliveries").select("lead_id, result").eq("status", "sent").gte("created_at", since).limit(5000),
   ]);
+  // Not on the database yet (migration 20261118100000 not run): the page says so, rather than failing.
+  if (error && ["PGRST205", "42P01"].includes(error.code)) return { rows: [], settings, sentToday: 0, missing: true };
   if (error) throw error;
   const rows = (data ?? []).map((h) => {
     const lead = one(h.lead);

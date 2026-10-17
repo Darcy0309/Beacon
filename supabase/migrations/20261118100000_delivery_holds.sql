@@ -76,7 +76,15 @@ revoke execute on function public.release_appointment_qa(bigint, bigint) from pu
 grant execute on function public.release_appointment_qa(bigint, bigint) to service_role;
 
 -- The server tells a manager when one of theirs is held back (as review_appointment_qa does for an appointment).
-grant execute on function public.notify_users(bigint[], text, text, text, text, text, uuid, bigint) to service_role;
+-- Whatever its arguments are on this database, so the grant never stops the rest.
+do $$
+declare f regprocedure;
+begin
+  for f in select p.oid::regprocedure from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'public' and p.proname = 'notify_users' loop
+    execute format('grant execute on function %s to service_role', f);
+  end loop;
+end $$;
 
 -- On the hour: when something is held, ask the app to clear it (it sends only in a clearing hour).
 create or replace function public.flush_held_deliveries()
@@ -101,8 +109,13 @@ exception when others then
 end $$;
 revoke execute on function public.flush_held_deliveries() from public, anon, authenticated;
 
+-- Scheduled where pg_cron is on; without it, held ones still go when an administrator sends them.
 do $$
 begin
+  if to_regclass('cron.job') is null then
+    raise notice 'pg_cron is not enabled: held deliveries are not cleared on a schedule';
+    return;
+  end if;
   if exists (select 1 from cron.job where jobname = 'flush-held-deliveries') then
     perform cron.unschedule('flush-held-deliveries');
   end if;
