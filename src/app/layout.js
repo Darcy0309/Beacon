@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import Backdrop from "@/components/brand/backdrop";
+import { APPEARANCE_SCRIPT } from "@/lib/appearance";
 import { RoleProvider } from "@/components/layout/role-provider";
 import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone } from "@/lib/server/business-day";
@@ -37,6 +38,9 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className="antialiased">
+        {/* Each person's wallpaper and brightness (Appearance), on before the page draws. */}
+        <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
+        <div aria-hidden className="brightness-veil" />
         <Backdrop />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <RoleProvider user={user} timeZone={timeZone}>

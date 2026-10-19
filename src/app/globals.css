@@ -946,48 +946,61 @@ html[data-navigating] body { cursor: progress; }
   pointer-events: none;
 }
 
-/* The phone's wallpapers (phone.jsx, WALLPAPERS): soft light gradients behind the keypad, and a
-   deeper take of each in the dark theme, so the keys and numbers read the same on any of them.
-   A swatch in Settings shows the same. */
-.phone-screen[data-wallpaper="aurora"], .phone-wallpaper-swatch[data-wallpaper="aurora"] {
-  background: radial-gradient(120% 70% at 0% 0%, #c7f9ec 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #e3d4ff 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #cde9ff 0%, transparent 65%), #f7fbff;
+/* The wallpapers (Sean, Oct 2026): soft light gradients, each with a deeper take in the dark
+   theme, so text reads the same on any of them. Defined once, for the phone's screen
+   (phone.jsx, WALLPAPERS), the whole workspace behind the pages (Appearance:
+   html[data-wallpaper], appearance.jsx) and the swatches to pick them from. */
+:root {
+  --wp-aurora: radial-gradient(120% 70% at 0% 0%, #c7f9ec 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #e3d4ff 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #cde9ff 0%, transparent 65%), #f7fbff;
+  --wp-ocean: linear-gradient(170deg, #e8f7ff 0%, #c9ecff 45%, #a8dcf5 100%);
+  --wp-sunrise: linear-gradient(175deg, #fff4e0 0%, #ffe1d0 45%, #ffd0de 100%);
+  --wp-lavender: radial-gradient(90% 60% at 80% 0%, #f3e8ff 0%, transparent 70%), linear-gradient(180deg, #f6f0ff 0%, #e6dcff 100%);
+  --wp-mint: linear-gradient(160deg, #effff7 0%, #d3f8e6 50%, #bff0de 100%);
+  --wp-peach: radial-gradient(100% 70% at 20% 10%, #fff1e6 0%, transparent 70%), linear-gradient(180deg, #ffeadb 0%, #ffd9c7 100%);
+  --wp-sky: radial-gradient(60% 30% at 25% 18%, rgb(255 255 255 / 0.9) 0%, transparent 70%), radial-gradient(50% 25% at 75% 35%, rgb(255 255 255 / 0.8) 0%, transparent 70%), linear-gradient(180deg, #dff1ff 0%, #f4faff 100%);
+  --wp-signature: radial-gradient(100% 60% at 0% 0%, #d6e8fb 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #ecd9f3 0%, transparent 65%), #f8f9fd;
 }
-.phone-screen[data-wallpaper="ocean"], .phone-wallpaper-swatch[data-wallpaper="ocean"] {
-  background: linear-gradient(170deg, #e8f7ff 0%, #c9ecff 45%, #a8dcf5 100%);
+.dark {
+  --wp-aurora: radial-gradient(120% 70% at 0% 0%, #0f3b3a 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #2a1f4d 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #0f2d4a 0%, transparent 65%), #0b111c;
+  --wp-ocean: linear-gradient(170deg, #0b1a2a 0%, #0c2a40 55%, #0f3a52 100%);
+  --wp-sunrise: linear-gradient(175deg, #1c1420 0%, #2e1a24 55%, #3a1d2e 100%);
+  --wp-lavender: linear-gradient(180deg, #141026 0%, #241a42 100%);
+  --wp-mint: linear-gradient(160deg, #0b1a17 0%, #0f2a23 55%, #12362c 100%);
+  --wp-peach: linear-gradient(180deg, #1e1512 0%, #33201a 100%);
+  --wp-sky: radial-gradient(60% 30% at 25% 18%, rgb(120 160 220 / 0.18) 0%, transparent 70%), linear-gradient(180deg, #0c1630 0%, #0a1020 100%);
+  --wp-signature: radial-gradient(100% 60% at 0% 0%, #152a45 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #2c1638 0%, transparent 65%), #0b0f19;
 }
-.phone-screen[data-wallpaper="sunrise"], .phone-wallpaper-swatch[data-wallpaper="sunrise"] {
-  background: linear-gradient(175deg, #fff4e0 0%, #ffe1d0 45%, #ffd0de 100%);
-}
-.phone-screen[data-wallpaper="lavender"], .phone-wallpaper-swatch[data-wallpaper="lavender"] {
-  background: radial-gradient(90% 60% at 80% 0%, #f3e8ff 0%, transparent 70%), linear-gradient(180deg, #f6f0ff 0%, #e6dcff 100%);
-}
-.phone-screen[data-wallpaper="mint"], .phone-wallpaper-swatch[data-wallpaper="mint"] {
-  background: linear-gradient(160deg, #effff7 0%, #d3f8e6 50%, #bff0de 100%);
-}
-.phone-screen[data-wallpaper="peach"], .phone-wallpaper-swatch[data-wallpaper="peach"] {
-  background: radial-gradient(100% 70% at 20% 10%, #fff1e6 0%, transparent 70%), linear-gradient(180deg, #ffeadb 0%, #ffd9c7 100%);
-}
-.phone-screen[data-wallpaper="sky"], .phone-wallpaper-swatch[data-wallpaper="sky"] {
-  background: radial-gradient(60% 30% at 25% 18%, rgb(255 255 255 / 0.9) 0%, transparent 70%), radial-gradient(50% 25% at 75% 35%, rgb(255 255 255 / 0.8) 0%, transparent 70%), linear-gradient(180deg, #dff1ff 0%, #f4faff 100%);
-}
-.phone-screen[data-wallpaper="signature"], .phone-wallpaper-swatch[data-wallpaper="signature"] {
-  background: radial-gradient(100% 60% at 0% 0%, #d6e8fb 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #ecd9f3 0%, transparent 65%), #f8f9fd;
-}
-.phone-wallpaper-swatch[data-wallpaper="plain"] { background: var(--card); }
-.dark .phone-screen[data-wallpaper="aurora"], .dark .phone-wallpaper-swatch[data-wallpaper="aurora"] {
-  background: radial-gradient(120% 70% at 0% 0%, #0f3b3a 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #2a1f4d 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #0f2d4a 0%, transparent 65%), #0b111c;
-}
-.dark .phone-screen[data-wallpaper="ocean"], .dark .phone-wallpaper-swatch[data-wallpaper="ocean"] { background: linear-gradient(170deg, #0b1a2a 0%, #0c2a40 55%, #0f3a52 100%); }
-.dark .phone-screen[data-wallpaper="sunrise"], .dark .phone-wallpaper-swatch[data-wallpaper="sunrise"] { background: linear-gradient(175deg, #1c1420 0%, #2e1a24 55%, #3a1d2e 100%); }
-.dark .phone-screen[data-wallpaper="lavender"], .dark .phone-wallpaper-swatch[data-wallpaper="lavender"] { background: linear-gradient(180deg, #141026 0%, #241a42 100%); }
-.dark .phone-screen[data-wallpaper="mint"], .dark .phone-wallpaper-swatch[data-wallpaper="mint"] { background: linear-gradient(160deg, #0b1a17 0%, #0f2a23 55%, #12362c 100%); }
-.dark .phone-screen[data-wallpaper="peach"], .dark .phone-wallpaper-swatch[data-wallpaper="peach"] { background: linear-gradient(180deg, #1e1512 0%, #33201a 100%); }
-.dark .phone-screen[data-wallpaper="sky"], .dark .phone-wallpaper-swatch[data-wallpaper="sky"] {
-  background: radial-gradient(60% 30% at 25% 18%, rgb(120 160 220 / 0.18) 0%, transparent 70%), linear-gradient(180deg, #0c1630 0%, #0a1020 100%);
-}
-.dark .phone-screen[data-wallpaper="signature"], .dark .phone-wallpaper-swatch[data-wallpaper="signature"] {
-  background: radial-gradient(100% 60% at 0% 0%, #152a45 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #2c1638 0%, transparent 65%), #0b0f19;
-}
+.phone-screen[data-wallpaper="aurora"], .wallpaper-swatch[data-wallpaper="aurora"], html[data-wallpaper="aurora"] body { background: var(--wp-aurora); }
+.phone-screen[data-wallpaper="ocean"], .wallpaper-swatch[data-wallpaper="ocean"], html[data-wallpaper="ocean"] body { background: var(--wp-ocean); }
+.phone-screen[data-wallpaper="sunrise"], .wallpaper-swatch[data-wallpaper="sunrise"], html[data-wallpaper="sunrise"] body { background: var(--wp-sunrise); }
+.phone-screen[data-wallpaper="lavender"], .wallpaper-swatch[data-wallpaper="lavender"], html[data-wallpaper="lavender"] body { background: var(--wp-lavender); }
+.phone-screen[data-wallpaper="mint"], .wallpaper-swatch[data-wallpaper="mint"], html[data-wallpaper="mint"] body { background: var(--wp-mint); }
+.phone-screen[data-wallpaper="peach"], .wallpaper-swatch[data-wallpaper="peach"], html[data-wallpaper="peach"] body { background: var(--wp-peach); }
+.phone-screen[data-wallpaper="sky"], .wallpaper-swatch[data-wallpaper="sky"], html[data-wallpaper="sky"] body { background: var(--wp-sky); }
+.phone-screen[data-wallpaper="signature"], .wallpaper-swatch[data-wallpaper="signature"], html[data-wallpaper="signature"] body { background: var(--wp-signature); }
+.wallpaper-swatch[data-wallpaper="plain"], .wallpaper-swatch[data-wallpaper="classic"] { background: var(--background); }
+/* An uploaded picture (Appearance): covering the screen, softened by the theme a little so
+   text and cards read on any photo. */
+:root { --wp-veil: rgb(255 255 255 / 0.35); }
+.dark { --wp-veil: rgb(5 8 16 / 0.55); }
+html[data-wallpaper="custom"] body { background: linear-gradient(var(--wp-veil), var(--wp-veil)), var(--wp-image) center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="custom"] { background: var(--wp-image-swatch, var(--muted)) center / cover no-repeat; }
+/* The live wallpapers' swatches: a still of each (live-wallpaper.jsx draws them). */
+.wallpaper-swatch[data-wallpaper="live-constellation"] { background: radial-gradient(circle at 25% 30%, var(--primary) 0 1.5px, transparent 2px), radial-gradient(circle at 70% 55%, var(--primary) 0 1.5px, transparent 2px), radial-gradient(circle at 45% 75%, var(--primary) 0 1.5px, transparent 2px), linear-gradient(35deg, transparent 48%, color-mix(in oklab, var(--primary) 35%, transparent) 49% 51%, transparent 52%), var(--background); }
+.wallpaper-swatch[data-wallpaper="live-waves"] { background: radial-gradient(120% 60% at 50% 115%, rgb(6 182 212 / 0.45) 0 45%, transparent 46%), radial-gradient(130% 60% at 30% 110%, rgb(139 92 246 / 0.35) 0 50%, transparent 51%), var(--background); }
+.wallpaper-swatch[data-wallpaper="live-glow"] { background: radial-gradient(50% 50% at 30% 35%, rgb(6 182 212 / 0.35), transparent), radial-gradient(50% 50% at 70% 65%, rgb(139 92 246 / 0.35), transparent), var(--background); }
+.wallpaper-swatch[data-wallpaper="live-starfield"] { background: radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 1.5px), radial-gradient(circle at 60% 20%, #fff 0 1.5px, transparent 2px), radial-gradient(circle at 80% 70%, #fff 0 1px, transparent 1.5px), radial-gradient(circle at 40% 80%, #fff 0 1.2px, transparent 1.8px), #0b1222; }
+html[data-wallpaper^="live-"] body { background: var(--background); }
+
+/* Behind the whole workspace, it stays put as the page scrolls. */
+html[data-wallpaper]:not([data-wallpaper^="live-"]) body { background-attachment: fixed; }
+
+/* Brightness (Appearance): a light theme dimmed, or a dark one lifted, over everything on screen.
+   Shown only when set, and never in the way of a click. */
+.brightness-veil { display: none; position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+html[data-brightness] .brightness-veil { display: block; }
+html[data-brightness]:not(.dark) .brightness-veil { background: rgb(0 0 0 / var(--dim-light, 0)); }
+html[data-brightness].dark .brightness-veil { background: rgb(255 255 255 / var(--lift-dark, 0)); mix-blend-mode: screen; }
 
 /* The camera's island at the top of the screen, its lens on the right. */
 .phone-island {

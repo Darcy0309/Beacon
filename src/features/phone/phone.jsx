@@ -784,7 +784,7 @@ function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
           <button key={k} type="button" role="radio" aria-checked={wallpaper === k} onClick={() => onWallpaper(k)} data-wallpaper-pick={k}
             className="group flex flex-col items-center gap-1.5 text-[0.7rem] font-medium">
             <span data-wallpaper={k}
-              className={cn("phone-wallpaper-swatch h-20 w-full rounded-2xl border transition-transform group-hover:scale-[1.03] group-active:scale-95",
+              className={cn("wallpaper-swatch h-20 w-full rounded-2xl border transition-transform group-hover:scale-[1.03] group-active:scale-95",
                 wallpaper === k ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")} />
             <span className={wallpaper === k ? "text-primary" : "text-muted-foreground"}>{label}</span>
           </button>
