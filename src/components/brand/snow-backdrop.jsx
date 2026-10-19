@@ -82,5 +82,5 @@ export default function SnowBackdrop() {
     };
   }, []);
 
-  return <canvas ref={ref} className="absolute inset-0 block h-full w-full" />;
+  return <canvas ref={ref} data-snow className="absolute inset-0 block h-full w-full" />;
 }

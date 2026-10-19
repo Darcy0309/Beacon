@@ -33,7 +33,7 @@ const buttonVariants = cva(
 
 function Button({ className, variant, size, asChild = false, ref, ...props }) {
   const Comp = asChild ? Slot : "button";
-  return <Comp ref={ref} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  return <Comp ref={ref} data-button data-variant={variant ?? "default"} data-size={size ?? "default"} className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }
 
 export { Button, buttonVariants };

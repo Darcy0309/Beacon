@@ -1068,3 +1068,194 @@ html[data-brightness].dark .brightness-veil { background: rgb(255 255 255 / var(
 @media (prefers-reduced-motion: reduce) {
   .phone-device[data-call="ringing"]::before, .phone-island[data-live]::before { animation: none; }
 }
+
+/* ===========================================================================
+   Modern (Appearance › Style, the default; Oct 2026). A calmer, cleaner look
+   over the same pages: the Signature logo's blue as the main colour and its
+   purple in the charts, on quiet slate greys, in light and dark alike; soft
+   cards with gentle shadows instead of neon edges; labels and headings in
+   ordinary case, a size up; plainer buttons and table headings. Classic
+   (html[data-style="classic"]) is the look as it was.
+   =========================================================================== */
+html[data-style="modern"] {
+  --radius: 0.75rem;
+  --background: hsl(220 23% 97%);
+  --foreground: hsl(222 32% 14%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 32% 14%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 32% 14%);
+  --primary: hsl(213 62% 45%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 20% 94%);
+  --secondary-foreground: hsl(222 30% 20%);
+  --muted: hsl(220 20% 95%);
+  --muted-foreground: hsl(220 12% 42%);
+  --accent: hsl(36 85% 46%);
+  --accent-foreground: hsl(222 30% 10%);
+  --border: hsl(220 16% 89%);
+  --input: hsl(220 16% 86%);
+  --ring: hsl(213 62% 45%);
+  --sidebar: hsl(0 0% 100%);
+  --sidebar-foreground: hsl(222 28% 22%);
+  --sidebar-primary: hsl(213 62% 45%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(213 60% 95%);
+  --sidebar-accent-foreground: hsl(213 62% 30%);
+  --sidebar-border: hsl(220 16% 91%);
+  --sidebar-ring: hsl(213 62% 45%);
+  --panel-border: hsl(220 16% 90%);
+  --grid-line: hsl(220 16% 93%);
+  --neon-cyan: hsl(196 70% 42%);
+  --neon-blue: hsl(213 62% 50%);
+  --neon-emerald: hsl(158 55% 38%);
+  --neon-amber: hsl(36 85% 46%);
+  --neon-violet: hsl(276 45% 52%);
+  --neon-magenta: hsl(290 45% 50%);
+  --neon-rose: hsl(350 62% 52%);
+  --chart-viable: hsl(213 62% 50%);
+  --chart-win: hsl(282 46% 52%);
+  --chart-done: hsl(220 14% 80%);
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 6px 20px -12px rgb(16 24 40 / 0.16);
+}
+html[data-style="modern"].dark {
+  --background: hsl(222 24% 8%);
+  --foreground: hsl(220 20% 94%);
+  --card: hsl(222 22% 11%);
+  --card-foreground: hsl(220 20% 94%);
+  --popover: hsl(222 22% 12%);
+  --popover-foreground: hsl(220 20% 94%);
+  --primary: hsl(212 80% 66%);
+  --primary-foreground: hsl(222 30% 10%);
+  --secondary: hsl(222 18% 16%);
+  --secondary-foreground: hsl(220 20% 94%);
+  --muted: hsl(222 18% 15%);
+  --muted-foreground: hsl(220 12% 66%);
+  --accent: hsl(38 85% 60%);
+  --accent-foreground: hsl(222 30% 10%);
+  --border: hsl(222 16% 20%);
+  --input: hsl(222 16% 23%);
+  --ring: hsl(212 80% 66%);
+  --sidebar: hsl(222 24% 9%);
+  --sidebar-foreground: hsl(220 20% 90%);
+  --sidebar-primary: hsl(212 80% 66%);
+  --sidebar-primary-foreground: hsl(222 30% 10%);
+  --sidebar-accent: hsl(212 40% 18%);
+  --sidebar-accent-foreground: hsl(212 85% 80%);
+  --sidebar-border: hsl(222 16% 16%);
+  --sidebar-ring: hsl(212 80% 66%);
+  --panel-border: hsl(222 16% 19%);
+  --grid-line: hsl(222 16% 14%);
+  --neon-cyan: hsl(192 70% 58%);
+  --neon-blue: hsl(212 80% 66%);
+  --neon-emerald: hsl(156 55% 52%);
+  --neon-amber: hsl(38 85% 60%);
+  --neon-violet: hsl(272 65% 74%);
+  --neon-magenta: hsl(290 55% 68%);
+  --neon-rose: hsl(350 75% 66%);
+  --chart-viable: hsl(212 80% 62%);
+  --chart-win: hsl(282 55% 70%);
+  --chart-done: hsl(220 12% 32%);
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03), 0 10px 28px -16px rgb(0 0 0 / 0.7);
+}
+
+/* Cards: solid, a soft shadow, no neon edge or moving streak, no snow behind. */
+html[data-style="modern"] [data-panel] {
+  background-color: var(--card);
+  box-shadow: var(--shadow-card);
+}
+html[data-style="modern"] [data-accent-edge]::before,
+html[data-style="modern"] .edge-trace,
+html[data-style="modern"] [data-workspace-backdrop] [data-snow] { display: none !important; }
+
+/* Labels and headings in ordinary case, a size up, so they read at a glance. */
+html[data-style="modern"] .uppercase { text-transform: none; }
+html[data-style="modern"] [class*="tracking-["] { letter-spacing: 0; }
+html[data-style="modern"] .uppercase[class*="text-[0.5"],
+html[data-style="modern"] .uppercase[class*="text-[0.6"] { font-size: 0.75rem; }
+html[data-style="modern"] .eyebrow {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--foreground);
+}
+html[data-style="modern"] .eyebrow-accent { color: var(--primary); }
+html[data-style="modern"] .stat-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+}
+html[data-style="modern"] [data-topbar-title] {
+  font-size: 1.0625rem;
+  font-weight: 650;
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+/* Buttons: ordinary case, no glow, a softer corner. */
+html[data-style="modern"] [data-button] {
+  font-size: 0.8125rem;
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: 0.625rem;
+  box-shadow: none;
+}
+html[data-style="modern"] [data-button][data-size="sm"] { font-size: 0.78rem; }
+html[data-style="modern"] [data-button][data-variant="default"] { box-shadow: 0 1px 2px rgb(16 24 40 / 0.14); }
+
+/* Table headings: quiet, in ordinary case, on a faint band. */
+html[data-style="modern"] th[data-th] {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  background: color-mix(in oklab, var(--muted) 70%, transparent);
+}
+
+/* The sign-in page's badges (login-fly-ins.jsx): each flies in from its side to rest around the
+   form (the outer span), overshooting a touch as it lands, then floats (the tile). */
+.login-fly {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
+  animation: login-fly-in 1.15s cubic-bezier(0.2, 0.9, 0.25, 1.12) var(--delay) both;
+}
+.login-fly[data-from="left"]   { --from: translate3d(-60vw, 0, 0); }
+.login-fly[data-from="right"]  { --from: translate3d(60vw, 0, 0); }
+.login-fly[data-from="top"]    { --from: translate3d(0, -60vh, 0); }
+.login-fly[data-from="bottom"] { --from: translate3d(0, 60vh, 0); }
+.login-fly-tile {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 28%;
+  color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tile) 82%, white), var(--tile) 55%, color-mix(in srgb, var(--tile) 85%, black));
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 10px 24px -6px color-mix(in srgb, var(--tile) 55%, black), 0 2px 6px rgb(0 0 0 / 0.35);
+  opacity: 0.92;
+  transform: rotate(var(--tilt));
+  animation: login-fly-bob var(--bob) ease-in-out calc(var(--delay) + 1.2s) infinite;
+}
+.login-fly-icon { width: 46%; height: 46%; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25)); }
+@keyframes login-fly-in {
+  from { opacity: 0; transform: var(--from) scale(0.6) rotate(-25deg); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes login-fly-bob {
+  0%, 100% { transform: rotate(var(--tilt)) translateY(0); }
+  50%      { transform: rotate(calc(var(--tilt) * -0.6)) translateY(-10px); }
+}
+/* On a phone: smaller, and only the outer ones, clear of the form. */
+@media (max-width: 640px) {
+  .login-fly { --size: 38px !important; }
+  .login-fly[data-fly="8"], .login-fly[data-fly="9"], .login-fly[data-fly="2"], .login-fly[data-fly="3"] { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-fly, .login-fly-tile { animation: none; }
+}

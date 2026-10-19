@@ -2,6 +2,7 @@ import { Lock } from "lucide-react";
 import { IDLE_CHOICES, IDLE_MINUTES, idleSpan } from "@/lib/idle";
 import LighthouseBackdrop from "@/components/brand/lighthouse-backdrop";
 import SnowBackdrop from "@/components/brand/snow-backdrop";
+import LoginFlyIns from "@/components/brand/login-fly-ins";
 import LighthouseWordmark from "@/components/brand/logo-wordmark";
 import LoginForm from "@/features/auth/components/login-form";
 import EmailLinkHandoff from "@/features/auth/components/email-link-handoff";
@@ -33,6 +34,7 @@ export default async function LoginPage({ searchParams }) {
       <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full blur-3xl" style={{ background: "rgb(43 87 201 / 0.20)" }} />
       <LighthouseBackdrop />
       <div className="pointer-events-none absolute inset-0"><SnowBackdrop /></div>
+      <LoginFlyIns />
 
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-2 text-center">

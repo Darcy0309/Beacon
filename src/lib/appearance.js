@@ -4,6 +4,8 @@
  * before the page draws (APPEARANCE_SCRIPT, in the root layout), so there is
  * no flash of the default look; changed from the theme button's Appearance.
  *
+ *   style      "modern" (the default: calmer colours, soft cards, ordinary-case
+ *              labels) or "classic" (the look as it was)
  *   wallpaper  "classic" (the workspace as it was), one of the phone's, a live
  *              one drawn on a canvas (LIVE_WALLPAPERS), or "custom": a picture
  *              they uploaded, kept apart under APPEARANCE_IMAGE_KEY
@@ -21,7 +23,8 @@ export const LIVE_WALLPAPERS = [
 export const APPEARANCE_IMAGE_KEY = "lighthouse.appearance.image";
 const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...LIVE_WALLPAPERS].map(([k]) => k).concat("custom"));
 export const MAX_SHIFT = 0.3;
-export const DEFAULT_APPEARANCE = { wallpaper: "classic", light: 0, dark: 0 };
+export const STYLES = [["modern", "Modern"], ["classic", "Classic"]];
+export const DEFAULT_APPEARANCE = { style: "modern", wallpaper: "classic", light: 0, dark: 0 };
 
 const clamp = (v) => Math.min(MAX_SHIFT, Math.max(0, Number(v) || 0));
 
@@ -29,6 +32,7 @@ export function readAppearance() {
   try {
     const a = JSON.parse(localStorage.getItem(APPEARANCE_KEY) ?? "{}") ?? {};
     return {
+      style: a.style === "classic" ? "classic" : "modern",
       wallpaper: KNOWN.has(a.wallpaper) && (a.wallpaper !== "custom" || readImage()) ? a.wallpaper : "classic",
       light: clamp(a.light),
       dark: clamp(a.dark),
@@ -88,6 +92,7 @@ export function fitImage(file, max = 1920) {
 /** Put an appearance on the page, and keep it (best-effort: private browsing may not). */
 export function applyAppearance(a, { keep = true } = {}) {
   const d = document.documentElement;
+  d.dataset.style = a.style === "classic" ? "classic" : "modern";
   const image = a.wallpaper === "custom" ? readImage() : null;
   if (image) d.style.setProperty("--wp-image", `url("${image}")`);
   else d.style.removeProperty("--wp-image");
@@ -99,14 +104,14 @@ export function applyAppearance(a, { keep = true } = {}) {
   else delete d.dataset.brightness;
   if (!keep) return;
   try {
-    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ wallpaper: a.wallpaper, light: clamp(a.light), dark: clamp(a.dark) }));
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ style: a.style === "classic" ? "classic" : "modern", wallpaper: a.wallpaper, light: clamp(a.light), dark: clamp(a.dark) }));
   } catch {
     // Kept for this visit only.
   }
 }
 
 /** The same, as a script run before the page draws: no flash of the default look. */
-export const APPEARANCE_SCRIPT = `try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},d=document.documentElement,c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
+export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};if(a.style==="classic")d.dataset.style="classic";`
   + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
   + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i)d.style.setProperty("--wp-image",'url("'+i+'")');}}`
   + `d.style.setProperty("--dim-light",String(c(a.light)));d.style.setProperty("--lift-dark",String(c(a.dark)));if(c(a.light)||c(a.dark))d.dataset.brightness="";}catch(e){}`;

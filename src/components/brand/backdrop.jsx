@@ -30,7 +30,7 @@ export default function Backdrop() {
   // A live wallpaper (Appearance) is drawn here, in place of the snow.
   const live = LIVE_SCENES.includes(wallpaper) ? wallpaper : null;
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden" data-workspace-backdrop>
       {live ? <LiveWallpaper scene={live} /> : null}
       <PageMotif path={path} className="absolute bottom-6 right-6 w-[min(46vw,540px)] text-primary opacity-[0.09]" />
       {live ? null : <SnowBackdrop />}

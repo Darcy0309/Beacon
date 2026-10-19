@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_APPEARANCE, DESKTOP_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
+import { DEFAULT_APPEARANCE, STYLES, DESKTOP_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const THEMES = [["light", "Light", Sun], ["dark", "Dark", Moon], ["system", "System", Monitor]];
@@ -78,6 +78,20 @@ export default function AppearanceDialog({ open, onOpenChange }) {
                 className={cn("flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
                   theme === k ? "border-primary bg-primary/10 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40 hover:text-foreground")}>
                 <Icon className="size-4" /> {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="eyebrow text-muted-foreground">Style</h3>
+          <div role="radiogroup" aria-label="Style" className="grid grid-cols-2 gap-2">
+            {STYLES.map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={a.style === k} onClick={() => change({ style: k })} data-style-pick={k}
+                className={cn("rounded-lg border px-3 py-2 text-left transition-colors",
+                  a.style === k ? "border-primary bg-primary/10" : "border-[var(--panel-border)] hover:border-primary/40")}>
+                <span className={cn("block text-sm font-medium", a.style === k ? "text-primary" : "")}>{label}</span>
+                <span className="block text-xs text-muted-foreground">{k === "modern" ? "Calm colours, soft cards, easy-to-read labels" : "The original look: neon edges, capital labels"}</span>
               </button>
             ))}
           </div>
@@ -158,7 +172,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </section>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.wallpaper === "classic" && !a.light && !a.dark}
+          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === "modern" && a.wallpaper === "classic" && !a.light && !a.dark}
             data-appearance-reset>
             <RotateCcw /> Back to the original
           </Button>

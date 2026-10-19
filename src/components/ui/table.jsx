@@ -20,6 +20,7 @@ function TableRow({ className, ...props }) {
 function TableHead({ className, ...props }) {
   return (
     <th
+      data-th
       className={cn(
         "h-10 whitespace-nowrap px-4 text-left align-middle text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground",
         className
