@@ -2,7 +2,7 @@ import { Lock } from "lucide-react";
 import { IDLE_CHOICES, IDLE_MINUTES, idleSpan } from "@/lib/idle";
 import LighthouseBackdrop from "@/components/brand/lighthouse-backdrop";
 import SnowBackdrop from "@/components/brand/snow-backdrop";
-import LoginFlyIns from "@/components/brand/login-fly-ins";
+import LoginDock from "@/components/brand/login-dock";
 import LighthouseWordmark from "@/components/brand/logo-wordmark";
 import LoginForm from "@/features/auth/components/login-form";
 import EmailLinkHandoff from "@/features/auth/components/email-link-handoff";
@@ -27,14 +27,14 @@ export default async function LoginPage({ searchParams }) {
 
   return (
     <div
-      className="relative grid min-h-svh place-items-center overflow-hidden p-4"
+      className="relative grid min-h-svh place-items-center overflow-hidden p-4 pb-28 sm:pb-32"
       style={{ background: "radial-gradient(120% 90% at 50% -10%, #223258 0%, #0e1830 55%, #080d19 100%)" }}
     >
       <div className="pointer-events-none absolute -left-24 top-1/3 size-96 rounded-full blur-3xl" style={{ background: "rgb(245 177 32 / 0.12)" }} />
       <div className="pointer-events-none absolute -right-24 -top-24 size-[28rem] rounded-full blur-3xl" style={{ background: "rgb(43 87 201 / 0.20)" }} />
       <LighthouseBackdrop />
       <div className="pointer-events-none absolute inset-0"><SnowBackdrop /></div>
-      <LoginFlyIns />
+      <LoginDock />
 
       <div className="relative w-full max-w-sm">
         <div className="mb-7 flex flex-col items-center gap-2 text-center">

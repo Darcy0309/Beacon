@@ -1214,57 +1214,82 @@ html[data-style="modern"] th[data-th] {
   background: color-mix(in oklab, var(--muted) 70%, transparent);
 }
 
-/* The sign-in page's badges (login-fly-ins.jsx): each flies in from its side to rest around the
-   form (the outer span), overshooting a touch as it lands, then floats (the tile). */
-.login-fly {
+/* The sign-in page's dock (login-dock.jsx): a row of badges on frosted glass along the foot of
+   the page, like a Mac's Dock. The one under the pointer grows (--grow, set as it moves), lifting
+   out of the bar, and shows what it stands for. */
+.login-dock-wrap {
   position: absolute;
-  width: var(--size);
-  height: var(--size);
-  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
-  animation: login-fly-in 1.15s cubic-bezier(0.2, 0.9, 0.25, 1.12) var(--delay) both;
+  inset: auto 0 1.25rem 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+  pointer-events: none;
+  animation: login-dock-in 0.7s cubic-bezier(0.2, 0.9, 0.25, 1.1) 0.2s both;
 }
-.login-fly[data-from="left"]   { --from: translate3d(-60vw, 0, 0); }
-.login-fly[data-from="right"]  { --from: translate3d(60vw, 0, 0); }
-.login-fly[data-from="top"]    { --from: translate3d(0, -60vh, 0); }
-.login-fly[data-from="bottom"] { --from: translate3d(0, 60vh, 0); }
-/* Pushed away from the pointer, and back with a bounce (login-fly-ins.jsx sets the transform). */
-.login-fly-push {
-  display: block;
-  width: 100%;
-  height: 100%;
-  transition: transform 0.55s cubic-bezier(0.34, 1.7, 0.5, 1);
-  will-change: transform;
+.login-dock {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  height: 4.5rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 1.4rem;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  background: rgb(255 255 255 / 0.07);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12), 0 18px 40px -18px rgb(0 0 0 / 0.7);
 }
-.login-fly-push[data-pushed] { transition-duration: 0.28s; transition-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.25); }
-.login-fly-tile {
+.login-dock-item {
+  --grow: 1;
+  position: relative;
+  width: calc(3.25rem * var(--grow));
+  height: calc(3.25rem * var(--grow));
+  flex-shrink: 0;
+  transition: width 0.16s ease-out, height 0.16s ease-out;
+}
+.login-dock-tile {
   display: flex;
   width: 100%;
   height: 100%;
   align-items: center;
   justify-content: center;
-  border-radius: 28%;
+  border-radius: 26%;
   color: #fff;
-  background: linear-gradient(160deg, color-mix(in srgb, var(--tile) 82%, white), var(--tile) 55%, color-mix(in srgb, var(--tile) 85%, black));
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.35) inset, 0 10px 24px -6px color-mix(in srgb, var(--tile) 55%, black), 0 2px 6px rgb(0 0 0 / 0.35);
-  opacity: 0.92;
-  transform: rotate(var(--tilt));
-  animation: login-fly-bob var(--bob) ease-in-out calc(var(--delay) + 1.2s) infinite;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tile) 80%, white), var(--tile) 55%, color-mix(in srgb, var(--tile) 85%, black));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.35), 0 8px 18px -8px color-mix(in srgb, var(--tile) 60%, black), 0 2px 5px rgb(0 0 0 / 0.3);
 }
-.login-fly-icon { width: 46%; height: 46%; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25)); }
-@keyframes login-fly-in {
-  from { opacity: 0; transform: var(--from) scale(0.6) rotate(-25deg); }
-  60%  { opacity: 1; }
+.login-dock-icon { width: 48%; height: 48%; filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25)); }
+.login-dock-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.55rem);
+  translate: -50% 4px;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.5rem;
+  background: rgb(15 20 35 / 0.85);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, translate 0.15s;
+}
+.login-dock-item:hover .login-dock-tip { opacity: 1; translate: -50% 0; }
+@keyframes login-dock-in {
+  from { opacity: 0; transform: translateY(2.5rem); }
   to   { opacity: 1; transform: none; }
 }
-@keyframes login-fly-bob {
-  0%, 100% { transform: rotate(var(--tilt)) translateY(0); }
-  50%      { transform: rotate(calc(var(--tilt) * -0.6)) translateY(-10px); }
-}
-/* On a phone: smaller, and only the outer ones, clear of the form. */
+/* On a phone: smaller tiles, and eight of them, so the row fits the screen. */
 @media (max-width: 640px) {
-  .login-fly { --size: 38px !important; }
-  .login-fly[data-fly="8"], .login-fly[data-fly="9"], .login-fly[data-fly="2"], .login-fly[data-fly="3"] { display: none; }
+  .login-dock { gap: 0.35rem; height: 3.3rem; padding: 0.45rem 0.55rem; }
+  .login-dock-item { width: 2.25rem; height: 2.25rem; }
+  .login-dock-item:nth-child(n + 9) { display: none; }
+  .login-dock-tip { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-fly, .login-fly-tile { animation: none; }
+  .login-dock-wrap { animation: none; }
+  .login-dock-item { transition: none; }
 }
