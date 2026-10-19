@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { DEFAULT_APPEARANCE, STYLES, DESKTOP_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
+const VEIL_KEY = "lighthouse.appearance.veil";
 const THEMES = [["light", "Light", Sun], ["dark", "Dark", Moon], ["system", "System", Monitor]];
 
 /**
@@ -21,6 +22,24 @@ export default function AppearanceDialog({ open, onOpenChange }) {
   const [a, setA] = useState(DEFAULT_APPEARANCE);
   const [image, setImage] = useState(null);
   const [fitting, setFitting] = useState(false);
+  // How much the page behind this window is dimmed and blurred: clear to begin with, so every
+  // change shows on the page as it is made (Sean, Oct 2026). Kept on this computer.
+  const [veil, setVeilState] = useState(0);
+  useEffect(() => {
+    try {
+      setVeilState(Math.min(1, Math.max(0, Number(localStorage.getItem(VEIL_KEY) ?? 0) || 0)));
+    } catch {
+      // Clear, then.
+    }
+  }, []);
+  const setVeil = (v) => {
+    setVeilState(v);
+    try {
+      localStorage.setItem(VEIL_KEY, String(v));
+    } catch {
+      // For this visit only.
+    }
+  };
   const fileRef = useRef(null);
   useEffect(() => {
     if (!open) return;
@@ -64,11 +83,18 @@ export default function AppearanceDialog({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90svh] max-w-lg overflow-y-auto" data-appearance-dialog>
+      <DialogContent veil={veil} side className="max-h-[90svh] max-w-lg overflow-y-auto" data-appearance-dialog>
         <DialogHeader>
           <DialogTitle>Appearance</DialogTitle>
           <DialogDescription>How Lighthouse looks for you. Saved on this computer; nobody else's changes.</DialogDescription>
         </DialogHeader>
+
+        <label className="flex items-center gap-3 rounded-lg border border-[var(--panel-border)] px-3 py-2 text-xs text-muted-foreground">
+          <span className="shrink-0 font-medium text-foreground">Background blur</span>
+          <input type="range" min={0} max={100} step={5} value={Math.round(veil * 100)} onChange={(e) => setVeil(Number(e.target.value) / 100)}
+            aria-label="How much the page behind this window is blurred" data-veil-slider className="min-w-0 flex-1 accent-[var(--primary)]" />
+          <span className="w-9 shrink-0 text-right tabular-nums">{veil ? `${Math.round(veil * 100)}%` : "Clear"}</span>
+        </label>
 
         <section className="space-y-2">
           <h3 className="eyebrow text-muted-foreground">Theme</h3>

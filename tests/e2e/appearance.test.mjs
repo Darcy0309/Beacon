@@ -38,6 +38,17 @@ try {
     (await page.ev("document.querySelectorAll('[data-appearance-dialog] [data-desktop-wallpaper]:not([data-desktop-wallpaper^=live-])').length")) === 9
     && (await page.ev("!!document.querySelector('[data-brightness-slider]') && document.querySelectorAll('[data-theme-pick]').length === 3")));
 
+  section("The page shows behind it");
+  const veil = () => page.ev("document.querySelector('[data-dialog-veil]')?.dataset.dialogVeil");
+  const box = await page.ev("(() => { const r = document.querySelector('[data-appearance-dialog]').getBoundingClientRect(); return { left: r.left, right: r.right, width: innerWidth }; })()");
+  check("clear, not blurred, to begin with", (await veil()) === "0"
+    && (await page.ev("getComputedStyle(document.querySelector('[data-dialog-veil]')).backdropFilter")) === "none");
+  check("…at the right edge, the page beside it", box.left > box.width / 2 - 50 && box.width - box.right < 60, JSON.stringify(box));
+  await page.fill("[data-veil-slider]", "60");
+  check("the blur slider dims and blurs it as far as asked", (await veil()) === "0.6"
+    && (await page.ev("getComputedStyle(document.querySelector('[data-dialog-veil]')).backdropFilter")).includes("blur"));
+  await page.fill("[data-veil-slider]", "0");
+
   section("A wallpaper, at once");
   await page.click('[data-desktop-wallpaper="aurora"]');
   check("picked: behind the whole workspace", (await html(page, "dataset.wallpaper")) === "aurora" && (await bodyImage(page)).includes("gradient"),

@@ -74,9 +74,11 @@ const MOTION = {
 /**
  * The dialog itself. Never taller than the screen: a form longer than the
  * room scrolls inside the box, and its DialogFooter (Save, Cancel) stays
- * pinned at the bottom.
+ * pinned at the bottom. `veil`: how much the page behind is dimmed and
+ * blurred, 0 (clear) to 1 (the usual); `side`: on a desktop, at the right
+ * edge rather than the middle (Appearance, so the page shows beside it).
  */
-function DialogContent({ className, children, ...props }) {
+function DialogContent({ className, children, veil = 1, side = false, ...props }) {
   const { open, setOpen } = useContext(DialogState);
   const reduced = useReducedMotion();
   const phone = usePhone();
@@ -89,7 +91,9 @@ function DialogContent({ className, children, ...props }) {
         <DialogPrimitive.Portal key="dialog" forceMount>
           <DialogPrimitive.Overlay forceMount asChild>
             <motion.div
-              className="fixed inset-0 z-50 bg-black/55 backdrop-blur-[3px]"
+              className="fixed inset-0 z-50"
+              data-dialog-veil={veil}
+              style={{ backgroundColor: `rgb(0 0 0 / ${0.55 * veil})`, backdropFilter: veil > 0 ? `blur(${3 * veil}px)` : "none", WebkitBackdropFilter: veil > 0 ? `blur(${3 * veil}px)` : "none" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { duration: 0.2 } }}
               exit={{ opacity: 0, transition: { duration: 0.15 } }}
@@ -97,7 +101,7 @@ function DialogContent({ className, children, ...props }) {
           </DialogPrimitive.Overlay>
           {/* Centres the box on a desktop and seats it on the bottom edge on a
               phone; clicks pass through it to the overlay. */}
-          <div className="pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+          <div className={cn("pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4", side && "sm:justify-end sm:pr-6")}>
             <DialogPrimitive.Content forceMount asChild {...props}>
               <motion.div
                 data-dialog-content
