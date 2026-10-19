@@ -35,7 +35,13 @@ export default async function CalendarPage({ searchParams }) {
 
   // ?client=<id> or ?project=<id>: that client's projects, or that project's calendar alone.
   const id = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
-  const scope = id(sp?.project) || id(sp?.client) ? await getCalendarScope({ projectId: id(sp?.project), clientId: id(sp?.project) ? null : id(sp?.client) }) : null;
+  // Two rounds of queries, not one after another: which calendars (the scope asked for, the ones
+  // they can open, who is asking), then everything shown on them at once.
+  const [scope, calendars, me] = await Promise.all([
+    id(sp?.project) || id(sp?.client) ? getCalendarScope({ projectId: id(sp?.project), clientId: id(sp?.project) ? null : id(sp?.client) }) : null,
+    getCalendarProjects(),
+    getCurrentUser(),
+  ]);
   const only = scope ? (id(sp?.project) ? `project=${id(sp.project)}&` : `client=${id(sp.client)}&`) : "";
   const projectIds = scope?.ids ?? null;
 
@@ -43,40 +49,43 @@ export default async function CalendarPage({ searchParams }) {
 
   // One project's calendar, with its blocked time, to look at and to block time out on: the one
   // chosen, or the only one there is (a client with a single project).
-  const calendars = await getCalendarProjects();
   const openId = id(sp?.project) ? projectIds?.[0] : calendars.length === 1 ? calendars[0].value : null;
   // Its blocked time: what is still to come (for the toolbar) and the month on show (shaded below).
   const shown = { from: anchor < today ? monthStart(anchor) : today, to: monthEnd(addMonths(monthStart(anchor > today ? anchor : today), 3)) };
-  const [projectCalendar, myFeed] = openId
-    ? await Promise.all([getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }), getMyCalendarFeed(openId)])
-    : [null, null];
   // Several calendars together (a client's projects; for a client, every one of their own): the
   // time blocked out on any of them shows too, each block with its project.
-  const togetherIds = openId ? null : scope ? projectIds : (await getCurrentUser())?.role === "client" ? calendars.map((c) => c.value) : null;
-  const together = togetherIds?.length ? await getBlocksAcross({ projectIds: togetherIds, from: monthGrid(shown.from)[0], to: shown.to }) : null;
+  const togetherIds = openId ? null : scope ? projectIds : me?.role === "client" ? calendars.map((c) => c.value) : null;
+  // The days on show: a month, or a week or a day (weeks start on Sunday, matching the month grid's columns).
+  const year = Number(anchor.slice(0, 4));
+  const month = Number(anchor.slice(5, 7)) - 1;
+  const rangeStart = view === "day" ? anchor : addDays(anchor, -weekdayOf(anchor));
+  const rangeEnd = addDays(rangeStart, (view === "day" ? 1 : 7) - 1);
+  const [projectCalendar, myFeed, together, shownData] = await Promise.all([
+    openId ? getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }) : null,
+    openId ? getMyCalendarFeed(openId) : null,
+    togetherIds?.length ? getBlocksAcross({ projectIds: togetherIds, from: monthGrid(shown.from)[0], to: shown.to }) : null,
+    view === "month" ? getCalendarMonth(year, month, projectIds) : getCalendarRange(rangeStart, rangeEnd, projectIds),
+  ]);
   const blocks = projectCalendar?.blocks ?? together;
   const upcoming = (blocks ?? []).filter((b) => b.endsOn >= today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
   const blockedDays = blocks
     ? Object.fromEntries(Object.entries(dayMarks({ blocks }, monthGrid(shown.from)[0], shown.to)).map(([d, m]) => [d, m.blocked]))
     : null;
   const viewHrefs = Object.fromEntries(VIEWS.map((v) => [v, href(v, anchor)]));
-  const year = Number(anchor.slice(0, 4));
-  const month = Number(anchor.slice(5, 7)) - 1;
 
   let data, days, title, prev, next;
 
   if (view === "month") {
-    data = await getCalendarMonth(year, month, projectIds);
+    data = shownData;
     title = formatIso(anchor, "month");
     prev = href("month", addMonths(monthStart(anchor), -1));
     next = href("month", addMonths(monthStart(anchor), 1));
     days = null;
   } else {
     const span = view === "day" ? 1 : 7;
-    // Weeks start on Sunday, matching the month grid's column order.
-    const start = view === "day" ? anchor : addDays(anchor, -weekdayOf(anchor));
-    const end = addDays(start, span - 1);
-    data = await getCalendarRange(start, end, projectIds);
+    const start = rangeStart;
+    const end = rangeEnd;
+    data = shownData;
 
     days = Array.from({ length: span }, (_, i) => {
       const d = addDays(start, i);

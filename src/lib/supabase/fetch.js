@@ -7,6 +7,13 @@ import { SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
 // connections in a burst costs far more than the queries themselves, so they
 // share a small keep-alive pool.
 //
+// Ten, not four (Oct 2026): a lead sheet sends about thirty queries and a
+// project page about twenty-five, most of them at once, and with four
+// sockets they queued four at a time, each wave a round trip. Measured with
+// a 50 ms round trip to the database: the project page 0.6 s -> 0.34 s, a
+// lead sheet 0.56 s -> 0.40 s, the dashboard 0.84 s -> 0.65 s. A quiet page
+// still opens only the sockets it needs.
+//
 // Measured against this deployment: a warm socket answers in well under a
 // second, the first call over a cold connection routinely takes four to eight,
 // and once in a while a fresh socket never answers at all. Reads therefore get
@@ -14,7 +21,7 @@ import { SUPABASE_URL, isSupabaseConfigured } from "@/lib/supabase/config";
 // tight enough to catch the dead socket quickly also fails every cold start,
 // which is what turned the first click after opening the app into an error
 // screen. Writes are never repeated; they get one long window instead.
-const CONNECTIONS = 4;
+const CONNECTIONS = 10;
 const READ_BUDGETS_MS = [12_000, 10_000, 8_000];
 const WRITE_TIMEOUT_MS = 30_000;
 const KEEP_ALIVE_MS = 60_000;
@@ -45,7 +52,39 @@ const isConnectionError = (err) => {
 // is safe to ask again; it is a passing hiccup, not an answer.
 const GATEWAY_ERRORS = new Set([502, 503, 504, 520, 521, 522, 523, 524]);
 
+// LIGHTHOUSE_QUERY_LOG=1: each call to Supabase in the server log, with its
+// time, table or function, rows and size, to find what makes a page slow.
+// Only the names: no filter values, so nothing anyone typed or stored.
+const QUERY_LOG = process.env.LIGHTHOUSE_QUERY_LOG === "1";
+
+function logQuery(url, method, started, res) {
+  try {
+    const u = new URL(url);
+    const select = u.searchParams.get("select");
+    const filters = [...u.searchParams.keys()].filter((k) => !["select", "order", "limit", "offset"].includes(k));
+    const rows = res?.headers.get("content-range")?.split("/")[1];
+    const size = res?.headers.get("content-length");
+    console.log(`[db] ${String(Date.now() - started).padStart(5)}ms ${method} ${u.pathname.replace(/^\/(rest|auth)\/v1/, "")}`
+      + `${select ? ` select=${select.length > 140 ? `${select.slice(0, 140)}…` : select}` : ""}`
+      + `${filters.length ? ` by ${filters.join(",")}` : ""}${rows && rows !== "*" ? ` total=${rows}` : ""}${size ? ` ${size}b` : ""} ${res?.status ?? "failed"}`);
+  } catch {
+    // A log line is never worth a failed query.
+  }
+}
+
 export async function supabaseFetch(url, init = {}) {
+  if (!QUERY_LOG) return supabaseFetchUnlogged(url, init);
+  const started = Date.now();
+  let res;
+  try {
+    res = await supabaseFetchUnlogged(url, init);
+    return res;
+  } finally {
+    logQuery(url, String(init.method ?? "GET").toUpperCase(), started, res);
+  }
+}
+
+async function supabaseFetchUnlogged(url, init = {}) {
   const method = String(init.method ?? "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") {
     return undiciFetch(url, { ...init, dispatcher: agent() });

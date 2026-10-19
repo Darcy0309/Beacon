@@ -29,6 +29,19 @@ const leadSelect = ({ status = false } = {}) => `
 const LEAD_SELECT = leadSelect();
 
 /**
+ * What a list of leads shows (the leads page, a project's names): the name, its contact,
+ * call result, last worked, X-date and rep. The whole record comes when it is opened or,
+ * from a row's menu, edited (loadLeadForEdit): a fraction of the size, on every page of them.
+ */
+const leadListSelect = ({ status = false } = {}) => `
+  id, company_name, contact_name, phone, city, state, lead_date, date_last_worked, updated_at,
+  status:lead_statuses${inner(status)}(id, code, name),
+  result:call_results(id, name, viable),
+  assigned:users!leads_assigned_user_id_fkey(id, first_name, last_name, email),
+  insurance:insurance_details(ultimate_xdate, pkg_xdate, wc_xdate, auto_xdate, health_xdate, dental_xdate, vision_xdate, prof_liab_xdate, do_xdate, eo_xdate)
+`;
+
+/**
  * The renewal date to show in a list. Their exports often leave the
  * "ultimate" X-date blank and carry the real date on the package or
  * workers-comp line, so fall back to the soonest one on file.
@@ -138,7 +151,7 @@ export async function listLeads(params, { projectId, clientId = null, worked = n
     (p) => {
       let query = supabase
         .from("leads")
-        .select(leadSelect({ status: Boolean(p.filters?.status) }), { count: "exact" })
+        .select(leadListSelect({ status: Boolean(p.filters?.status) }), { count: "exact" })
         .order("lead_date", { ascending: false, nullsFirst: false })
         .order("id", { ascending: false });
       if (projectId) query = query.eq("project_id", Number(projectId));

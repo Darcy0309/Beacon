@@ -5,6 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { check, fail, idFrom, logActivity, n, ok, onlySubmitted, removeRecord, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
+import { getLead } from "@/features/leads/queries";
 import { normalizeEin, normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
 import { POLICY_LINES } from "@/lib/coverage";
@@ -89,6 +90,18 @@ async function saveInternalNotes(supabase, leadId, formData) {
   if (!formData.has("internal_notes")) return null;
   const { error } = await supabase.from("lead_notes").upsert({ lead_id: leadId, notes: s(formData, "internal_notes") }, { onConflict: "lead_id" });
   return error;
+}
+
+/**
+ * A lead's whole record, for the edit form opened from a row of a list (the list itself
+ * carries only what it shows). Read as the person asking: Row Level Security decides.
+ * With its internal notes, so saving the form keeps them.
+ */
+export async function loadLeadForEdit(formData) {
+  const id = idFrom(formData);
+  if (!id) return fail("Missing lead id.");
+  const lead = await getLead(id);
+  return lead ? ok(lead.raw) : fail("That lead no longer exists.");
 }
 
 export async function createLead(prevState, formData) {

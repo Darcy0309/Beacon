@@ -8,12 +8,23 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * The business's time zone (business_tz(): the business_timezone setting,
  * America/Phoenix until set). "Today", "this week" and each day of the
- * reports follow it. Read once per request.
+ * reports follow it.
+ *
+ * The same for everyone, and set only in the database, so the server keeps
+ * it for a few minutes rather than asking on every page (nearly every page
+ * needs it): one query fewer on each.
  */
+const ZONE_KEPT_MS = 5 * 60_000;
+let zoneKept = null; // { zone, until }
+
 export const getBusinessTimeZone = cache(async function getBusinessTimeZone() {
+  if (zoneKept && zoneKept.until > Date.now()) return zoneKept.zone;
   const supabase = await createClient();
-  const { data } = await supabase.rpc("business_tz");
-  return data || "America/Phoenix";
+  const { data, error } = await supabase.rpc("business_tz");
+  const zone = data || "America/Phoenix";
+  // Kept only when the database answered: a failed read is asked again next time.
+  if (!error && data) zoneKept = { zone, until: Date.now() + ZONE_KEPT_MS };
+  return zone;
 });
 
 /**

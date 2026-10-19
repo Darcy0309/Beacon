@@ -81,29 +81,20 @@ export default async function Dashboard({ searchParams }) {
   const isManager = Boolean(subject);
   const view = dashboardView(isManager ? "manager" : role);
 
-  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday] = await Promise.all([
-    // An administrator has Recent Leads & Appointments instead (below).
-    isManager || view.audience === "company" ? [] : getRecentLeads(6),
-    isManager ? { today: [], tomorrow: [] } : getAppointments(),
-    isManager ? null : getDashboardStats(),
-    // Months, status mix and totals — only the client dashboard renders them.
-    view.trend === "months" || view.statusMix ? getReports() : null,
-    view.campaigns ? getProjects() : null,
-    view.myPerformance ? getMyWorkload() : null,
-    // Administrators have the production chart instead (below).
-    view.trend === "weeks" && !isManager && view.audience !== "company" ? getLeadVolume() : null,
-    getBusinessTimeZone(),
-    getBusinessToday(),
-  ]);
+  // Two rounds of queries rather than one after another: the business's day, its time zone and
+  // the pay rules (what every period is counted by), then every part of the dashboard at once. Each
+  // part starts the moment those three are in, alongside the first round's slower stats.
+  const tzP = getBusinessTimeZone();
+  const todayP = getBusinessToday();
+  const rulesP = isManager || view.audience === "company" ? getPayRules() : Promise.resolve(null);
+  const basics = Promise.all([todayP, rulesP, tzP]);
 
   // An account manager's own four tiles, each counted over the period chosen on it (the pay period by default).
-  let manager = null;
   const periods = {
     ap: PERIOD_KEYS.includes(sp?.ap) ? sp.ap : "period",
     ld: PERIOD_KEYS.includes(sp?.ld) ? sp.ld : "period",
   };
-  const rules = isManager || view.audience === "company" ? await getPayRules() : null;
-  if (isManager) {
+  const managerP = !isManager ? Promise.resolve(null) : basics.then(async ([businessToday, rules, tz]) => {
     const ranges = { appts: tileRange(periods.ap, businessToday, rules.time), leads: tileRange(periods.ld, businessToday, rules.time) };
     // Row two: their production over the day or period chosen, and their own calendar (the month chosen).
     const prod = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
@@ -119,62 +110,74 @@ export default async function Dashboard({ searchParams }) {
       getMySchedule({ userId: subject.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: subject.own }),
       getTeamProduction(businessToday),
     ]);
-    manager = {
+    return {
       ranges, ...dash, prod, recent, cm, developed, schedule, team,
       person: production.find((r) => r.userId === subject.id) ?? null,
     };
-  }
-  // An administrator's view of the team: a day (today to begin with) or a pay period, week or month.
-  let production = null;
-  // And the top tiles: what the managers developed over a day, the pay period (to begin with), a week or a month.
-  let team = null;
-  if (view.audience === "company") {
+  });
+
+  const companyP = view.audience !== "company" ? Promise.resolve(null) : basics.then(async ([businessToday, rules, tz]) => {
+    // An administrator's view of the team: a day (today to begin with) or a pay period, week or month.
     const v = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
+    // And the top tiles: what the managers developed over a day, the pay period (to begin with), a week or a month.
     const tp = { tl: VIEW_KEYS.includes(sp?.tl) ? sp.tl : "period", ta: VIEW_KEYS.includes(sp?.ta) ? sp.ta : "period" };
-    const [rows, tiles] = await Promise.all([
-      getProduction(v.range),
-      getTeamTiles({ today: businessToday, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
-    ]);
-    production = { view: v, rows };
     // The calendar in place of Today's Schedule, as a manager's dashboard has it: every manager's
     // appointments, and the administrator's own reminders and messages (Sean, Oct 2026).
     const cm = typeof sp?.cm === "string" && isIsoDate(`${sp.cm}-01`) ? `${sp.cm}-01` : monthStart(businessToday);
     const grid = monthGrid(cm);
-    const schedule = await getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true });
-    team = { ...tiles, periods: tp, cm, schedule };
-  }
-
-  // The administrator's chart of what the team developed: a day (by the hour) to two years, everyone or one manager or project.
-  let chart = null;
-  if (view.audience === "company") {
+    // The administrator's chart of what the team developed: a day (by the hour) to two years, everyone or one manager or project.
     const range = chartRange(typeof sp?.pr === "string" ? sp.pr : "1D", businessToday, { from: sp?.pf, to: sp?.pt });
-    const id = (v) => (typeof v === "string" && /^\d{1,18}$/.test(v) ? Number(v) : null);
+    const id = (x) => (typeof x === "string" && /^\d{1,18}$/.test(x) ? Number(x) : null);
     const selected = { user: id(sp?.pu), project: id(sp?.pp) };
-    const [data, goals, options] = await Promise.all([
+    // The administrator's Recent Leads & Appointments: what every manager developed on a day (today to begin
+    // with), a week, a pay period or days of their own choosing; leads, appointments or both.
+    const kind = RECENT_KINDS.some(([k]) => k === sp?.rk) ? sp.rk : "both";
+    let rv;
+    if (sp?.rl === "custom" && isIsoDate(sp?.rf) && isIsoDate(sp?.rt)) {
+      const to = sp.rt <= businessToday ? sp.rt : businessToday;
+      const from = sp.rf > to ? to : daysBetween(sp.rf, to) > 366 ? addDays(to, -366) : sp.rf;
+      rv = { key: "custom", anchor: to, range: { key: "custom", from, to }, label: formatRange(from, to), today: businessToday };
+    } else {
+      rv = readView(sp, { keyParam: "rl", dateParam: "rd", keys: RECENT_PERIODS.map(([k]) => k), today: businessToday, time: rules.time });
+    }
+    const [rows, tiles, schedule, data, goals, options, developed] = await Promise.all([
+      getProduction(v.range),
+      getTeamTiles({ today: businessToday, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
+      getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true }),
       getProductionChart({ from: range.from, to: range.to, ...selected }),
       // The months shown, and a year either way for setting goals ahead.
       getProductionGoals(addDays(range.from < businessToday ? range.from : businessToday, -366), addDays(businessToday, 366)),
       getProductionChartOptions(),
+      getDeveloped({ from: rv.range.from, to: rv.range.to, timeZone: tz, kinds: kind === "both" ? ["lead", "appointment"] : [kind] }),
     ]);
-    chart = { data, range, goals, options, selected };
-  }
+    return {
+      production: { view: v, rows },
+      team: { ...tiles, periods: tp, cm, schedule },
+      chart: { data, range, goals, options, selected },
+      recentAll: { view: rv, kind, rows: developed },
+    };
+  });
 
-  // The administrator's Recent Leads & Appointments: what every manager developed on a day (today to begin
-  // with), a week, a pay period or days of their own choosing; leads, appointments or both.
-  let recentAll = null;
-  if (view.audience === "company") {
-    const kind = RECENT_KINDS.some(([k]) => k === sp?.rk) ? sp.rk : "both";
-    let v;
-    if (sp?.rl === "custom" && isIsoDate(sp?.rf) && isIsoDate(sp?.rt)) {
-      const to = sp.rt <= businessToday ? sp.rt : businessToday;
-      const from = sp.rf > to ? to : daysBetween(sp.rf, to) > 366 ? addDays(to, -366) : sp.rf;
-      v = { key: "custom", anchor: to, range: { key: "custom", from, to }, label: formatRange(from, to), today: businessToday };
-    } else {
-      v = readView(sp, { keyParam: "rl", dateParam: "rd", keys: RECENT_PERIODS.map(([k]) => k), today: businessToday, time: rules.time });
-    }
-    const rows = await getDeveloped({ from: v.range.from, to: v.range.to, timeZone: tz, kinds: kind === "both" ? ["lead", "appointment"] : [kind] });
-    recentAll = { view: v, kind, rows };
-  }
+  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company] = await Promise.all([
+    // An administrator has Recent Leads & Appointments instead (below).
+    isManager || view.audience === "company" ? [] : getRecentLeads(6),
+    isManager ? { today: [], tomorrow: [] } : getAppointments(),
+    isManager ? null : getDashboardStats(),
+    // Months, status mix and totals — only the client dashboard renders them.
+    view.trend === "months" || view.statusMix ? getReports() : null,
+    view.campaigns ? getProjects() : null,
+    view.myPerformance ? getMyWorkload() : null,
+    // Administrators have the production chart instead (below).
+    view.trend === "weeks" && !isManager && view.audience !== "company" ? getLeadVolume() : null,
+    tzP,
+    todayP,
+    managerP,
+    companyP,
+  ]);
+  const production = company?.production ?? null;
+  const team = company?.team ?? null;
+  const chart = company?.chart ?? null;
+  const recentAll = company?.recentAll ?? null;
 
   // Appointments per rep ride along with the dashboard stats.
   const reps = s?.reps ?? [];

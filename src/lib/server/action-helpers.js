@@ -11,6 +11,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { publicOrigin } from "@/lib/origin";
 import { createClient } from "@/lib/supabase/server";
+import { AUTH_ID_HEADER } from "@/lib/supabase/config";
 import { formValues, validate } from "@/lib/validate";
 
 export const ok = (data = null) => ({ ok: true, data, error: null, fieldErrors: null, values: null });
@@ -77,15 +78,28 @@ export const n = (form, key) => {
   return v === null ? null : Number(v);
 };
 
+/**
+ * Who is acting: their id, role, status and email, or null when signed out.
+ *
+ * The proxy has already verified the session for this request and put the
+ * verified auth id on a request header (it overwrites any header sent with
+ * the request), so asking Supabase Auth again only cost a round trip on
+ * every save. Without the header, it asks. Row Level Security still checks
+ * every query against the session itself.
+ */
 export async function currentAppUser(supabase) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  let authId = (await headers()).get(AUTH_ID_HEADER);
+  if (!authId) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    authId = user?.id ?? null;
+  }
+  if (!authId) return null;
   const { data } = await supabase
     .from("users")
     .select("id, role, status, email")
-    .eq("auth_id", user.id)
+    .eq("auth_id", authId)
     .maybeSingle();
   return data ?? null;
 }

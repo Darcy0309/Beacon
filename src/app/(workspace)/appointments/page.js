@@ -63,22 +63,32 @@ const COLUMNS = ["Time", "Company", "Client", "Project", "Agent", "Status", "Set
 
 export default async function AppointmentsPage({ searchParams }) {
   const sp = await searchParams;
-  const [{ rows, groups }, options, today, me, filters] = await Promise.all([getWeekAppointments(), getLookups(), getBusinessToday(), getCurrentUser(), getAppointmentFilters()]);
-  const staff = me?.role !== "client";
-
   // The list: the next 7 days to begin with, or the appointment days chosen (a year at most);
-  // by client, project, the manager who set it and status.
+  // by client, project, the manager who set it and status. Read as soon as the day, who is asking
+  // and the filters are known, alongside the week's appointments.
   const id = (v) => (typeof v === "string" && /^[1-9]\d{0,17}$/.test(v) ? v : "");
-  let from = isIsoDate(sp?.from) ? sp.from : today;
-  let to = isIsoDate(sp?.to) ? sp.to : addDays(from, 6);
-  if (to < from) [from, to] = [to, from];
-  if (daysBetween(from, to) > 366) to = addDays(from, 366);
-  const custom = isIsoDate(sp?.from) || isIsoDate(sp?.to);
-  const chosen = {
-    client: id(sp?.client), project: id(sp?.project), manager: staff ? id(sp?.manager) : "",
-    status: filters.statuses.some((o) => o.value === sp?.status) ? sp.status : "",
+  const pick = ([today, me, filters]) => {
+    let from = isIsoDate(sp?.from) ? sp.from : today;
+    let to = isIsoDate(sp?.to) ? sp.to : addDays(from, 6);
+    if (to < from) [from, to] = [to, from];
+    if (daysBetween(from, to) > 366) to = addDays(from, 366);
+    const chosen = {
+      client: id(sp?.client), project: id(sp?.project), manager: me?.role !== "client" ? id(sp?.manager) : "",
+      status: filters.statuses.some((o) => o.value === sp?.status) ? sp.status : "",
+    };
+    return { from, to, chosen };
   };
-  const list = await listAppointments({ from, to, clientId: chosen.client || null, projectId: chosen.project || null, userId: chosen.manager || null, status: chosen.status || null });
+  const todayP = getBusinessToday();
+  const meP = getCurrentUser();
+  const filtersP = getAppointmentFilters();
+  const listP = Promise.all([todayP, meP, filtersP]).then((got) => {
+    const { from, to, chosen } = pick(got);
+    return listAppointments({ from, to, clientId: chosen.client || null, projectId: chosen.project || null, userId: chosen.manager || null, status: chosen.status || null });
+  });
+  const [{ rows, groups }, options, today, me, filters, list] = await Promise.all([getWeekAppointments(), getLookups(), todayP, meP, filtersP, listP]);
+  const staff = me?.role !== "client";
+  const { from, to, chosen } = pick([today, me, filters]);
+  const custom = isIsoDate(sp?.from) || isIsoDate(sp?.to);
   const days = [];
   for (const a of list.rows) {
     const last = days[days.length - 1];

@@ -23,10 +23,15 @@ const scoreColor = (s) => (s >= 85 ? "var(--neon-emerald)" : s >= 70 ? "var(--ne
 
 export default async function QaPage({ searchParams }) {
   const params = readListParams(await searchParams, ["result", "rep"]);
-  const [{ rows, total, reps }, queue, me, today, tz] = await Promise.all([listQaCalls(params), getQaQueue(), getCurrentUser(), getBusinessToday(), getBusinessTimeZone()]);
-  // What waits to go to clients (administrators: they send it).
+  // What waits to go to clients (administrators: they send it), read alongside the rest.
+  const meP = getCurrentUser();
+  const todayP = getBusinessToday();
+  const tzP = getBusinessTimeZone();
+  const heldP = Promise.all([meP, todayP, tzP]).then(([me, today, tz]) => (me?.role === "admin"
+    ? getHeldDeliveries({ since: appointmentSpan(today, "12:00 AM", 0, tz).start.toISOString() })
+    : null));
+  const [{ rows, total, reps }, queue, me, today, tz, held] = await Promise.all([listQaCalls(params), getQaQueue(), meP, todayP, tzP, heldP]);
   const admin = me?.role === "admin";
-  const held = admin ? await getHeldDeliveries({ since: appointmentSpan(today, "12:00 AM", 0, tz).start.toISOString() }) : null;
   const waiting = held?.rows.filter((r) => r.status !== "failed") ?? [];
   const heldBack = held?.rows.filter((r) => r.status === "failed") ?? [];
 

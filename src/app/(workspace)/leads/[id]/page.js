@@ -175,9 +175,40 @@ export default async function LeadSheet({ params, searchParams }) {
   // Names already skipped on this pass through the list, so Skip keeps going down it.
   const skipped = String(sp?.skipped ?? "").split(",").filter((v) => /^[1-9]\d{0,17}$/.test(v)).map(Number).slice(-50);
 
-  const [lead, activity, me, results, openAppt, today, tz] = await Promise.all([
-    getLead(id), getLeadActivity(id), getCurrentUser(), getCallResults(), getOpenAppointment(id), getBusinessToday(),
-    getBusinessTimeZone(),
+  // What needs only the lead and who is asking starts as soon as those two are in, alongside the
+  // lead's history (the slowest part), rather than after it: one round trip to the database fewer.
+  const leadP = getLead(id);
+  const meP = getCurrentUser();
+  const todayP = getBusinessToday();
+  const restP = Promise.all([leadP, meP, todayP]).then(async ([lead, me, today]) => {
+    if (!lead) return null;
+    const r = lead.raw;
+    const staff = ["admin", "manager", "agent"].includes(me?.role);
+    const seesInternal = ["admin", "manager"].includes(me?.role);
+    return Promise.all([
+      // Working a call list: where the list stands. And whether the caller is on
+      // this name's project, which (like being its rep) lets them record on it.
+      listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
+      listId ? getWorkProject(listId) : null,
+      r.project && staff ? getWorkProject(r.project.id) : null,
+      staff ? getEmailSender(me) : null,
+      staff ? getCarrierNames() : [],
+      seesInternal ? getAssignableStaff() : [],
+      listLeadFiles(await createClient(), lead.id),
+      // The cargo list, for the Business tab's Cargo field.
+      staff ? getCargoTypes() : [],
+      // The client's profile sheet for the project (Project Info), at hand while on the phone.
+      r.project?.id ? getProjectInfo(r.project.id) : null,
+      // Held back from the client by QA: its manager (or an administrator) fixes it and says so here.
+      seesInternal ? getLeadHold(lead.id) : null,
+      // The project's calendar, at hand while on the phone: this month and the two after (others are read as they are opened).
+      staff && r.project?.id
+        ? getProjectCalendar({ projectId: r.project.id, from: monthGrid(monthStart(today))[0], to: monthGrid(addMonths(monthStart(today), 2))[41] })
+        : null,
+    ]);
+  });
+  const [lead, activity, me, results, openAppt, today, tz, rest] = await Promise.all([
+    leadP, getLeadActivity(id), meP, getCallResults(), getOpenAppointment(id), todayP, getBusinessTimeZone(), restP,
   ]);
   if (!lead) notFound();
 
@@ -189,24 +220,8 @@ export default async function LeadSheet({ params, searchParams }) {
   // The lead's internal notes and its call notes: administrators and managers (the database gives an agent neither).
   const seesInternal = ["admin", "manager"].includes(me?.role);
 
-  // Working a call list: where the list stands. And whether the caller is on
-  // this name's project, which (like being its rep) lets them record on it.
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold] = await Promise.all([
-    listId ? getNextOnList(listId, [lead.id, ...skipped]) : null,
-    listId ? getWorkProject(listId) : null,
-    r.project && staff ? getWorkProject(r.project.id) : null,
-    staff ? getEmailSender(me) : null,
-    staff ? getCarrierNames() : [],
-    seesInternal ? getAssignableStaff() : [],
-    listLeadFiles(await createClient(), lead.id),
-    // The cargo list, for the Business tab's Cargo field.
-    staff ? getCargoTypes() : [],
-    // The client's profile sheet for the project (Project Info), at hand while on the phone.
-    r.project?.id ? getProjectInfo(r.project.id) : null,
-    // Held back from the client by QA: its manager (or an administrator) fixes it and says so here.
-    seesInternal ? getLeadHold(lead.id) : null,
-  ]);
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar] = rest;
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
 
@@ -222,10 +237,6 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
-  // The project's calendar, at hand while on the phone: this month and the two after (others are read as they are opened).
-  const calendar = staff && r.project?.id
-    ? await getProjectCalendar({ projectId: r.project.id, from: monthGrid(monthStart(today))[0], to: monthGrid(addMonths(monthStart(today), 2))[41] })
-    : null;
   // The appointment an Appointment result would move (record_call_result's rule: still to come or
   // waiting for QA, never one that failed it): the panel starts from its day and time.
   const movable = openAppt && openAppt.qa_status !== "failed" && (openAppt.qa_status === "pending" || String(openAppt.appt_date) >= today)

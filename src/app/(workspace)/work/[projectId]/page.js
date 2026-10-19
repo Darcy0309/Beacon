@@ -34,19 +34,20 @@ export default async function CallListPage({ params, searchParams }) {
 
   const admin = me?.role === "admin";
   const canLookAtOthers = admin || me?.role === "manager";
-  const reps = canLookAtOthers ? await getProjectReps(projectId) : [];
   const repId = canLookAtOthers && /^\d+$/.test(sp?.rep ?? "") ? Number(sp.rep) : me?.id;
   const mine = repId === me?.id;
   // Call lists are long: 50 a page unless the rep picks another size.
   const perPage = sp?.per ? list.perPage : 50;
 
-  const [{ rows, total }, followUps, criteria, options, everyone] = await Promise.all([
+  const [{ rows, total }, followUps, criteria, options, everyone, reps] = await Promise.all([
     getCallList(projectId, { page: list.page, perPage, q: list.q, rep: repId }),
     mine ? getFollowUps({ projectId }) : [],
     getCallListFilter(projectId),
     getCallListOptions(projectId, repId),
     // Without the filter, for "37 of 220".
     getCallList(projectId, { page: 1, perPage: 1, rep: repId, filtered: false }),
+    // The reps on it, for a manager or administrator to look at another's list.
+    canLookAtOthers ? getProjectReps(projectId) : [],
   ]);
   const filtered = criteriaCount(criteria) > 0;
   const first = rows[0];

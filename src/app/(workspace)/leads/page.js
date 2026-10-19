@@ -4,6 +4,7 @@ import Link from "@/components/shared/intent-link";
 import ResultBadge from "@/components/shared/result-badge";
 import RowActions from "@/components/shared/row-actions";
 import LeadForm from "@/features/leads/components/lead-form";
+import LeadEditLoader from "@/features/leads/components/lead-edit-loader";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import { Button } from "@/components/ui/button";
@@ -127,7 +128,7 @@ export default async function LeadsPage({ searchParams }) {
                       name={l.co}
                       href={leadHref(l.id, here)}
                       id={l.id}
-                      edit={<LeadForm lead={l.raw} options={options} />}
+                      edit={<LeadEditLoader id={l.id} name={l.co} options={options} />}
                       onDelete={deleteLead}
                       warning="It comes off every list, call list, calendar and count, with its appointments. Nothing is erased: its call history, coverage and notes are kept, and an administrator can restore it under Settings › Deleted records."
                     />

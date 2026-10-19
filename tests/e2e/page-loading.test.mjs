@@ -109,6 +109,8 @@ try {
   sql(`delete from public.activity_log where entity='lead' and entity_id in (select id from public.leads where project_id = ${P})`);
   sql(`delete from public.leads where project_id = ${P}`);
   sql(`delete from public.project_assignments where project_id = ${P}`);
+  sql(`delete from public.project_assignment_log where project_id = ${P}`);
+  sql(`delete from public.notifications where link = ${lit(`/work/${P}`)}`);
   sql(`delete from public.activity_log where entity='project' and entity_id = ${P}`);
   sql(`delete from public.projects where id = ${P}`);
   sql(`delete from public.companies where id = ${company}`);

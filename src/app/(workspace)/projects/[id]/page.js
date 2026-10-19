@@ -55,34 +55,44 @@ export default async function ProjectDetail({ params, searchParams }) {
   const sp = await searchParams;
   const list = readListParams(sp, ["result", "rep"]);
   if (list.filters.result && !/^[1-9]\d{0,17}$/.test(list.filters.result)) delete list.filters.result;
-  const me = await getCurrentUser();
-  const admin = me?.role === "admin";
-  const canManage = admin || me?.role === "manager";
+  // Everything at once: what needs only the project's id, and (as soon as the person and the day
+  // are known) what depends on them, rather than one round of queries after another.
+  const pid = Number(id);
+  const meP = getCurrentUser();
+  const todayP = getBusinessToday();
+  const role = (me) => ({ admin: me?.role === "admin", canManage: me?.role === "admin" || me?.role === "manager" });
+  // The months its calendar shows: the one before this, this, and the three after.
+  const span = (today) => ({ first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) });
+  // Counted by call result, as on the client's page; and the project's calendar (a DB dev
+  // project shares the one of the appointment project it promotes to).
+  const scopeP = getCalendarScope({ projectId: pid });
+  const daysP = Promise.all([scopeP, todayP]).then(([scope, today]) => Promise.all([
+    getAppointmentDays({ projectIds: scope?.ids ?? [pid], from: span(today).first, to: span(today).last }),
+    getBlockedDays({ projectIds: scope?.ids ?? [pid], from: span(today).first, to: span(today).last }),
+  ]));
 
-  const [p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers] = await Promise.all([
+  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked]] = await Promise.all([
+    meP,
     getProject(id),
     getProjectOverview(id),
     getProjectTeam(id),
     listLeads(list, { projectId: id }),
     getLookups().then(async (l) => ({ ...l, ...(await getOfficeOptions()) })),
-    canManage ? getAssignableStaff() : [],
-    getXdatesByMonth({ projectId: Number(id) }),
-    getBusinessToday(),
-    admin ? getPayRules() : null,
+    meP.then((me) => (role(me).canManage ? getAssignableStaff() : [])),
+    getXdatesByMonth({ projectId: pid }),
+    todayP,
+    meP.then((me) => (role(me).admin ? getPayRules() : null)),
     getCallResults(),
     getProjectInfo(id),
-    admin ? getCarrierNames() : [],
+    meP.then((me) => (role(me).admin ? getCarrierNames() : [])),
+    getLeadStats({ projectId: pid }),
+    getResultBreakdown(pid),
+    scopeP,
+    daysP,
   ]);
   if (!p) notFound();
-
-  // Counted by call result, as on the client's page; and the project's calendar (a DB dev
-  // project shares the one of the appointment project it promotes to).
-  const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
-  const [{ total: s }, results, scope] = await Promise.all([getLeadStats({ projectId: p.id }), getResultBreakdown(p.id), getCalendarScope({ projectId: p.id })]);
-  const [days, blocked] = await Promise.all([
-    getAppointmentDays({ projectIds: scope?.ids ?? [p.id], from: calendar.first, to: calendar.last }),
-    getBlockedDays({ projectIds: scope?.ids ?? [p.id], from: calendar.first, to: calendar.last }),
-  ]);
+  const { admin, canManage } = role(me);
+  const calendar = span(today);
   const dbdev = p.type === "DBDV";
 
   const raw = p.raw ?? {};
