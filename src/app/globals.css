@@ -1227,6 +1227,15 @@ html[data-style="modern"] th[data-th] {
 .login-fly[data-from="right"]  { --from: translate3d(60vw, 0, 0); }
 .login-fly[data-from="top"]    { --from: translate3d(0, -60vh, 0); }
 .login-fly[data-from="bottom"] { --from: translate3d(0, 60vh, 0); }
+/* Pushed away from the pointer, and back with a bounce (login-fly-ins.jsx sets the transform). */
+.login-fly-push {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.55s cubic-bezier(0.34, 1.7, 0.5, 1);
+  will-change: transform;
+}
+.login-fly-push[data-pushed] { transition-duration: 0.28s; transition-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.25); }
 .login-fly-tile {
   display: flex;
   width: 100%;
