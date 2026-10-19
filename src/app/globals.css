@@ -946,6 +946,49 @@ html[data-navigating] body { cursor: progress; }
   pointer-events: none;
 }
 
+/* The phone's wallpapers (phone.jsx, WALLPAPERS): soft light gradients behind the keypad, and a
+   deeper take of each in the dark theme, so the keys and numbers read the same on any of them.
+   A swatch in Settings shows the same. */
+.phone-screen[data-wallpaper="aurora"], .phone-wallpaper-swatch[data-wallpaper="aurora"] {
+  background: radial-gradient(120% 70% at 0% 0%, #c7f9ec 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #e3d4ff 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #cde9ff 0%, transparent 65%), #f7fbff;
+}
+.phone-screen[data-wallpaper="ocean"], .phone-wallpaper-swatch[data-wallpaper="ocean"] {
+  background: linear-gradient(170deg, #e8f7ff 0%, #c9ecff 45%, #a8dcf5 100%);
+}
+.phone-screen[data-wallpaper="sunrise"], .phone-wallpaper-swatch[data-wallpaper="sunrise"] {
+  background: linear-gradient(175deg, #fff4e0 0%, #ffe1d0 45%, #ffd0de 100%);
+}
+.phone-screen[data-wallpaper="lavender"], .phone-wallpaper-swatch[data-wallpaper="lavender"] {
+  background: radial-gradient(90% 60% at 80% 0%, #f3e8ff 0%, transparent 70%), linear-gradient(180deg, #f6f0ff 0%, #e6dcff 100%);
+}
+.phone-screen[data-wallpaper="mint"], .phone-wallpaper-swatch[data-wallpaper="mint"] {
+  background: linear-gradient(160deg, #effff7 0%, #d3f8e6 50%, #bff0de 100%);
+}
+.phone-screen[data-wallpaper="peach"], .phone-wallpaper-swatch[data-wallpaper="peach"] {
+  background: radial-gradient(100% 70% at 20% 10%, #fff1e6 0%, transparent 70%), linear-gradient(180deg, #ffeadb 0%, #ffd9c7 100%);
+}
+.phone-screen[data-wallpaper="sky"], .phone-wallpaper-swatch[data-wallpaper="sky"] {
+  background: radial-gradient(60% 30% at 25% 18%, rgb(255 255 255 / 0.9) 0%, transparent 70%), radial-gradient(50% 25% at 75% 35%, rgb(255 255 255 / 0.8) 0%, transparent 70%), linear-gradient(180deg, #dff1ff 0%, #f4faff 100%);
+}
+.phone-screen[data-wallpaper="signature"], .phone-wallpaper-swatch[data-wallpaper="signature"] {
+  background: radial-gradient(100% 60% at 0% 0%, #d6e8fb 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #ecd9f3 0%, transparent 65%), #f8f9fd;
+}
+.phone-wallpaper-swatch[data-wallpaper="plain"] { background: var(--card); }
+.dark .phone-screen[data-wallpaper="aurora"], .dark .phone-wallpaper-swatch[data-wallpaper="aurora"] {
+  background: radial-gradient(120% 70% at 0% 0%, #0f3b3a 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #2a1f4d 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #0f2d4a 0%, transparent 65%), #0b111c;
+}
+.dark .phone-screen[data-wallpaper="ocean"], .dark .phone-wallpaper-swatch[data-wallpaper="ocean"] { background: linear-gradient(170deg, #0b1a2a 0%, #0c2a40 55%, #0f3a52 100%); }
+.dark .phone-screen[data-wallpaper="sunrise"], .dark .phone-wallpaper-swatch[data-wallpaper="sunrise"] { background: linear-gradient(175deg, #1c1420 0%, #2e1a24 55%, #3a1d2e 100%); }
+.dark .phone-screen[data-wallpaper="lavender"], .dark .phone-wallpaper-swatch[data-wallpaper="lavender"] { background: linear-gradient(180deg, #141026 0%, #241a42 100%); }
+.dark .phone-screen[data-wallpaper="mint"], .dark .phone-wallpaper-swatch[data-wallpaper="mint"] { background: linear-gradient(160deg, #0b1a17 0%, #0f2a23 55%, #12362c 100%); }
+.dark .phone-screen[data-wallpaper="peach"], .dark .phone-wallpaper-swatch[data-wallpaper="peach"] { background: linear-gradient(180deg, #1e1512 0%, #33201a 100%); }
+.dark .phone-screen[data-wallpaper="sky"], .dark .phone-wallpaper-swatch[data-wallpaper="sky"] {
+  background: radial-gradient(60% 30% at 25% 18%, rgb(120 160 220 / 0.18) 0%, transparent 70%), linear-gradient(180deg, #0c1630 0%, #0a1020 100%);
+}
+.dark .phone-screen[data-wallpaper="signature"], .dark .phone-wallpaper-swatch[data-wallpaper="signature"] {
+  background: radial-gradient(100% 60% at 0% 0%, #152a45 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #2c1638 0%, transparent 65%), #0b0f19;
+}
+
 /* The camera's island at the top of the screen, its lens on the right. */
 .phone-island {
   position: relative;

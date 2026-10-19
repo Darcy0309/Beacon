@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight, CircleDot, CircleX, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
-  PhoneMissed, PhoneOff, PhoneOutgoing, X,
+  PhoneMissed, PhoneOff, PhoneOutgoing, Settings, X,
 } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import { createClient } from "@/lib/supabase/client";
@@ -19,6 +19,25 @@ export const usePhone = () => useContext(PhoneContext);
 
 // Where the phone's window was moved to, in this browser: { x, y } from the top left, or none (docked in the corner).
 const POS_KEY = "lighthouse.phone.position";
+
+/**
+ * The phone's wallpaper, chosen under its Settings (Sean, Oct 2026): light
+ * gradients behind the keypad (globals.css, .phone-screen[data-wallpaper]),
+ * each with a deeper take in the dark theme. Kept on this computer.
+ */
+export const WALLPAPERS = [
+  ["plain", "Plain"], ["aurora", "Aurora"], ["ocean", "Ocean"], ["sunrise", "Sunrise"], ["lavender", "Lavender"],
+  ["mint", "Mint"], ["peach", "Peach"], ["sky", "Sky"], ["signature", "Signature"],
+];
+const WALLPAPER_KEY = "lighthouse.phone.wallpaper";
+const readWallpaper = () => {
+  try {
+    const w = localStorage.getItem(WALLPAPER_KEY);
+    return WALLPAPERS.some(([k]) => k === w) ? w : "plain";
+  } catch {
+    return "plain";
+  }
+};
 const readPos = () => {
   try {
     const p = JSON.parse(localStorage.getItem(POS_KEY) ?? "null");
@@ -108,6 +127,16 @@ export function PhoneProvider({ children, tracked = false }) {
   const [now, setNow] = useState(Date.now());
   const [controls, setControls] = useState({ muted: false, held: false, recording: false, keys: false });
   const [recent, setRecent] = useState([]);
+  const [wallpaper, setWallpaperState] = useState("plain");
+  useEffect(() => setWallpaperState(readWallpaper()), []);
+  const setWallpaper = (w) => {
+    setWallpaperState(w);
+    try {
+      localStorage.setItem(WALLPAPER_KEY, w);
+    } catch {
+      // Private browsing: it lasts until the page is closed.
+    }
+  };
   const inputRef = useRef(null);
   const active = Boolean(call);
   // The window: docked in the corner (pos null), or wherever it was dragged; always docked on a small screen.
@@ -535,7 +564,7 @@ export function PhoneProvider({ children, tracked = false }) {
               !small && "touch-none [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_input]:cursor-text",
               !small && (dragging ? "cursor-grabbing select-none" : "cursor-grab"))}>
             {/* The screen: the camera's island at its top (a green light while a call is on), the home bar at its foot. */}
-            <div className="phone-screen flex min-h-0 flex-1 flex-col" data-phone-screen>
+            <div className="phone-screen flex min-h-0 flex-1 flex-col" data-phone-screen data-wallpaper={wallpaper}>
               <div aria-hidden className="phone-island" data-live={active || ringing ? "" : undefined} />
               <header onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest(PRESSABLE))) dock(); }}
                 data-phone-bar title={small ? undefined : "Drag anywhere to move · double-click here to put it back in the corner"}
@@ -559,7 +588,7 @@ export function PhoneProvider({ children, tracked = false }) {
                       <ArrowDownRight className="size-4" />
                     </button>
                   ) : null}
-                  {[["keypad", "Keypad", Grid3x3], ["recent", "Recent", Clock]].map(([k, label, Icon]) => (
+                  {[["keypad", "Keypad", Grid3x3], ["recent", "Recent", Clock], ["settings", "Settings", Settings]].map(([k, label, Icon]) => (
                     <button key={k} type="button" onClick={() => setTab(k)} aria-pressed={tab === k} aria-label={label} title={label} data-phone-tab={k}
                       className={cn("rounded-md p-1.5 transition-colors", tab === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
                       <Icon className="size-4" />
@@ -606,6 +635,8 @@ export function PhoneProvider({ children, tracked = false }) {
                   </div>
                   {ringing.test ? <p className="mt-4 text-[0.66rem] text-muted-foreground">A test: nobody is on the line.</p> : null}
                 </div>
+              ) : tab === "settings" ? (
+                <PhoneSettings wallpaper={wallpaper} onWallpaper={setWallpaper} onDone={() => setTab("keypad")} />
               ) : tab === "recent" ? (
                 <Recent list={recent} disabled={active} onPick={(r) => { setValue(r.number); setLead(r.leadId ? { id: r.leadId, co: r.co } : null); setChecked(null); setTab("keypad"); }}
                   onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
@@ -743,6 +774,30 @@ export function PhoneProvider({ children, tracked = false }) {
 }
 
 /** The calls made and taken lately in this browser: who, which way, when, how long; one picked fills the keypad, the button calls back. */
+/** The phone's settings: its wallpaper, picked from swatches; it changes behind them as one is picked. */
+function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4" data-phone-settings>
+      <div className="text-[0.66rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">Wallpaper</div>
+      <div role="radiogroup" aria-label="Wallpaper" className="mt-3 grid grid-cols-3 gap-3">
+        {WALLPAPERS.map(([k, label]) => (
+          <button key={k} type="button" role="radio" aria-checked={wallpaper === k} onClick={() => onWallpaper(k)} data-wallpaper-pick={k}
+            className="group flex flex-col items-center gap-1.5 text-[0.7rem] font-medium">
+            <span data-wallpaper={k}
+              className={cn("phone-wallpaper-swatch h-20 w-full rounded-2xl border transition-transform group-hover:scale-[1.03] group-active:scale-95",
+                wallpaper === k ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")} />
+            <span className={wallpaper === k ? "text-primary" : "text-muted-foreground"}>{label}</span>
+          </button>
+        ))}
+      </div>
+      <button type="button" onClick={onDone} data-phone-settings-done
+        className="mt-5 w-full rounded-full border border-[var(--panel-border)] bg-background/50 py-2 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-primary/10">
+        Done
+      </button>
+    </div>
+  );
+}
+
 function Recent({ list, disabled, onPick, onCall }) {
   if (!list.length) return <p className="px-4 py-10 text-center text-sm text-muted-foreground" data-phone-recent>No calls yet.</p>;
   return (
