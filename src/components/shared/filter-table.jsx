@@ -11,6 +11,7 @@ import { csvLine } from "@/lib/lead-export";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { PAGE_SIZE, PAGE_SIZES } from "@/lib/paging";
+import { useReportPending } from "@/components/layout/navigation-progress";
 
 /**
  * A data table with a search box and facet filters across the top.
@@ -70,6 +71,7 @@ export default function FilterTable({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  useReportPending(isPending); // the bar along the top runs while the list is on its way
 
   const [q, setQ] = useState(query);
   const [picked, setPicked] = useState(selected ?? {});

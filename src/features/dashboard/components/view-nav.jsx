@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import Calendar from "@/components/shared/calendar";
@@ -19,7 +19,7 @@ const step = "flex size-6 items-center justify-center rounded-md text-muted-fore
  * with the rest of `params` kept. `prev`/`next`: the day to go to, or null.
  */
 export default function ViewNav({ params, dateParam, anchor, label, prev, next, today, showsToday, name, base = "/" }) {
-  const router = useRouter();
+  const router = useNavigationRouter();
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState(() => monthStart(anchor));
   const href = (day) => dashboardHref(params, { [dateParam]: day }, base);

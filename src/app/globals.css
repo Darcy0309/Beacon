@@ -725,8 +725,130 @@ option {
   to   { background-position: 200% 0; }
 }
 
+/* The bar along the top of the window while a page is on its way (navigation-progress.jsx):
+   it runs quickly at first and slows as it nears the end, then fills and fades once the page
+   is showing. The gradient is pinned to the window's width, so the finishing sweep matches it. */
+.nav-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 3px;
+  z-index: 9999;
+  pointer-events: none;
+}
+.nav-progress.is-done {
+  opacity: 0;
+  transition: opacity 0.35s ease 0.2s;
+}
+.nav-progress-fill,
+.nav-progress-finish {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 0 9999px 9999px 0;
+  background: linear-gradient(90deg, var(--primary), #8b5cf6) 0 0 / 100vw 100% no-repeat;
+  box-shadow: 0 0 10px color-mix(in oklab, var(--primary) 55%, transparent), 0 0 3px color-mix(in oklab, var(--primary) 70%, transparent);
+}
+.nav-progress-fill { animation: nav-progress-grow 14s cubic-bezier(0.05, 0.75, 0.15, 1) 0.12s both; }
+.nav-progress-finish { animation: nav-progress-finish 0.25s ease-out both; }
+@keyframes nav-progress-grow {
+  from { width: 0; }
+  to   { width: 94%; }
+}
+@keyframes nav-progress-finish {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+html[data-navigating] body { cursor: progress; }
+
+/* The page loader (page-loader.jsx): the Signature sphere breathing, a cyan light running
+   around it one way and a purple one the other, each a comet with a fading tail. */
+.page-loader { animation: page-loader-in 0.35s ease 0.15s both; }
+.page-loader-mark {
+  --loader-purple: #a06cf0;
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+}
+/* A soft glow behind the sphere that breathes with it. */
+.page-loader-mark::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  inset: 18%;
+  background: radial-gradient(circle, color-mix(in oklab, var(--primary) 28%, transparent), transparent 70%);
+  animation: page-loader-glow 2.4s ease-in-out infinite;
+}
+.page-loader-sphere {
+  position: absolute;
+  z-index: 1;
+  inset: 25%;
+  overflow: visible;
+  animation: page-loader-breathe 2.4s ease-in-out infinite;
+}
+.page-loader-orbit { position: absolute; }
+/* Each light's faint track. */
+.page-loader-orbit::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 9999px;
+  border: 1px solid color-mix(in oklab, var(--primary) 16%, transparent);
+}
+.page-loader-orbit-in::before { border-color: color-mix(in oklab, var(--loader-purple) 16%, transparent); }
+.page-loader-orbit-out { inset: 0; animation: page-loader-spin 1.15s linear infinite; }
+.page-loader-orbit-in { inset: 12%; animation: page-loader-spin 1.7s linear infinite reverse; }
+/* The tail: a conic sweep, masked down to a thin ring. The head beside it is not masked, so it glows. */
+.page-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3.5px), #000 calc(100% - 3px));
+}
+.page-loader-orbit-out .page-loader-ring {
+  background: conic-gradient(from 0deg, transparent 0 40%, color-mix(in oklab, var(--primary) 30%, transparent) 70%, var(--primary));
+}
+.page-loader-orbit-in .page-loader-ring {
+  background: conic-gradient(from 180deg, var(--loader-purple), color-mix(in oklab, var(--loader-purple) 35%, transparent) 30%, transparent 60% 100%);
+}
+.page-loader-head {
+  position: absolute;
+  top: -2px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 9999px;
+  background: #fff;
+}
+.page-loader-orbit-out .page-loader-head { box-shadow: 0 0 6px 2px var(--primary), 0 0 18px 6px color-mix(in oklab, var(--primary) 55%, transparent); }
+.page-loader-orbit-in .page-loader-head { top: auto; bottom: -2px; box-shadow: 0 0 6px 2px var(--loader-purple), 0 0 18px 6px color-mix(in oklab, var(--loader-purple) 55%, transparent); }
+.page-loader-dots span { animation: page-loader-dot 1.2s ease-in-out infinite; }
+.page-loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+.page-loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes page-loader-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes page-loader-spin { to { transform: rotate(360deg); } }
+@keyframes page-loader-breathe {
+  0%, 100% { transform: scale(0.95); filter: drop-shadow(0 0 0 transparent); }
+  50%      { transform: scale(1.03); filter: drop-shadow(0 0 12px color-mix(in oklab, var(--primary) 45%, transparent)); }
+}
+@keyframes page-loader-glow {
+  0%, 100% { opacity: 0.45; transform: scale(0.9); }
+  50%      { opacity: 1; transform: scale(1.15); }
+}
+@keyframes page-loader-dot {
+  0%, 100% { opacity: 0.2; }
+  40%      { opacity: 1; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-loading.is-pending { animation: none; background-size: 100% 100%; }
+  .nav-progress-fill { animation: none; width: 100%; opacity: 0.7; }
+  .page-loader-orbit, .page-loader-dots span, .page-loader-mark::after { animation: none; }
+  .page-loader-sphere { animation: page-loader-dot 2.4s ease-in-out infinite; }
   .animate-grow-height, .animate-grow-width, .animate-rise,
   .animate-badge-shake, .animate-bell-ring, .animate-popover-in, .appt-focus,
   .drop-target, .drop-landed,

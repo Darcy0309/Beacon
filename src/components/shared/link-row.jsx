@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import { TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  * the row's name a real link too, for opening in a new tab.
  */
 export default function LinkRow({ href, className, children, ...props }) {
-  const router = useRouter();
+  const router = useNavigationRouter();
   const open = (e) => {
     if (e.target.closest("a, button, input, select, textarea, [role=menuitem]")) return;
     router.push(href);

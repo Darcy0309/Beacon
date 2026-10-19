@@ -16,6 +16,7 @@ import IdleGuard from "@/features/auth/components/idle-guard";
 import ExpandRowGuard from "@/components/layout/expand-row-guard";
 import { idleLimitFor } from "@/lib/idle";
 import { PhoneProvider } from "@/features/phone/phone";
+import NavigationProgress from "@/components/layout/navigation-progress";
 
 /**
  * The chrome around every workspace page: sidebar, access checks, and the
@@ -60,6 +61,7 @@ export default function WorkspaceShell({ children }) {
 
   const shell = (
     <div className="flex min-h-svh">
+      <NavigationProgress />
       {tracked ? <ActivityTracker /> : null}
       {guarded ? <IdleGuard /> : null}
       <ExpandRowGuard />

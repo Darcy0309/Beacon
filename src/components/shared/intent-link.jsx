@@ -1,7 +1,14 @@
 "use client";
 
-import NextLink from "next/link";
+import NextLink, { useLinkStatus } from "next/link";
 import { useState } from "react";
+import { useReportPending } from "@/components/layout/navigation-progress";
+
+/** Inside a link: tells the bar along the top of the window while the page it opens is on its way. */
+function ReportPending() {
+  useReportPending(useLinkStatus().pending);
+  return null;
+}
 
 /**
  * next/link that prefetches only when someone shows they may click it: the
@@ -16,8 +23,11 @@ import { useState } from "react";
  * clicked its instant loading skeleton.
  *
  * Pass `prefetch` to decide for one link (false: never).
+ *
+ * While the page it opens is on its way, the bar along the top of the window
+ * runs (navigation-progress.jsx).
  */
-export default function Link({ prefetch, onMouseEnter, onFocus, onTouchStart, ...props }) {
+export default function Link({ prefetch, onMouseEnter, onFocus, onTouchStart, children, ...props }) {
   const [intent, setIntent] = useState(false);
   const showsIntent = (handler) => (event) => {
     if (!intent) setIntent(true);
@@ -32,6 +42,9 @@ export default function Link({ prefetch, onMouseEnter, onFocus, onTouchStart, ..
       onMouseEnter={showsIntent(onMouseEnter)}
       onFocus={showsIntent(onFocus)}
       onTouchStart={showsIntent(onTouchStart)}
-    />
+    >
+      {children}
+      <ReportPending />
+    </NextLink>
   );
 }

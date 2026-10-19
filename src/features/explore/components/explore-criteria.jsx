@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FIELDS, MONTHS } from "@/features/explore/criteria";
 import { cn } from "@/lib/utils";
+import { useReportPending } from "@/components/layout/navigation-progress";
 
 /**
  * The explorer's criteria panel. Every choice is written to the URL, so the
@@ -17,6 +18,7 @@ export default function ExploreCriteria({ options, criteria }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  useReportPending(isPending); // the bar along the top runs while the list is on its way
 
   const apply = (mutate) => {
     const params = new URLSearchParams(searchParams.toString());

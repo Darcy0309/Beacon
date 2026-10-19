@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import Link from "@/components/shared/intent-link";
 import { toast } from "sonner";
 import { Bell, BellOff, CheckCheck } from "lucide-react";
@@ -66,7 +67,7 @@ const formOf = (id) => {
  * until clicked again, Escape, a click elsewhere, or a page change.
  */
 export default function NotificationBell() {
-  const router = useRouter();
+  const router = useNavigationRouter();
   const pathname = usePathname();
   const { user } = useRole();
   const me = user?.id ?? null;

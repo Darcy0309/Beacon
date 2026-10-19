@@ -7,6 +7,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { useReportPending } from "@/components/layout/navigation-progress";
 
 // The "all" choice; a menu choice cannot be the empty string.
 const ALL = "__all";
@@ -27,6 +28,7 @@ export default function ParamSelect({ name, label, value = "", options, placehol
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
+  useReportPending(pending); // the bar along the top runs while the list is on its way
   const labelId = useId();
 
   const current = options.find((o) => String(o.value) === String(value))?.label ?? placeholder;

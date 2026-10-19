@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import { toast } from "sonner";
 import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  */
 export default function ClientForm({ client, groups = [], zones = [] }) {
   const isEdit = Boolean(client?.id);
-  const router = useRouter();
+  const router = useNavigationRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(saveCompany, EMPTY);
   const { fe, invalid, dv } = formHelpers(state, client ?? { status: "active" });

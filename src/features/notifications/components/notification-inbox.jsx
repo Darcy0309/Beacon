@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "@/components/shared/intent-link";
-import { useRouter } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import { Bell, BellOff, CheckCheck, ArrowUpRight, ChevronRight } from "lucide-react";
 import { KIND_ICONS, linkLabel } from "@/features/notifications/kinds";
 import { markNotificationRead, markAllNotificationsRead } from "@/features/notifications/actions";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
  * to what it points at.
  */
 export default function NotificationInbox({ rows, unread, empty }) {
-  const router = useRouter();
+  const router = useNavigationRouter();
   const [readIds, setReadIds] = useState(() => new Set());
   const [allRead, setAllRead] = useState(false);
   const [, startTransition] = useTransition();

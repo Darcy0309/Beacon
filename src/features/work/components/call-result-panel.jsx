@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import { toast } from "sonner";
 import { PhoneCall, CalendarCheck, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +40,7 @@ const GROUPS = [
 export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null, calendarProjectId = null }) {
   // The slot being chosen for an appointment is told to the warning under it (taken, or blocked out, on the project's calendar).
   const [slotControl, tellSlot] = useSlotControl();
-  const router = useRouter();
+  const router = useNavigationRouter();
   const [state, setState] = useState(EMPTY);
   const [pending, startTransition] = useTransition();
   const [chosen, setChosen] = useState(null);

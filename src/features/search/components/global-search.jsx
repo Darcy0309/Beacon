@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigationRouter } from "@/components/layout/navigation-progress";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Command } from "cmdk";
@@ -57,7 +57,7 @@ function Result({ item, onPick }) {
  * Arrow keys move, Enter opens, Esc closes.
  */
 export default function GlobalSearch() {
-  const router = useRouter();
+  const router = useNavigationRouter();
   const { role } = useRole();
   const [open, setOpen] = useState(false);
   const reduceMotion = useReducedMotion();
