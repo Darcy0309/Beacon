@@ -32,6 +32,22 @@ async function atFullAssurance(supabase) {
   }
 }
 
+/**
+ * Send the browser to `url`. A plain redirect, except in answer to a server
+ * action (Sign out, Save…): its caller expects an action's reply, and a
+ * redirect it followed to an ordinary page broke the screen ("An unexpected
+ * response was received from the server"): signing out after the session had
+ * already ended (it expired, or ended in another tab). Next's own header for
+ * an action's redirect opens the page instead.
+ */
+function goTo(request, url) {
+  if (!request.headers.has("next-action")) return NextResponse.redirect(url);
+  return new NextResponse(null, {
+    status: 200,
+    headers: { "x-action-redirect": `${url.pathname}${url.search};replace`, "content-type": "text/plain" },
+  });
+}
+
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
 
@@ -43,7 +59,7 @@ export async function proxy(request) {
     const url = request.nextUrl.clone();
     url.pathname = "/setup";
     url.search = `?reason=${problem}`;
-    return NextResponse.redirect(url);
+    return goTo(request, url);
   }
 
   let refreshed = [];
@@ -93,7 +109,7 @@ export async function proxy(request) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return goTo(request, url);
   }
 
   // With an authenticator enrolled, a password alone only reaches aal1. Send
@@ -106,7 +122,7 @@ export async function proxy(request) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+    return goTo(request, url);
   }
 
   // Left too long without activity (a manager's or client's session, see
@@ -123,7 +139,7 @@ export async function proxy(request) {
       url.searchParams.set("error", "idle");
       url.searchParams.set("after", String(idleLimitOf(idle)));
       if (!isPublic && !pathname.startsWith("/api/")) url.searchParams.set("next", pathname);
-      const response = NextResponse.redirect(url);
+      const response = goTo(request, url);
       refreshed.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       response.cookies.delete(IDLE_COOKIE);
       return response;
@@ -134,7 +150,7 @@ export async function proxy(request) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
-    return NextResponse.redirect(url);
+    return goTo(request, url);
   }
 
   // Snapshot the headers after getUser() so a refreshed session cookie is
