@@ -13,6 +13,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { APPOINTMENT_NOTICES, sendsSheet } from "@/lib/delivery";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
+import { getCallListOptions } from "@/features/work/queries";
 
 // record_call_result() explains what a result needs; show it beside the field.
 const FIELD_FOR = [
@@ -130,6 +131,24 @@ export async function recordCallResult(prevState, formData) {
  * the list, Start calling, Skip and the next name after a result all follow
  * it. An empty filter clears it.
  */
+/**
+ * The Filter panel's choices for a call list (each city, ZIP, county,
+ * industry, carrier, year, developer, result and source on it, with counts):
+ * read when the panel is first opened, not on every page of the list, since
+ * working them out goes over every name on it. The database decides whose
+ * list may be read.
+ */
+export async function loadCallListOptions(formData) {
+  const projectId = idFrom(formData, "project_id");
+  if (!projectId) return fail("Missing project.");
+  const rep = idFrom(formData, "rep");
+  try {
+    return ok(await getCallListOptions(projectId, rep));
+  } catch (err) {
+    return fail(err?.message ?? "The filter's choices could not be read.");
+  }
+}
+
 export async function saveCallListFilter(formData) {
   const projectId = idFrom(formData, "project_id");
   if (!projectId) return fail("Missing project.");

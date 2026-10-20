@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, ChevronDown, Filter, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, ChevronDown, Filter, Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
   FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, RENEWAL_LINES, XMOD_SIDES, cleanCriteria, describeCriteria, monthDay, monthWindow,
 } from "@/lib/call-list-filter";
 import { cn } from "@/lib/utils";
-import { saveCallListFilter } from "@/features/work/actions";
+import { loadCallListOptions, saveCallListFilter } from "@/features/work/actions";
 
 /** Include · Exclude, for one criterion. */
 function Mode({ exclude, onChange, label }) {
@@ -124,20 +124,41 @@ function Values({ field, options, chosen, onChange }) {
  * Start calling, Skip and the next name after a result all follow it.
  *
  *   criteria   what is kept (cleanCriteria())
- *   options    getCallListOptions(): { city: [{ value, label, count }], … }
+ *   options    getCallListOptions(): { city: [{ value, label, count }], … }; null when
+ *              no filter is applied: read when the panel is first opened
+ *   rep        whose list (a manager may look at another's)
  *   matching   names that pass it; all  names left without it
  */
-export default function CallListFilters({ projectId, criteria, options, matching, all }) {
+export default function CallListFilters({ projectId, rep = null, criteria, options, matching, all }) {
   const router = useRouter();
+  // The choices: from the page with a filter applied, else read the first time the panel opens.
+  const [opts, setOpts] = useState(options);
+  const [loadingOpts, setLoadingOpts] = useState(false);
+  useEffect(() => {
+    if (options) setOpts(options);
+  }, [options]);
   const [draft, setDraft] = useState(criteria);
   const [saving, startSaving] = useTransition();
   // One line until it is wanted: the list comes first, and what is applied shows on that line.
   const [open, setOpen] = useState(false);
   useEffect(() => setDraft(criteria), [criteria]);
+  useEffect(() => {
+    if (!open || opts || loadingOpts) return;
+    setLoadingOpts(true);
+    const f = new FormData();
+    f.set("project_id", String(projectId));
+    if (rep) f.set("rep", String(rep));
+    loadCallListOptions(f)
+      .then((result) => {
+        if (result?.ok) setOpts(result.data ?? {});
+        else toast.error(result?.error ?? "The filter's choices could not be read.");
+      })
+      .finally(() => setLoadingOpts(false));
+  }, [open, opts, loadingOpts, projectId, rep]);
 
   const clean = cleanCriteria(draft);
   const dirty = JSON.stringify(clean) !== JSON.stringify(cleanCriteria(criteria));
-  const applied = describeCriteria(criteria, options);
+  const applied = describeCriteria(criteria, opts ?? {});
 
   const save = (next) =>
     startSaving(async () => {
@@ -189,7 +210,12 @@ export default function CallListFilters({ projectId, criteria, options, matching
           {open ? "Close" : applied.length ? "Change" : "Filter"} <ChevronDown className={cn("transition-transform duration-150", open && "rotate-180")} />
         </Button>
       </div>
-      {open ? (
+      {open && !opts ? (
+        <div className="flex items-center gap-2 border-t border-[var(--panel-border)] p-5 text-sm text-muted-foreground" data-filter-options-loading>
+          <Loader2 className="size-4 animate-spin text-primary" aria-hidden /> Loading the choices for this list…
+        </div>
+      ) : null}
+      {open && opts ? (
       <div className="space-y-4 border-t border-[var(--panel-border)] p-5">
         {/* When it renews: a window of the year, or one month with a click. */}
         <div className="space-y-2" data-renewal-filter>
@@ -238,7 +264,7 @@ export default function CallListFilters({ projectId, criteria, options, matching
                   <span className="text-xs font-medium text-muted-foreground">{field.label}</span>
                   <Mode label={field.label} exclude={c.exclude === true} onChange={(exclude) => setDraft({ ...draft, [field.key]: { ...c, exclude } })} />
                 </div>
-                <Values field={field} options={options[field.key] ?? []} chosen={c.values ?? []}
+                <Values field={field} options={opts[field.key] ?? []} chosen={c.values ?? []}
                   onChange={(values) => setDraft({ ...draft, [field.key]: { ...c, values } })} />
               </div>
             );
@@ -262,7 +288,7 @@ export default function CallListFilters({ projectId, criteria, options, matching
               ))}
             </div>
             <div className="text-[0.66rem] text-muted-foreground" data-employees-span>
-              {options.employees?.[0] ? `${options.employees[0].label} on this list` : "No name on this list has a count"}
+              {opts.employees?.[0] ? `${opts.employees[0].label} on this list` : "No name on this list has a count"}
             </div>
           </div>
 
@@ -273,7 +299,7 @@ export default function CallListFilters({ projectId, criteria, options, matching
               onChange={(e) => { const { xmod: _x, ...rest } = draft; setDraft(e.target.value ? { ...rest, xmod: { side: e.target.value } } : rest); }}>
               <option value="">Any</option>
               {XMOD_SIDES.map((s) => {
-                const n = options.xmod?.find((o) => o.value === s.key)?.count ?? 0;
+                const n = opts.xmod?.find((o) => o.value === s.key)?.count ?? 0;
                 return <option key={s.key} value={s.key}>{s.label} ({n.toLocaleString()})</option>;
               })}
             </Select>

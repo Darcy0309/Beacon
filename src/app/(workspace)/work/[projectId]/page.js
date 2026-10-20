@@ -39,16 +39,20 @@ export default async function CallListPage({ params, searchParams }) {
   // Call lists are long: 50 a page unless the rep picks another size.
   const perPage = sp?.per ? list.perPage : 50;
 
-  const [{ rows, total }, followUps, criteria, options, everyone, reps] = await Promise.all([
+  const criteriaP = getCallListFilter(projectId);
+  const [{ rows, total }, followUps, criteria, options, everyoneOrNull, reps] = await Promise.all([
     getCallList(projectId, { page: list.page, perPage, q: list.q, rep: repId }),
     mine ? getFollowUps({ projectId }) : [],
-    getCallListFilter(projectId),
-    getCallListOptions(projectId, repId),
-    // Without the filter, for "37 of 220".
-    getCallList(projectId, { page: 1, perPage: 1, rep: repId, filtered: false }),
+    criteriaP,
+    // The Filter panel's choices: only with a filter applied (its summary names what it picks);
+    // without one, the panel reads them when it is first opened.
+    criteriaP.then((c) => (criteriaCount(c) > 0 ? getCallListOptions(projectId, repId) : null)),
+    // Without the filter, for "37 of 220": with neither a filter nor a search, the list's own total.
+    criteriaP.then((c) => (criteriaCount(c) > 0 || list.q ? getCallList(projectId, { page: 1, perPage: 1, rep: repId, filtered: false }) : null)),
     // The reps on it, for a manager or administrator to look at another's list.
     canLookAtOthers ? getProjectReps(projectId) : [],
   ]);
+  const everyone = everyoneOrNull ?? { total };
   const filtered = criteriaCount(criteria) > 0;
   const first = rows[0];
   const sheet = (id) => (mine ? `/leads/${id}?project=${project.id}` : `/leads/${id}`);
@@ -131,7 +135,7 @@ export default async function CallListPage({ params, searchParams }) {
           </Card>
         ) : null}
 
-        <CallListFilters projectId={project.id} criteria={criteria} options={options} matching={total} all={everyone.total} />
+        <CallListFilters key={repId ?? "mine"} projectId={project.id} rep={repId} criteria={criteria} options={options} matching={total} all={everyone.total} />
 
         <Card>
           <SectionHeader label="Names to Call" icon={ListChecks} action={<span className="flex items-center gap-1 text-[0.66rem] text-muted-foreground"><Repeat className="size-3" /> Least-called first</span>} />
