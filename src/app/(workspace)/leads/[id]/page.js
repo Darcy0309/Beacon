@@ -35,7 +35,7 @@ import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day
 import { addMonths, daysBetween, monthGrid, monthStart, todayIn } from "@/lib/dates";
 import { apptWhen, fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
+import { autosLine, employeesLine, locationsLine, subcontractorsLine, xmodText, yesNo } from "@/lib/business";
 import { getCargoTypes } from "@/features/cargo/queries";
 import { backFrom } from "@/lib/back-link";
 import { emailSignature } from "@/lib/email";
@@ -456,6 +456,7 @@ export default async function LeadSheet({ params, searchParams }) {
                           ["Autos", autosLine(r)],
                           ["DOT#", r.dot_number ? <span className="tabular-nums">{r.dot_number}</span> : null],
                           ["Cargo", r.cargo],
+                          ["XMOD", r.xmod != null ? <span className="tabular-nums">{xmodText(r.xmod)}</span> : null],
                           ["Sales volume", r.sales_volume],
                           ["Annual payroll", r.annual_payroll],
                           ["EIN", r.ein ? <span className="tabular-nums">{r.ein}</span> : null],

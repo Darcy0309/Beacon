@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, RENEWAL_LINES, cleanCriteria, describeCriteria, monthDay, monthWindow,
+  FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, RENEWAL_LINES, XMOD_SIDES, cleanCriteria, describeCriteria, monthDay, monthWindow,
 } from "@/lib/call-list-filter";
 import { cn } from "@/lib/utils";
 import { saveCallListFilter } from "@/features/work/actions";
@@ -118,8 +118,9 @@ function Values({ field, options, chosen, onChange }) {
  * Narrow a call list to the names most worth calling now: those renewing in
  * a window of the year (any year; Nov 1 – Jan 31 runs over the new year), in
  * given cities, ZIP codes or counties, industries, with given carriers,
- * developed in a given year or by given managers, or with given results —
- * each included or excluded. Applied, it is kept for this project, and
+ * developed in a given year or by given managers, or with given results, or
+ * with a number of employees (a range) — each included or excluded; and with
+ * an XMOD over 1 or under it. Applied, it is kept for this project, and
  * Start calling, Skip and the next name after a result all follow it.
  *
  *   criteria   what is kept (cleanCriteria())
@@ -242,6 +243,41 @@ export default function CallListFilters({ projectId, criteria, options, matching
               </div>
             );
           })}
+
+          {/* Employees (the total): a range, either end left open. */}
+          <div className="min-w-0 space-y-1" data-criterion="employees">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Employees</span>
+              <Mode label="Employees" exclude={draft.employees?.exclude === true}
+                onChange={(exclude) => setDraft({ ...draft, employees: { ...(draft.employees ?? {}), exclude } })} />
+            </div>
+            <div className="flex items-center gap-1.5">
+              {["min", "max"].map((end, i) => (
+                <span key={end} className="contents">
+                  {i ? <span className="text-xs text-muted-foreground">to</span> : null}
+                  <Input inputMode="numeric" maxLength={9} className="h-8 min-w-0" aria-label={`Employees: ${end === "min" ? "at least" : "at most"}`}
+                    placeholder={end === "min" ? "Min" : "Max"} data-employees={end} value={draft.employees?.[end] ?? ""}
+                    onChange={(e) => setDraft({ ...draft, employees: { ...(draft.employees ?? {}), [end]: e.target.value } })} />
+                </span>
+              ))}
+            </div>
+            <div className="text-[0.66rem] text-muted-foreground" data-employees-span>
+              {options.employees?.[0] ? `${options.employees[0].label} on this list` : "No name on this list has a count"}
+            </div>
+          </div>
+
+          {/* XMOD over 1 (paying more for work comp) or under it. */}
+          <div className="min-w-0 space-y-1" data-criterion="xmod">
+            <span className="block text-xs font-medium text-muted-foreground">XMOD</span>
+            <Select aria-label="XMOD" value={draft.xmod?.side ?? ""} className="h-8 w-full" data-xmod
+              onChange={(e) => { const { xmod: _x, ...rest } = draft; setDraft(e.target.value ? { ...rest, xmod: { side: e.target.value } } : rest); }}>
+              <option value="">Any</option>
+              {XMOD_SIDES.map((s) => {
+                const n = options.xmod?.find((o) => o.value === s.key)?.count ?? 0;
+                return <option key={s.key} value={s.key}>{s.label} ({n.toLocaleString()})</option>;
+              })}
+            </Select>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--panel-border)] pt-4">

@@ -95,6 +95,9 @@ export const COLUMN_ALIASES = {
   coveredemployees: "covered_employees",
   professionals: "professionals", numberofprofessionals: "professionals",
   autos: "autos", vehicles: "autos", numberofautos: "autos",
+  drivers: "drivers", numberofdrivers: "drivers", drivercount: "drivers",
+  // The experience MOD on work comp: .85, 1.50.
+  xmod: "xmod", emod: "xmod", expmod: "xmod", experiencemod: "xmod", experiencemodifier: "xmod", modrating: "xmod", wcmod: "xmod",
   salesvolume: "sales_volume", revenue: "sales_volume", annualrevenue: "sales_volume",
   yearsinbusiness: "years_in_business", yrsinbusiness: "years_in_business",
   premium: "estimated_annual_premium", estimatedannualpremium: "estimated_annual_premium",
@@ -126,7 +129,7 @@ export const TEMPLATE_HEADERS = [
   "Company", "Contact", "Contact Title", "Phone", "Mobile Phone", "Email", "Fax", "Website",
   "Decision Maker", "DM Title", "DM Phone", "DM Cell", "DM Email",
   "Address", "City", "State", "Zip", "County", "Territory",
-  "SIC Code", "SIC Description", "Employees", "Autos", "Sales Volume", "Locations", "EIN", "Years In Business", "Estimated Annual Premium",
+  "SIC Code", "SIC Description", "Employees", "Autos", "Drivers", "XMOD", "Sales Volume", "Locations", "EIN", "Years In Business", "Estimated Annual Premium",
   "Producer Name", "List Source",
   "Ultimate XDate", "Package XDate", "Package Carrier", "Work Comp XDate", "Work Comp Carrier",
   "Auto XDate", "Auto Carrier", "Health XDate", "Health Carrier", "Dental XDate", "Dental Provider",
@@ -342,6 +345,23 @@ export function normalizeEin(value) {
   return digits.length === 9 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : null;
 }
 
+/** "8" or "1,200" drivers -> a whole number (0-100,000), or null. */
+export function parseDrivers(value) {
+  const s = String(value ?? "").replace(/[\s,]/g, "");
+  return /^\d{1,6}$/.test(s) && Number(s) <= 100000 ? Number(s) : null;
+}
+
+/**
+ * An XMOD as written (".85", "1.5", "1.50") -> a number over 0 and under 10,
+ * to two places, or null for anything else.
+ */
+export function parseXmod(value) {
+  const s = String(value ?? "").trim();
+  if (!/^(\d?\.\d{1,2}|\d(\.\d{0,2})?)$/.test(s)) return null;
+  const n = Number(s);
+  return n > 0 && n < 10 ? n : null;
+}
+
 /**
  * Turn parsed CSV rows into the records each row can produce: the lead, its
  * insurance detail, a booked appointment, and its internal notes. Rows without a company name
@@ -400,6 +420,13 @@ export function rowsToImport(csvRows) {
       const ein = normalizeEin(lead.ein);
       if (ein) lead.ein = ein;
       else delete lead.ein;
+    }
+    // Numbers in the database: one that is not a count or an XMOD is left out, or the whole batch would fail.
+    for (const [column, parse] of [["drivers", parseDrivers], ["xmod", parseXmod]]) {
+      if (!(column in lead)) continue;
+      const v = parse(lead[column]);
+      if (v === null) delete lead[column];
+      else lead[column] = v;
     }
 
     rows.push({

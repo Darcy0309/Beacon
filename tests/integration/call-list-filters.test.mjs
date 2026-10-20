@@ -2,7 +2,8 @@
  * Filtering a call list, against the database as a real account manager:
  * names renewing in a window of the year (any year, wrapping Nov – Jan),
  * by city, ZIP, county, industry, carrier (on any line), year developed,
- * developer and result, each included or excluded; the filter is the
+ * developer and result, each included or excluded; employees in a range
+ * (included or excluded) and XMOD over or under 1; the filter is the
  * manager's own and steers the next name; the options come from the list.
  *
  * Removes everything it made.
@@ -44,6 +45,10 @@ const label = (id) => Object.entries(ids).find(([, v]) => v === id)?.[0];
 // Feb Phoenix's workers comp renews in December (its Ultimate X-Date is Feb 1); two names came from one list.
 sql(`update public.insurance_details set wc_xdate = '2026-12-10' where lead_id = ${ids["Feb Phoenix"]}`);
 sql(`update public.leads set list_source = 'IPA-Maricopa-Cold_2026' where id in (${ids["Nov Phoenix"]}, ${ids["No renewal"]})`);
+// Employees as lists write them ("1,200"), one with none; XMODs over 1, under it, exactly 1, and none.
+for (const [name, employees, xmod] of [["Nov Phoenix", "8", "1.25"], ["Dec Mesa", "1,200", "0.85"], ["Jan Tucson", "45", "1.00"], ["Feb Phoenix", "20", null], ["No renewal", null, "1.50"]]) {
+  sql(`update public.leads set employees = ${employees ? lit(employees) : "null"}, xmod = ${xmod ?? "null"} where id = ${ids[name]}`);
+}
 
 const listWith = async (criteria) => {
   const up = await sean.sb.from("call_list_filters").upsert({ user_id: SEAN, project_id: project, criteria }, { onConflict: "user_id,project_id" });
@@ -83,6 +88,13 @@ try {
   check("developed by", (await listWith({ developer: { values: [String(MIKE)] } })) === names("Nov Phoenix", "Jan Tucson"));
   check("call result", (await listWith({ result: { values: [String(leftMessage)] } })) === names("Jan Tucson"));
   check("the list a name came from (a lead manager's cold lists)", (await listWith({ source: { values: ["ipa-maricopa-cold_2026"] } })) === names("Nov Phoenix", "No renewal"));
+  section("Employees and XMOD");
+  check("employees in a range, a count written with a comma too", (await listWith({ employees: { min: 10, max: 1200 } })) === names("Dec Mesa", "Jan Tucson", "Feb Phoenix"));
+  check("…either end open", (await listWith({ employees: { min: 40 } })) === names("Dec Mesa", "Jan Tucson") && (await listWith({ employees: { max: 20 } })) === names("Nov Phoenix", "Feb Phoenix"));
+  check("…excluded: a name with no count stays", (await listWith({ employees: { min: 10, max: 50, exclude: true } })) === names("Nov Phoenix", "Dec Mesa", "No renewal"));
+  check("XMOD over 1", (await listWith({ xmod: { side: "over" } })) === names("Nov Phoenix", "No renewal"));
+  check("…under 1 (exactly 1, and none, are neither)", (await listWith({ xmod: { side: "under" } })) === names("Dec Mesa"));
+  check("…with the others", (await listWith({ xmod: { side: "over" }, city: { values: ["phoenix"] } })) === names("Nov Phoenix"));
   check("all together: Nov – Jan, in Maricopa, not The Hartford",
     (await listWith({ renewal: { from: "11-01", to: "01-31" }, county: { values: ["maricopa"] }, carrier: { values: ["the hartford"], exclude: true } })) === names("Dec Mesa", "Feb Phoenix"));
 
@@ -114,6 +126,8 @@ try {
     && count("carrier", "the hartford") === 2 && count("year", "2026") === 3 && count("developer", String(MIKE)) === 2
     && o.sic.some((x) => x.value === "1711" && /Plumbing/.test(x.label))
     && o.source?.some((x) => x.label === "IPA-Maricopa-Cold_2026" && x.count === 2), error?.message ?? JSON.stringify(o));
+  check("…how many have an XMOD over 1 and under it", count("xmod", "over") === 2 && count("xmod", "under") === 1, JSON.stringify(o?.xmod));
+  check("…and the fewest and most employees", o?.employees?.[0]?.label === "8–1200" && o.employees[0].count === 4, JSON.stringify(o?.employees));
 } finally {
   sql(`delete from public.call_list_filters where project_id = ${project}`);
   sql(`delete from public.insurance_details where lead_id in (select id from public.leads where project_id = ${project})`);

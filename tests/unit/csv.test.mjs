@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the CSV lead importer. */
-import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, TEMPLATE_HEADERS, cleanValue } from "../../src/lib/csv.js";
+import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, parseDrivers, parseXmod, TEMPLATE_HEADERS, cleanValue } from "../../src/lib/csv.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -127,6 +127,18 @@ check("an email field keeps the first real address", JSON.stringify(["bob@acme.c
   const { rows } = rowsToImport([["Company", "Website", "Email", "City"], ["Acme Plumbing", "no site", "n/a", "Mesa"]]);
   check("…and an imported row leaves them empty", rows[0]?.lead?.website === undefined && rows[0]?.lead?.email === undefined && rows[0]?.lead?.city === "Mesa", JSON.stringify(rows[0]?.lead));
 }
+
+// Drivers and XMOD: numbers in the database, so anything else is left out rather than failing the import.
+check("drivers read as a count", JSON.stringify(["8", "1,200", "", "eight", "-2"].map(parseDrivers)) === JSON.stringify([8, 1200, null, null, null]));
+check("an XMOD read as written", JSON.stringify([".85", "0.85", "1.5", "1.50", "1", "0", "10", "1.234", "n/a"].map(parseXmod)) === JSON.stringify([0.85, 0.85, 1.5, 1.5, 1, null, null, null, null]));
+{
+  const { rows } = rowsToImport([["Company", "Drivers", "XMOD", "Autos"], ["Good Co", "6", ".92", "4"], ["Odd Co", "six", "high", "2"]]);
+  check("…on import, beside Autos", rows[0]?.lead?.drivers === 6 && rows[0]?.lead?.xmod === 0.92 && rows[0]?.lead?.autos === "4", JSON.stringify(rows[0]?.lead));
+  check("…and one that is not a number is left out, the row kept", rows[1]?.lead && !("drivers" in rows[1].lead) && !("xmod" in rows[1].lead), JSON.stringify(rows[1]?.lead));
+  check("an E-Mod or Experience Mod column reads as the XMOD", mapAllHeaders(["E-Mod", "Experience Mod", "Number of Drivers"]).map((t) => t?.column).join(",") === "xmod,xmod,drivers");
+}
+check("the template has Drivers and XMOD after Autos, before Sales Volume",
+  TEMPLATE_HEADERS.slice(TEMPLATE_HEADERS.indexOf("Autos"), TEMPLATE_HEADERS.indexOf("Autos") + 4).join(",") === "Autos,Drivers,XMOD,Sales Volume");
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
 process.exit(failures ? 1 : 0);

@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronDown, X, Loader2, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { FIELDS, MONTHS } from "@/features/explore/criteria";
+import { EMPLOYEE_KEYS, FIELDS, MONTHS, employeesRange } from "@/features/explore/criteria";
 import { cn } from "@/lib/utils";
 import { useReportPending } from "@/components/layout/navigation-progress";
 
@@ -44,9 +44,19 @@ export default function ExploreCriteria({ options, criteria }) {
       for (const f of FIELDS) p.delete(f.key);
       p.delete("zips");
       p.delete("q");
+      for (const k of EMPLOYEE_KEYS) p.delete(k);
     });
 
-  const active = FIELDS.reduce((n, f) => n + (criteria[f.key]?.length ?? 0), 0) + (criteria.zips?.length ?? 0);
+  const employees = employeesRange(criteria);
+  const setEmployees = ({ min, max, exclude }) =>
+    apply((p) => {
+      for (const k of EMPLOYEE_KEYS) p.delete(k);
+      if (min) p.set("emp_min", min);
+      if (max) p.set("emp_max", max);
+      if ((min || max) && exclude) p.set("emp_not", "1");
+    });
+
+  const active = FIELDS.reduce((n, f) => n + (criteria[f.key]?.length ?? 0), 0) + (criteria.zips?.length ?? 0) + (employees ? 1 : 0);
 
   const sourceFor = (field) => (field.options === "months" ? MONTHS : options[field.options] ?? []);
 
@@ -65,6 +75,7 @@ export default function ExploreCriteria({ options, criteria }) {
           />
         ))}
         <ZipInput value={(criteria.zips ?? []).join(", ")} onCommit={(v) => apply((p) => (v ? p.set("zips", v) : p.delete("zips")))} />
+        <EmployeesInput min={criteria.emp_min ?? ""} max={criteria.emp_max ?? ""} exclude={criteria.emp_not === "1"} onCommit={setEmployees} />
 
         <div className="ml-auto flex items-center gap-3">
           {isPending ? <Loader2 className="size-4 animate-spin text-primary" aria-label="Running" /> : null}
@@ -97,6 +108,11 @@ export default function ExploreCriteria({ options, criteria }) {
               <span className="text-muted-foreground">ZIP:</span> {zip}
             </Chip>
           ))}
+          {employees ? (
+            <Chip onRemove={() => setEmployees({})}>
+              <span className="text-muted-foreground">{criteria.emp_not ? "Not employees" : "Employees"}:</span> {employees}
+            </Chip>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -245,6 +261,59 @@ function ZipInput({ value, onCommit }) {
         inputMode="numeric"
         className="h-8 w-44 text-xs"
       />
+    </div>
+  );
+}
+
+/**
+ * Employees (the total) in a range, either end left open: typed, and run on
+ * Enter or leaving the box; Include or Exclude the leads in it.
+ */
+function EmployeesInput({ min, max, exclude, onCommit }) {
+  const [text, setText] = useState({ min, max });
+  useEffect(() => setText({ min, max }), [min, max]);
+  const commit = (next = {}) => {
+    const v = { min: text.min.trim(), max: text.max.trim(), exclude, ...next };
+    if (v.min !== min || v.max !== max || v.exclude !== exclude) onCommit(v);
+  };
+  return (
+    <div data-explore-employees>
+      <span className="eyebrow mb-1 flex items-center gap-2">
+        Employees
+        <span className="inline-flex rounded-md border border-[var(--panel-border)] p-px text-[0.58rem] font-semibold normal-case tracking-normal" role="group" aria-label="Employees: include or exclude">
+          {[[false, "Include"], [true, "Exclude"]].map(([value, label]) => (
+            <button key={label} type="button" aria-pressed={exclude === value} onClick={() => commit({ exclude: value })} data-employees-mode={value ? "exclude" : "include"}
+              className={cn("cursor-pointer rounded px-1.5 leading-4 transition-colors",
+                exclude === value ? (value ? "bg-rose-500/15 text-rose-500" : "bg-primary/15 text-primary") : "text-muted-foreground hover:text-foreground")}>
+              {label}
+            </button>
+          ))}
+        </span>
+      </span>
+      <div className="flex items-center gap-1.5">
+        {["min", "max"].map((end, i) => (
+          <span key={end} className="contents">
+            {i ? <span className="text-xs text-muted-foreground">to</span> : null}
+            <Input
+              value={text[end]}
+              onChange={(e) => setText({ ...text, [end]: e.target.value })}
+              onBlur={() => commit()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  commit();
+                }
+              }}
+              placeholder={end === "min" ? "Min" : "Max"}
+              aria-label={`Employees: ${end === "min" ? "at least" : "at most"}`}
+              data-employees={end}
+              inputMode="numeric"
+              maxLength={9}
+              className="h-8 w-20 text-xs"
+            />
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

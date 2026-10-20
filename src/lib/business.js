@@ -33,10 +33,11 @@ export function employeesLine(l) {
   return [has(l.employees) ? String(l.employees) : null, split ? `(${split})` : null].filter(Boolean).join(" ");
 }
 
-/** "11 · Vans, Delivery trucks · within 100 miles", or null. */
+/** "11 · Vans, Delivery trucks · 8 drivers · within 100 miles", or null. */
 export function autosLine(l) {
   const kinds = (l.auto_types ?? []).map((k) => label(AUTO_TYPES, k)).join(", ");
-  const parts = [has(l.autos) ? String(l.autos) : null, kinds || null, l.travel_radius ? `within ${l.travel_radius} miles` : null].filter(Boolean);
+  const parts = [has(l.autos) ? String(l.autos) : null, kinds || null, has(l.drivers) ? plural(l.drivers, "driver") : null,
+    l.travel_radius ? `within ${l.travel_radius} miles` : null].filter(Boolean);
   return parts.length ? parts.join(" · ") : null;
 }
 
@@ -62,3 +63,6 @@ export function cargoNamesFromText(text) {
 
 /** "Yes", "No", or null for not known: claims in the last three years. */
 export const yesNo = (v) => (v === true ? "Yes" : v === false ? "No" : null);
+
+/** An XMOD to two places, as it is written: "0.85", "1.50"; null for none. */
+export const xmodText = (v) => (has(v) && Number.isFinite(Number(v)) ? Number(v).toFixed(2) : null);

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { updateLead } from "@/features/leads/actions";
-import { AUTO_TYPES, TRAVEL_RADII } from "@/lib/business";
+import { AUTO_TYPES, TRAVEL_RADII, xmodText } from "@/lib/business";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -29,8 +29,8 @@ async function loadSic() {
  * Edit what a business is (the Business tab; Sean, Oct 2026): its name and
  * phone; its locations and the building (owned or leased, its age, stories
  * and acres); employees, full-time and part-time; sub-contractors as a %;
- * autos, their kinds, how far they travel, DOT number and cargo (from the
- * cargo list, `cargoTypes`); sales volume and annual payroll, EIN, years in
+ * autos, their kinds, drivers, how far they travel, DOT number and cargo
+ * (from the cargo list, `cargoTypes`); XMOD; sales volume and annual payroll, EIN, years in
  * business, estimated premium and claims in the last three years,
  * professionals, covered employees; and its SIC code, with what the code
  * means from the SIC list. Only these fields are sent, so nothing else on
@@ -118,6 +118,7 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
             <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-group="autos">
               <legend className="px-1 text-xs font-semibold">Autos</legend>
               {num("autos", "Autos", { max: 6 })}
+              {num("drivers", "Drivers", { max: 6 })}
               <Field label="Travel radius" error={fe("travel_radius")}>
                 <Select name="travel_radius" defaultValue={dv("travel_radius", "") ?? ""} aria-invalid={invalid("travel_radius")}>
                   <option value="">—</option>
@@ -148,6 +149,9 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
               </div>
             </fieldset>
 
+            <Field label="XMOD" error={fe("xmod")} hint="e.g. .85 or 1.50">
+              <Input name="xmod" inputMode="decimal" defaultValue={state?.values ? dv("xmod") : xmodText(lead.xmod) ?? ""} maxLength={4} aria-invalid={invalid("xmod")} />
+            </Field>
             <Field label="Sales volume" error={fe("sales_volume")} hint="e.g. $12.4M">
               <Input name="sales_volume" defaultValue={dv("sales_volume")} maxLength={30} aria-invalid={invalid("sales_volume")} />
             </Field>

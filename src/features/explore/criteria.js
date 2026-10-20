@@ -1,7 +1,9 @@
 // The explorer's criteria live in the URL as comma-separated lists —
-//   /explore?sic=1711&zips=85018,85016&months=7
+//   /explore?sic=1711&zips=85018,85016&months=7&emp_min=10&emp_max=50
 // so a question worth asking twice can be bookmarked, and a list someone
 // wants can be sent as a link rather than exported and emailed.
+
+import { employeeCount, employeesRangeLabel } from "@/lib/call-list-filter";
 
 export const MONTHS = [
   { value: "1", label: "January" }, { value: "2", label: "February" }, { value: "3", label: "March" },
@@ -30,6 +32,9 @@ export const FIELDS = [
 
 const LIST_KEYS = FIELDS.map((f) => f.key);
 
+/** The employees range's keys in the URL: its ends, and "1" to exclude it. */
+export const EMPLOYEE_KEYS = ["emp_min", "emp_max", "emp_not"];
+
 // Keys whose values are numbers in the database. Anything else typed into
 // the URL is dropped here rather than reaching Postgres as a cast error.
 // (Carriers are named by carrier_key(), "the hartford"; an old link's
@@ -52,6 +57,10 @@ const list = (key, v) =>
     ),
   ].slice(0, 50);
 
+/** The employees range in words ("10 – 50", "10 or more"), or "" for none. */
+export const employeesRange = (criteria) =>
+  employeesRangeLabel({ min: employeeCount(criteria.emp_min) ?? undefined, max: employeeCount(criteria.emp_max) ?? undefined });
+
 /** Read the criteria out of a page's searchParams. */
 export function readCriteria(sp) {
   const criteria = {};
@@ -66,6 +75,14 @@ export function readCriteria(sp) {
     .filter((z) => /^\d{5}$/.test(z))
     .slice(0, 100);
   if (zips.length) criteria.zips = [...new Set(zips)];
+
+  // Employees (the total) in a range, either end open, or not in it.
+  let min = employeeCount(sp?.emp_min);
+  let max = employeeCount(sp?.emp_max);
+  if (min !== null && max !== null && min > max) [min, max] = [max, min];
+  if (min !== null) criteria.emp_min = String(min);
+  if (max !== null) criteria.emp_max = String(max);
+  if ((min !== null || max !== null) && sp?.emp_not === "1") criteria.emp_not = "1";
 
   const q = String(sp?.q ?? "").trim().slice(0, 100);
   if (q) criteria.q = q;
@@ -100,6 +117,8 @@ export function describe(criteria, options) {
     if (values?.length) parts.push(`${field.label.toLowerCase()}: ${values.map((v) => labelFor(field, v)).join(", ")}`);
   }
   if (criteria.zips?.length) parts.push(`ZIP: ${criteria.zips.join(", ")}`);
+  const employees = employeesRange(criteria);
+  if (employees) parts.push(`${criteria.emp_not ? "not employees" : "employees"}: ${employees}`);
   if (criteria.q) parts.push(`matching “${criteria.q}”`);
   return parts.join(" · ");
 }

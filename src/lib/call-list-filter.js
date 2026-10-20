@@ -5,7 +5,9 @@
  * functions, shared by the page, the form and the action.
  *
  *   { renewal: { from: "11-01", to: "01-31", line?: "wc", exclude },
- *     city: { values: ["phoenix"], exclude }, … }
+ *     city: { values: ["phoenix"], exclude }, …,
+ *     employees: { min?: 10, max?: 50, exclude },   (the total, either end open)
+ *     xmod: { side: "over" | "under" } }             (XMOD over or under 1)
  */
 
 import { POLICY_LINES } from "./coverage.js";
@@ -32,6 +34,29 @@ export const FILTER_FIELDS = [
   { key: "result", label: "Call result", not: "Not call result" },
   { key: "source", label: "List source", not: "Not list source" },
 ];
+
+/** XMOD over 1 (paying more for work comp) or under it. */
+export const XMOD_SIDES = [
+  { key: "over", label: "Over 1.00" },
+  { key: "under", label: "Under 1.00" },
+];
+
+/** The most employees a range can name. */
+export const EMPLOYEES_MAX = 1000000;
+
+/** A whole number of employees (0 – EMPLOYEES_MAX) from what was typed ("1,200"), or null. */
+export function employeeCount(v) {
+  const s = String(v ?? "").replace(/[\s,]/g, "");
+  return /^\d{1,7}$/.test(s) && Number(s) <= EMPLOYEES_MAX ? Number(s) : null;
+}
+
+/** "10 – 50", "10 or more", "Up to 50". */
+export function employeesRangeLabel({ min, max } = {}) {
+  const has = (v) => typeof v === "number";
+  if (has(min) && has(max)) return min === max ? String(min) : `${min.toLocaleString()} – ${max.toLocaleString()}`;
+  if (has(min)) return `${min.toLocaleString()} or more`;
+  return has(max) ? `Up to ${max.toLocaleString()}` : "";
+}
 
 const pad = (n) => String(n).padStart(2, "0");
 /** "MM-DD" for a month (1-12) and day, or null when there is no such day. */
@@ -75,6 +100,16 @@ export function cleanCriteria(raw) {
       : [];
     if (values.length) out[key] = { values, exclude: c[key].exclude === true };
   }
+  // A range of employees, the ends the right way round; neither end is no criterion.
+  let min = employeeCount(c.employees?.min);
+  let max = employeeCount(c.employees?.max);
+  if (min !== null && max !== null && min > max) [min, max] = [max, min];
+  if (min !== null || max !== null) {
+    out.employees = { exclude: c.employees.exclude === true };
+    if (min !== null) out.employees.min = min;
+    if (max !== null) out.employees.max = max;
+  }
+  if (XMOD_SIDES.some((s) => s.key === c.xmod?.side)) out.xmod = { side: c.xmod.side };
   return out;
 }
 
@@ -83,7 +118,8 @@ export const criteriaCount = (c) => Object.keys(cleanCriteria(c)).length;
 
 /**
  * The filter in words, one phrase per criterion: "Renews Nov 1 – Jan 31",
- * "City: Phoenix, Mesa", "Not carrier: Hartford". `options` give the labels.
+ * "City: Phoenix, Mesa", "Not carrier: Hartford", "Employees: 10 – 50",
+ * "XMOD over 1.00". `options` give the labels.
  */
 export function describeCriteria(c, options = {}) {
   const clean = cleanCriteria(c);
@@ -100,5 +136,9 @@ export function describeCriteria(c, options = {}) {
     const shown = names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", ");
     out.push({ key, text: `${f.exclude ? not : label}: ${shown}`, exclude: f.exclude });
   }
+  if (clean.employees) {
+    out.push({ key: "employees", text: `${clean.employees.exclude ? "Not employees" : "Employees"}: ${employeesRangeLabel(clean.employees)}`, exclude: clean.employees.exclude });
+  }
+  if (clean.xmod) out.push({ key: "xmod", text: `XMOD ${clean.xmod.side} 1.00`, exclude: false });
   return out;
 }

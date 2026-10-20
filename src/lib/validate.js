@@ -239,6 +239,9 @@ export const schemas = {
     employees_part_time: [int({ min: 0, max: 1000000 })],
     subcontractors_pct: [num({ min: 0, max: 100 })],
     travel_radius: [oneOf(["25", "50", "100", "250", "300", "500+"])],
+    drivers: [int({ min: 0, max: 100000 })],
+    // The experience MOD on work comp, as written: .85, 1.50.
+    xmod: [rules.custom((v) => (!v || (/^(\d?\.\d{1,2}|\d(\.\d{0,2})?)$/.test(String(v).trim()) && Number(v) > 0) ? null : "An XMOD is a number like .85 or 1.50"))],
     professionals: [int({ min: 0, max: 1000000 })],
     sales_volume: [max(30)],
     annual_payroll: [max(30)],

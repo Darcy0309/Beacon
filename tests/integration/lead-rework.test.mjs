@@ -56,6 +56,10 @@ try {
   check("annual payroll, DOT#, cargo and claims in the last 3 years are saved", !more.error && more.data.annual_payroll === "$1.2M"
     && more.data.dot_number === "1234567" && more.data.cargo === `${TAG} Lumber` && more.data.claims_3yrs === false, more.error?.message);
   check("a DOT# that is not digits is refused", Boolean((await sean.sb.from("leads").update({ dot_number: "12-AB" }).eq("id", L)).error));
+  const dx = await sean.sb.from("leads").update({ drivers: 6, xmod: 1.5 }).eq("id", L).select("drivers, xmod").single();
+  check("drivers and the XMOD are saved", !dx.error && dx.data.drivers === 6 && Number(dx.data.xmod) === 1.5 && sql(`select xmod from public.leads where id = ${L}`) === "1.50", dx.error?.message);
+  check("…an XMOD of 0 or 10 and over is refused", Boolean((await sean.sb.from("leads").update({ xmod: 0 }).eq("id", L)).error) && Boolean((await sean.sb.from("leads").update({ xmod: 12 }).eq("id", L)).error));
+  check("…and so are negative drivers", Boolean((await sean.sb.from("leads").update({ drivers: -1 }).eq("id", L)).error));
 
   section("The cargo list");
   const added = await admin.sb.from("cargo_types").insert([{ name: `${TAG} Lumber` }, { name: `${TAG} Steel` }]).select("id, name");

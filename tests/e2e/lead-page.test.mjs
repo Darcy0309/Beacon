@@ -92,6 +92,10 @@ try {
   await sean.fill('[data-business-form] input[name="autos"]', "11");
   await sean.ev(`document.querySelectorAll('[data-business-form] input[name="auto_types"][value="vans"], [data-business-form] input[name="auto_types"][value="delivery_trucks"]').forEach((c) => c.click())`);
   await sean.fill('[data-business-form] select[name="travel_radius"]', "100");
+  const autosOrder = await sean.ev(`[...document.querySelectorAll('[data-business-form] [data-group="autos"] [name]')].map((e) => e.name).filter((n) => n !== "auto_types").join(",")`);
+  check("Drivers comes before Travel radius in Autos", autosOrder.startsWith("autos,drivers,travel_radius"), autosOrder);
+  await sean.fill('[data-business-form] input[name="drivers"]', "8");
+  await sean.fill('[data-business-form] input[name="xmod"]', ".85");
   const cargoChoices = await sean.ev(`[...document.querySelectorAll('[data-business-form] select[name="cargo"] option')].map((o) => o.value)`);
   check("Cargo picks from the cargo list", cargoChoices.includes(`${TAG} Lumber`) && cargoChoices.includes(`${TAG} Steel, coiled`) && !cargoChoices.includes(`${TAG} Livestock`), JSON.stringify(cargoChoices));
   await sean.fill('[data-business-form] select[name="cargo"]', `${TAG} Steel, coiled`);
@@ -102,6 +106,7 @@ try {
   await sean.click("[data-business-form] button[type=submit]");
   check("its details are saved", Boolean(await until(() => sql(`select location_ownership || '|' || building_acres || '|' || employees_full_time || '|' || array_to_string(auto_types, ',') || '|' || travel_radius from public.leads where id = ${lead}`)
     === "lease|1.50|15|vans,delivery_trucks|100")));
+  check("…with the drivers and the XMOD", sql(`select drivers || '|' || xmod from public.leads where id = ${lead}`) === "8|0.85");
   check("…with the DOT# (its digits), cargo, annual payroll and claims", sql(`select dot_number || '|' || cargo || '|' || annual_payroll || '|' || claims_3yrs from public.leads where id = ${lead}`)
     === `1234567|${TAG} Steel, coiled|$1.2M|true`);
   const rows = await until(async () => {
@@ -109,17 +114,17 @@ try {
     return /Lease/.test(r?.Locations ?? "") ? r : null;
   });
   check("…and read as one line each", rows?.Locations === "2 · Lease · 15 years old, 2 stories, 1.5 acres" && rows.Employees === "20 (15 full-time, 5 part-time)"
-    && rows["Sub-contractors"] === "10%" && rows.Autos === "11 · Vans, Delivery trucks · within 100 miles", JSON.stringify(rows));
+    && rows["Sub-contractors"] === "10%" && rows.Autos === "11 · Vans, Delivery trucks · 8 drivers · within 100 miles", JSON.stringify(rows));
   check("…with no county (it is on Prospect Info)", rows && !("County" in rows));
   check("…and the new ones in their places", rows?.["DOT#"] === "1234567" && rows.Cargo === `${TAG} Steel, coiled` && rows["Annual payroll"] === "$1.2M" && rows["Claims last 3 yrs"] === "Yes"
-    && Object.keys(rows).join(",").includes("Autos,DOT#,Cargo,Sales volume,Annual payroll") && Object.keys(rows).join(",").includes("Est. annual premium,Claims last 3 yrs"), JSON.stringify(Object.keys(rows ?? {})));
+    && rows.XMOD === "0.85" && Object.keys(rows).join(",").includes("Autos,DOT#,Cargo,XMOD,Sales volume,Annual payroll") && Object.keys(rows).join(",").includes("Est. annual premium,Claims last 3 yrs"), JSON.stringify(Object.keys(rows ?? {})));
   await shot("lead-page");
 
   section("Print");
   const printed = await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie } });
   const html = await printed.text();
   check("Print gives the lead sheet the client gets, and opens the print dialog", printed.status === 200 && /Lead sheet/i.test(html) && html.includes(`${TAG} Medford Knife and Tool`)
-    && html.includes("print()") && html.includes("20 (15 full-time, 5 part-time)") && html.includes("1234567") && html.includes("Claims last 3 yrs"), `${printed.status} ${html.slice(0, 120)}`);
+    && html.includes("print()") && html.includes("20 (15 full-time, 5 part-time)") && html.includes("1234567") && html.includes("Claims last 3 yrs") && html.includes("8 drivers") && /XMOD[\s\S]{0,200}0\.85/.test(html), `${printed.status} ${html.slice(0, 120)}`);
   check("…not to someone signed out", (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { redirect: "manual" })).status !== 200);
 
   section("Policy Files");

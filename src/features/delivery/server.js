@@ -12,7 +12,7 @@ import { isMailbox, mailFailure, isReservedAddress, oneLine } from "@/lib/email"
 import { APPOINTMENT_NOTICES, deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet, sendsSheet } from "@/lib/delivery";
 import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links";
 import { fileSize, fullName, sicLabel } from "@/lib/format";
-import { autosLine, employeesLine, locationsLine, subcontractorsLine, yesNo } from "@/lib/business";
+import { autosLine, employeesLine, locationsLine, subcontractorsLine, xmodText, yesNo } from "@/lib/business";
 import { infoProjectOf, producerAddresses } from "@/lib/project-info";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { LINK_DAYS, sheetToken } from "@/lib/server/sheet-link";
@@ -42,7 +42,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       address, city, state, zip, website, fax, producer_name, list_source,
       location, employees, autos, sales_volume, ein, years_in_business, sic_code, estimated_annual_premium, description, client_note,
       professionals, covered_employees, location_ownership, building_age, building_stories, building_acres,
-      employees_full_time, employees_part_time, subcontractors_pct, auto_types, travel_radius, annual_payroll, dot_number, cargo, claims_3yrs,
+      employees_full_time, employees_part_time, subcontractors_pct, auto_types, drivers, travel_radius, xmod, annual_payroll, dot_number, cargo, claims_3yrs,
       project_id, insurance:insurance_details(*),
       assigned:users!leads_assigned_user_id_fkey(first_name, last_name, email)`)
     .eq("id", leadId)
@@ -122,7 +122,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       // What the Business tab holds, as it reads there.
       ["Locations", locationsLine(lead)], ["Employees", employeesLine(lead)], ["Sub-contractors", subcontractorsLine(lead)],
       ["Autos", autosLine(lead)], ["DOT#", lead.dot_number], ["Cargo", lead.cargo],
-      ["Sales volume", lead.sales_volume], ["Annual payroll", lead.annual_payroll],
+      ["XMOD", xmodText(lead.xmod)], ["Sales volume", lead.sales_volume], ["Annual payroll", lead.annual_payroll],
       ["EIN", lead.ein], ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
       ["Est. premium", lead.estimated_annual_premium], ["Claims last 3 yrs", yesNo(lead.claims_3yrs)],
       ["Professionals", lead.professionals], ["Covered employees", lead.covered_employees],

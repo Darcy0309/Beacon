@@ -13,7 +13,7 @@ const LEAD_COLUMNS = `id, company_name, contact_name, contact_title, phone, cont
   decision_maker, dm_title, dm_phone, dm_mobile, dm_email,
   contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email,
   address, city, state, zip, county, territory,
-  sic_code, description, employees, autos, sales_volume, location, ein, years_in_business, estimated_annual_premium,
+  sic_code, description, employees, autos, drivers, xmod, sales_volume, location, ein, years_in_business, estimated_annual_premium,
   producer_name, list_source, call_result_dbdv, call_result_appt, client_note,
   result:call_results(name, project_type),
   insurance:insurance_details(agency_name, agency_years, ultimate_xdate, pkg_xdate, pkg_carrier, wc_xdate, wc_carrier, auto_xdate, auto_carrier,

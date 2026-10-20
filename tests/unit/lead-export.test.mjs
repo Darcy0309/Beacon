@@ -18,7 +18,7 @@ const lead = {
   fax: "480-823-1987", website: "parkviewwash.example", decision_maker: "Dana \"DJ\" Jones", dm_title: "GM", dm_phone: "480-823-1990", dm_mobile: "480-823-1991", dm_email: "dana@parkview.example",
   contact2_name: "Lee", contact2_title: "Bookkeeper", contact2_phone: "480-823-1992", contact2_mobile: "480-823-1993", contact2_email: "lee@parkview.example",
   address: "16827 E Parkview Ave", city: "Fountain Hills", state: "AZ", zip: "85268", county: "Maricopa", territory: "East Valley",
-  sic_code: "7542", description: "Two tunnels", employees: "14", autos: "3", sales_volume: "$2.1M", location: "2", ein: "98-7654321", years_in_business: "12", estimated_annual_premium: "18000",
+  sic_code: "7542", description: "Two tunnels", employees: "14", autos: "3", drivers: 4, xmod: 1.5, sales_volume: "$2.1M", location: "2", ein: "98-7654321", years_in_business: "12", estimated_annual_premium: "18000",
   producer_name: "Jeff McDonald", list_source: "IPA-CarWash_MaricopaAZ_June2026", call_result_dbdv: "Lead", call_result_appt: "Lead-No Contact",
   client_note: "Appt set with Sean.\nBring the loss runs.",
 };
@@ -29,6 +29,9 @@ const row = { lead, insurance, note: "-10/9/26 mike: left vm\n10/12/26 mike: set
 
 const cells = exportCells(row);
 const at = (h) => cells[EXPORT_HEADERS.indexOf(h)];
+check("Drivers and XMOD sit after Autos, before Sales Volume, the XMOD to two places",
+  EXPORT_HEADERS.indexOf("Drivers") === EXPORT_HEADERS.indexOf("Autos") + 1 && EXPORT_HEADERS.indexOf("XMOD") === EXPORT_HEADERS.indexOf("Drivers") + 1
+    && EXPORT_HEADERS.indexOf("Sales Volume") === EXPORT_HEADERS.indexOf("XMOD") + 1 && at("Drivers") === 4 && at("XMOD") === "1.50", `${at("Drivers")} ${at("XMOD")}`);
 check("one value for each column", cells.length === EXPORT_HEADERS.length);
 check("dates are written as the lists write them", at("Ultimate XDate") === "3/1/2027" && at("Work Comp XDate") === "8/17/2027" && at("Appointment Date") === "10/20/2026" && at("Health XDate") === "");
 check("the call result is where the lead stands now; the other column keeps what it had", at("Call Result Appt") === "Appointment-Phone" && at("Call Result DBDV") === "Lead");

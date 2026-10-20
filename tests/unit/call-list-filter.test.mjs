@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for a call list's filter: windows of the year, cleaning what is saved, and the filter in words. */
-import { cleanCriteria, criteriaCount, describeCriteria, monthDay, monthDayLabel, monthWindow, renewsIn } from "../../src/lib/call-list-filter.js";
+import { cleanCriteria, criteriaCount, describeCriteria, employeeCount, monthDay, monthDayLabel, monthWindow, renewsIn } from "../../src/lib/call-list-filter.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -50,6 +50,20 @@ is("a window on one policy line keeps it, and says so",
 is("…a line that is not one means any line", cleanCriteria({ renewal: { from: "12-01", to: "12-31", line: "boats" } }).renewal.line, undefined);
 is("the list a name came from, included or not", describeCriteria({ source: { values: ["ipa-maricopa"], exclude: true } }, { source: [{ value: "ipa-maricopa", label: "IPA-Maricopa" }] })[0].text, "Not list source: IPA-Maricopa");
 is("…a long list shortened", describeCriteria({ zip: { values: ["85001", "85002", "85003", "85004", "85005"] } })[0].text, "ZIP code: 85001, 85002, 85003 +2");
+
+// --- employees and XMOD -----------------------------------------------------------
+is("a count of employees as typed", ["1,200", " 15 ", "10-19", "", "abc", "99999999"].map(employeeCount), [1200, 15, null, null, null, null]);
+is("a range of employees, either end open, kept as numbers",
+  [cleanCriteria({ employees: { min: "10", max: "50" } }).employees, cleanCriteria({ employees: { min: "25", exclude: true } }).employees, cleanCriteria({ employees: { max: 100 } }).employees],
+  [{ exclude: false, min: 10, max: 50 }, { exclude: true, min: 25 }, { exclude: false, max: 100 }]);
+is("…the ends put the right way round", cleanCriteria({ employees: { min: 50, max: 10 } }).employees, { exclude: false, min: 10, max: 50 });
+is("…neither end is no criterion", cleanCriteria({ employees: { min: "", max: "x", exclude: true } }), {});
+is("XMOD over or under 1, nothing else", [cleanCriteria({ xmod: { side: "over" } }), cleanCriteria({ xmod: { side: "under" } }), cleanCriteria({ xmod: { side: "1" } })],
+  [{ xmod: { side: "over" } }, { xmod: { side: "under" } }, {}]);
+is("…both in words",
+  describeCriteria({ employees: { min: 10, max: 1500 }, xmod: { side: "over" } }).map((d) => d.text).concat(
+    describeCriteria({ employees: { min: 25, exclude: true } }).map((d) => d.text), describeCriteria({ employees: { max: 9 } }).map((d) => d.text)),
+  ["Employees: 10 – 1,500", "XMOD over 1.00", "Not employees: 25 or more", "Employees: Up to 9"]);
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`);

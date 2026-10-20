@@ -6,6 +6,7 @@
  */
 
 import { TEMPLATE_HEADERS } from "./csv.js";
+import { xmodText } from "./business.js";
 
 /** A date (YYYY-MM-DD…) as the lists write it: 8/17/2026. Blank for none. */
 const usDate = (d) => {
@@ -53,6 +54,8 @@ const TEMPLATE_VALUES = {
   "SIC Description": (r) => r.sicDescription,
   "Employees": (r) => r.lead.employees,
   "Autos": (r) => r.lead.autos,
+  "Drivers": (r) => r.lead.drivers,
+  "XMOD": (r) => xmodText(r.lead.xmod),
   "Sales Volume": (r) => r.lead.sales_volume,
   "Locations": (r) => r.lead.location,
   "EIN": (r) => r.lead.ein,

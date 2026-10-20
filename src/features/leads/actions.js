@@ -67,7 +67,10 @@ function leadPayload(formData) {
     employees_part_time: n(formData, "employees_part_time"),
     subcontractors_pct: n(formData, "subcontractors_pct"),
     auto_types: autoTypes(formData),
+    drivers: n(formData, "drivers"),
     travel_radius: s(formData, "travel_radius"),
+    // ".85" or "1.50": kept as a number, shown to two places.
+    xmod: n(formData, "xmod"),
     annual_payroll: s(formData, "annual_payroll"),
     // "DOT# 1234567" or "1,234,567": the digits.
     dot_number: s(formData, "dot_number")?.replace(/\D/g, "") || null,
