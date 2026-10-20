@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { getWorkProjects, getFollowUps } from "@/features/work/queries";
 import { getCurrentUser } from "@/lib/server/session";
+import ProjectInfoGlance from "@/features/project-info/components/project-info-glance";
 
 export const dynamic = "force-dynamic";
 
@@ -58,14 +59,25 @@ export default async function WorkPage() {
             <ul className="divide-y divide-[var(--panel-border)]">
               {followUps.map((f) => (
                 <li key={f.id} data-list-row>
-                  <Link href={`/leads/${f.leadId}?project=${f.projectId}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 transition-colors hover:bg-muted/40">
+                  {/* The company and who to call; then the project, its time zone, when it was set and when it is (Sean, Oct 2026). */}
+                  <Link href={`/leads/${f.leadId}?project=${f.projectId}`}
+                    className="grid grid-cols-1 items-center gap-x-4 gap-y-1 px-5 py-3 transition-colors hover:bg-muted/40 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.4fr)_6.5rem_6.5rem_minmax(0,1fr)_auto]">
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{f.company}</span>
                       <span className="text-xs text-muted-foreground">{f.contact} · <span className="tabular-nums">{f.phone}</span></span>
                     </span>
-                    <span className="flex items-center gap-3 text-xs">
-                      <span className="tabular-nums">{f.when}</span>
-                      {f.qa === "pending" ? <ToneBadge tone="amber">QA pending</ToneBadge> : f.qa === "failed" ? <ToneBadge tone="rose">QA failed</ToneBadge> : <ToneBadge tone="emerald">QA passed</ToneBadge>}
+                    <span className="min-w-0 truncate text-xs" data-follow-up-project title={f.project}>
+                      <span className="text-muted-foreground lg:hidden">Project: </span>{f.project}
+                    </span>
+                    <span className="text-xs text-muted-foreground" data-follow-up-zone>{f.timezone ?? "—"}</span>
+                    <span className="text-xs tabular-nums" data-follow-up-set>
+                      <span className="block text-[0.66rem] text-muted-foreground">Set</span>{f.setOn ?? "—"}
+                    </span>
+                    <span className="text-xs tabular-nums" data-follow-up-when>
+                      <span className="block text-[0.66rem] text-muted-foreground">Appointment</span>{f.when}
+                    </span>
+                    <span className="flex items-center gap-3 text-xs lg:justify-end">
+                      <ToneBadge tone="amber"><span data-to-confirm>To Confirm</span></ToneBadge>
                       <ArrowRight className="size-3.5 text-muted-foreground" />
                     </span>
                   </Link>
@@ -78,7 +90,7 @@ export default async function WorkPage() {
         <Card>
           <SectionHeader label="Projects" icon={FolderKanban} />
           <FilterTable
-            columns={["Project", "Client", "Type", "Time zone", "State", "Last worked", { label: admin ? "Left (all reps)" : "Names left", className: "text-right" }, { label: "", className: "text-right" }]}
+            columns={["Project", "Client", "Type", "Time zone", "State", "Last worked", "Project Info", { label: admin ? "Left (all reps)" : "Names left", className: "text-right" }, { label: "", className: "text-right" }]}
             filters={[
               { key: "state", label: "State" },
               { key: "timezone", label: "Time zone" },
@@ -102,6 +114,8 @@ export default async function WorkPage() {
                   <TableCell className="text-muted-foreground">{p.timezone}</TableCell>
                   <TableCell className="text-muted-foreground">{p.state}</TableCell>
                   <TableCell className={p.lastWorkedAt ? "" : "text-muted-foreground"}>{p.lastWorked}</TableCell>
+                  {/* A quick look at what the client wants, before filtering the list (Sean, Oct 2026). */}
+                  <TableCell><ProjectInfoGlance projectId={p.id} name={p.name} /></TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">
                     {(admin ? p.namesLeftAll : p.namesLeft).toLocaleString()}
                   </TableCell>

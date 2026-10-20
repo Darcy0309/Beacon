@@ -21,6 +21,18 @@ import { carrierNames, infoByLink, keptCarriers, loadProjectInfo, readInfoForm, 
 
 const NOT_YOURS = "Only an administrator or the client can change Project Info.";
 
+/**
+ * A project's Project Info to glance at (a manager's My Projects, Sean, Oct
+ * 2026): read when asked, not with the page. Row Level Security decides
+ * whether it is theirs to see.
+ */
+export async function glanceProjectInfo(formData) {
+  const projectId = idFrom(formData, "project_id");
+  if (!projectId) return fail("That project no longer exists.");
+  const info = await loadProjectInfo(await createClient(), projectId);
+  return info ? ok(info) : fail("No Project Info to show for this project.");
+}
+
 /** Pages that show a project's Project Info, fresh after a change. */
 function refresh(projectId) {
   revalidatePath(`/projects/${projectId}`);

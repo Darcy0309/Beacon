@@ -138,10 +138,14 @@ export async function getNextOnList(projectId, except = []) {
 export async function getFollowUps({ projectId } = {}) {
   const me = await getCurrentUser();
   if (!me) return [];
-  const supabase = await createClient();
+  const [supabase, tz] = await Promise.all([createClient(), getBusinessTimeZone()]);
+  // With the project it was set on (else where it goes), its time zone, and when it was set (Sean, Oct 2026).
   let q = supabase
     .from("appointments")
-    .select("id, appt_date, appt_time, qa_status, set_project_id, lead:leads(id, company_name, contact_name, phone, project_id)")
+    .select(`id, appt_date, appt_time, qa_status, set_project_id, created_at,
+      lead:leads(id, company_name, contact_name, phone, project_id),
+      setOn:projects!appointments_set_project_id_fkey(id, name, timezone:timezones(name)),
+      goesTo:projects!appointments_project_id_fkey(id, name, timezone:timezones(name))`)
     .eq("user_id", me.id)
     .is("confirmed_at", null)
     .is("invalid_at", null)
@@ -151,17 +155,23 @@ export async function getFollowUps({ projectId } = {}) {
   if (projectId) q = q.eq("set_project_id", Number(projectId));
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []).map((a) => ({
+  return (data ?? []).map((a) => {
+    const project = a.setOn ?? a.goesTo;
+    return {
     id: a.id,
     leadId: a.lead?.id,
     projectId: a.lead?.project_id,
+    project: project?.name ?? "—",
+    timezone: project?.timezone?.name ?? null,
+    setOn: a.created_at ? shortDate(todayIn(tz, new Date(a.created_at))) : null,
     company: a.lead?.company_name ?? "—",
     contact: a.lead?.contact_name ?? "—",
     phone: a.lead?.phone ?? "—",
     when: `${shortDate(a.appt_date)}${a.appt_time ? ` · ${a.appt_time}` : ""}`,
     date: a.appt_date,
     qa: a.qa_status ?? "passed",
-  }));
+    };
+  });
 }
 
 /** Every call result, in the order the client listed them. Cached per request. */
