@@ -970,54 +970,69 @@ html[data-navigating] body { cursor: progress; }
   --wp-nebula: radial-gradient(55% 45% at 20% 25%, #1c2a70 0%, transparent 60%), radial-gradient(50% 45% at 82% 18%, #4b1c6e 0%, transparent 60%), radial-gradient(60% 50% at 60% 92%, #0e4864 0%, transparent 62%), #070915;
   --wp-signature: radial-gradient(75% 60% at 0% 0%, #15314f 0%, transparent 62%), radial-gradient(75% 60% at 100% 100%, #34173f 0%, transparent 62%), linear-gradient(135deg, #0a0e18 0%, #0d0a16 100%);
 }
-.phone-screen[data-wallpaper="mist"], .wallpaper-swatch[data-wallpaper="mist"], html[data-wallpaper="mist"] body { background: var(--wp-mist); }
-.phone-screen[data-wallpaper="dawn"], .wallpaper-swatch[data-wallpaper="dawn"], html[data-wallpaper="dawn"] body { background: var(--wp-dawn); }
-.phone-screen[data-wallpaper="lagoon"], .wallpaper-swatch[data-wallpaper="lagoon"], html[data-wallpaper="lagoon"] body { background: var(--wp-lagoon); }
-.phone-screen[data-wallpaper="orchid"], .wallpaper-swatch[data-wallpaper="orchid"], html[data-wallpaper="orchid"] body { background: var(--wp-orchid); }
-.phone-screen[data-wallpaper="meadow"], .wallpaper-swatch[data-wallpaper="meadow"], html[data-wallpaper="meadow"] body { background: var(--wp-meadow); }
-.phone-screen[data-wallpaper="ember"], .wallpaper-swatch[data-wallpaper="ember"], html[data-wallpaper="ember"] body { background: var(--wp-ember); }
-.phone-screen[data-wallpaper="nebula"], .wallpaper-swatch[data-wallpaper="nebula"], html[data-wallpaper="nebula"] body { background: var(--wp-nebula); }
-.phone-screen[data-wallpaper="signature"], .wallpaper-swatch[data-wallpaper="signature"], html[data-wallpaper="signature"] body { background: var(--wp-signature); }
+.phone-screen[data-wallpaper="mist"], .wallpaper-swatch[data-wallpaper="mist"], html[data-wallpaper="mist"] body::before { background: var(--wp-mist); }
+.phone-screen[data-wallpaper="dawn"], .wallpaper-swatch[data-wallpaper="dawn"], html[data-wallpaper="dawn"] body::before { background: var(--wp-dawn); }
+.phone-screen[data-wallpaper="lagoon"], .wallpaper-swatch[data-wallpaper="lagoon"], html[data-wallpaper="lagoon"] body::before { background: var(--wp-lagoon); }
+.phone-screen[data-wallpaper="orchid"], .wallpaper-swatch[data-wallpaper="orchid"], html[data-wallpaper="orchid"] body::before { background: var(--wp-orchid); }
+.phone-screen[data-wallpaper="meadow"], .wallpaper-swatch[data-wallpaper="meadow"], html[data-wallpaper="meadow"] body::before { background: var(--wp-meadow); }
+.phone-screen[data-wallpaper="ember"], .wallpaper-swatch[data-wallpaper="ember"], html[data-wallpaper="ember"] body::before { background: var(--wp-ember); }
+.phone-screen[data-wallpaper="nebula"], .wallpaper-swatch[data-wallpaper="nebula"], html[data-wallpaper="nebula"] body::before { background: var(--wp-nebula); }
+.phone-screen[data-wallpaper="signature"], .wallpaper-swatch[data-wallpaper="signature"], html[data-wallpaper="signature"] body::before { background: var(--wp-signature); }
 /* The photographs (public/wallpapers): covering the screen behind the workspace, softened a
    touch by the theme so text and cards read on them; each swatch its own small copy. */
 :root { --wp-photo-veil: rgb(255 255 255 / 0.18); }
 .dark { --wp-photo-veil: rgb(5 8 16 / 0.42); }
-html[data-wallpaper="photo-fjord"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/fjord.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-fjord"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/fjord.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-fjord"] { background: url("/wallpapers/fjord-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-canyon"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/canyon.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-canyon"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/canyon.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-canyon"] { background: url("/wallpapers/canyon-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-highlands"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/highlands.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-highlands"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/highlands.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-highlands"] { background: url("/wallpapers/highlands-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-northern-lights"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/northern-lights.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-northern-lights"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/northern-lights.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-northern-lights"] { background: url("/wallpapers/northern-lights-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-alpine"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/alpine.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-alpine"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/alpine.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-alpine"] { background: url("/wallpapers/alpine-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-valley"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/valley.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-valley"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/valley.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-valley"] { background: url("/wallpapers/valley-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-coast"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/coast.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-coast"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/coast.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-coast"] { background: url("/wallpapers/coast-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-city"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/city.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-city"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/city.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-city"] { background: url("/wallpapers/city-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-sunset"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/sunset.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-sunset"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/sunset.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-sunset"] { background: url("/wallpapers/sunset-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-dunes"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/dunes.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-dunes"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/dunes.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="photo-dunes"] { background: url("/wallpapers/dunes-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-lake"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/lake.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-lake"] { background: url("/wallpapers/lake-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-golden-field"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/golden-field.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-golden-field"] { background: url("/wallpapers/golden-field-thumb.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="plain"], .wallpaper-swatch[data-wallpaper="classic"] { background: var(--background); }
 /* An uploaded picture (Appearance): covering the screen, softened by the theme a little so
    text and cards read on any photo. */
 :root { --wp-veil: rgb(255 255 255 / 0.35); }
 .dark { --wp-veil: rgb(5 8 16 / 0.55); }
-html[data-wallpaper="custom"] body { background: linear-gradient(var(--wp-veil), var(--wp-veil)), var(--wp-image) center / cover no-repeat; }
+html[data-wallpaper="custom"] body::before { background: linear-gradient(var(--wp-veil), var(--wp-veil)), var(--wp-image) center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="custom"] { background: var(--wp-image-swatch, var(--muted)) center / cover no-repeat; }
 /* The live wallpapers' swatches: a still of each (live-wallpaper.jsx draws them). */
 .wallpaper-swatch[data-wallpaper="live-constellation"] { background: radial-gradient(circle at 25% 30%, var(--primary) 0 1.5px, transparent 2px), radial-gradient(circle at 70% 55%, var(--primary) 0 1.5px, transparent 2px), radial-gradient(circle at 45% 75%, var(--primary) 0 1.5px, transparent 2px), linear-gradient(35deg, transparent 48%, color-mix(in oklab, var(--primary) 35%, transparent) 49% 51%, transparent 52%), var(--background); }
 .wallpaper-swatch[data-wallpaper="live-waves"] { background: radial-gradient(120% 60% at 50% 115%, rgb(6 182 212 / 0.45) 0 45%, transparent 46%), radial-gradient(130% 60% at 30% 110%, rgb(139 92 246 / 0.35) 0 50%, transparent 51%), var(--background); }
 .wallpaper-swatch[data-wallpaper="live-glow"] { background: radial-gradient(50% 50% at 30% 35%, rgb(6 182 212 / 0.35), transparent), radial-gradient(50% 50% at 70% 65%, rgb(139 92 246 / 0.35), transparent), var(--background); }
 .wallpaper-swatch[data-wallpaper="live-starfield"] { background: radial-gradient(circle at 20% 30%, #fff 0 1px, transparent 1.5px), radial-gradient(circle at 60% 20%, #fff 0 1.5px, transparent 2px), radial-gradient(circle at 80% 70%, #fff 0 1px, transparent 1.5px), radial-gradient(circle at 40% 80%, #fff 0 1.2px, transparent 1.8px), #0b1222; }
-html[data-wallpaper^="live-"] body { background: var(--background); }
 
 /* Behind the whole workspace, it stays put as the page scrolls. */
-html[data-wallpaper]:not([data-wallpaper^="live-"]) body { background-attachment: fixed; }
+/* Each wallpaper is drawn on a layer of its own behind the page (body::before), so it can be blurred
+   (Appearance › Wallpaper blur, --wp-blur) without the page, and stays put as the page scrolls;
+   grown a touch when blurred, so its edges never fade in. A live one's canvas blurs the same. */
+html[data-wallpaper]:not([data-wallpaper^="live-"]) body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -20;
+  pointer-events: none;
+  filter: blur(var(--wp-blur, 0px));
+  transform: scale(var(--wp-blur-scale, 1));
+}
+[data-live-wallpaper] { filter: blur(var(--wp-blur, 0px)); transform: scale(var(--wp-blur-scale, 1)); }
 
 /* Brightness (Appearance): a light theme dimmed, or a dark one lifted, over everything on screen.
    Shown only when set, and never in the way of a click. */

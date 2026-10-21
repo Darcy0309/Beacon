@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_APPEARANCE, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
+import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
@@ -83,14 +83,14 @@ export default function AppearanceDialog({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent veil={veil} side className="max-h-[90svh] max-w-lg overflow-y-auto" data-appearance-dialog>
+      <DialogContent veil={veil} veilBlur={12} side className="max-h-[90svh] max-w-lg overflow-y-auto" data-appearance-dialog>
         <DialogHeader>
           <DialogTitle>Appearance</DialogTitle>
           <DialogDescription>How Lighthouse looks for you. Saved on this computer; nobody else's changes.</DialogDescription>
         </DialogHeader>
 
         <label className="flex items-center gap-3 rounded-lg border border-[var(--panel-border)] px-3 py-2 text-xs text-muted-foreground">
-          <span className="shrink-0 font-medium text-foreground">Background blur</span>
+          <span className="shrink-0 font-medium text-foreground">Blur behind this window</span>
           <input type="range" min={0} max={100} step={5} value={Math.round(veil * 100)} onChange={(e) => setVeil(Number(e.target.value) / 100)}
             aria-label="How much the page behind this window is blurred" data-veil-slider className="min-w-0 flex-1 accent-[var(--primary)]" />
           <span className="w-9 shrink-0 text-right tabular-nums">{veil ? `${Math.round(veil * 100)}%` : "Clear"}</span>
@@ -195,6 +195,19 @@ export default function AppearanceDialog({ open, onOpenChange }) {
           <p className="text-xs text-muted-foreground">JPG, PNG or WebP. It stays on this computer and is softened a little so text reads on it.</p>
         </section>
 
+        <section className="space-y-2" data-wallpaper-blur>
+          <div className="flex items-center justify-between">
+            <h3 className="eyebrow text-muted-foreground">Wallpaper blur</h3>
+            <span className="text-sm font-semibold tabular-nums" data-wallpaper-blur-value>{a.blur ? `${a.blur} px` : "Sharp"}</span>
+          </div>
+          <input type="range" min={0} max={MAX_BLUR} step={1} value={a.blur ?? 0} onChange={(e) => change({ blur: Number(e.target.value) })}
+            disabled={a.wallpaper === "classic"} data-wallpaper-blur-slider aria-label="How much the wallpaper is blurred"
+            className="w-full accent-[var(--primary)] disabled:opacity-40" />
+          <p className="text-xs text-muted-foreground">
+            {a.wallpaper === "classic" ? "Choose a wallpaper or photo to blur it." : "Softens the wallpaper or photo behind the pages, so text stands out."}
+          </p>
+        </section>
+
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <h3 className="eyebrow text-muted-foreground">Brightness · {dark ? "dark" : "light"} theme</h3>
@@ -213,7 +226,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </section>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === "modern" && a.wallpaper === "classic" && !a.light && !a.dark}
+          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === "modern" && a.wallpaper === "classic" && !a.light && !a.dark && !a.blur}
             data-appearance-reset>
             <RotateCcw /> Back to the original
           </Button>

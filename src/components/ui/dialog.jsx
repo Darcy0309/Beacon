@@ -75,10 +75,10 @@ const MOTION = {
  * The dialog itself. Never taller than the screen: a form longer than the
  * room scrolls inside the box, and its DialogFooter (Save, Cancel) stays
  * pinned at the bottom. `veil`: how much the page behind is dimmed and
- * blurred, 0 (clear) to 1 (the usual); `side`: on a desktop, at the right
+ * blurred, 0 (clear) to 1 (the usual), and `veilBlur` how far it blurs at 1 (px); `side`: on a desktop, at the right
  * edge rather than the middle (Appearance, so the page shows beside it).
  */
-function DialogContent({ className, children, veil = 1, side = false, ...props }) {
+function DialogContent({ className, children, veil = 1, veilBlur = 3, side = false, ...props }) {
   const { open, setOpen } = useContext(DialogState);
   const reduced = useReducedMotion();
   const phone = usePhone();
@@ -93,7 +93,7 @@ function DialogContent({ className, children, veil = 1, side = false, ...props }
             <motion.div
               className="fixed inset-0 z-50"
               data-dialog-veil={veil}
-              style={{ backgroundColor: `rgb(0 0 0 / ${0.55 * veil})`, backdropFilter: veil > 0 ? `blur(${3 * veil}px)` : "none", WebkitBackdropFilter: veil > 0 ? `blur(${3 * veil}px)` : "none" }}
+              style={{ backgroundColor: `rgb(0 0 0 / ${0.55 * veil})`, backdropFilter: veil > 0 ? `blur(${veilBlur * veil}px)` : "none", WebkitBackdropFilter: veil > 0 ? `blur(${veilBlur * veil}px)` : "none" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1, transition: { duration: 0.2 } }}
               exit={{ opacity: 0, transition: { duration: 0.15 } }}

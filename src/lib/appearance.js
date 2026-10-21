@@ -11,6 +11,7 @@
  *              they uploaded, kept apart under APPEARANCE_IMAGE_KEY
  *   light      how much the light theme is dimmed: 0 to 0.3 (100% to 70%)
  *   dark       how much the dark theme is lifted: 0 to 0.3 (100% to 130%)
+ *   blur       how much the wallpaper itself is blurred, 0 to MAX_BLUR px
  */
 export const APPEARANCE_KEY = "lighthouse.appearance";
 export const DESKTOP_WALLPAPERS = [
@@ -21,7 +22,7 @@ export const DESKTOP_WALLPAPERS = [
 export const PHOTO_WALLPAPERS = [
   ["photo-fjord", "Fjord"], ["photo-canyon", "Canyon"], ["photo-highlands", "Highlands"], ["photo-northern-lights", "Northern lights"],
   ["photo-alpine", "Alpine"], ["photo-valley", "Valley"], ["photo-coast", "Coast"], ["photo-city", "City"],
-  ["photo-sunset", "Sunset"], ["photo-dunes", "Dunes"],
+  ["photo-sunset", "Sunset"], ["photo-dunes", "Dunes"], ["photo-lake", "Lake"], ["photo-golden-field", "Golden field"],
 ];
 export const LIVE_WALLPAPERS = [
   ["live-constellation", "Constellation"], ["live-waves", "Waves"], ["live-glow", "Glow"], ["live-starfield", "Starfield"],
@@ -29,8 +30,10 @@ export const LIVE_WALLPAPERS = [
 export const APPEARANCE_IMAGE_KEY = "lighthouse.appearance.image";
 const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...PHOTO_WALLPAPERS, ...LIVE_WALLPAPERS].map(([k]) => k).concat("custom"));
 export const MAX_SHIFT = 0.3;
+export const MAX_BLUR = 24;
+const clampBlur = (v) => Math.min(MAX_BLUR, Math.max(0, Math.round(Number(v) || 0)));
 export const STYLES = [["modern", "Modern"], ["classic", "Classic"]];
-export const DEFAULT_APPEARANCE = { style: "modern", wallpaper: "classic", light: 0, dark: 0 };
+export const DEFAULT_APPEARANCE = { style: "modern", wallpaper: "classic", light: 0, dark: 0, blur: 0 };
 
 const clamp = (v) => Math.min(MAX_SHIFT, Math.max(0, Number(v) || 0));
 
@@ -42,6 +45,7 @@ export function readAppearance() {
       wallpaper: KNOWN.has(a.wallpaper) && (a.wallpaper !== "custom" || readImage()) ? a.wallpaper : "classic",
       light: clamp(a.light),
       dark: clamp(a.dark),
+      blur: clampBlur(a.blur),
     };
   } catch {
     return { ...DEFAULT_APPEARANCE };
@@ -104,13 +108,15 @@ export function applyAppearance(a, { keep = true } = {}) {
   else d.style.removeProperty("--wp-image");
   if (a.wallpaper && a.wallpaper !== "classic") d.dataset.wallpaper = a.wallpaper;
   else delete d.dataset.wallpaper;
+  d.style.setProperty("--wp-blur", `${clampBlur(a.blur)}px`);
+  d.style.setProperty("--wp-blur-scale", String(1 + clampBlur(a.blur) / 160));
   d.style.setProperty("--dim-light", String(clamp(a.light)));
   d.style.setProperty("--lift-dark", String(clamp(a.dark)));
   if (clamp(a.light) || clamp(a.dark)) d.dataset.brightness = "";
   else delete d.dataset.brightness;
   if (!keep) return;
   try {
-    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ style: a.style === "classic" ? "classic" : "modern", wallpaper: a.wallpaper, light: clamp(a.light), dark: clamp(a.dark) }));
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ style: a.style === "classic" ? "classic" : "modern", wallpaper: a.wallpaper, blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark) }));
   } catch {
     // Kept for this visit only.
   }
@@ -120,4 +126,5 @@ export function applyAppearance(a, { keep = true } = {}) {
 export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};if(a.style==="classic")d.dataset.style="classic";`
   + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
   + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i)d.style.setProperty("--wp-image",'url("'+i+'")');}}`
+  + `var b=Math.min(${MAX_BLUR},Math.max(0,Math.round(Number(a.blur)||0)));d.style.setProperty("--wp-blur",b+"px");d.style.setProperty("--wp-blur-scale",String(1+b/160));`
   + `d.style.setProperty("--dim-light",String(c(a.light)));d.style.setProperty("--lift-dark",String(c(a.dark)));if(c(a.light)||c(a.dark))d.dataset.brightness="";}catch(e){}`;

@@ -16,7 +16,8 @@ const PICTURE = fileURLToPath(new URL("../../public/notification-icon.png", impo
 const SHOTS = process.env.SHOTS;
 const browser = await launchBrowser();
 const html = (page, what) => page.ev(`document.documentElement.${what}`);
-const bodyImage = (page) => page.ev("getComputedStyle(document.body).backgroundImage");
+// The wallpaper is drawn on its own layer behind the page (body::before), so it can be blurred alone.
+const bodyImage = (page) => page.ev("getComputedStyle(document.body, '::before').backgroundImage");
 const openAppearance = async (page) => {
   await page.pointer('button[aria-label="Toggle theme"]');
   await sleep(300);
@@ -55,11 +56,22 @@ try {
     await bodyImage(page));
 
   section("A photo behind the workspace");
-  check("ten photos to pick from", (await page.ev("document.querySelectorAll('[data-desktop-wallpaper^=\"photo-\"]').length")) === 10);
+  check("twelve photos to pick from", (await page.ev("document.querySelectorAll('[data-desktop-wallpaper^=\"photo-\"]').length")) === 12);
   await page.click('[data-desktop-wallpaper="photo-fjord"]');
   check("picked: the photo covers the screen", (await html(page, "dataset.wallpaper")) === "photo-fjord" && (await bodyImage(page)).includes("/wallpapers/fjord.webp"), await bodyImage(page));
   check("…and it is there to load", (await page.ev("fetch('/wallpapers/fjord.webp').then((r) => r.ok && r.headers.get('content-type'))")) === "image/webp");
   if (SHOTS) await page.screenshot(`${SHOTS}/appearance-photo.png`);
+  section("The wallpaper blurred, not the page");
+  await page.fill("[data-wallpaper-blur-slider]", "12");
+  check("Wallpaper blur: the photo behind the pages blurs", (await page.ev("getComputedStyle(document.body, '::before').filter")) === "blur(12px)"
+    && (await page.ev("getComputedStyle(document.querySelector('main, [data-panel]') ?? document.body).filter")) === "none",
+    await page.ev("getComputedStyle(document.body, '::before').filter"));
+  if (SHOTS) await page.screenshot(`${SHOTS}/appearance-photo-blurred.png`);
+  await page.fill("[data-veil-slider]", "100");
+  check("Blur behind this window goes well past a hint (12 px at the top)", (await page.ev("getComputedStyle(document.querySelector('[data-dialog-veil]')).backdropFilter")) === "blur(12px)",
+    await page.ev("getComputedStyle(document.querySelector('[data-dialog-veil]')).backdropFilter"));
+  await page.fill("[data-veil-slider]", "0");
+  await page.fill("[data-wallpaper-blur-slider]", "0");
   await page.click('[data-desktop-wallpaper="nebula"]');
 
   section("Brightness, for the theme on show");
