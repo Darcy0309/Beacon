@@ -3,7 +3,7 @@
 /** The dashboard: a manager's goals for the day, and moving things on their calendar. */
 
 import { revalidatePath } from "next/cache";
-import { check, currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
+import { check, currentAppUser, fail, idFrom, logActivity, ok } from "@/lib/server/action-helpers";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
@@ -79,4 +79,28 @@ export async function saveProductionGoal(prevState, formData) {
   await logActivity(supabase, "production.goal", { detail: values.month.slice(0, 7) });
   revalidatePath("/");
   return ok({ month: values.month });
+}
+
+/**
+ * A client's premium goal for the year (the Sale Pipeline, Sean, Oct 2026): their own, or, for an
+ * administrator on a client's page, that client's. The database checks who may.
+ */
+export async function setClientGoal(formData) {
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("Please sign in again.");
+  const year = Number(formData.get("year"));
+  const goal = Number(String(formData.get("goal") ?? "").replace(/[$,\s]/g, ""));
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) return fail("Which year is this goal for?");
+  if (!Number.isFinite(goal) || goal < 0 || goal > 999999999999) return fail("Enter the goal as an amount, e.g. 250,000.");
+  let companyId = idFrom(formData, "company_id");
+  if (!companyId) {
+    const { data } = await supabase.from("users").select("company_id").eq("id", me.id).maybeSingle();
+    companyId = data?.company_id ?? null;
+  }
+  if (!companyId) return fail("This account is not linked to a client.");
+  const { error } = await supabase.rpc("set_client_goal", { p_company_id: companyId, p_year: year, p_goal: goal });
+  if (error) return fail(error.message);
+  revalidatePath("/");
+  return ok({ goal });
 }

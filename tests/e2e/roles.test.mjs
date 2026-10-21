@@ -179,8 +179,12 @@ try {
   t = await open(client, "/appointments");
   check("client: the appointment appears once QA has passed it", t.includes(appointed));
   check("client: and they are told it is confirmed", Number(sql(`select count(*) from public.notifications where user_id=${CLIENT} and title=${lit(`Appointment confirmed: ${appointed}`)}`)) === 1);
+  // A lead sheet: the names on their own projects open (Sean, Oct 2026), read-only, with no call panel or internal notes.
   t = await open(client, `/leads/${leadId("Ace Roofing")}`);
-  check("client: no lead sheets", DENIED.test(t));
+  const ownAce = sql(`select (select p.company_id from public.leads l join public.projects p on p.id = l.project_id where l.id = ${leadId("Ace Roofing")})
+    = (select company_id from public.users where email = 'client@beacon.test')`) === "t";
+  check(ownAce ? "client: their own lead sheet, read-only" : "client: no lead sheet off their projects",
+    ownAce ? !DENIED.test(t) && !/Internal notes|Save:|Send to a manager/.test(t) : DENIED.test(t) || /could not be found/i.test(t), t.slice(0, 200));
   await shot(client, "role-client-appointments");
 
   // --- Administrator: the whole picture ----------------------------------------------------------

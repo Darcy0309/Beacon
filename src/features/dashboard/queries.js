@@ -320,7 +320,10 @@ export async function getDeveloped({ userId = null, from, to, timeZone, kinds = 
  * appointments they set, still to come, wait for confirmation. `owner`:
  * false when an administrator is looking at someone else's.
  */
-export async function getMySchedule({ userId, from, to, today, timeZone, owner = true, everyone = false }) {
+export async function getMySchedule({ userId, from, to, today, timeZone, owner = true, everyone = false, client = false }) {
+  // `client`: a client's own calendar (Sean, Oct 2026): every appointment of theirs Row Level Security
+  // shows them, to open but not to move, without who set it.
+  if (client) everyone = true;
   const supabase = await createClient();
   const [lo, hi] = around({ from, to });
   // `everyone`: an administrator's calendar, every manager's appointments with who set each (Sean, Oct 2026).
@@ -377,13 +380,13 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       time: [time, ampm].filter(Boolean).join(" "), clock: a.appt_time, minutes: timeRank(a.appt_time),
       title: lead?.company_name ?? "Appointment",
       detail: [appointmentKind(one(lead?.result)?.name, Boolean(a.confirmed_at)), lead?.contact_name, one(one(lead?.project)?.company)?.name,
-        everyone && one(a.setter) ? `Set by ${[one(a.setter).first_name, one(a.setter).last_name].filter(Boolean).join(" ")}` : null].filter(Boolean).join(" · "),
+        everyone && !client && one(a.setter) ? `Set by ${[one(a.setter).first_name, one(a.setter).last_name].filter(Boolean).join(" ")}` : null].filter(Boolean).join(" · "),
       // Confirmed, or still waiting for the confirmation call; QA first if it has not passed.
       badge: a.confirmed_at ? "Confirmed" : a.qa_status === "pending" ? "Pending QA" : waiting ? "Awaiting confirmation" : status,
       tone: a.confirmed_at ? "ok" : waiting ? "warn" : "muted",
       waiting,
       href: lead?.id ? `/leads/${lead.id}` : `/calendar?a=${a.id}`,
-      movable: a.appt_date >= today,
+      movable: !client && a.appt_date >= today,
     });
   }
   for (const r of reminders.data ?? []) {
@@ -466,4 +469,75 @@ export async function getProductionChartOptions() {
     people: (people.data ?? []).map((u) => ({ value: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(" ") || u.email })),
     projects: (projects.data ?? []).map((p) => ({ value: p.id, label: p.name })),
   };
+}
+
+/**
+ * The client's dashboard, tiles 1 to 3 (Sean, Oct 2026): every name on their projects (whatever its
+ * call result) since `from` (null: all time), how many on each project, the appointments set and
+ * their outcomes as the client records them. `companyId`: one client's (an administrator on that
+ * client's page); else all the person sees.
+ */
+export async function getClientDashboard({ from = null, companyId = null } = {}) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("client_dashboard", { p_from: from, p_company_id: companyId });
+  if (error) throw error;
+  const leads = Number(data?.leads ?? 0);
+  const appts = Number(data?.appts ?? 0);
+  return {
+    leads,
+    appts,
+    // Appointments as a share of every lead on their projects over the same days.
+    pct: leads ? Math.round((appts / leads) * 1000) / 10 : 0,
+    projects: (data?.projects ?? []).map((p) => ({ id: p.id, name: p.name, leads: Number(p.leads) })),
+    results: data?.results ?? {},
+  };
+}
+
+/** Tile 4: viable names renewing in each of the next `months` months (not this one): [{ key, label, leads }]. */
+export async function getClientPipeline({ months = 3, companyId = null } = {}) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("client_pipeline", { p_months: months, p_company_id: companyId });
+  if (error) throw error;
+  return (data ?? []).map((m) => ({ key: m.key, label: m.label, leads: Number(m.leads) }));
+}
+
+/**
+ * The Sale Pipeline (Sean, Oct 2026), from what the client records on our appointments: premium
+ * written this year, in the pipe, their goal for the year, the close ratio, and the premium written
+ * month by month. `companyId`: one client's (an administrator); else the client's own.
+ */
+export async function getClientSales({ companyId = null } = {}) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("client_sales", { p_company_id: companyId });
+  if (error) throw error;
+  const sold = Number(data?.sold ?? 0);
+  const considered = Number(data?.considered ?? 0);
+  return {
+    year: Number(data?.year ?? new Date().getFullYear()),
+    written: Number(data?.written ?? 0),
+    pipe: Number(data?.pipe ?? 0),
+    goal: data?.goal == null ? null : Number(data.goal),
+    sold,
+    considered,
+    closeRatio: considered ? Math.round((sold / considered) * 1000) / 10 : 0,
+    months: (data?.months ?? []).map((m) => ({ month: Number(m.month), label: m.label, written: Number(m.written) })),
+  };
+}
+
+/**
+ * Recent Activity on a client's dashboard (Sean, Oct 2026): the leads and appointments developed on
+ * their projects from `from` to `to` (the business's days), newest first, as client_activity() gives
+ * them (never what they paid). `projectId`, `kind` ("lead" | "appointment") narrow it.
+ */
+export async function getClientActivity({ from, to, projectId = null, kind = null, companyId = null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("client_activity", {
+    p_from: from, p_to: to, p_project_id: projectId, p_kind: kind, p_company_id: companyId,
+  });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id, at: r.at, kind: r.kind, result: r.result, leadId: r.lead_id,
+    company: r.company ?? "—", location: cityState(r), projectId: r.project_id, project: r.project ?? "—",
+    agent: r.agent ?? "—", manager: r.manager ?? "—", xdate: shortDate(r.xdate),
+  }));
 }

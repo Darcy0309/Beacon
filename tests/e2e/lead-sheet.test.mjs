@@ -149,7 +149,11 @@ try {
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage();
   await client.go(`/leads/${lead}`, 4000);
   const html = await client.ev("document.documentElement.outerHTML");
-  check("the client cannot open the lead page, with its notes", /don't have access/.test(html) && !/INTERNAL-SECRET|OLD-HISTORY|INTERNAL-CALL-NOTE/.test(html));
+  // A client opens the names on their own projects (Sean, Oct 2026), never the internal or call notes; others stay closed.
+  const theirs = sql(`select (select p.company_id from public.leads l join public.projects p on p.id = l.project_id where l.id = ${lead})
+    = (select company_id from public.users where email = 'client@beacon.test')`) === "t";
+  check(theirs ? "the client opens the lead page of their project, without its internal or call notes" : "the client cannot open a lead page that is not on their projects",
+    !/INTERNAL-SECRET|OLD-HISTORY|INTERNAL-CALL-NOTE/.test(html) && (theirs ? !/don't have access/.test(html) : /don't have access|could not be found/i.test(html)));
   const apptId = sql(`select id from public.appointments where lead_id = ${lead} order by id desc limit 1`);
   sql(`update public.appointments set qa_status = 'passed' where id = ${apptId}`);
   await client.go(`/calendar?view=day&d=${tomorrow}&a=${apptId}`, 4000);

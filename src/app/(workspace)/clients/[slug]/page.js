@@ -16,6 +16,10 @@ import ConversionLines from "@/features/stats/components/conversion-lines";
 import { addMonths, monthEnd, monthStart } from "@/lib/dates";
 import { pctLabel, shapeStats, statsLine } from "@/lib/lead-stats";
 import { getBusinessToday } from "@/lib/server/business-day";
+import { getClientDashboard, getClientPipeline, getClientSales } from "@/features/dashboard/queries";
+import SalePipeline from "@/features/dashboard/components/sale-pipeline";
+import { PIPELINE_PERIODS, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
+import PeriodSwitch from "@/features/dashboard/components/period-switch";
 
 export const dynamic = "force-dynamic";
 
@@ -30,8 +34,10 @@ function Field({ label, children }) {
   );
 }
 
-export default async function ClientProfile({ params }) {
+export default async function ClientProfile({ params, searchParams }) {
   const { slug } = await params;
+  const sp = await searchParams;
+  const up = pipelineMonths(sp?.up);
   const [c, projects, today, groups, zones] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups(), getTimeZones()]);
   if (!c) notFound();
 
@@ -39,10 +45,14 @@ export default async function ClientProfile({ params }) {
   const delivery = `leads-${slug}@signaturemktg.net`;
   // The client calendar: every project's appointments together, last month to three months on.
   const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
-  const [stats, days, blocked] = await Promise.all([
+  const [stats, days, blocked, results, pipeline, sales] = await Promise.all([
     getLeadStats({ companyId: c.id }),
     getAppointmentDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
     getBlockedDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
+    // As the client's own dashboard has them (Sean, Oct 2026): how their appointments turned out, and what is coming up.
+    getClientDashboard({ companyId: c.id }).then((d) => d.results),
+    getClientPipeline({ months: up, companyId: c.id }),
+    getClientSales({ companyId: c.id }),
   ]);
   const s = stats.total;
   const of = (p) => stats.byProject[p.id] ?? shapeStats(null);
@@ -55,6 +65,11 @@ export default async function ClientProfile({ params }) {
       icon: CalendarCheck, accent: "var(--neon-emerald)", series: clientProjects.map((p) => of(p).appointments), bars: true },
     { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
       icon: Percent, accent: "var(--neon-violet)", children: <ConversionLines s={s} /> },
+  ];
+  // As the client's own dashboard has them (Sean, Oct 2026): how their appointments turned out, and what is coming up.
+  const clientTiles = [
+    resultsTile(results),
+    pipelineTile(pipeline, <PeriodSwitch param="up" current={String(up)} params={{}} options={PIPELINE_PERIODS} base={`/clients/${slug}`} />),
   ];
 
   return (
@@ -101,6 +116,14 @@ export default async function ClientProfile({ params }) {
           <CalendarTile label="Client Calendar" days={days} blocked={blocked} today={today} first={calendar.first} last={calendar.last} query={`client=${c.id}`}
             compact className="animate-pop-in" style={{ animationDelay: "180ms" }} />
         </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2" data-client-own-tiles>
+          {clientTiles.map((t, i) => (
+            <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${240 + i * 60}ms` }} />
+          ))}
+        </div>
+        {/* What the client records from our appointments, as they see it (Sean, Oct 2026). */}
+        <SalePipeline sales={sales} companyId={c.id} thisMonth={Number(today.slice(5, 7))} />
 
         <Card>
           <SectionHeader label="Projects" icon={FolderKanban} href="/projects" action="All projects" />

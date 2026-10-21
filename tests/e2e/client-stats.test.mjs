@@ -55,8 +55,8 @@ try {
   section("The client's page");
   await admin.go(`/clients/${slug}`, 5000);
   const labels = await until(() => admin.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent.trim())`).then((l) => l.length >= 4 && l));
-  check("Leads, Appointments, Conversions and a Client Calendar (no Active Leads, no Campaigns)",
-    JSON.stringify(labels) === JSON.stringify(["Leads", "Appointments", "Conversions", "Client Calendar"]), JSON.stringify(labels));
+  check("Leads, Appointments, Conversions and a Client Calendar (no Active Leads, no Campaigns); then the client's own Appointment Results and Upcoming Pipeline",
+    JSON.stringify(labels) === JSON.stringify(["Leads", "Appointments", "Conversions", "Client Calendar", "Appointment Results", "Upcoming Pipeline"]), JSON.stringify(labels));
   check("Leads: the names at the appointment stage, active and resolved", Boolean(await until(async () => /Leads 4 1 active · 3 resolved/i.test((await tile(admin, "Leads")) ?? ""))), await tile(admin, "Leads"));
   check("Appointments: by call result, the invalid apart", /Appointments 1 1 invalid/i.test((await tile(admin, "Appointments")) ?? ""), await tile(admin, "Appointments"));
   const conv = await tile(admin, "Conversions");

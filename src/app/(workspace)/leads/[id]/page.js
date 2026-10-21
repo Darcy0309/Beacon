@@ -261,6 +261,8 @@ export default async function LeadSheet({ params, searchParams }) {
     ? { href: `/work/${listId}`, label: "Back to call list" }
     : backFrom(sp?.from) ?? (me?.role === "manager"
       ? { href: "/work", label: "My projects" }
+      // A client opens their leads from the dashboard's Recent Activity (they have no Leads list).
+      : me?.role === "client" ? { href: "/", label: "Back to dashboard" }
       : { href: "/leads", label: "Back to leads" });
 
   // The lead account manager developed the name (database development); the

@@ -39,6 +39,10 @@ import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
+import { getClientActivity, getClientDashboard, getClientPipeline, getClientSales } from "@/features/dashboard/queries";
+import ClientActivity from "@/features/dashboard/components/client-activity";
+import SalePipeline from "@/features/dashboard/components/sale-pipeline";
+import { CLIENT_PERIODS, PIPELINE_PERIODS, appointmentsTile, clientPeriod, clientPeriodFrom, leadsTile, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 
 export const dynamic = "force-dynamic";
@@ -158,7 +162,32 @@ export default async function Dashboard({ searchParams }) {
     };
   });
 
-  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company] = await Promise.all([
+  // A client's top row (Sean, Oct 2026): leads, appointments and their results over the period chosen
+  // (?cp=, all time to begin with), and the viable leads renewing over the months ahead (?up=, three).
+  const client = view.audience === "client";
+  const cp = clientPeriod(sp?.cp);
+  const up = pipelineMonths(sp?.up);
+  const clientDashP = client ? todayP.then((t) => getClientDashboard({ from: clientPeriodFrom(cp, t) })) : null;
+  const clientPipelineP = client ? getClientPipeline({ months: up }) : null;
+  // Row two (Sean, Oct 2026): the Sale Pipeline, and their calendar as a manager's (the month chosen, ?cm=).
+  const clientSalesP = client ? getClientSales() : null;
+  // Row three (Sean, Oct 2026): Recent Activity, the last week to begin with (?af=, ?ato=), by project (?ap=) and type (?at=).
+  const id = (v) => (typeof v === "string" && /^[1-9]\d{0,17}$/.test(v) ? Number(v) : null);
+  const activityChosen = { project: id(sp?.ap), type: sp?.at === "lead" || sp?.at === "appointment" ? sp.at : null };
+  const clientActivityP = client ? todayP.then((t) => {
+    const custom = isIsoDate(sp?.af) && isIsoDate(sp?.ato);
+    const to = custom && sp.ato <= t ? sp.ato : t;
+    const from = custom ? (sp.af > to ? to : daysBetween(sp.af, to) > 366 ? addDays(to, -366) : sp.af) : addDays(t, -6);
+    return getClientActivity({ from, to, projectId: activityChosen.project, kind: activityChosen.type })
+      .then((rows) => ({ rows, range: { from, to, custom } }));
+  }) : null;
+  const clientScheduleP = client ? basics.then(([businessToday, , tz]) => {
+    const cm = typeof sp?.cm === "string" && isIsoDate(`${sp.cm}-01`) ? `${sp.cm}-01` : monthStart(businessToday);
+    const grid = monthGrid(cm);
+    return getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, client: true }).then((schedule) => ({ cm, schedule }));
+  }) : null;
+
+  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company, clientDash, clientPipeline, clientSales, clientSchedule, clientActivity] = await Promise.all([
     // An administrator has Recent Leads & Appointments instead (below).
     isManager || view.audience === "company" ? [] : getRecentLeads(6),
     isManager ? { today: [], tomorrow: [] } : getAppointments(),
@@ -173,6 +202,11 @@ export default async function Dashboard({ searchParams }) {
     todayP,
     managerP,
     companyP,
+    clientDashP,
+    clientPipelineP,
+    clientSalesP,
+    clientScheduleP,
+    clientActivityP,
   ]);
   const production = company?.production ?? null;
   const team = company?.team ?? null;
@@ -228,19 +262,14 @@ export default async function Dashboard({ searchParams }) {
         icon: PhoneCall, accent: "var(--neon-amber)", series: manager.calls.series, bars: true },
     ];
   } else if (view.audience === "client") {
-    // What the client bought: totals and delivery quality, not weekly activity.
+    // Sean, Oct 2026: what was developed and set over the period chosen, how the appointments
+    // turned out, and the viable leads coming up for renewal.
+    const periodSwitch = (param, current, options) => <PeriodSwitch param={param} current={current} params={otherParams(sp, param)} options={options} />;
     tiles = [
-      { label: "Leads Delivered", value: (report?.leads ?? 0).toLocaleString(),
-        note: `${report?.projects ?? 0} campaign${(report?.projects ?? 0) === 1 ? "" : "s"}`,
-        icon: Target, accent: "var(--neon-cyan)", series: months.map((m) => m.leads) },
-      { label: "Appointments Set", value: (report?.appts ?? 0).toLocaleString(),
-        note: `${report?.conversion ?? 0}% of leads`,
-        icon: CalendarCheck, accent: "var(--neon-emerald)", series: months.map((m) => m.appts) },
-      { label: "Booked Today", value: String(s.apptToday),
-        note: `${appointments.tomorrow.length} tomorrow`,
-        icon: CalendarClock, accent: "var(--neon-violet)", series: months.map((m) => m.appts), bars: true },
-      { label: "Show Rate", value: `${report?.showRate ?? 0}%`, note: "appointments held",
-        icon: CheckCheck, accent: "var(--neon-amber)", series: months.map((m) => m.appts), bars: true },
+      leadsTile(clientDash, periodSwitch("cp", cp, CLIENT_PERIODS)),
+      appointmentsTile(clientDash, periodSwitch("cp", cp, CLIENT_PERIODS)),
+      resultsTile(clientDash.results),
+      pipelineTile(clientPipeline, periodSwitch("up", String(up), PIPELINE_PERIODS)),
     ];
   } else {
     tiles = [
@@ -492,7 +521,19 @@ export default async function Dashboard({ searchParams }) {
           </div>
         ) : (
         <>
-        {/* volume over time + today */}
+        {client ? (
+          // A client's row two: the Sale Pipeline, and their calendar with the month beside the day (Sean, Oct 2026).
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2" data-client-row-two>
+            <div className="flex flex-col [&>*]:flex-1">
+              <SalePipeline sales={clientSales} thisMonth={Number(businessToday.slice(5, 7))} />
+            </div>
+            <div className="flex flex-col [&>*]:flex-1">
+              <MySchedule items={clientSchedule.schedule.items} awaiting={clientSchedule.schedule.awaiting} month={clientSchedule.cm}
+                today={businessToday} params={otherParams(sp, "cm")} allHref="/appointments" />
+            </div>
+          </div>
+        ) : (
+        /* volume over time + today */
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {/* The monthly chart fills its card, which grows beside a long schedule. */}
           <Card className={view.trend === "weeks" ? "lg:col-span-2" : "flex flex-col lg:col-span-2"}>
@@ -538,13 +579,20 @@ export default async function Dashboard({ searchParams }) {
 
           {scheduleCard}
         </div>
+        )}
 
-        {/* recent leads + the side panel this role gets */}
+        {client ? (
+          // A client's only row under the second (Sean, Oct 2026): what was developed for them lately.
+          <ClientActivity rows={clientActivity.rows} range={clientActivity.range} projects={clientDash.projects}
+            chosen={activityChosen} params={otherParams(sp)} timeZone={tz} />
+        ) : (
+        /* recent leads + the side panel this role gets */
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           {recentCard("lg:col-span-2")}
 
           <div className="space-y-4">{sideCards}</div>
         </div>
+        )}
         </>
         )}
         </>

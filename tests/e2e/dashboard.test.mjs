@@ -126,9 +126,9 @@ try {
   section("Client dashboard and phone width");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage();
   await client.go("/");
-  check("client keeps the six-month delivery bars", /Delivered/i.test(await client.text()) && (await client.ev(`document.querySelectorAll('.animate-grow-height').length`)) > 0);
-  const clientGap = await gapUnderMonths(client);
-  check("…filling their card, with no empty band under the months", clientGap !== null && clientGap <= 24, `${clientGap}px`);
+  // Row two (Sean, Oct 2026): the Sale Pipeline in place of the six-month bars, beside their calendar.
+  check("client has the Sale Pipeline and their calendar, in place of the six-month delivery bars",
+    Boolean(await until(() => client.ev("!!document.querySelector('[data-client-row-two] [data-sale-pipeline]') && !!document.querySelector('[data-client-row-two] [data-my-schedule]') && !document.querySelector('[data-months-chart]')"))));
   const phone = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go("/", 4500);
   const overflow = await phone.ev("document.documentElement.scrollWidth - document.documentElement.clientWidth");

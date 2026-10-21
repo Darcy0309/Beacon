@@ -124,7 +124,8 @@ try {
   check("…and searches by contact", Boolean(await until(async () => { const n = await names(); return n.length === 1 && n[0] === NAME; })), JSON.stringify(await names()));
   await admin.ev(`[...document.querySelectorAll('tr[data-client-row]')].find((x) => x.querySelector('[data-client-link]')?.textContent === ${JSON.stringify(NAME)}).cells[2].click()`);
   check("clicking anywhere on a row opens the client", Boolean(await until(async () => (await admin.path()) === `/clients/${slug}`)), await admin.path());
-  check("…whose page shows its time zone and dates", /MST/.test(await admin.text()) && /Jan 26, 2026 – Dec 31, 2026/.test(await admin.text()));
+  check("…whose page shows its time zone and dates", Boolean(await until(async () => { const t = await admin.text(); return /MST/.test(t) && /Jan 26, 2026 – Dec 31, 2026/.test(t); })),
+    ((await admin.text()) ?? "").match(/Time zone[^\n]*\n?[^\n]*/)?.[0]);
 
   section("The Clients page: tiles");
   const companyNow = Number(sql(`select id from public.companies where name = ${lit(NAME)}`));

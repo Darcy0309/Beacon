@@ -19,7 +19,8 @@ const STAFF = ["admin", "manager", "agent"];
 // Pages open to more roles than the section they sit in. A lead sheet is
 // where every call is worked, so anyone with a call list can open one; the
 // full Leads list stays with administrators and agents.
-const DETAIL_ROLES = [[/^\/leads\/\d+$/, STAFF]];
+// A lead sheet: staff, and a client for the names on their own projects (Row Level Security keeps the rest from them; Sean, Oct 2026).
+const DETAIL_ROLES = [[/^\/leads\/\d+$/, [...STAFF, "client"]]];
 
 /**
  * Which roles may open a path. Detail pages inherit from their section, so
