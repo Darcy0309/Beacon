@@ -104,3 +104,22 @@ export async function setClientGoal(formData) {
   revalidatePath("/");
   return ok({ goal });
 }
+
+/**
+ * A note about a lead to the manager who developed it (Recent Activity, Sean, Oct 2026): delivered
+ * as a message in their notifications, linked to the lead, that they can reply to. The database
+ * checks the lead is the client's and the manager worked it.
+ */
+export async function messageManager(formData) {
+  const leadId = idFrom(formData, "lead_id");
+  const managerId = idFrom(formData, "manager_id");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!leadId || !managerId) return fail("That lead or manager could not be found.");
+  if (!body) return fail("Write your message first.");
+  if (body.length > 1000) return fail("Keep a message under 1,000 characters.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("message_manager", { p_lead_id: leadId, p_manager_id: managerId, p_body: body });
+  if (error) return fail(error.message);
+  if (!data) return fail("It could not be delivered: that manager may no longer be active.");
+  return ok({ sent: data });
+}

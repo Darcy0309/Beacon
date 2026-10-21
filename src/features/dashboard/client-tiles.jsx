@@ -34,11 +34,11 @@ export const CLIENT_RESULTS = [
   ["sold", "Sold Account", "var(--neon-emerald)"],
 ];
 
-/** Tile 1: leads on their projects, and how many on each. */
+/** Tile 1: the leads developed for them (never the names still to call), and each DB dev project's. */
 export function leadsTile(d, action) {
   return {
     label: "Leads Developed", value: d.leads.toLocaleString(), icon: Target, accent: "var(--neon-cyan)", action,
-    note: d.projects.length === 1 ? "1 project" : `${d.projects.length} projects`,
+    note: d.projects.length === 1 ? "from 1 DB dev project" : `from ${d.projects.length} DB dev projects`,
     children: (
       <ul className="mt-2 space-y-1 text-xs" data-client-projects>
         {d.projects.slice(0, 4).map((p) => (

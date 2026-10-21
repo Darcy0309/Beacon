@@ -538,6 +538,6 @@ export async function getClientActivity({ from, to, projectId = null, kind = nul
   return (data ?? []).map((r) => ({
     id: r.id, at: r.at, kind: r.kind, result: r.result, leadId: r.lead_id,
     company: r.company ?? "—", location: cityState(r), projectId: r.project_id, project: r.project ?? "—",
-    agent: r.agent ?? "—", manager: r.manager ?? "—", xdate: shortDate(r.xdate),
+    agent: r.agent ?? "—", manager: r.manager ?? "—", managerId: r.manager_id ?? null, xdate: shortDate(r.xdate),
   }));
 }

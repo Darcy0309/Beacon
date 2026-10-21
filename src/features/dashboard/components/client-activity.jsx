@@ -7,6 +7,7 @@ import ParamSelect from "@/components/shared/param-select";
 import DateRangePicker from "@/components/shared/date-range-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatRange } from "@/lib/dates";
+import MessageManager from "@/features/dashboard/components/message-manager";
 
 const TONE = { Lead: "cyan", Appointment: "violet", "Appointment-Confirmed": "emerald", "Appointment-Invalid": "rose" };
 const TYPES = [{ value: "lead", label: "Leads" }, { value: "appointment", label: "Appointments" }];
@@ -15,7 +16,8 @@ const TYPES = [{ value: "lead", label: "Leads" }, { value: "appointment", label:
  * Recent Activity, under a client's dashboard (Sean, Oct 2026): the leads and
  * appointments developed on their projects, newest first, over the days
  * chosen (the last week to begin with), by project and type. Each opens the
- * lead (its sheet, with the client notes; never the internal ones).
+ * lead (its sheet, with the client notes; never the internal ones); the
+ * manager's name opens a message to them about it.
  *
  *   rows       getClientActivity()
  *   range      { from, to } shown; `custom` when chosen
@@ -60,7 +62,7 @@ export default function ClientActivity({ rows, range, projects, chosen, params, 
                 <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{when.format(new Date(r.at))}</TableCell>
                 <TableCell><ToneBadge tone={TONE[r.result] ?? "slate"} className="normal-case tracking-normal">{r.result}</ToneBadge></TableCell>
                 <TableCell className="tabular-nums text-muted-foreground">{r.xdate}</TableCell>
-                <TableCell>{r.manager}</TableCell>
+                <TableCell><MessageManager leadId={r.leadId} managerId={r.managerId} manager={r.manager} company={r.company} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
