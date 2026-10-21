@@ -35,7 +35,7 @@ try {
   section("Appearance, from the theme button");
   check("the theme button has Appearance", Boolean(await openAppearance(page)));
   check("…with the theme, the wallpapers and a brightness slider",
-    (await page.ev("document.querySelectorAll('[data-appearance-dialog] [data-desktop-wallpaper]:not([data-desktop-wallpaper^=live-])').length")) === 9
+    (await page.ev("document.querySelectorAll('[data-appearance-dialog] [data-desktop-wallpaper]:not([data-desktop-wallpaper^=live-]):not([data-desktop-wallpaper^=photo-])').length")) === 9
     && (await page.ev("!!document.querySelector('[data-brightness-slider]') && document.querySelectorAll('[data-theme-pick]').length === 3")));
 
   section("The page shows behind it");
@@ -50,9 +50,17 @@ try {
   await page.fill("[data-veil-slider]", "0");
 
   section("A wallpaper, at once");
-  await page.click('[data-desktop-wallpaper="aurora"]');
-  check("picked: behind the whole workspace", (await html(page, "dataset.wallpaper")) === "aurora" && (await bodyImage(page)).includes("gradient"),
+  await page.click('[data-desktop-wallpaper="nebula"]');
+  check("picked: behind the whole workspace", (await html(page, "dataset.wallpaper")) === "nebula" && (await bodyImage(page)).includes("gradient"),
     await bodyImage(page));
+
+  section("A photo behind the workspace");
+  check("ten photos to pick from", (await page.ev("document.querySelectorAll('[data-desktop-wallpaper^=\"photo-\"]').length")) === 10);
+  await page.click('[data-desktop-wallpaper="photo-fjord"]');
+  check("picked: the photo covers the screen", (await html(page, "dataset.wallpaper")) === "photo-fjord" && (await bodyImage(page)).includes("/wallpapers/fjord.webp"), await bodyImage(page));
+  check("…and it is there to load", (await page.ev("fetch('/wallpapers/fjord.webp').then((r) => r.ok && r.headers.get('content-type'))")) === "image/webp");
+  if (SHOTS) await page.screenshot(`${SHOTS}/appearance-photo.png`);
+  await page.click('[data-desktop-wallpaper="nebula"]');
 
   section("Brightness, for the theme on show");
   await page.click('[data-theme-pick="dark"]');
@@ -72,7 +80,7 @@ try {
 
   section("Kept for next time, on before the page draws");
   await page.go("/work", 3000);
-  check("the wallpaper and brightness come back with the page", (await html(page, "dataset.wallpaper")) === "aurora"
+  check("the wallpaper and brightness come back with the page", (await html(page, "dataset.wallpaper")) === "nebula"
     && (await html(page, "hasAttribute('data-brightness')")) && (await bodyImage(page)).includes("gradient"));
   if (SHOTS) await page.screenshot(`${SHOTS}/appearance-workspace.png`);
 

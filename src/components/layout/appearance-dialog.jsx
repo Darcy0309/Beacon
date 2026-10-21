@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ImageUp, Monitor, Moon, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
+import { Image as ImageIcon, ImageUp, Monitor, Moon, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_APPEARANCE, STYLES, DESKTOP_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
+import { DEFAULT_APPEARANCE, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
@@ -133,6 +133,21 @@ export default function AppearanceDialog({ open, onOpenChange }) {
                   className={cn("wallpaper-swatch h-14 w-full rounded-xl border transition-transform group-hover:scale-[1.04] group-active:scale-95",
                     a.wallpaper === k ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")} />
                 <span className={a.wallpaper === k ? "text-primary" : "text-muted-foreground"}>{label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="eyebrow flex items-center gap-1.5 text-muted-foreground"><ImageIcon className="size-3.5 text-primary" /> Photos</h3>
+          <div role="radiogroup" aria-label="Photo wallpaper" className="grid grid-cols-3 gap-3 sm:grid-cols-5">
+            {PHOTO_WALLPAPERS.map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={a.wallpaper === k} onClick={() => change({ wallpaper: k })} data-desktop-wallpaper={k}
+                className="group flex flex-col items-center gap-1.5 text-[0.7rem] font-medium">
+                <span data-wallpaper={k}
+                  className={cn("wallpaper-swatch h-14 w-full rounded-xl border transition-transform group-hover:scale-[1.04] group-active:scale-95",
+                    a.wallpaper === k ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")} />
+                <span className={cn("truncate", a.wallpaper === k ? "text-primary" : "text-muted-foreground")}>{label}</span>
               </button>
             ))}
           </div>

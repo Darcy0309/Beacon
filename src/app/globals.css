@@ -946,38 +946,62 @@ html[data-navigating] body { cursor: progress; }
   pointer-events: none;
 }
 
-/* The wallpapers (Sean, Oct 2026): soft light gradients, each with a deeper take in the dark
+/* The wallpapers (Sean, Oct 2026): soft mesh gradients, each with its own deeper take in the dark
    theme, so text reads the same on any of them. Defined once, for the phone's screen
    (phone.jsx, WALLPAPERS), the whole workspace behind the pages (Appearance:
    html[data-wallpaper], appearance.jsx) and the swatches to pick them from. */
 :root {
-  --wp-aurora: radial-gradient(120% 70% at 0% 0%, #c7f9ec 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #e3d4ff 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #cde9ff 0%, transparent 65%), #f7fbff;
-  --wp-ocean: linear-gradient(170deg, #e8f7ff 0%, #c9ecff 45%, #a8dcf5 100%);
-  --wp-sunrise: linear-gradient(175deg, #fff4e0 0%, #ffe1d0 45%, #ffd0de 100%);
-  --wp-lavender: radial-gradient(90% 60% at 80% 0%, #f3e8ff 0%, transparent 70%), linear-gradient(180deg, #f6f0ff 0%, #e6dcff 100%);
-  --wp-mint: linear-gradient(160deg, #effff7 0%, #d3f8e6 50%, #bff0de 100%);
-  --wp-peach: radial-gradient(100% 70% at 20% 10%, #fff1e6 0%, transparent 70%), linear-gradient(180deg, #ffeadb 0%, #ffd9c7 100%);
-  --wp-sky: radial-gradient(60% 30% at 25% 18%, rgb(255 255 255 / 0.9) 0%, transparent 70%), radial-gradient(50% 25% at 75% 35%, rgb(255 255 255 / 0.8) 0%, transparent 70%), linear-gradient(180deg, #dff1ff 0%, #f4faff 100%);
-  --wp-signature: radial-gradient(100% 60% at 0% 0%, #d6e8fb 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #ecd9f3 0%, transparent 65%), #f8f9fd;
+  --wp-mist: radial-gradient(70% 55% at 18% 8%, #e3eefb 0%, transparent 60%), radial-gradient(70% 60% at 88% 85%, #eceef8 0%, transparent 62%), linear-gradient(180deg, #f7f9fc 0%, #eaeff6 100%);
+  --wp-dawn: radial-gradient(80% 60% at 10% 0%, #ffe9d6 0%, transparent 62%), radial-gradient(70% 60% at 95% 30%, #fbdbe6 0%, transparent 60%), linear-gradient(165deg, #fff6ee 0%, #fbe7ee 50%, #ebe6ff 100%);
+  --wp-lagoon: radial-gradient(75% 60% at 0% 0%, #c8f1ec 0%, transparent 60%), radial-gradient(80% 65% at 100% 100%, #c9dcff 0%, transparent 62%), linear-gradient(180deg, #f1fafa 0%, #e8f2fb 100%);
+  --wp-orchid: radial-gradient(70% 55% at 85% 8%, #f5d6f0 0%, transparent 58%), radial-gradient(75% 60% at 8% 92%, #ddd4fb 0%, transparent 60%), linear-gradient(180deg, #fbf6fd 0%, #f2ecfb 100%);
+  --wp-meadow: radial-gradient(80% 55% at 15% 10%, #eaf8d9 0%, transparent 60%), radial-gradient(80% 60% at 90% 95%, #cdeee3 0%, transparent 62%), linear-gradient(170deg, #f6fbef 0%, #e6f4ec 100%);
+  --wp-ember: radial-gradient(90% 55% at 50% 115%, #ffd2b2 0%, transparent 62%), radial-gradient(60% 45% at 90% 10%, #ffe7d2 0%, transparent 60%), linear-gradient(180deg, #fffaf5 0%, #fff0e4 100%);
+  --wp-nebula: radial-gradient(55% 45% at 20% 25%, #dbe3ff 0%, transparent 60%), radial-gradient(50% 45% at 82% 18%, #f0d8ff 0%, transparent 60%), radial-gradient(60% 50% at 60% 92%, #d2efff 0%, transparent 62%), #f7f8fe;
+  --wp-signature: radial-gradient(75% 60% at 0% 0%, #cfe1f8 0%, transparent 62%), radial-gradient(75% 60% at 100% 100%, #ead2f3 0%, transparent 62%), linear-gradient(135deg, #f7f9fd 0%, #f4f0fa 100%);
 }
 .dark {
-  --wp-aurora: radial-gradient(120% 70% at 0% 0%, #0f3b3a 0%, transparent 60%), radial-gradient(110% 70% at 100% 20%, #2a1f4d 0%, transparent 60%), radial-gradient(120% 80% at 50% 110%, #0f2d4a 0%, transparent 65%), #0b111c;
-  --wp-ocean: linear-gradient(170deg, #0b1a2a 0%, #0c2a40 55%, #0f3a52 100%);
-  --wp-sunrise: linear-gradient(175deg, #1c1420 0%, #2e1a24 55%, #3a1d2e 100%);
-  --wp-lavender: linear-gradient(180deg, #141026 0%, #241a42 100%);
-  --wp-mint: linear-gradient(160deg, #0b1a17 0%, #0f2a23 55%, #12362c 100%);
-  --wp-peach: linear-gradient(180deg, #1e1512 0%, #33201a 100%);
-  --wp-sky: radial-gradient(60% 30% at 25% 18%, rgb(120 160 220 / 0.18) 0%, transparent 70%), linear-gradient(180deg, #0c1630 0%, #0a1020 100%);
-  --wp-signature: radial-gradient(100% 60% at 0% 0%, #152a45 0%, transparent 65%), radial-gradient(100% 60% at 100% 100%, #2c1638 0%, transparent 65%), #0b0f19;
+  --wp-mist: radial-gradient(70% 55% at 18% 8%, #17243a 0%, transparent 60%), radial-gradient(70% 60% at 88% 85%, #1a1f33 0%, transparent 62%), linear-gradient(180deg, #0c121c 0%, #0a0f18 100%);
+  --wp-dawn: radial-gradient(80% 60% at 10% 0%, #3a2117 0%, transparent 62%), radial-gradient(70% 60% at 95% 30%, #3a1a2a 0%, transparent 60%), linear-gradient(165deg, #150f12 0%, #1c1220 50%, #13152c 100%);
+  --wp-lagoon: radial-gradient(75% 60% at 0% 0%, #0d3a39 0%, transparent 60%), radial-gradient(80% 65% at 100% 100%, #0e2550 0%, transparent 62%), linear-gradient(180deg, #071318 0%, #08111f 100%);
+  --wp-orchid: radial-gradient(70% 55% at 85% 8%, #3d1741 0%, transparent 58%), radial-gradient(75% 60% at 8% 92%, #221b4f 0%, transparent 60%), linear-gradient(180deg, #110b19 0%, #0d0b18 100%);
+  --wp-meadow: radial-gradient(80% 55% at 15% 10%, #1b3315 0%, transparent 60%), radial-gradient(80% 60% at 90% 95%, #0f3428 0%, transparent 62%), linear-gradient(170deg, #0b150c 0%, #0a1614 100%);
+  --wp-ember: radial-gradient(90% 55% at 50% 115%, #4d2410 0%, transparent 62%), radial-gradient(60% 45% at 90% 10%, #2c1a10 0%, transparent 60%), linear-gradient(180deg, #120c09 0%, #1a110b 100%);
+  --wp-nebula: radial-gradient(55% 45% at 20% 25%, #1c2a70 0%, transparent 60%), radial-gradient(50% 45% at 82% 18%, #4b1c6e 0%, transparent 60%), radial-gradient(60% 50% at 60% 92%, #0e4864 0%, transparent 62%), #070915;
+  --wp-signature: radial-gradient(75% 60% at 0% 0%, #15314f 0%, transparent 62%), radial-gradient(75% 60% at 100% 100%, #34173f 0%, transparent 62%), linear-gradient(135deg, #0a0e18 0%, #0d0a16 100%);
 }
-.phone-screen[data-wallpaper="aurora"], .wallpaper-swatch[data-wallpaper="aurora"], html[data-wallpaper="aurora"] body { background: var(--wp-aurora); }
-.phone-screen[data-wallpaper="ocean"], .wallpaper-swatch[data-wallpaper="ocean"], html[data-wallpaper="ocean"] body { background: var(--wp-ocean); }
-.phone-screen[data-wallpaper="sunrise"], .wallpaper-swatch[data-wallpaper="sunrise"], html[data-wallpaper="sunrise"] body { background: var(--wp-sunrise); }
-.phone-screen[data-wallpaper="lavender"], .wallpaper-swatch[data-wallpaper="lavender"], html[data-wallpaper="lavender"] body { background: var(--wp-lavender); }
-.phone-screen[data-wallpaper="mint"], .wallpaper-swatch[data-wallpaper="mint"], html[data-wallpaper="mint"] body { background: var(--wp-mint); }
-.phone-screen[data-wallpaper="peach"], .wallpaper-swatch[data-wallpaper="peach"], html[data-wallpaper="peach"] body { background: var(--wp-peach); }
-.phone-screen[data-wallpaper="sky"], .wallpaper-swatch[data-wallpaper="sky"], html[data-wallpaper="sky"] body { background: var(--wp-sky); }
+.phone-screen[data-wallpaper="mist"], .wallpaper-swatch[data-wallpaper="mist"], html[data-wallpaper="mist"] body { background: var(--wp-mist); }
+.phone-screen[data-wallpaper="dawn"], .wallpaper-swatch[data-wallpaper="dawn"], html[data-wallpaper="dawn"] body { background: var(--wp-dawn); }
+.phone-screen[data-wallpaper="lagoon"], .wallpaper-swatch[data-wallpaper="lagoon"], html[data-wallpaper="lagoon"] body { background: var(--wp-lagoon); }
+.phone-screen[data-wallpaper="orchid"], .wallpaper-swatch[data-wallpaper="orchid"], html[data-wallpaper="orchid"] body { background: var(--wp-orchid); }
+.phone-screen[data-wallpaper="meadow"], .wallpaper-swatch[data-wallpaper="meadow"], html[data-wallpaper="meadow"] body { background: var(--wp-meadow); }
+.phone-screen[data-wallpaper="ember"], .wallpaper-swatch[data-wallpaper="ember"], html[data-wallpaper="ember"] body { background: var(--wp-ember); }
+.phone-screen[data-wallpaper="nebula"], .wallpaper-swatch[data-wallpaper="nebula"], html[data-wallpaper="nebula"] body { background: var(--wp-nebula); }
 .phone-screen[data-wallpaper="signature"], .wallpaper-swatch[data-wallpaper="signature"], html[data-wallpaper="signature"] body { background: var(--wp-signature); }
+/* The photographs (public/wallpapers): covering the screen behind the workspace, softened a
+   touch by the theme so text and cards read on them; each swatch its own small copy. */
+:root { --wp-photo-veil: rgb(255 255 255 / 0.18); }
+.dark { --wp-photo-veil: rgb(5 8 16 / 0.42); }
+html[data-wallpaper="photo-fjord"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/fjord.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-fjord"] { background: url("/wallpapers/fjord-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-canyon"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/canyon.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-canyon"] { background: url("/wallpapers/canyon-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-highlands"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/highlands.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-highlands"] { background: url("/wallpapers/highlands-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-northern-lights"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/northern-lights.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-northern-lights"] { background: url("/wallpapers/northern-lights-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-alpine"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/alpine.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-alpine"] { background: url("/wallpapers/alpine-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-valley"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/valley.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-valley"] { background: url("/wallpapers/valley-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-coast"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/coast.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-coast"] { background: url("/wallpapers/coast-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-city"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/city.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-city"] { background: url("/wallpapers/city-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-sunset"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/sunset.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-sunset"] { background: url("/wallpapers/sunset-thumb.webp") center / cover no-repeat; }
+html[data-wallpaper="photo-dunes"] body { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/dunes.webp") center / cover no-repeat; }
+.wallpaper-swatch[data-wallpaper="photo-dunes"] { background: url("/wallpapers/dunes-thumb.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="plain"], .wallpaper-swatch[data-wallpaper="classic"] { background: var(--background); }
 /* An uploaded picture (Appearance): covering the screen, softened by the theme a little so
    text and cards read on any photo. */

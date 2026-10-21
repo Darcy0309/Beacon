@@ -26,8 +26,8 @@ const POS_KEY = "lighthouse.phone.position";
  * each with a deeper take in the dark theme. Kept on this computer.
  */
 export const WALLPAPERS = [
-  ["plain", "Plain"], ["aurora", "Aurora"], ["ocean", "Ocean"], ["sunrise", "Sunrise"], ["lavender", "Lavender"],
-  ["mint", "Mint"], ["peach", "Peach"], ["sky", "Sky"], ["signature", "Signature"],
+  ["plain", "Plain"], ["mist", "Mist"], ["dawn", "Dawn"], ["lagoon", "Lagoon"], ["orchid", "Orchid"],
+  ["meadow", "Meadow"], ["ember", "Ember"], ["nebula", "Nebula"], ["signature", "Signature"],
 ];
 const WALLPAPER_KEY = "lighthouse.phone.wallpaper";
 const readWallpaper = () => {

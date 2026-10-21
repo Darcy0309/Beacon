@@ -123,15 +123,15 @@ try {
   section("Settings: the phone's wallpaper");
   await sean.click('[data-phone-tab="settings"]');
   check("Settings shows the wallpapers to pick from", Boolean(await until(() => sean.ev(`document.querySelectorAll('[data-phone-settings] [data-wallpaper-pick]').length >= 8`))));
-  await sean.click('[data-wallpaper-pick="aurora"]');
-  check("…picking one puts it behind the screen", Boolean(await until(() => sean.ev(`document.querySelector('[data-phone-screen]')?.dataset.wallpaper === 'aurora'`)))
+  await sean.click('[data-wallpaper-pick="lagoon"]');
+  check("…picking one puts it behind the screen", Boolean(await until(() => sean.ev(`document.querySelector('[data-phone-screen]')?.dataset.wallpaper === 'lagoon'`)))
     && (await sean.ev(`getComputedStyle(document.querySelector('[data-phone-screen]')).backgroundImage`)).includes("gradient"));
   if (process.env.SHOTS) await sean.screenshot(`${process.env.SHOTS}/phone-settings.png`);
   await sean.click("[data-phone-settings-done]");
   check("…Done goes back to the keypad, on the new wallpaper", Boolean(await until(() => sean.ev(`!!document.querySelector('[data-phone-key="5"]')`)))
-    && (await sean.ev(`document.querySelector('[data-phone-screen]').dataset.wallpaper`)) === "aurora");
+    && (await sean.ev(`document.querySelector('[data-phone-screen]').dataset.wallpaper`)) === "lagoon");
   if (process.env.SHOTS) await sean.screenshot(`${process.env.SHOTS}/phone-wallpaper.png`);
-  check("…and it is kept for next time", (await sean.ev(`localStorage.getItem('lighthouse.phone.wallpaper')`)) === "aurora");
+  check("…and it is kept for next time", (await sean.ev(`localStorage.getItem('lighthouse.phone.wallpaper')`)) === "lagoon");
   await sean.click('[data-phone-tab="settings"]');
   await sean.click('[data-wallpaper-pick="plain"]');
   await sean.click("[data-phone-settings-done]");

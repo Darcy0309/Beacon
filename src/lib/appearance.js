@@ -14,14 +14,20 @@
  */
 export const APPEARANCE_KEY = "lighthouse.appearance";
 export const DESKTOP_WALLPAPERS = [
-  ["classic", "Classic"], ["aurora", "Aurora"], ["ocean", "Ocean"], ["sunrise", "Sunrise"], ["lavender", "Lavender"],
-  ["mint", "Mint"], ["peach", "Peach"], ["sky", "Sky"], ["signature", "Signature"],
+  ["classic", "Classic"], ["mist", "Mist"], ["dawn", "Dawn"], ["lagoon", "Lagoon"], ["orchid", "Orchid"],
+  ["meadow", "Meadow"], ["ember", "Ember"], ["nebula", "Nebula"], ["signature", "Signature"],
+];
+/** Photographs behind the workspace (public/wallpapers, free to use: Unsplash, by way of Picsum). */
+export const PHOTO_WALLPAPERS = [
+  ["photo-fjord", "Fjord"], ["photo-canyon", "Canyon"], ["photo-highlands", "Highlands"], ["photo-northern-lights", "Northern lights"],
+  ["photo-alpine", "Alpine"], ["photo-valley", "Valley"], ["photo-coast", "Coast"], ["photo-city", "City"],
+  ["photo-sunset", "Sunset"], ["photo-dunes", "Dunes"],
 ];
 export const LIVE_WALLPAPERS = [
   ["live-constellation", "Constellation"], ["live-waves", "Waves"], ["live-glow", "Glow"], ["live-starfield", "Starfield"],
 ];
 export const APPEARANCE_IMAGE_KEY = "lighthouse.appearance.image";
-const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...LIVE_WALLPAPERS].map(([k]) => k).concat("custom"));
+const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...PHOTO_WALLPAPERS, ...LIVE_WALLPAPERS].map(([k]) => k).concat("custom"));
 export const MAX_SHIFT = 0.3;
 export const STYLES = [["modern", "Modern"], ["classic", "Classic"]];
 export const DEFAULT_APPEARANCE = { style: "modern", wallpaper: "classic", light: 0, dark: 0 };
