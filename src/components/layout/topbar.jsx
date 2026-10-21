@@ -6,7 +6,7 @@ import NotificationBell from "@/features/notifications/components/notification-b
 /** `tag`: a short line beside the title (the dashboard's "Signature Marketing · Lighthouse Platform"). */
 export default function Topbar({ title, sub, tag }) {
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[var(--panel-border)] bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
+    <header className="sticky top-0 z-40 flex items-center gap-3 border-b border-[var(--panel-border)] bg-background/80 px-4 py-3 backdrop-blur-sm sm:px-6">
       <MobileNav />
       <div className="min-w-0">
         <div className="flex min-w-0 items-baseline gap-3">
