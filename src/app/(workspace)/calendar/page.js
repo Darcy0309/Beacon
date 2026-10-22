@@ -113,7 +113,7 @@ export default async function CalendarPage({ searchParams }) {
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         {/* One line: whose calendar this is, its blocked time still to come, and blocking out more. */}
         {calendars.length || scope ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--panel-border)] bg-card/60 px-4 py-2.5" data-calendar-picker>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-[var(--panel-border)] surface-chip px-4 py-2.5" data-calendar-picker>
             {calendars.length ? (
               <ParamSelect name="project" label="Project calendar" placeholder="Every calendar" value={id(sp?.project) ? String(openId ?? "") : ""} options={calendars} clears={["client", "a"]} />
             ) : null}

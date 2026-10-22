@@ -62,7 +62,7 @@ export default async function CallListPage({ params, searchParams }) {
       <Topbar title="Call List" sub={`${project.name} · ${project.client}`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link href="/work" className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+          <Link href="/work" className="back-link inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
             <ArrowLeft className="size-3.5" /> Change project
           </Link>
           {canLookAtOthers && reps.length ? (

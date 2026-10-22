@@ -140,7 +140,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     <>
       <Topbar title="Project" sub={p.name} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
-        <Link href="/projects" className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+        <Link href="/projects" className="back-link inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
           <ArrowLeft className="size-3.5" /> Back to projects
         </Link>
 

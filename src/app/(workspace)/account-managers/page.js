@@ -82,7 +82,7 @@ export default async function AccountManagersPage({ searchParams }) {
       <Topbar title="Account Managers" sub="Team performance and book of business" />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         {/* The days the figures count: the pay period to begin with. */}
-        <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--panel-border)] bg-card/60 px-4 py-2.5" data-manager-period>
+        <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-[var(--panel-border)] surface-chip px-4 py-2.5" data-manager-period>
           <span className="mr-auto text-xs text-muted-foreground">Clients and leads held are as they stand now; the rest count the days chosen.</span>
           <PeriodSwitch param="p" current={view.key} params={otherParams(sp, "p", "pf", "pt")} options={VIEW_PERIODS} base={BASE} />
           {/* Days of one's own: the picker submits these with the rest of the address. */}

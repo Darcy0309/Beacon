@@ -134,7 +134,7 @@ export default function CalendarView(props) {
     <FocusedAppointment.Provider value={focusId}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-1 rounded-lg border border-[var(--panel-border)] p-1">
+        <div className="surface-chip flex items-center gap-1 rounded-lg border border-[var(--panel-border)] p-1">
           {["day", "week", "month"].map((v) => (
             <Link
               key={v}
@@ -152,15 +152,15 @@ export default function CalendarView(props) {
         </div>
         <div className="flex items-center gap-1">
           <Link href={prev} scroll={false} aria-label={`Previous ${view}`}
-            className="flex size-7 items-center justify-center rounded-md border border-[var(--panel-border)] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
+            className="surface-chip flex size-7 items-center justify-center rounded-md border border-[var(--panel-border)] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
             <ChevronLeft className="size-3.5" />
           </Link>
           <Link href={todayHref} scroll={false}
-            className="rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
+            className="surface-chip rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
             Today
           </Link>
           <Link href={next} scroll={false} aria-label={`Next ${view}`}
-            className="flex size-7 items-center justify-center rounded-md border border-[var(--panel-border)] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
+            className="surface-chip flex size-7 items-center justify-center rounded-md border border-[var(--panel-border)] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
             <ChevronRight className="size-3.5" />
           </Link>
         </div>

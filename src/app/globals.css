@@ -241,6 +241,23 @@
   background-color: color-mix(in srgb, var(--card) 80%, transparent);
   border-radius: var(--radius-xl);
 }
+/* A control that sits on the page itself rather than in a panel (the calendar's view switch and
+   arrows, a page's back link): the panels' own backing, so it reads over a wallpaper or photo. */
+.surface-chip {
+  background-color: color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+html[data-style="modern"] .surface-chip { background-color: var(--card); }
+/* A back link is plain text on the page: over a wallpaper it gets the same backing, as a pill. */
+html[data-wallpaper] .back-link {
+  padding: 0.3rem 0.7rem;
+  border-radius: 9999px;
+  border: 1px solid var(--panel-border);
+  background-color: color-mix(in srgb, var(--card) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+html[data-wallpaper][data-style="modern"] .back-link { background-color: var(--card); }
+
 /* The accent rail along the top edge. Dimmed only when the animated streak
    is present, so it keeps the tile's hue while the streak is on another edge. */
 [data-accent-edge]::before {

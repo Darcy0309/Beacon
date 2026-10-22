@@ -319,7 +319,7 @@ export default async function LeadSheet({ params, searchParams }) {
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
-            <Link href={back.href} className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+            <Link href={back.href} className="back-link inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
               <ArrowLeft className="size-3.5" /> {back.label}
             </Link>
           </div>
