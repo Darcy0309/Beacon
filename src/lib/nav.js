@@ -58,7 +58,8 @@ export const navGroups = [
     items: [
       // Administrators only (Sean, Oct 2026): a manager works their call lists from My Projects.
       { href: "/clients", label: "Clients", icon: Users, roles: ["admin"] },
-      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin"] },
+      // A client's people see their own projects (Sean, Oct 2026), without what is ours to see or change.
+      { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "client"] },
       { href: "/account-managers", label: "Account Managers", icon: UserCog, roles: ["admin"] },
       { href: "/insurance-companies", label: "Insurance Cos.", icon: Building2, roles: ["admin"] },
     ],

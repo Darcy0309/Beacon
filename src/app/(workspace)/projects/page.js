@@ -15,6 +15,7 @@ import { getClientGroups } from "@/features/clients/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
+import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,17 @@ export default async function ProjectsPage({ searchParams }) {
   const params = readListParams(await searchParams, ["status", "type", "client", "group"]);
   // ?group=<insurance company id>: the projects of the clients in that agency group.
   if (params.filters.group && !/^[1-9]\d{0,17}$/.test(params.filters.group)) delete params.filters.group;
-  const [{ rows, total }, stats, lookups, offices, clientGroups] = await Promise.all([listProjects(params), getProjectStats(), getLookups(), getOfficeOptions(), getClientGroups()]);
+  // A client's people see their own projects (Sean, Oct 2026): Row Level Security gives them no others; what is
+  // ours to change (new, edit, delete), and the other clients' filters and contract value, is not shown them.
+  const me = await getCurrentUser();
+  const client = me?.role === "client";
+  if (client) {
+    delete params.filters.client;
+    delete params.filters.group;
+  }
+  const [{ rows, total }, stats, lookups, offices, clientGroups] = await Promise.all([
+    listProjects(params), getProjectStats(), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(),
+  ]);
   const { projects } = stats;
   const statsOf = new Map(projects.map((p) => [p.id, p]));
   const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
@@ -46,8 +57,8 @@ export default async function ProjectsPage({ searchParams }) {
       // As the tile's own heading reads.
       note: <span className="stat-label" data-dbdev-count>{projects.filter((p) => p.type === "DBDV").length} database development</span>,
       icon: Activity, accent: "var(--neon-violet)", series: projects.map((p) => (p.type === "APPT" ? 1 : 0)), bars: true },
-    { label: "Contract Value", value: contract ? `$${Math.round(contract / 1000)}k` : "—", note: "across active work",
-      icon: DollarSign, accent: "var(--neon-amber)", series: projects.map((p) => Number(p.amount ?? 0)), bars: true },
+    ...(client ? [] : [{ label: "Contract Value", value: contract ? `$${Math.round(contract / 1000)}k` : "—", note: "across active work",
+      icon: DollarSign, accent: "var(--neon-amber)", series: projects.map((p) => Number(p.amount ?? 0)), bars: true }]),
   ];
 
   return (
@@ -64,15 +75,15 @@ export default async function ProjectsPage({ searchParams }) {
           <SectionHeader
             label="All Projects"
             icon={FolderKanban}
-            action={<ProjectForm options={options} trigger={<Button size="sm"><Plus /> New project</Button>} />}
+            action={client ? null : <ProjectForm options={options} trigger={<Button size="sm"><Plus /> New project</Button>} />}
           />
           <FilterTable
-            columns={["Project", "Client", "Type", "Leads", "To call", "Status", "Manager", { label: "Action", className: "text-right" }]}
+            columns={["Project", "Client", "Type", "Leads", "To call", "Status", ...(client ? [] : ["Manager"]), { label: "Action", className: "text-right" }]}
             filters={[
               { key: "status", label: "Status", options: options.projectStatuses.map((s) => ({ value: s.name, label: s.name })) },
               { key: "type", label: "Type", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
-              { key: "client", label: "Client", kind: "select", options: options.companies.map((c) => ({ value: c.name, label: c.name })) },
-              ...(groupOptions.length ? [{ key: "group", label: "Agency group", kind: "select", options: groupOptions }] : []),
+              ...(client ? [] : [{ key: "client", label: "Client", kind: "select", options: options.companies.map((c) => ({ value: c.name, label: c.name })) }]),
+              ...(!client && groupOptions.length ? [{ key: "group", label: "Agency group", kind: "select", options: groupOptions }] : []),
             ]}
             placeholder="Search projects…"
             empty="No projects yet."
@@ -103,8 +114,11 @@ export default async function ProjectsPage({ searchParams }) {
                   <TableCell className="tabular-nums text-muted-foreground" data-project-to-call
                     title={p.type === "DBDV" ? "Names still to call" : "Leads still to call for an appointment"}>{(statsOf.get(p.id)?.toCall ?? 0).toLocaleString()}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge></TableCell>
-                  <TableCell>{p.manager}</TableCell>
+                  {client ? null : <TableCell>{p.manager}</TableCell>}
                   <TableCell className="text-right">
+                    {client ? (
+                      <Link href={`/projects/${p.id}`} className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Open</Link>
+                    ) : (
                     <RowActions
                       name={p.name}
                       href={`/projects/${p.id}`}
@@ -123,6 +137,7 @@ export default async function ProjectsPage({ searchParams }) {
                       onDelete={deleteProject}
                       warning={`The project comes off Lighthouse for everyone, with its ${Number(p.leads).toLocaleString()} name${Number(p.leads) === 1 ? "" : "s"} and their appointments: no list, call list, calendar or count shows them. Nothing is erased: an administrator can restore all of it under Settings › Deleted records. Calls made and pay earned stay as they are.`}
                     />
+                    )}
                   </TableCell>
                 </TableRow>
               ),

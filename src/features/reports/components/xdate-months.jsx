@@ -23,7 +23,7 @@ const monthTips = (months) =>
 
 /**
  * Renewals per month of the year, as stacked columns and as a table. Every
- * number is a link to the names behind it: `href(month, bucket)` builds it
+ * number is a link to the names behind it: `href(month, bucket)` builds it (none without `href`)
  * (bucket null for the month's total). `selected` marks the one open.
  * `compact` draws the columns only, for the project page. `today` (the
  * business's "YYYY-MM-DD") marks the current month; the server's own clock
@@ -38,6 +38,8 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
   const number = (m, bucket) => {
     const n = bucket ? m[bucket] : m.total;
     if (!n) return <span className="text-muted-foreground">0</span>;
+    // Without `href` (a client's view of their project), figures only: the names behind them are an administrator's report.
+    if (!href) return <span className="px-1.5 py-0.5 font-semibold tabular-nums">{n.toLocaleString()}</span>;
     return (
       <Link
         href={href(m.month, bucket)}
@@ -77,7 +79,10 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
                   style={{ height: `${(m.total / max) * 100}%`, animationDelay: `${i * 45}ms` }}
                 >
                   {SEGMENTS.map((s) =>
-                    m[s.key] ? (
+                    m[s.key] && !href ? (
+                      <span key={s.key} data-seg={s.key} data-tip-row={s.key} aria-label={`${m.label}: ${m[s.key]} ${s.label.toLowerCase()}`}
+                        className="block w-full" style={{ height: `${(m[s.key] / m.total) * 100}%`, background: s.color, minHeight: 2 }} />
+                    ) : m[s.key] ? (
                       <Link
                         key={s.key}
                         href={href(m.month, s.key)}

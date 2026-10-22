@@ -62,7 +62,7 @@ export default async function ProjectDetail({ params, searchParams }) {
   const pid = Number(id);
   const meP = getCurrentUser();
   const todayP = getBusinessToday();
-  const role = (me) => ({ admin: me?.role === "admin", canManage: me?.role === "admin" || me?.role === "manager" });
+  const role = (me) => ({ admin: me?.role === "admin", canManage: me?.role === "admin" || me?.role === "manager", client: me?.role === "client" });
   // The months its calendar shows: the one before this, this, and the three after.
   const span = (today) => ({ first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) });
   // Counted by call result, as on the client's page; and the project's calendar (a DB dev
@@ -95,7 +95,9 @@ export default async function ProjectDetail({ params, searchParams }) {
     meP.then((me) => (role(me).canManage ? getProjectMonthCounts([pid]) : {})),
   ]);
   if (!p) notFound();
-  const { admin, canManage } = role(me);
+  // A client's people (Sean, Oct 2026): their own project (Row Level Security), without its description (our billing
+  // notes), pay, Edit, its reps or the Assigned filter.
+  const { admin, canManage, client } = role(me);
   const calendar = span(today);
   const dbdev = p.type === "DBDV";
 
@@ -104,17 +106,18 @@ export default async function ProjectDetail({ params, searchParams }) {
   const canOpenLists = admin || team.some((r) => r.id === me?.id);
   const byMonth = (key) => xdates.months.map((m) => m[key]);
 
-  const waiting = overview.unassigned ? `${overview.unassigned.toLocaleString()} waiting for a rep` : `across ${team.length} rep${team.length === 1 ? "" : "s"}`;
+  // Who works it is ours: a client's people are not told of reps.
+  const waiting = client ? null : overview.unassigned ? `${overview.unassigned.toLocaleString()} waiting for a rep` : `across ${team.length} rep${team.length === 1 ? "" : "s"}`;
   const tiles = [
     // DB dev only: an appointment project's names are leads, counted in the next tile.
     ...(dbdev ? [{ label: "Names Left to Call", value: s.namesLeft.toLocaleString(),
       note: [`of ${s.names.toLocaleString()} names`, overview.pending ? `${overview.pending.toLocaleString()} pending` : null, waiting].filter(Boolean).join(" · "),
       icon: ListChecks, accent: "var(--neon-cyan)", series: byMonth("viable") }] : []),
     { label: "Leads", value: s.leads.toLocaleString(),
-      note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved${dbdev ? "" : ` · ${waiting}`}`,
+      note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved${dbdev || !waiting ? "" : ` · ${waiting}`}`,
       icon: Target, accent: "var(--neon-emerald)", series: byMonth("total"), bars: true },
     { label: "Appointments", value: s.appointments.toLocaleString(),
-      note: `${s.invalid.toLocaleString()} invalid · ${overview.apptsMonth} this month · ${overview.qaPending} in QA`,
+      note: `${s.invalid.toLocaleString()} invalid · ${overview.apptsMonth} this month${client ? "" : ` · ${overview.qaPending} in QA`}`,
       icon: CalendarCheck, accent: "var(--neon-violet)", series: byMonth("appointment"), bars: true },
     dbdev
       ? { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
@@ -154,7 +157,7 @@ export default async function ProjectDetail({ params, searchParams }) {
                   <h2 className="break-words text-lg font-bold tracking-tight">{p.name}</h2>
                   <p className="text-sm text-muted-foreground">
                     <Link href={`/clients/${clientSlug(p.client)}`} className="transition-colors hover:text-primary hover:underline">{p.client}</Link>
-                    {team.length ? ` · ${team.map((r) => r.short).join(", ")}` : " · nobody assigned"}
+                    {client ? null : team.length ? ` · ${team.map((r) => r.short).join(", ")}` : " · nobody assigned"}
                     {p.salesRep ? <span data-project-sales-rep> · Sales Rep {p.salesRep}</span> : null}
                   </p>
                 </div>
@@ -163,10 +166,10 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <ToneBadge tone={typeTone[p.type] ?? "slate"}>{p.type}</ToneBadge>
                 <ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge>
                 {admin ? <ProjectRatesForm project={rates} ranges={payRules?.rates} /> : null}
-                <ProjectForm project={p.raw ? { ...p.raw, company: p.raw.company?.[0] ?? p.raw.company, type: p.raw.type?.[0] ?? p.raw.type, status: p.raw.status?.[0] ?? p.raw.status } : p} options={options} />
+                {client ? null : <ProjectForm project={p.raw ? { ...p.raw, company: p.raw.company?.[0] ?? p.raw.company, type: p.raw.type?.[0] ?? p.raw.type, status: p.raw.status?.[0] ?? p.raw.status } : p} options={options} />}
               </div>
             </div>
-            {p.description ? <p className="mt-4 text-sm text-muted-foreground">{p.description}</p> : null}
+            {p.description && !client ? <p className="mt-4 text-sm text-muted-foreground">{p.description}</p> : null}
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {p.startDate !== "—" || p.endDate !== "—" ? <span>{p.startDate} — {p.endDate}</span> : null}
               {raw.contact_name || raw.city || raw.phone ? (
@@ -204,7 +207,7 @@ export default async function ProjectDetail({ params, searchParams }) {
             className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
         </div>
 
-        <ProjectTeam
+        {client ? null : <ProjectTeam
           projectId={p.id}
           team={team}
           staff={staff}
@@ -212,7 +215,7 @@ export default async function ProjectDetail({ params, searchParams }) {
           canOpenLists={canOpenLists}
           unassigned={overview.unassigned}
           namesLeft={overview.viableLeft}
-        />
+        />}
 
         {/* The client's profile sheet (Sean, Oct 2026): what managers read on every lead sheet. The client
             fills it in from a private link as they come on board, and from their own sign-in after. */}
@@ -236,14 +239,14 @@ export default async function ProjectDetail({ params, searchParams }) {
           <SectionHeader
             label="X-Dates by Month"
             icon={CalendarSearch}
-            action={
+            action={client ? null : (
               <Link href={`/reports/x-dates?project=${p.id}`} className="flex items-center gap-1 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75">
                 Full report <ArrowRight className="size-3" />
               </Link>
-            }
+            )}
           />
           <div className="p-5">
-            <XdateMonths data={xdates} href={xdateHref} today={today} compact />
+            <XdateMonths data={xdates} href={client ? null : xdateHref} today={today} compact />
           </div>
         </Card>
 
@@ -269,7 +272,7 @@ export default async function ProjectDetail({ params, searchParams }) {
             filters={[
               // A project's names stand on its own kind of project's results.
               { key: "result", label: "Call result", kind: "select", options: callResults.filter((c) => c.project_type === (dbdev ? "DBDV" : "APPT")).map((c) => ({ value: String(c.id), label: c.name })) },
-              { key: "rep", label: "Assigned", kind: "select", options: team.map((r) => ({ value: String(r.id), label: r.name })) },
+              ...(client ? [] : [{ key: "rep", label: "Assigned", kind: "select", options: team.map((r) => ({ value: String(r.id), label: r.name })) }]),
             ]}
             placeholder="Search this project's leads…"
             empty="No leads on this project yet."
