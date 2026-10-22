@@ -30,8 +30,17 @@ export const PAY_PERIODS = [
 export const RATE_KINDS = [
   ["lead", "lead_rate", "Lead pay", "A DBDev Lead result: the name promoted to appointment setting"],
   ["appointment", "appointment_rate", "Appointment pay", "An appointment set from a call"],
-  ["special", "confirmation_rate", "Special pay", "Added for the account manager who confirms an appointment (Appointment-Confirmed)"],
+  ["special", "confirmation_rate", "Confirmation pay", "Added for the account manager who confirms an appointment (Appointment-Confirmed)"],
 ];
+
+/**
+ * A DB dev project's Special Pay as the pages say it (Sean, Oct 2026): "$1.00
+ * a lead at 5 leads a pay period", or null when it has none.
+ */
+export function specialPayLabel(goal, rate) {
+  if (!goal || !(Number(rate) > 0)) return null;
+  return `${usd(rate)} a lead at ${goal} lead${goal === 1 ? "" : "s"} a pay period`;
+}
 
 const cents = (n) => Math.round(Number(n) * 100);
 

@@ -8,7 +8,7 @@
  *
  *   npm run test:e2e
  */
-import { check, finish, section, until } from "../support/assert.mjs";
+import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
@@ -20,11 +20,12 @@ const typeId = (c) => sql(`select id from public.project_types where code=${lit(
 const today = sql("select (now() at time zone public.business_tz())::date");
 const month = (n) => Number(sql(`select extract(month from ('${today}'::date + interval '${n} month'))::int`));
 const [M1, M2] = [month(1), month(2)];
-const company = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Insurance`)}, ${MIKE}) returning id`));
+// The client is on Eastern time; only the DB dev project has a time zone of its own (Pacific).
+const company = Number(sql(`insert into public.companies (name, sales_rep_id, timezone_id) values (${lit(`${TAG} Insurance`)}, ${MIKE}, 1) returning id`));
 const P = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id, state, appointment_rate, confirmation_rate)
   values (${lit(`${TAG} Trucking_Appts`)}, ${company}, ${typeId("APPT")}, 1, 'AZ', 35, 5) returning id`));
-const Q = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id, state, lead_rate)
-  values (${lit(`${TAG} Churches_DBDev`)}, ${company}, ${typeId("DBDV")}, 1, 'NE', 9) returning id`));
+const Q = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id, state, lead_rate, special_goal, special_rate, timezone_id)
+  values (${lit(`${TAG} Churches_DBDev`)}, ${company}, ${typeId("DBDV")}, 1, 'NE', 9, 5, 1, 4) returning id`));
 // Sean works both; Rachel shares the first.
 sql(`insert into public.project_assignments (project_id, ae_user_id) values (${P}, ${SEAN}), (${P}, ${RACHEL}), (${Q}, ${SEAN})`);
 const result = (type, cond) => sql(`select id from public.call_results where project_type = '${type}' and ${cond} order by id limit 1`);
@@ -77,8 +78,17 @@ try {
     && Boolean(await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"]').dataset.stale`)), JSON.stringify(cells));
   check("…the DB dev project, worked today, not red, its pay a lead's ($9)", !(await admin.ev(`document.querySelector('[data-pipeline-row="${Q}-${SEAN}"]')?.dataset.stale`))
     && /\$9/.test(await rowText(admin, `${Q}-${SEAN}`)));
-  check("…shared with one other manager: Rachel, on hover", (await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-shared]')?.dataset.shared`)) === "1"
-    && /Rachel/.test(await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-shared-names]')?.textContent ?? ''`)));
+  const qCells = await admin.ev(`[...document.querySelector('[data-pipeline-row="${Q}-${SEAN}"]').cells].map((c) => c.innerText.trim().replace(/\\s+/g, ' '))`);
+  check("…its Special Pay a lead at its goal, not a confirmation's", qCells[15] === "$1 at 5 leads", JSON.stringify(qCells));
+  check("the time zone: the project's own (PST), none when it has none (not the client's EST)", qCells[1] === "PST" && cells[1] === "—", `${qCells[1]} / ${cells[1]}`);
+  // Focus opens it as hover does (a toast in the corner could sit over the badge for the mouse).
+  await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-shared]').scrollIntoView({ block: 'center' })`);
+  await sleep(300);
+  await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-shared]').focus()`);
+  const tip = await until(() => admin.ev(`(() => { const t = document.querySelector('[data-tip-open="shared-${P}-${SEAN}"]'); if (!t || t.style.visibility === 'hidden') return null;
+    const r = t.getBoundingClientRect(); return { text: t.textContent, inWindow: r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth }; })()`));
+  check("…shared with one other manager: Rachel, on hover or focus, over the page", (await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-shared]')?.dataset.shared`)) === "1"
+    && /Rachel/.test(tip?.text ?? "") && tip.inWindow, JSON.stringify(tip));
   check("…by manager, then the one last worked longest ago", await admin.ev(`(() => { const keys = [...document.querySelectorAll('[data-pipeline-row]')].map((r) => r.dataset.pipelineRow);
     const a = keys.indexOf('${P}-${SEAN}'), b = keys.indexOf('${Q}-${SEAN}'); return a >= 0 && b > a; })()`));
   // The export: as the sample.
@@ -89,7 +99,8 @@ try {
   const csv = ((await until(() => admin.ev("window.__csv"))) ?? "").replace(/^﻿/, "").split(/\r\n/);
   const MON = (m) => ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][m - 1];
   check("Export CSV: the sample's columns, a row each", csv[0] === `projectname,TimeZone,ST,Manager,last appt set,LastWorked,Calls,${MON(M1)},${MON(M2)},${MON(month(3))},Total,Appts,OffTheList,ViableLeft,PAY,SpecialPay,SalesRep,Conv%,SharedWith`
-    && csv.some((l) => l.startsWith(`${TAG} Trucking_Appts,,AZ,Sean F,`) && l.includes(",6,2,0,8,2,1,5,$35,$5,Mike P,25%,Rachel C")), JSON.stringify(csv.slice(0, 3)));
+    && csv.some((l) => l.startsWith(`${TAG} Trucking_Appts,,AZ,Sean F,`) && l.includes(",6,2,0,8,2,1,5,$35,$5,Mike P,25%,Rachel C"))
+    && csv.some((l) => l.startsWith(`${TAG} Churches_DBDev,PST,NE,Sean F,`) && l.includes(",$9,$1,Mike P,")), JSON.stringify(csv.slice(0, 4)));
 
   section("Filtered");
   await admin.go(`/reports/x-dates?client=${company}&managers=${RACHEL}`, 6000);
@@ -112,6 +123,16 @@ try {
   await mgr.go("/reports/pipeline", 7000);
   check("in their Data & Insights", Boolean(await when(mgr, "!!document.querySelector('aside nav a[href=\"/reports/pipeline\"]')")));
   await when(mgr, "!!document.querySelector('[data-pipeline-report]')");
+  // A short report: the months list still shows all twelve, scrolling to December.
+  await mgr.mouseClick('[data-param-multi="months"] > button');
+  const months = '[data-param-multi-list="months"]';
+  await when(mgr, `!!document.querySelector('${months} [data-option="12"]')`);
+  await mgr.ev(`document.querySelector('${months} [role=listbox]').scrollTop = 1e6`);
+  await sleep(200);
+  const dec = await mgr.ev(`(() => { const o = document.querySelector('${months} [data-option="12"]'); const r = o.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { bottom: Math.round(r.bottom), window: innerHeight, reachable: !!hit && o.contains(hit) }; })()`);
+  check("the Renewal month list scrolls all the way to December, over the card's edge", dec.reachable && dec.bottom <= dec.window, JSON.stringify(dec));
+  await mgr.key("Escape");
   check("their projects' rows, each project opening its call list", (await mgr.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-pipeline-project]')?.getAttribute('href')`)) === `/work/${P}`);
   await mgr.go(`/reports/pipeline?months=${M2}&project=${P}`, 6000);
   await when(mgr, "!!document.querySelector('[data-pipeline-report]')");

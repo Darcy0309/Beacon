@@ -17,6 +17,7 @@ import { getProjectRates } from "@/features/projects/queries";
 import { getBusinessTimeZone, getProductionReport } from "@/features/reports/queries";
 import { daysBetween, PERIODS, readPeriod, trendStart } from "@/features/reports/period";
 import { GROUPINGS, groupProduction, withGroups } from "@/features/reports/production";
+import { specialPayLabel } from "@/lib/pay";
 import { getClientGroups } from "@/features/clients/queries";
 import { getPayRules } from "@/features/pay/queries";
 import { getAssignableStaff } from "@/features/users/queries";
@@ -28,7 +29,8 @@ export const dynamic = "force-dynamic";
 
 const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
 const usd = (n) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-const COUNTS = ["calls", "leads", "appointments", "confirmations", "chargebacks", "amount"];
+const COUNTS = ["calls", "leads", "appointments", "confirmations", "chargebacks", "specialPay", "amount"];
+const MONEY = new Set(["specialPay", "amount"]);
 const add = (into, r) => {
   for (const k of COUNTS) into[k] = (into[k] ?? 0) + r[k];
   return into;
@@ -176,6 +178,7 @@ export default async function ProductionReport({ searchParams }) {
                 <TableHead className="text-right">Appointments</TableHead>
                 <TableHead className="text-right">Confirmations</TableHead>
                 <TableHead className="text-right">Chargebacks</TableHead>
+                <TableHead className="text-right" title="Paid on a DB dev project's lead goal">Special Pay</TableHead>
                 <TableHead className="text-right">Pay</TableHead>
               </TableRow>
             </TableHeader>
@@ -188,6 +191,7 @@ export default async function ProductionReport({ searchParams }) {
                   <TableCell className="text-right tabular-nums">{r.appointments.toLocaleString()}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.confirmations.toLocaleString()}</TableCell>
                   <TableCell className={cn("text-right tabular-nums", r.chargebacks && "text-rose-400")}>{r.chargebacks.toLocaleString()}</TableCell>
+                  <TableCell className="text-right tabular-nums" data-special-pay>{r.specialPay ? usd(r.specialPay) : "—"}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">{usd(r.amount)}</TableCell>
                 </TableRow>
               ))}
@@ -195,12 +199,12 @@ export default async function ProductionReport({ searchParams }) {
                 <TableRow className="border-t-2 font-semibold">
                   <TableCell>Total</TableCell>
                   {COUNTS.map((k) => (
-                    <TableCell key={k} className="text-right tabular-nums">{k === "amount" ? usd(totals[k]) : totals[k].toLocaleString()}</TableCell>
+                    <TableCell key={k} className="text-right tabular-nums">{MONEY.has(k) ? usd(totals[k]) : totals[k].toLocaleString()}</TableCell>
                   ))}
                 </TableRow>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">No calls or paid events {range.period === "today" ? "yet today" : "in this period"}.</TableCell>
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">No calls or paid events {range.period === "today" ? "yet today" : "in this period"}.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -216,7 +220,8 @@ export default async function ProductionReport({ searchParams }) {
                   <TableHead>Client</TableHead>
                   <TableHead className="text-right">Lead pay</TableHead>
                   <TableHead className="text-right">Appointment pay</TableHead>
-                  <TableHead className="text-right">Special pay</TableHead>
+                  <TableHead className="text-right">Confirmation pay</TableHead>
+                  <TableHead className="text-right">Special Pay</TableHead>
                   <TableHead className="text-right">Chargebacks</TableHead>
                   <TableHead className="text-right">Total pay</TableHead>
                 </TableRow>
@@ -230,6 +235,7 @@ export default async function ProductionReport({ searchParams }) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.leadPay)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.appointmentPay)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{usd(c.confirmationPay)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(c.specialPay)}</TableCell>
                     <TableCell className={cn("text-right tabular-nums", c.chargebackAmount && "text-rose-400")}>{usd(c.chargebackAmount)}</TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">{usd(c.amount)}</TableCell>
@@ -275,7 +281,8 @@ export default async function ProductionReport({ searchParams }) {
           <Card id="rates">
             <SectionHeader label="Pay Rates by Project" icon={Banknote} />
             <p className="border-b border-[var(--panel-border)] px-5 py-3 text-sm text-muted-foreground">
-              What each project pays for a lead, an appointment, and the special pay for confirming an appointment, picked from the ranges in Settings.
+              What each project pays for a lead, an appointment, and confirming an appointment, picked from the ranges in Settings, and a DB dev
+              project&apos;s Special Pay: more a lead once a rep develops its goal of leads there in a pay period.
               {unratedProjects ? ` ${unratedProjects} of ${rates.length} still pay $0: set them when the rate sheet arrives.` : ""}
               {" "}A new rate applies from the next event; what is already earned keeps its rate.
             </p>
@@ -286,7 +293,8 @@ export default async function ProductionReport({ searchParams }) {
                   <TableHead>Client</TableHead>
                   <TableHead className="text-right">Lead pay</TableHead>
                   <TableHead className="text-right">Appointment pay</TableHead>
-                  <TableHead className="text-right">Special pay</TableHead>
+                  <TableHead className="text-right">Confirmation pay</TableHead>
+                  <TableHead className="text-right">Special Pay</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -301,6 +309,7 @@ export default async function ProductionReport({ searchParams }) {
                     <TableCell className="text-right tabular-nums">{usd(p.lead)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(p.appointment)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(p.confirmation)}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground" data-special-pay>{specialPayLabel(p.specialGoal, p.specialRate) ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       <ProjectRatesForm project={p} ranges={payRules?.rates} trigger={<Button size="sm" variant="ghost"><Banknote /> Set rates</Button>} />
                     </TableCell>

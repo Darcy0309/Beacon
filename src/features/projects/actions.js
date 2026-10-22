@@ -111,9 +111,13 @@ export async function redistributeProject(formData) {
   return ok({ message: sharedOut(data) });
 }
 
-/** An administrator sets one project's pay rates (USD per lead, appointment, confirmation). */
+/**
+ * An administrator sets one project's pay rates (USD per lead, appointment,
+ * confirmation) and, on a DB dev project, its Special Pay: the leads a rep
+ * develops there in a pay period to earn it, and how much more a lead.
+ */
 export async function saveProjectRates(prevState, formData) {
-  const { failed } = check(formData, schemas.projectRates);
+  const { failed } = check(formData, schemas.projectRates, cross.projectRates);
   if (failed) return failed;
   const projectId = idFrom(formData, "project_id");
   if (!projectId) return fail("That project no longer exists");
@@ -121,6 +125,7 @@ export async function saveProjectRates(prevState, formData) {
   const supabase = await createClient();
   // "$12.50" and "1,000" are fine; a blank rate is $0.
   const rate = (key) => Number(String(formData.get(key) ?? "").replace(/[$,\s]/g, "")) || 0;
+  const values = () => formValues(formData, Object.keys(schemas.projectRates));
   const { data, error } = await supabase.rpc("set_project_rates", {
     p_project_id: projectId,
     p_lead: rate("lead_rate"),
@@ -129,17 +134,29 @@ export async function saveProjectRates(prevState, formData) {
   });
   if (error) {
     // A rate outside its range in Settings: say so beside that rate.
-    const field = [[/^Lead pay/, "lead_rate"], [/^Appointment pay/, "appointment_rate"], [/^Special pay/, "confirmation_rate"]]
+    const field = [[/^Lead pay/, "lead_rate"], [/^Appointment pay/, "appointment_rate"], [/^(Confirmation|Special) pay/, "confirmation_rate"]]
       .find(([re]) => re.test(error.message))?.[1];
     // With what was chosen, so the form resets to it rather than to the old rates.
-    return fail(error, field ? { [field]: error.message } : null, formValues(formData, Object.keys(schemas.projectRates)));
+    return fail(error, field ? { [field]: error.message } : null, values());
+  }
+  // Special Pay: only a DB dev project's form has it.
+  let special = null;
+  if (formData.has("special_goal")) {
+    const goal = Number(String(formData.get("special_goal") ?? "").trim()) || null;
+    const res = await supabase.rpc("set_project_special_pay", { p_project_id: projectId, p_goal: goal, p_rate: goal ? rate("special_rate") : 0 });
+    if (res.error) {
+      const field = /goal/i.test(res.error.message) ? "special_goal" : "special_rate";
+      return fail(res.error, { [field]: res.error.message }, values());
+    }
+    special = res.data;
   }
 
   await logActivity(supabase, "project.rates", {
     entity: "project", entityId: projectId,
-    detail: `lead ${data.lead_rate} · appointment ${data.appointment_rate} · special pay ${data.confirmation_rate}`,
+    detail: [`lead ${data.lead_rate} · appointment ${data.appointment_rate} · confirmation ${data.confirmation_rate}`,
+      special ? (special.special_goal ? `Special Pay ${special.special_rate} a lead at ${special.special_goal} leads` : "no Special Pay") : null].filter(Boolean).join(" · "),
   });
   revalidatePath("/reports/production");
   revalidatePath(`/projects/${projectId}`);
-  return ok(data);
+  return ok({ ...data, ...(special ?? {}) });
 }

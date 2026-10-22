@@ -170,7 +170,7 @@ export async function getProjectRates() {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, lead_rate, appointment_rate, confirmation_rate, type:project_types(code), company:companies(name)")
+    .select("id, name, lead_rate, appointment_rate, confirmation_rate, special_goal, special_rate, type:project_types(code), company:companies(name)")
     .order("name");
   if (error) throw error;
   return (data ?? []).map((p) => ({
@@ -181,6 +181,8 @@ export async function getProjectRates() {
     lead: Number(p.lead_rate ?? 0),
     appointment: Number(p.appointment_rate ?? 0),
     confirmation: Number(p.confirmation_rate ?? 0),
+    specialGoal: p.special_goal ?? null,
+    specialRate: Number(p.special_rate ?? 0),
   }));
 }
 

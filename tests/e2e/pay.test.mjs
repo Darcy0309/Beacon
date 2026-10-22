@@ -44,7 +44,7 @@ try {
     const leads = await admin.ev("[...document.querySelectorAll('select[name=lead_rate] option')].map((o) => o.value)");
     check("a project's lead rate list now reaches $13", leads.includes("12.50") && leads.includes("13.00"), leads.join(" "));
     const special = await admin.ev("[...document.querySelectorAll('select[name=confirmation_rate] option')].map((o) => o.textContent)");
-    check("special pay is picked from $5–$20", special.includes("$5.00") && special.includes("$20.00") && special[0].includes("not paid"), special.join(" "));
+    check("confirmation pay is picked from $5–$20", special.includes("$5.00") && special.includes("$20.00") && special[0].includes("not paid"), special.join(" "));
     await admin.key("Escape");
   }
 
@@ -111,7 +111,7 @@ try {
     const csv = await admin.ev("fetch('/api/reports/production?period=month&by=client').then((r) => r.text())");
     const lines = csv.trim().split(/\r?\n/);
     check("by client: the client, its pay by kind, and a Total row",
-      lines[0].replace(/^﻿/, "") === "Client,Calls,Leads,Appointments,Confirmations,Chargebacks,Lead pay (USD),Appointment pay (USD),Special pay (USD),Chargebacks (USD),Total pay (USD)"
+      lines[0].replace(/^﻿/, "") === "Client,Calls,Leads,Appointments,Confirmations,Chargebacks,Lead pay (USD),Appointment pay (USD),Confirmation pay (USD),Special Pay (USD),Chargebacks (USD),Total pay (USD)"
       && (lines.length === 1 || lines.at(-1).startsWith("Total")), `${lines[0]} … ${lines.at(-1)}`);
   }
 } finally {

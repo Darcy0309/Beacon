@@ -110,7 +110,7 @@ try {
   section("Pay rates and the production report");
   await admin.go("/reports/production#rates", 4000);
   await admin.click(`tr[data-project="${PROJECT}"] button`, "Set rates");
-  // Each rate is picked from the range in Settings: lead $8–$12, appointment $30–$50, special pay $5–$20.
+  // Each rate is picked from the range in Settings: lead $8–$12, appointment $30–$50, confirmation pay $5–$20.
   await until(() => admin.ev("!!document.querySelector('select[name=lead_rate]')"));
   const leadChoices = await admin.ev("[...document.querySelectorAll('select[name=lead_rate] option')].map((o) => o.value).join(' ')");
   check("lead pay is picked from $0 or $8–$12 in 50¢ steps", leadChoices === "0.00 8.00 8.50 9.00 9.50 10.00 10.50 11.00 11.50 12.00", leadChoices);
@@ -135,13 +135,13 @@ try {
 
   await admin.go(`/reports/production?period=today&project=${PROJECT}`, 4000);
   const row = await cells(admin, `tr[data-rep="${SEAN}"]`);
-  check("today, on that project: Sean, 2 calls, 1 appointment, $30.00", row[0] === "Sean Fitzgerald" && row[1] === "2" && row[3] === "1" && row[6] === "$30.00", JSON.stringify(row));
+  check("today, on that project: Sean, 2 calls, 1 appointment, no Special Pay, $30.00", row[0] === "Sean Fitzgerald" && row[1] === "2" && row[3] === "1" && row[6] === "—" && row[7] === "$30.00", JSON.stringify(row));
   check("the Pay tile agrees", await until(async () => (await tile(admin, "Pay")) === "$30.00"), await tile(admin, "Pay"));
   const callBars = await admin.ev(`[...document.querySelectorAll('[data-panel]')].find((p) => /^calls$/i.test(p.querySelector('.stat-label')?.textContent.trim()))?.querySelectorAll(':scope > svg rect').length ?? 0`);
   check("even for one day, the tiles plot the last 14", callBars === 14, `${callBars} bars`);
   const csv = await admin.ev(`fetch('/api/reports/production?period=today&project=${PROJECT}').then((r) => r.text())`);
-  // Day, account manager, client, project, five counts, then lead, appointment and special pay, chargebacks and the total.
-  check("the CSV export has the same row", /Sean Fitzgerald,"?[^\n]*DBDev"?,2,0,1,0,0,0\.00,30\.00,0\.00,0\.00,30\.00/.test(csv), csv.split("\n").slice(0, 2).join(" | "));
+  // Day, account manager, client, project, five counts, then lead, appointment and confirmation pay, Special Pay, chargebacks and the total.
+  check("the CSV export has the same row", /Sean Fitzgerald,"?[^\n]*DBDev"?,2,0,1,0,0,0\.00,30\.00,0\.00,0\.00,0\.00,30\.00/.test(csv), csv.split("\n").slice(0, 2).join(" | "));
   await shot(admin, "admin-production");
 
   const manager = await (await browser.newContext({ as: "mike@beacon.test" })).newPage();

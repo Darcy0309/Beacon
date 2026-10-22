@@ -342,6 +342,9 @@ export const schemas = {
     lead_rate: [num({ min: 0, max: 10000 })],
     appointment_rate: [num({ min: 0, max: 10000 })],
     confirmation_rate: [num({ min: 0, max: 10000 })],
+    // A DB dev project's Special Pay: leads a pay period, and USD more a lead once hit (both blank: none).
+    special_goal: [int({ min: 1, max: 1000 })],
+    special_rate: [num({ min: 0, max: 1000 })],
   },
 
   appointment: {
@@ -667,6 +670,15 @@ export const cross = {
       if (!errors[`${kind}_min`] && !errors[`${kind}_max`] && amount(`${kind}_max`) < amount(`${kind}_min`)) {
         errors[`${kind}_max`] = "Must be at least the lowest rate";
       }
+    }
+  },
+  projectRates(values, errors) {
+    // Special Pay takes both a goal and an amount, or neither.
+    const goal = str(values.special_goal);
+    const rate = Number(str(values.special_rate).replace(/[$,]/g, "")) || 0;
+    if (!errors.special_goal && !errors.special_rate) {
+      if (goal && !rate) errors.special_rate = "Set what the Special Pay is a lead, or clear the goal";
+      else if (!goal && rate) errors.special_goal = "Set the goal, or clear the Special Pay";
     }
   },
   appointment(values, errors) {

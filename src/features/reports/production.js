@@ -6,8 +6,8 @@
 
 /** Every figure a production row carries, all summed when rows are grouped. */
 export const SUM_KEYS = [
-  "calls", "leads", "appointments", "confirmations", "chargebacks",
-  "leadPay", "appointmentPay", "specialPay", "chargebackAmount", "amount",
+  "calls", "leads", "appointments", "confirmations", "chargebacks", "specials",
+  "leadPay", "appointmentPay", "confirmationPay", "specialPay", "chargebackAmount", "amount",
 ];
 
 /** The ways the CSV can be laid out: day by day, or totals per account manager, project, client or agency group. */
@@ -69,7 +69,8 @@ const FIGURES = [
   ["Chargebacks", (r) => r.chargebacks, true],
   ["Lead pay (USD)", (r) => money(r.leadPay), true],
   ["Appointment pay (USD)", (r) => money(r.appointmentPay), true],
-  ["Special pay (USD)", (r) => money(r.specialPay), true],
+  ["Confirmation pay (USD)", (r) => money(r.confirmationPay), true],
+  ["Special Pay (USD)", (r) => money(r.specialPay), true],
   ["Chargebacks (USD)", (r) => money(r.chargebackAmount), true],
   ["Total pay (USD)", (r) => money(r.amount), true],
 ];

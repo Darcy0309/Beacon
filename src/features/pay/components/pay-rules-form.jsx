@@ -146,7 +146,7 @@ export default function PayRulesForm({ rules }) {
             </div>
             <p className="text-xs text-muted-foreground">
               Hybrid pay compares, for each pay period, the hours paid at the person&apos;s rate with their commission
-              (lead, appointment and special pay, less chargebacks), and pays the higher. Today the hourly range is{" "}
+              (lead, appointment and confirmation pay and any Special Pay, less chargebacks), and pays the higher. Today the hourly range is{" "}
               {usd(rules.rates.hourly.min)}–{usd(rules.rates.hourly.max)}.
             </p>
           </div>

@@ -32,6 +32,7 @@ import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getPayRules } from "@/features/pay/queries";
+import { specialPayLabel } from "@/lib/pay";
 import { getAppointmentDays, getBlockedDays, getCalendarScope, getLeadStats, getResultBreakdown } from "@/features/stats/queries";
 import CalendarTile from "@/features/stats/components/calendar-tile";
 import ConversionLines from "@/features/stats/components/conversion-lines";
@@ -138,7 +139,9 @@ export default async function ProjectDetail({ params, searchParams }) {
   const { leads: leadGoal, appts: apptGoal } = projectGoals({ raw, done: s, month: canManage ? monthCounts[p.id] ?? { leads: 0, appointments: 0 } : null, days: goalDays });
 
   const xdateHref = (m, b) => `/reports/x-dates?project=${p.id}&month=${m}${b ? `&bucket=${b}` : ""}#names`;
-  const rates = { id: p.id, name: p.name, lead: Number(raw.lead_rate ?? 0), appointment: Number(raw.appointment_rate ?? 0), confirmation: Number(raw.confirmation_rate ?? 0) };
+  const rates = { id: p.id, name: p.name, type: p.type, lead: Number(raw.lead_rate ?? 0), appointment: Number(raw.appointment_rate ?? 0), confirmation: Number(raw.confirmation_rate ?? 0),
+    specialGoal: raw.special_goal ?? null, specialRate: Number(raw.special_rate ?? 0) };
+  const special = dbdev ? specialPayLabel(rates.specialGoal, rates.specialRate) : null;
 
   return (
     <>
@@ -184,7 +187,10 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <span>Promotes leads to <Link href={`/projects/${apptProject.id}`} className="text-primary hover:underline">{apptProject.name}</Link></span>
               ) : null}
               {admin ? (
-                <span data-rates>Pays {usd(rates.lead)} a lead · {usd(rates.appointment)} an appointment · {usd(rates.confirmation)} special pay a confirmation</span>
+                <span data-rates>
+                  Pays {usd(rates.lead)} a lead · {usd(rates.appointment)} an appointment · {usd(rates.confirmation)} confirmation pay
+                  {special ? <span data-special-pay> · Special Pay {special}</span> : null}
+                </span>
               ) : null}
             </div>
           </div>

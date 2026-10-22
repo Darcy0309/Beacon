@@ -213,7 +213,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
             {paid ? (
               <>
                 <Field label="Pay" error={fe("pay_model")} className="sm:col-span-2"
-                  hint={payModel === "hybrid" ? "Each pay period: their hours at this rate, or their commission, whichever is higher." : "Lead, appointment and special pay at each project's rates."}>
+                  hint={payModel === "hybrid" ? "Each pay period: their hours at this rate, or their commission, whichever is higher." : "Lead, appointment and confirmation pay at each project's rates, and Special Pay on a DB dev lead goal."}>
                   <Select name="pay_model" defaultValue={dv("pay_model")} onChange={(e) => setPayModel(e.target.value)} aria-invalid={invalid("pay_model")}>
                     {PAY_MODELS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </Select>

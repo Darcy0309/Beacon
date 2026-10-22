@@ -2,6 +2,7 @@
 
 import { Download, Users } from "lucide-react";
 import Link from "@/components/shared/intent-link";
+import TipLayer from "@/components/shared/tip-layer";
 import { MONTH_SHORT, STALE_DAYS, pipelineCsv, stale } from "@/lib/pipeline";
 import { cn } from "@/lib/utils";
 
@@ -15,7 +16,8 @@ const mdy = (iso) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10
  * names renewing in the months counted, as the X-Dates chart splits them,
  * with the manager's last appointment set and last call on it (red when
  * that is more than STALE_DAYS days ago, or never), this month's calls, the
- * pay, the client's Sales Rep, the conversion (appointments of all), and how
+ * pay (an appointment's, or a lead's) and special pay (confirmation pay, or a
+ * DB dev project's Special Pay at its goal), the client's Sales Rep, the conversion (appointments of all), and how
  * many other managers share the project (their names on hover). Exported in
  * the columns of Sean's sample.
  *
@@ -36,6 +38,9 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
   };
   const sum = (key) => rows.reduce((n, r) => n + (r[key] ?? 0), 0);
   const total = sum("total");
+  // Who shares each project, shown over the page on hover so the table's edge never cuts the list off.
+  const tips = Object.fromEntries(rows.filter((r) => r.sharedWith.length)
+    .map((r) => [`shared-${r.key}`, { title: "Shared with", rows: r.sharedWith.map((n) => ({ key: n, label: n, value: "" })) }]));
 
   return (
     <div data-pipeline-report>
@@ -50,7 +55,7 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
         </button>
       </div>
       {rows.length ? (
-        <div className="overflow-x-auto">
+        <TipLayer tips={tips} className="overflow-x-auto">
           <table className="w-full min-w-[72rem] text-xs">
             <thead>
               <tr className="border-b border-[var(--panel-border)]">
@@ -58,7 +63,7 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
                 <th className={TH}>Last appt set</th><th className={TH}>Last worked</th><th className={cn(TH, "text-right")} title="Their calls on it this month">Calls</th>
                 {months.map((m) => <th key={m} className={cn(TH, "text-right")}>{MONTH_SHORT[m - 1]}</th>)}
                 <th className={cn(TH, "text-right")}>Total</th><th className={cn(TH, "text-right")}>Appts</th><th className={cn(TH, "text-right")}>Off list</th>
-                <th className={cn(TH, "text-right")}>Viable left</th><th className={cn(TH, "text-right")}>Pay</th><th className={cn(TH, "text-right")}>Special</th>
+                <th className={cn(TH, "text-right")}>Viable left</th><th className={cn(TH, "text-right")}>Pay</th><th className={cn(TH, "text-right")} title="Confirmation pay on an appointment project; on a DB dev project, its Special Pay a lead at its goal">Special</th>
                 <th className={TH}>Sales Rep</th><th className={cn(TH, "text-right")}>Conv%</th><th className={cn(TH, "text-center")}>Shared</th>
               </tr>
             </thead>
@@ -82,17 +87,18 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
                     <td className={cn(TD, "text-right tabular-nums text-muted-foreground")}>{r.offList.toLocaleString()}</td>
                     <td className={cn(TD, "text-right tabular-nums text-primary")}>{r.viableLeft.toLocaleString()}</td>
                     <td className={cn(TD, "text-right tabular-nums")}>{money(r.pay)}</td>
-                    <td className={cn(TD, "text-right tabular-nums")}>{money(r.specialPay)}</td>
+                    <td className={cn(TD, "text-right tabular-nums")} data-special>
+                      {money(r.specialPay)}
+                      {r.specialGoal ? <span className="block text-[0.62rem] text-muted-foreground">at {r.specialGoal} leads</span> : null}
+                    </td>
                     <td className={cn(TD, "whitespace-nowrap")}>{r.salesRep ?? "—"}</td>
                     <td className={cn(TD, "text-right font-semibold tabular-nums")}>{r.conversion}%</td>
                     <td className={cn(TD, "text-center")}>
                       {/* How many share it; their names on hover (or focus), to keep the row short. */}
                       {r.sharedWith.length ? (
-                        <span tabIndex={0} className="group relative inline-flex cursor-default items-center gap-1 rounded-full border border-[var(--panel-border)] px-2 py-0.5 tabular-nums outline-none" data-shared={r.sharedWith.length}>
+                        <span tabIndex={0} data-tip={`shared-${r.key}`} data-shared={r.sharedWith.length}
+                          className="inline-flex cursor-default items-center gap-1 rounded-full border border-[var(--panel-border)] px-2 py-0.5 tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring">
                           <Users className="size-3" />{r.sharedWith.length}
-                          <span role="tooltip" className="pointer-events-none absolute right-0 top-full z-20 mt-1 hidden w-max max-w-56 rounded-md border bg-popover px-2.5 py-1.5 text-left text-xs shadow-md group-hover:block group-focus:block" data-shared-names>
-                            {r.sharedWith.map((n) => <span key={n} className="block">{n}</span>)}
-                          </span>
                         </span>
                       ) : <span className="text-muted-foreground">—</span>}
                     </td>
@@ -112,7 +118,7 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
               </tr>
             </tbody>
           </table>
-        </div>
+        </TipLayer>
       ) : (
         <p className="p-8 text-center text-sm text-muted-foreground">No names renewing in these months match these filters.</p>
       )}

@@ -1,5 +1,5 @@
 import Link from "@/components/shared/intent-link";
-import { Banknote, Clock, Download, ListChecks, Timer, Users } from "lucide-react";
+import { Banknote, Clock, Download, ListChecks, Sparkles, Timer, Users } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
@@ -56,7 +56,9 @@ export default async function PayReport({ searchParams }) {
     { label: admin ? "Pay Due" : "My Pay", value: usd(sum("pay")), note: admin ? `${people.length} people` : open?.model === "hybrid" ? "the higher of hourly and commission" : "commission",
       icon: Banknote, accent: "var(--neon-amber)" },
     { label: "Hours Paid", value: hoursLabel(paidMinutes), note: `${hoursLabel(sum("workedMinutes"))} worked`, icon: Clock, accent: "var(--neon-cyan)" },
-    { label: "Commission", value: usd(sum("commission")), note: "lead, appointment and special pay, less chargebacks", icon: Users, accent: "var(--neon-emerald)" },
+    { label: "Commission", value: usd(sum("commission")), note: "lead, appointment and confirmation pay, less chargebacks", icon: Users, accent: "var(--neon-emerald)" },
+    { label: "Special Pay", value: usd(sum("specialPay")), note: sum("specials") ? `${sum("specials")} lead${sum("specials") === 1 ? "" : "s"} on a DB dev goal hit` : "a DB dev project's lead goal hit in the period",
+      icon: Sparkles, accent: "var(--neon-magenta)" },
     { label: "Hourly Pay", value: usd(sum("hourlyPay")), note: "hours paid × hourly rate", icon: Timer, accent: "var(--neon-violet)" },
   ];
 
@@ -126,6 +128,7 @@ export default async function PayReport({ searchParams }) {
                 <TableHead className="text-right">Paid hours</TableHead>
                 <TableHead className="text-right">Hourly pay</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
+                <TableHead className="text-right">Special Pay</TableHead>
                 <TableHead className="text-right">Pay due</TableHead>
                 <TableHead className="text-right">Per hour</TableHead>
                 <TableHead className="text-right">Calls</TableHead>
@@ -157,6 +160,9 @@ export default async function PayReport({ searchParams }) {
                   <TableCell className={cn("text-right tabular-nums", p.model === "hybrid" && p.paidBy === "commission" && "font-semibold text-primary")}>
                     {usd(p.commission)}
                   </TableCell>
+                  <TableCell className={cn("text-right tabular-nums", p.model === "hybrid" && p.paidBy === "commission" && p.specialPay && "font-semibold text-primary")} data-special-pay>
+                    {p.specialPay ? usd(p.specialPay) : "—"}
+                  </TableCell>
                   <TableCell className="text-right font-semibold tabular-nums" data-pay-due>{usd(p.pay)}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">{p.perHour == null ? "—" : usd(p.perHour)}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.calls.toLocaleString()}</TableCell>
@@ -169,6 +175,7 @@ export default async function PayReport({ searchParams }) {
                   <TableCell className="text-right tabular-nums">{hoursLabel(paidMinutes)}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(sum("hourlyPay"))}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(sum("commission"))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{usd(sum("specialPay"))}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(sum("pay"))}</TableCell>
                   <TableCell />
                   <TableCell className="text-right tabular-nums">{sum("calls").toLocaleString()}</TableCell>
@@ -176,13 +183,13 @@ export default async function PayReport({ searchParams }) {
               ) : null}
               {people.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">Nobody to pay in this period.</TableCell>
+                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">Nobody to pay in this period.</TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
           </Table>
           <p className="border-t border-[var(--panel-border)] px-5 py-3 text-xs text-muted-foreground">
-            Hybrid pay is the higher of the hourly pay and the commission, shown in colour. {admin ? "Open a name to see the hours behind it." : ""}
+            Hybrid pay is the higher of the hourly pay and the commission with any Special Pay, shown in colour. {admin ? "Open a name to see the hours behind it." : ""}
           </p>
         </Card>
 

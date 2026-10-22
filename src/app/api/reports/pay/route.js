@@ -25,6 +25,7 @@ const PEOPLE = [
   ["Hours paid", (p) => hoursDecimal(p.paidMinutes), true],
   ["Hourly pay (USD)", (p) => money(p.hourlyPay), true],
   ["Commission (USD)", (p) => money(p.commission), true],
+  ["Special Pay (USD)", (p) => money(p.specialPay), true],
   ["Pay due (USD)", (p) => money(p.pay), true],
   ["Paid by", (p) => (p.model === "hybrid" ? (p.paidBy === "hourly" ? "Hourly" : "Commission") : "Commission")],
   ["Pay per hour (USD)", (p) => (p.perHour == null ? "" : money(p.perHour))],

@@ -59,7 +59,7 @@ try {
     const high = await setRates(admin, 13, 0, 0);
     check("a lead rate above the range is refused, saying the range", /Lead pay must be between \$8\.00 and \$12\.00/.test(high.error?.message ?? ""), high.error?.message);
     const low = await setRates(admin, 15, 30, 4);
-    check("special pay below its range is refused", /Special pay must be between \$5\.00 and \$20\.00/.test(low.error?.message ?? ""), low.error?.message);
+    check("confirmation pay below its range is refused", /Confirmation pay must be between \$5\.00 and \$20\.00/.test(low.error?.message ?? ""), low.error?.message);
     const kept = await setRates(admin, 15, 31, 0);
     check("a rate left as it was is kept, even outside the range ($15 lead)", !kept.error && Number(kept.data?.lead_rate) === 15, kept.error?.message);
     const zero = await setRates(admin, 0, 31, 0);

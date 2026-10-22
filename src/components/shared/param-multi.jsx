@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useReportPending } from "@/components/layout/navigation-progress";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +13,9 @@ import { cn } from "@/lib/utils";
  * report's filters are (Sean, Oct 2026: like Lead Explorer's): a button
  * saying what is picked, opening a list of check boxes with "All" at the
  * top (which clears the rest). Changing it also drops the params in
- * `clears`. Closes on a click outside or Escape.
+ * `clears`. The list floats over the page, so a card's edge never cuts it
+ * off, and scrolls inside the room there is; a click outside or Escape
+ * closes it.
  *
  *   values   the values picked now (strings); none: all
  */
@@ -23,23 +26,8 @@ export default function ParamMulti({ name, label, values = [], options, clears =
   const [pending, startTransition] = useTransition();
   useReportPending(pending);
   const [open, setOpen] = useState(false);
-  // Opening leftwards when the list would run past the window's right edge.
-  const [right, setRight] = useState(false);
   const [find, setFind] = useState("");
-  const box = useRef(null);
   const picked = new Set(values.map(String));
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e) => !box.current?.contains(e.target) && setOpen(false);
-    const esc = (e) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
 
   const go = (next) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -70,26 +58,25 @@ export default function ParamMulti({ name, label, values = [], options, clears =
   );
 
   return (
-    <div className={cn("relative flex items-center gap-2", className)} ref={box} data-param-multi={name}>
+    <div className={cn("flex items-center gap-2", className)} data-param-multi={name}>
       <span className="eyebrow">{label}</span>
-      <button type="button" onClick={() => {
-        if (!open) setRight((box.current?.getBoundingClientRect().left ?? 0) + 336 > window.innerWidth);
-        setOpen((o) => !o);
-      }} aria-expanded={open} aria-haspopup="listbox" aria-label={`${label}: ${summary}`}
-        className={cn("flex h-8 min-w-32 max-w-60 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors",
-          picked.size ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
-        <span className="flex-1 truncate text-left">{summary}</span>
-        <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
-      </button>
-      {open ? (
-        <div role="listbox" aria-multiselectable aria-label={label}
-          className={cn("absolute top-full z-30 mt-1 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border bg-card shadow-xl", right ? "right-0" : "left-0")}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button type="button" aria-haspopup="listbox" aria-label={`${label}: ${summary}`}
+            className={cn("flex h-8 min-w-32 max-w-60 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors",
+              picked.size ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
+            <span className="flex-1 truncate text-left">{summary}</span>
+            <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
+          </button>
+        </PopoverTrigger>
+        {/* The find box stays put; the list under it scrolls, in what room the window has. */}
+        <PopoverContent className="flex w-80 max-w-[calc(100vw-2rem)] flex-col overflow-hidden bg-card p-0" data-param-multi-list={name}>
           {options.length > 8 ? (
-            <div className="border-b border-[var(--panel-border)] p-2">
-              <Input value={find} onChange={(e) => setFind(e.target.value)} placeholder={`Find ${label.toLowerCase()}…`} aria-label={`Find ${label}`} className="h-7 text-xs" autoFocus />
+            <div className="shrink-0 border-b border-[var(--panel-border)] p-2">
+              <Input value={find} onChange={(e) => setFind(e.target.value)} placeholder={`Find ${label.toLowerCase()}…`} aria-label={`Find ${label}`} className="h-7 text-xs" />
             </div>
           ) : null}
-          <div className="max-h-72 overflow-y-auto p-1">
+          <div role="listbox" aria-multiselectable aria-label={label} className="max-h-72 min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
             {/* All: every one (none picked). */}
             <button type="button" role="option" aria-selected={picked.size === 0} onClick={() => go(new Set())} className={cn(row, "font-semibold")} data-option="">
               {tick(picked.size === 0)} All
@@ -105,8 +92,8 @@ export default function ParamMulti({ name, label, values = [], options, clears =
             })}
             {shown.length === 0 ? <p className="px-2 py-3 text-center text-xs text-muted-foreground">No matches.</p> : null}
           </div>
-        </div>
-      ) : null}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

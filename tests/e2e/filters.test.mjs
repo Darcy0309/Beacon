@@ -73,7 +73,7 @@ try {
     return { text: t.textContent, height: Math.round(br.height), cut: t.scrollWidth > t.clientWidth, ellipsis: getComputedStyle(t).textOverflow, iconInside: ir.right <= br.right && ir.left >= br.left }; })()`);
   check("the same one-line button: the chosen project cut short, the chevron inside", m?.text === LONG && m.height === 32 && m.cut && m.ellipsis === "ellipsis" && m.iconInside, JSON.stringify(m));
   await admin.mouseClick(multi);
-  const list = '[data-param-multi="project"] [role=listbox]';
+  const list = '[data-param-multi-list="project"]';
   check("clicking opens the list", await until(() => admin.ev(`!!document.querySelector('${list}')`)));
   const opts = await admin.ev(`[...document.querySelectorAll('${list} [role=option]')].map((o) => ({ text: o.textContent.trim(), on: o.getAttribute('aria-selected') }))`);
   check("…“All” first, then every project in full, the chosen one ticked", opts[0]?.text === "All" && opts.some((o) => o.text === LONG && o.on === "true"), JSON.stringify(opts.slice(0, 2)));

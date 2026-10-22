@@ -50,8 +50,10 @@ export async function getPayProfiles() {
 
 /**
  * Pay for a period, one row a person (pay_report()): time worked and paid,
- * hourly pay, commission, and what they are due. Everyone but an
- * administrator gets only their own row.
+ * hourly pay, commission (lead, appointment and confirmation pay, less
+ * chargebacks), Special Pay (a DB dev project's lead goal hit; with the
+ * commission, what a hybrid's hours are weighed against), and what they are
+ * due. Everyone but an administrator gets only their own row.
  */
 export async function getPayReport({ from, to, userId = null }) {
   const supabase = await createClient();
@@ -62,6 +64,7 @@ export async function getPayReport({ from, to, userId = null }) {
     const pay = n(r.pay);
     // Hourly pay applies to hybrid pay only; a rate kept on a commission profile earns nothing.
     const hourlyPay = r.pay_model === "hybrid" ? n(r.hourly_pay) : 0;
+    const specialPay = n(r.special_goal_pay);
     return {
       id: r.user_id,
       name: fullName(r) || r.email,
@@ -72,7 +75,10 @@ export async function getPayReport({ from, to, userId = null }) {
       workedMinutes: n(r.worked_minutes),
       paidMinutes,
       hourlyPay,
-      commission: n(r.commission),
+      // Every pay event in the period is the commission side; Special Pay is shown on its own.
+      commission: Math.round((n(r.commission) - specialPay) * 100) / 100,
+      specialPay,
+      specials: n(r.specials),
       pay,
       // Which side of a hybrid won, for the report to say so.
       paidBy: r.pay_model === "hybrid" && hourlyPay > n(r.commission) ? "hourly" : "commission",

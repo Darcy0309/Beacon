@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for pay: the rates an administrator picks from, pay periods, hours, and production totals. */
-import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, stepView, tileRange, viewRange, workDays } from "../../src/lib/pay.js";
+import { hourLabel, hoursDecimal, hoursLabel, parsePeriodDays, payPeriod, periodView, rateOptions, readPayPeriod, scheduledPeriod, specialPayLabel, stepView, tileRange, viewRange, workDays } from "../../src/lib/pay.js";
 import { generateTempPassword } from "../../src/lib/temp-password.js";
 import { CSV_COLUMNS, GROUPINGS, groupProduction, totalOf, totalRow, withGroups } from "../../src/features/reports/production.js";
 
@@ -61,29 +61,35 @@ const reversed = readPayPeriod({ period: "custom", from: "2026-09-30", to: "2026
 check("a reversed range says so and shows this pay period", reversed.error && reversed.period === "current" && reversed.from === "2026-10-05", JSON.stringify(reversed));
 
 // --- production totals ------------------------------------------------------------
-const row = (o) => ({ calls: 0, leads: 0, appointments: 0, confirmations: 0, chargebacks: 0, leadPay: 0, appointmentPay: 0, specialPay: 0, chargebackAmount: 0, amount: 0, ...o });
+const row = (o) => ({ calls: 0, leads: 0, appointments: 0, confirmations: 0, chargebacks: 0, specials: 0, leadPay: 0, appointmentPay: 0, confirmationPay: 0, specialPay: 0, chargebackAmount: 0, amount: 0, ...o });
 const rows = [
-  row({ day: "2026-10-05", userId: 1, rep: "Sean", projectId: 10, project: "DBDev", clientId: 7, client: "Capital", calls: 20, leads: 2, leadPay: 20, amount: 20 }),
-  row({ day: "2026-10-06", userId: 1, rep: "Sean", projectId: 11, project: "Appts", clientId: 7, client: "Capital", appointments: 1, confirmations: 1, appointmentPay: 30, specialPay: 5, amount: 35 }),
+  row({ day: "2026-10-05", userId: 1, rep: "Sean", projectId: 10, project: "DBDev", clientId: 7, client: "Capital", calls: 20, leads: 2, leadPay: 20, specials: 2, specialPay: 2, amount: 22 }),
+  row({ day: "2026-10-06", userId: 1, rep: "Sean", projectId: 11, project: "Appts", clientId: 7, client: "Capital", appointments: 1, confirmations: 1, appointmentPay: 30, confirmationPay: 5, amount: 35 }),
   row({ day: "2026-10-06", userId: 2, rep: "Mike", projectId: 12, project: "Other", clientId: 8, client: "Bender", calls: 5, chargebacks: 1, chargebackAmount: -30, amount: -30 }),
 ];
 const byRep = groupProduction(rows, "rep");
-eq("by account manager: Sean's two days added", byRep.map((r) => [r.rep, r.calls, r.amount]), [["Sean", 20, 55], ["Mike", 5, -30]]);
-eq("by client: Capital's two projects added", groupProduction(rows, "client").map((r) => [r.client, r.leadPay, r.appointmentPay, r.specialPay, r.amount]),
-  [["Capital", 20, 30, 5, 55], ["Bender", 0, 0, 0, -30]]);
+eq("by account manager: Sean's two days added", byRep.map((r) => [r.rep, r.calls, r.amount]), [["Sean", 20, 57], ["Mike", 5, -30]]);
+eq("by client: Capital's two projects added, confirmation pay and Special Pay apart", groupProduction(rows, "client").map((r) => [r.client, r.leadPay, r.appointmentPay, r.confirmationPay, r.specialPay, r.amount]),
+  [["Capital", 20, 30, 5, 2, 57], ["Bender", 0, 0, 0, 0, -30]]);
 eq("by project: one row each", groupProduction(rows, "project").length, 3);
 eq("day by day: rows as they are", groupProduction(rows, "day"), rows);
 const total = totalOf(rows);
-eq("the total", [total.calls, total.amount, total.chargebackAmount], [25, 25, -30]);
+eq("the total", [total.calls, total.amount, total.chargebackAmount, total.specials], [25, 27, -30, 2]);
 eq("the CSV's Total row: names blank, figures summed", totalRow(CSV_COLUMNS.project, total),
-  ["Total", "", 25, 2, 1, 1, 1, "20.00", "30.00", "5.00", "-30.00", "25.00"]);
+  ["Total", "", 25, 2, 1, 1, 1, "20.00", "30.00", "5.00", "2.00", "-30.00", "27.00"]);
+eq("the CSV's pay columns: confirmation pay and Special Pay by name", CSV_COLUMNS.client.map(([h]) => h).slice(6),
+  ["Lead pay (USD)", "Appointment pay (USD)", "Confirmation pay (USD)", "Special Pay (USD)", "Chargebacks (USD)", "Total pay (USD)"]);
+
+// --- Special Pay, as the pages say it ----------------------------------------------
+eq("Special Pay: $1.00 a lead at 5 leads a pay period", specialPayLabel(5, 1), "$1.00 a lead at 5 leads a pay period");
+eq("…none without a goal or an amount", [specialPayLabel(null, 1), specialPayLabel(5, 0)], [null, null]);
 // A client's agency group: the carrier group it belongs to.
 const grouped = withGroups(rows, { 7: { id: 31, name: "Farmers" } });
 eq("each row carries its client's agency group, or says there is none", grouped.map((r) => [r.client, r.groupId, r.group]), [["Capital", 31, "Farmers"], ["Capital", 31, "Farmers"], ["Bender", null, "No agency group"]]);
 eq("…kept to one group when asked", withGroups(rows, { 7: { id: 31, name: "Farmers" } }, 31).map((r) => r.project), ["DBDev", "Appts"]);
 eq("…and to nothing for a group no client is in", withGroups(rows, { 7: { id: 31, name: "Farmers" } }, 99), []);
-eq("by agency group: a group's clients added, the rest together", groupProduction(grouped, "group").map((r) => [r.group, r.calls, r.amount]), [["Farmers", 20, 55], ["No agency group", 5, -30]]);
-eq("the CSV by agency group: the group, then the figures", [CSV_COLUMNS.group[0][0], CSV_COLUMNS.group.length, GROUPINGS.at(-1)], ["Agency group", 11, ["group", "Totals by agency group"]]);
+eq("by agency group: a group's clients added, the rest together", groupProduction(grouped, "group").map((r) => [r.group, r.calls, r.amount]), [["Farmers", 20, 57], ["No agency group", 5, -30]]);
+eq("the CSV by agency group: the group, then the figures", [CSV_COLUMNS.group[0][0], CSV_COLUMNS.group.length, GROUPINGS.at(-1)], ["Agency group", 12, ["group", "Totals by agency group"]]);
 eq("every layout ends with the total pay", Object.values(CSV_COLUMNS).every((cols) => cols.at(-1)[0] === "Total pay (USD)"), true);
 
 // --- a custom schedule (the business's 2026 pay periods) ---------------------

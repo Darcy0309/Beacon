@@ -105,7 +105,7 @@ export async function getPipelineReport({ filters, months, timeZone }) {
       lastApptSet: r.last_appt_set, lastWorked: r.last_worked, lastWorkedDay: day(r.last_worked), calls: Number(r.calls) || 0,
       months: Object.fromEntries(Object.entries(r.months ?? {}).map(([m, n]) => [Number(m), Number(n)])),
       total, appts, offList: Number(r.off_list) || 0, viableLeft: Number(r.viable_left) || 0,
-      pay: r.pay == null ? null : Number(r.pay), specialPay: r.special_pay == null ? null : Number(r.special_pay),
+      pay: r.pay == null ? null : Number(r.pay), specialPay: r.special_pay == null ? null : Number(r.special_pay), specialGoal: r.special_goal ?? null,
       salesRep: r.sales_rep_first || r.sales_rep_last ? personShort(r.sales_rep_first, r.sales_rep_last) : null,
       conversion: total ? Math.round((appts / total) * 100) : 0,
       sharedWith: (r.shared_with ?? []).map((o) => personShort(o.first, o.last)),
@@ -192,10 +192,13 @@ export async function getProductionReport({ from, to, projectId = null, userId =
     appointments: Number(r.appointments),
     confirmations: Number(r.confirmations),
     chargebacks: Number(r.chargebacks),
-    // What the day's pay came to, by kind; chargebacks are negative.
+    // What the day's pay came to, by kind; chargebacks are negative. Special Pay:
+    // a DB dev project's lead goal hit (specials: the leads it was paid on).
     leadPay: Number(r.lead_pay ?? 0),
     appointmentPay: Number(r.appointment_pay ?? 0),
-    specialPay: Number(r.special_pay ?? 0),
+    confirmationPay: Number(r.confirmation_pay ?? r.special_pay ?? 0),
+    specialPay: Number(r.special_goal_pay ?? 0),
+    specials: Number(r.specials ?? 0),
     chargebackAmount: Number(r.chargeback_amount ?? 0),
     amount: Number(r.amount),
   }));
