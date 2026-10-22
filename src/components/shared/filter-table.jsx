@@ -44,13 +44,15 @@ import { useReportPending } from "@/components/layout/navigation-progress";
  * A facet with up to CHIP_LIMIT options renders as a chip row, larger ones
  * fall back to a select; set `kind: "chips" | "select"` to force one, or
  * "multi" for a drop-down of checkboxes where several can be picked (kept as
- * "a,b,c" in its URL parameter; server mode only; an option's `group` heads
- * its part of the list).
+ * "a,b,c" in its URL parameter in server mode; filtered here otherwise; an
+ * option's `group` heads its part of the list).
  * `searchable={false}` drops the search box, for a list that cannot be searched.
  * `exportCsv` ({ name, header }, client mode): an Export CSV button saving
  * the rows as filtered just then, each row's `csv` cells under `header`.
  */
 const CHIP_LIMIT = 6;
+// Between the values picked in a "multi" filter on a list filtered here (names may hold commas).
+const MULTI_SEP = "\u001f";
 const SEARCH_DEBOUNCE_MS = 300;
 
 export default function FilterTable({
@@ -158,9 +160,9 @@ export default function FilterTable({
             .map(([value, count]) => ({ value, label: value, count }));
         }
         const kind = f.kind ?? (options.length > CHIP_LIMIT ? "select" : "chips");
-        return { ...f, options, kind };
+        return { ...f, options, kind, ...(kind === "multi" && !server ? { sep: MULTI_SEP } : {}) };
       }),
-    [filters, rows]
+    [filters, rows, server]
   );
 
   // The same word rules as every server-side search: each word, in any order.
@@ -170,7 +172,10 @@ export default function FilterTable({
     : rows.filter((r) => {
         for (const f of filters) {
           const want = picked[f.key];
-          if (want && String(r.facets?.[f.key] ?? "") !== want) return false;
+          if (!want) continue;
+          const value = String(r.facets?.[f.key] ?? "");
+          // Several at once (a "multi" filter): any of those picked.
+          if (f.kind === "multi" ? !want.split(MULTI_SEP).includes(value) : value !== want) return false;
         }
         return terms.length === 0 || matchesAll(r.search, terms);
       });
@@ -308,13 +313,15 @@ function FacetGroup({ group, value, onChange }) {
 /**
  * Several options at once (Sean, Oct 2026: the call results a lead list
  * shows): a button saying what is picked, opening a list of checkboxes, each
- * group under its heading. Picked values go out as "a,b,c". Closes on a
- * click outside or Escape.
+ * group under its heading. Picked values go out as "a,b,c" (in the URL, server
+ * mode), or joined by MULTI_SEP in a list filtered here, whose values are names
+ * that may hold a comma. Closes on a click outside or Escape.
  */
 function MultiFacet({ group, value, onChange }) {
   const [open, setOpen] = useState(false);
   const box = useRef(null);
-  const picked = useMemo(() => new Set(String(value || "").split(",").filter(Boolean)), [value]);
+  const sep = group.sep ?? ",";
+  const picked = useMemo(() => new Set(String(value || "").split(sep).filter(Boolean)), [value, sep]);
   useEffect(() => {
     if (!open) return;
     const away = (e) => !box.current?.contains(e.target) && setOpen(false);
@@ -327,7 +334,7 @@ function MultiFacet({ group, value, onChange }) {
     };
   }, [open]);
   // In the list's own order, so the address reads the same however they were ticked.
-  const set = (next) => onChange(group.options.filter((o) => next.has(String(o.value))).map((o) => o.value).join(","));
+  const set = (next) => onChange(group.options.filter((o) => next.has(String(o.value))).map((o) => o.value).join(sep));
   const toggle = (v) => {
     const next = new Set(picked);
     if (next.has(v)) next.delete(v);

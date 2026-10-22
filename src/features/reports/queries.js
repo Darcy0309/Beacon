@@ -71,6 +71,13 @@ export async function getXdateMonthLeads({ month, bucket = null, projectId = nul
     renewal: l.renewal_date,
     rep: l.rep_first || l.rep_last ? shortName({ first_name: l.rep_first, last_name: l.rep_last, email: l.rep_email }) : "Unassigned",
   }));
+  // A client cannot read the staff: the manager on each of their own leads, filled in (lead_rep_names()).
+  const unnamed = rows.filter((r) => r.rep === "Unassigned").map((r) => r.id);
+  if (unnamed.length) {
+    const { data: names } = await supabase.rpc("lead_rep_names", { p_lead_ids: unnamed });
+    const byLead = new Map((names ?? []).map((n) => [n.lead_id, shortName(n)]));
+    for (const r of rows) if (byLead.has(r.id)) r.rep = byLead.get(r.id);
+  }
   return { rows, total: Number(data?.[0]?.total ?? 0) };
 }
 

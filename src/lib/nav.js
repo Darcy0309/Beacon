@@ -20,7 +20,11 @@ const STAFF = ["admin", "manager", "agent"];
 // where every call is worked, so anyone with a call list can open one; the
 // full Leads list stays with administrators and agents.
 // A lead sheet: staff, and a client for the names on their own projects (Row Level Security keeps the rest from them; Sean, Oct 2026).
-const DETAIL_ROLES = [[/^\/leads\/\d+$/, [...STAFF, "client"]]];
+const DETAIL_ROLES = [
+  [/^\/leads\/\d+$/, [...STAFF, "client"]],
+  // X-Dates by Month, opened from a client's own project (its month bars; Sean, Oct 2026): their projects only.
+  [/^\/reports\/x-dates$/, ["admin", "client"]],
+];
 
 /**
  * Which roles may open a path. Detail pages inherit from their section, so

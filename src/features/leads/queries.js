@@ -34,7 +34,7 @@ const LEAD_SELECT = leadSelect();
  * from a row's menu, edited (loadLeadForEdit): a fraction of the size, on every page of them.
  */
 const leadListSelect = ({ status = false } = {}) => `
-  id, company_name, contact_name, phone, city, state, lead_date, date_last_worked, updated_at,
+  id, company_name, contact_name, phone, city, state, lead_date, date_last_worked, updated_at, assigned_user_id,
   status:lead_statuses${inner(status)}(id, code, name),
   result:call_results(id, name, viable),
   assigned:users!leads_assigned_user_id_fkey(id, first_name, last_name, email),
@@ -169,7 +169,7 @@ export async function listLeads(params, { projectId, clientId = null, worked = n
     },
     params
   );
-  return { rows: rows.map(toLeadView), total };
+  return { rows: await withRepNames(supabase, rows.map(toLeadView), (l) => l.raw.assigned_user_id), total };
 }
 
 /**
@@ -292,4 +292,18 @@ export async function getLeadActivity(leadId) {
       by: fullName(one(e.user)) || "—",
     })),
   };
+}
+
+/**
+ * The manager on each row whose name its reader could not see (a client cannot read the staff;
+ * Sean, Oct 2026): filled in from lead_rep_names(), which gives a client the names on their own leads
+ * only. `assignedOf(row)`: the row's assigned user id; rows already named are left alone.
+ */
+export async function withRepNames(supabase, rows, assignedOf, leadIdOf = (r) => r.id) {
+  const missing = rows.filter((r) => r.rep === "Unassigned" && assignedOf(r));
+  if (!missing.length) return rows;
+  const { data, error } = await supabase.rpc("lead_rep_names", { p_lead_ids: missing.map(leadIdOf) });
+  if (error) return rows;
+  const names = new Map((data ?? []).map((n) => [n.lead_id, shortName(n)]));
+  return rows.map((r) => (names.has(leadIdOf(r)) ? { ...r, rep: names.get(leadIdOf(r)) } : r));
 }

@@ -239,14 +239,14 @@ export default async function ProjectDetail({ params, searchParams }) {
           <SectionHeader
             label="X-Dates by Month"
             icon={CalendarSearch}
-            action={client ? null : (
+            action={(
               <Link href={`/reports/x-dates?project=${p.id}`} className="flex items-center gap-1 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75">
                 Full report <ArrowRight className="size-3" />
               </Link>
             )}
           />
           <div className="p-5">
-            <XdateMonths data={xdates} href={client ? null : xdateHref} today={today} compact />
+            <XdateMonths data={xdates} href={xdateHref} today={today} compact />
           </div>
         </Card>
 

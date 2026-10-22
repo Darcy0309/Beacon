@@ -16,6 +16,7 @@ import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
 import { getCurrentUser } from "@/lib/server/session";
+import { getSalesReps } from "@/features/users/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,9 @@ const typeTone = { DBDV: "cyan", APPT: "violet" };
 const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Completed: "sky" };
 
 export default async function ProjectsPage({ searchParams }) {
-  const params = readListParams(await searchParams, ["status", "type", "client", "group"]);
+  const params = readListParams(await searchParams, ["status", "type", "client", "group", "rep"]);
+  // ?rep=<user id>: the projects of the clients that Sales Rep owns (Sean, Oct 2026).
+  if (params.filters.rep && !/^[1-9]\d{0,17}$/.test(params.filters.rep)) delete params.filters.rep;
   // ?group=<insurance company id>: the projects of the clients in that agency group.
   if (params.filters.group && !/^[1-9]\d{0,17}$/.test(params.filters.group)) delete params.filters.group;
   // A client's people see their own projects (Sean, Oct 2026): Row Level Security gives them no others; what is
@@ -33,9 +36,10 @@ export default async function ProjectsPage({ searchParams }) {
   if (client) {
     delete params.filters.client;
     delete params.filters.group;
+    delete params.filters.rep;
   }
-  const [{ rows, total }, stats, lookups, offices, clientGroups] = await Promise.all([
-    listProjects(params), getProjectStats(), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(),
+  const [{ rows, total }, stats, lookups, offices, clientGroups, reps] = await Promise.all([
+    listProjects(params), getProjectStats(), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(), client ? [] : getSalesReps(),
   ]);
   const { projects } = stats;
   const statsOf = new Map(projects.map((p) => [p.id, p]));
@@ -84,6 +88,7 @@ export default async function ProjectsPage({ searchParams }) {
               { key: "type", label: "Type", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
               ...(client ? [] : [{ key: "client", label: "Client", kind: "select", options: options.companies.map((c) => ({ value: c.name, label: c.name })) }]),
               ...(!client && groupOptions.length ? [{ key: "group", label: "Agency group", kind: "select", options: groupOptions }] : []),
+              ...(client ? [] : [{ key: "rep", label: "Sales Rep", kind: "select", options: reps.map((r) => ({ value: String(r.id), label: r.name })) }]),
             ]}
             placeholder="Search projects…"
             empty="No projects yet."

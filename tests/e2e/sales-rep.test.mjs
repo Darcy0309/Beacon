@@ -20,6 +20,8 @@ const SECRET = process.env.TEST_PUSH_SECRET ?? "lighthouse-local-flush-test";
 const TAG = `REP-TEST ${Date.now()}`;
 const MIKE = Number(sql("select id from public.users where email='mike@beacon.test'"));
 const ADMIN = Number(sql("select id from public.users where email='admin@beacon.test'"));
+const CLIENT = Number(sql("select id from public.users where email='client@beacon.test'"));
+const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT}`);
 const typeId = (c) => sql(`select id from public.project_types where code=${lit(c)}`);
 const company = Number(sql(`insert into public.companies (name, subscription_end) values (${lit(`${TAG} Insurance`)}, current_date + 90) returning id`));
 const P = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Churches`)}, ${company}, ${typeId("APPT")}, 1) returning id`));
@@ -60,6 +62,14 @@ try {
   await admin.go(`/projects/${P}`, 5000);
   check("every project of the client shows it", /Sales Rep Mike/.test((await when(admin, "document.querySelector('[data-project-sales-rep]')?.textContent")) ?? ""));
 
+  const projectNames = () => admin.ev("[...document.querySelectorAll('[data-project-link]')].map((a) => a.textContent)");
+  await admin.go(`/projects?rep=${MIKE}&q=${encodeURIComponent(TAG)}`, 5000);
+  check("Projects filters by Sales Rep: Mike's client's projects", Boolean(await when(admin, `[...document.querySelectorAll('[data-project-link]')].some((a) => a.textContent.includes(${JSON.stringify(`${TAG} Churches`)}))`)));
+  await admin.go(`/projects?rep=${ADMIN}&q=${encodeURIComponent(TAG)}`, 5000);
+  await when(admin, "!!document.querySelector('table')");
+  check("…not another rep's", !(await projectNames()).some((n) => n.includes(TAG)), JSON.stringify(await projectNames()));
+  check("…offered as a filter", Boolean(await admin.ev("!!document.querySelector('select[aria-label=\"Filter by Sales Rep\"]') || /Sales Rep/.test(document.querySelector('[data-filter-bar], main')?.innerText ?? '')")));
+
   section("Who is told");
   const L1 = lead("Fusion Air");
   book(L1);
@@ -67,6 +77,15 @@ try {
   check("…and by email, as asked", sql(`select count(*) from public.email_outbox where user_id = ${ADMIN} and kind = 'client_appointment' and subject like ${lit(`%${TAG} Fusion Air%`)}`) === "1");
   await fetch(`${APP_URL}/api/appointments/nudge`, { method: "POST", headers: { "content-type": "application/json", "x-push-secret": SECRET }, body: "{}" });
   check("…sent", Boolean(await until(() => mail.messages.find((m) => m.to.some((t) => t.includes("admin@beacon.test")) && String(m.raw ?? "").replace(/=\r?\n/g, "").includes("Fusion Air")) ?? null, { timeout: 10000 })));
+  // An administrator who watches the client by email, when the client updates an appointment: one email, not two.
+  const A1 = sql(`select id from public.appointments where lead_id = ${L1}`);
+  const clientAuth = sql("select auth_id from public.users where email = 'client@beacon.test'");
+  sql(`update public.users set company_id = ${company} where id = ${CLIENT}`);
+  sql(`set local role authenticated; select set_config('request.jwt.claims', json_build_object('sub', '${clientAuth}', 'role', 'authenticated')::text, true);
+    select public.update_appointment_status(${A1}, 'valid', ${lit(`${TAG} went well`)}, null, null)`);
+  check("a client's update: an administrator who also watches the client by email gets it once",
+    sql(`select count(*) from public.email_outbox where user_id = ${ADMIN} and subject like 'Appointment update:%' and subject like ${lit(`%${TAG} Fusion Air%`)}`) === "1"
+    && sql(`select count(*) from public.notifications where user_id = ${ADMIN} and title like 'Appointment update:%' and title like ${lit(`%${TAG} Fusion Air%`)}`) === "1");
   sql(`delete from public.client_watchers where company_id = ${company}`);
   const L2 = lead("Desert Roofing");
   book(L2);
@@ -75,6 +94,8 @@ try {
 } finally {
   browser.close();
   await mail.close?.();
+  sql(`update public.users set company_id = ${clientCompany} where id = ${CLIENT}`);
+  sql(`delete from public.appointment_updates where lead_id in (select id from public.leads where company_name like ${lit(`%${TAG}%`)})`);
   const like = lit(`%${TAG}%`);
   sql(`delete from public.notifications where title like ${like} or body like ${like}`);
   sql(`delete from public.email_outbox where subject like ${like}`);

@@ -54,8 +54,14 @@ export default function RecentDevelopedCard({ rows, view, kind, kindSwitch, swit
       </div>
       <FilterTable
         columns={["Company", "Client", "Project", "Call result", "Ultimate X-Date", "Manager", "Created"]}
-        // By manager and by project (Sean, Oct 2026): each with the ones that have something in these days.
-        filters={[{ key: "manager", label: "Manager" }, { key: "project", label: "Project" }]}
+        // By manager, project, client and Sales Rep (Sean, Oct 2026): each with the ones that have something in these
+        // days; projects and clients as a drop-down of check boxes, several at once (all to begin with).
+        filters={[
+          { key: "manager", label: "Manager" },
+          { key: "project", label: "Project", kind: "multi" },
+          { key: "client", label: "Client", kind: "multi" },
+          { key: "rep", label: "Sales Rep", kind: "select" },
+        ]}
         // What is shown, filtered, as a CSV (Sean, Oct 2026): a manager's backup for their production and pay.
         exportCsv={{ name: exportName(view, kind), header: EXPORT_HEADER }}
         placeholder="Search company, phone, client, manager…"
@@ -63,7 +69,7 @@ export default function RecentDevelopedCard({ rows, view, kind, kindSwitch, swit
         rows={rows.map((r) => ({
           id: r.id,
           search: `${r.company} ${r.phone ?? ""} ${(r.phone ?? "").replace(/\D/g, "")} ${r.contact ?? ""} ${r.client} ${r.project} ${r.manager} ${r.result?.name ?? ""} ${r.type}`,
-          facets: { manager: r.manager, project: r.project },
+          facets: { manager: r.manager, project: r.project, client: r.client, rep: r.salesRep },
           csv: [r.day, r.time, r.type, r.manager, r.company, r.contact ?? "", r.phone ?? "", r.location === "—" ? "" : r.location,
             r.client, r.project, r.result?.name ?? "", r.xdate === "—" ? "" : r.xdate, r.amount != null ? r.amount.toFixed(2) : ""],
           node: (

@@ -30,6 +30,13 @@ const glass = Number(sql(`insert into public.leads (project_id, company_name, ci
 const glassCall = Number(sql(`insert into public.call_records (lead_id, project_id, user_id, call_date, result_id) values (${glass}, ${other}, ${SEAN}, now(), ${result("Lead")}) returning id`));
 sql(`insert into public.pay_events (user_id, project_id, lead_id, call_record_id, kind, amount, created_at) values (${SEAN}, ${other}, ${glass}, ${glassCall}, 'lead', 10, now())`);
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${plumbing}, '2027-03-15')`);
+// A second client, owned by Sean as its Sales Rep, with a lead today: for the Client and Sales Rep filters.
+const company2 = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Second, Inc.`)}, ${SEAN}) returning id`));
+const third = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
+  values (${lit(`${TAG} Third DBDev`)}, ${company2}, (select id from public.project_types where code='DBDV'), 1) returning id`));
+const tile = Number(sql(`insert into public.leads (project_id, company_name, city, state, result_id) values (${third}, ${lit(`${TAG} Tile`)}, 'Mesa', 'AZ', ${result("Lead")}) returning id`));
+const tileCall = Number(sql(`insert into public.call_records (lead_id, project_id, user_id, call_date, result_id) values (${tile}, ${third}, ${SEAN}, now(), ${result("Lead")}) returning id`));
+sql(`insert into public.pay_events (user_id, project_id, lead_id, call_record_id, kind, amount, created_at) values (${SEAN}, ${third}, ${tile}, ${tileCall}, 'lead', 10, now())`);
 const call = (l, r) => Number(sql(`insert into public.call_records (lead_id, project_id, user_id, call_date, result_id) values (${l}, ${project}, ${SEAN}, now(), ${result(r)}) returning id`));
 sql(`insert into public.pay_events (user_id, project_id, lead_id, call_record_id, kind, amount, created_at) values
   (${SEAN}, ${project}, ${plumbing}, ${call(plumbing, "Lead-Hot Lead")}, 'lead', 10, now()),
@@ -51,14 +58,15 @@ try {
   check("…each with its client, project, call result, ultimate X-date, manager and when, with what it was",
     p.includes(`${TAG} Insurance`) && p.includes(`${TAG} DBDev`) && /Lead-Hot Lead/i.test(p) && p.includes("Mar 15") && p.includes("Sean Fitzgerald") && /\d:\d\d [AP]M Hot Lead/.test(p), p);
   check("the old six-newest-leads tile is gone", !(await admin.text()).includes("Search recent leads"));
-  // By project (Sean, Oct 2026): a chip each, or a list once there are more than a few.
-  const byProject = await admin.ev(`(() => {
-    const card = document.querySelector('[data-recent-developed]');
-    const select = card.querySelector('select[aria-label="Filter by Project"]');
-    if (select) { const o = [...select.options].find((x) => x.value === ${JSON.stringify(`${TAG} Other DBDev`)}); if (!o) return false;
-      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(select, o.value); select.dispatchEvent(new Event('change', { bubbles: true })); return true; }
-    const chip = [...card.querySelectorAll('[aria-label="Filter by Project"] button')].find((b) => b.textContent.includes(${JSON.stringify(`${TAG} Other DBDev`)}));
-    if (!chip) return false; chip.click(); return true; })()`);
+  // By project (Sean, Oct 2026): a drop-down of check boxes, several at once.
+  const pickMulti = (key, value) => admin.ev(`(() => {
+    const box = document.querySelector('[data-recent-developed] [data-multi-facet="${key}"]');
+    if (!box) return false;
+    if (!box.querySelector('[role=listbox]')) box.querySelector('button').click();
+    return true; })()`).then(() => until(() => admin.ev(`(() => {
+    const o = [...document.querySelectorAll('[data-recent-developed] [data-multi-facet="${key}"] [data-option]')].find((b) => b.dataset.option === ${JSON.stringify(value)});
+    if (!o) return false; o.click(); return true; })()`)));
+  const byProject = await pickMulti("project", `${TAG} Other DBDev`);
   const one = await until(async () => { const r = await rows(); return r.length === 1 ? r : null; });
   check("a Project filter: that project's alone", byProject && one && has(one, "Glass"), JSON.stringify(one ?? await rows()));
   // Export CSV: what is shown, as filtered (the file read as the page makes it).
@@ -71,6 +79,26 @@ try {
   check("Export CSV: the rows as filtered, with each one's pay", lines.length === 2 && lines[0].startsWith("Date,Time,Type,Manager,Company")
     && lines[1].includes(`${TAG} Glass`) && lines[1].includes(`${TAG} Other DBDev`) && lines[1].endsWith(",10.00"), JSON.stringify(lines));
   check("…named for what and which days", /^Leads-and-appointments_\d{4}-\d{2}-\d{2}\.csv$/.test((await admin.ev("window.__csvName")) ?? ""), await admin.ev("window.__csvName"));
+  await admin.go("/", 4000);
+
+  section("Several projects, clients, a Sales Rep");
+  await pickMulti("project", `${TAG} Other DBDev`);
+  await pickMulti("project", `${TAG} DBDev`);
+  const two = await until(async () => { const r = await rows(); return r.length === 3 ? r : null; });
+  check("Projects: several at once, ticked", two && has(two, "Plumbing") && has(two, "Glass") && !has(two, "Tile"), JSON.stringify(two ?? await rows()));
+  await admin.go("/", 5000);
+  await pickMulti("client", `${TAG} Second, Inc.`);
+  const second = await until(async () => { const r = await rows(); return r.length === 1 ? r : null; });
+  check("Clients: a name with a comma in it, alone", second && has(second, "Tile"), JSON.stringify(second ?? await rows()));
+  await pickMulti("client", `${TAG} Insurance`);
+  const both = await until(async () => { const r = await rows(); return r.length === 4 ? r : null; });
+  check("…and two clients at once", Boolean(both), JSON.stringify(await rows()));
+  await admin.go("/", 5000);
+  await until(() => admin.ev("!!document.querySelector('[data-recent-developed] select[aria-label=\"Filter by Sales Rep\"]')"));
+  await admin.ev(`(() => { const sel = document.querySelector('[data-recent-developed] select[aria-label="Filter by Sales Rep"]');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, 'Sean Fitzgerald'); sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+  const rep = await until(async () => { const r = await rows(); return r.length === 1 ? r : null; });
+  check("Sales Rep: the clients they own", rep && has(rep, "Tile"), JSON.stringify(rep ?? await rows()));
   await admin.go("/", 4000);
 
   section("Leads, appointments or both");
@@ -91,11 +119,11 @@ try {
   check("a day gone by: only what was developed that day", back && has(back, "Older Co") && !has(back, "Plumbing"), back);
 } finally {
   await browser.close();
-  sql(`delete from public.pay_events where project_id in (${project}, ${other})`);
-  sql(`delete from public.call_records where project_id in (${project}, ${other})`);
+  sql(`delete from public.pay_events where project_id in (${project}, ${other}, ${third})`);
+  sql(`delete from public.call_records where project_id in (${project}, ${other}, ${third})`);
   sql(`delete from public.insurance_details where lead_id in (${plumbing}, ${roofing}, ${older})`);
-  sql(`delete from public.leads where project_id in (${project}, ${other})`);
-  sql(`delete from public.projects where id in (${project}, ${other})`);
-  sql(`delete from public.companies where id = ${company}`);
+  sql(`delete from public.leads where project_id in (${project}, ${other}, ${third})`);
+  sql(`delete from public.projects where id in (${project}, ${other}, ${third})`);
+  sql(`delete from public.companies where id in (${company}, ${company2})`);
 }
 finish("admin recent leads & appointments");

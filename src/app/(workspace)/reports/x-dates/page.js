@@ -13,6 +13,7 @@ import { getBusinessToday } from "@/lib/server/business-day";
 import { pageInfo, readListParams } from "@/lib/paging";
 import { mediumDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,11 @@ const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
  */
 export default async function XdatesReport({ searchParams }) {
   const sp = await searchParams;
-  const companyId = idParam(sp?.client);
+  // A client's people come here from their own project's month bars (Sean, Oct 2026): Row Level Security
+  // keeps it to their projects; the client picker is ours.
+  const me = await getCurrentUser();
+  const isClient = me?.role === "client";
+  const companyId = isClient ? null : idParam(sp?.client);
   const projectId = idParam(sp?.project);
   const month = /^(0|[1-9]|1[0-2])$/.test(sp?.month ?? "") ? Number(sp.month) : null;
   const bucket = XDATE_BUCKETS[sp?.bucket] ? sp.bucket : null;
@@ -42,7 +47,7 @@ export default async function XdatesReport({ searchParams }) {
   const client = options.companies.find((c) => c.id === companyId);
   const projects = options.projects.filter((p) => !companyId || p.company_id === companyId);
   const project = options.projects.find((p) => p.id === projectId);
-  const scope = project?.name ?? client?.name ?? "The whole book";
+  const scope = project?.name ?? client?.name ?? (isClient ? me?.company?.name ?? "Your projects" : "The whole book");
 
   // Links keep the client and project, and open one month's names.
   const scoped = () => {
@@ -75,9 +80,11 @@ export default async function XdatesReport({ searchParams }) {
         <Card>
           <SectionHeader label="Renewals by Month" icon={CalendarSearch} />
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--panel-border)] px-5 py-3">
-            <ParamSelect name="client" label="Client" value={companyId ? String(companyId) : ""} placeholder="All clients"
-              clears={["page", "month", "bucket", "project"]}
-              options={options.companies.map((c) => ({ value: String(c.id), label: c.name }))} />
+            {isClient ? null : (
+              <ParamSelect name="client" label="Client" value={companyId ? String(companyId) : ""} placeholder="All clients"
+                clears={["page", "month", "bucket", "project"]}
+                options={options.companies.map((c) => ({ value: String(c.id), label: c.name }))} />
+            )}
             <ParamSelect name="project" label="Project" value={projectId ? String(projectId) : ""} placeholder="All projects"
               clears={["page", "month", "bucket"]}
               options={projects.map((p) => ({ value: String(p.id), label: p.name }))} />

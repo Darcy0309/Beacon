@@ -69,12 +69,14 @@ export async function listProjects(params) {
         supabase
           .from("projects")
           .select(
-            projectSelect({ company: Boolean(p.filters?.client || p.filters?.group), type: Boolean(p.filters?.type), status: Boolean(p.filters?.status) }),
+            projectSelect({ company: Boolean(p.filters?.client || p.filters?.group || p.filters?.rep), type: Boolean(p.filters?.type), status: Boolean(p.filters?.status) }),
             { count: "exact" }
           )
           .order("id"),
         p,
-        { search: ["name", "client_name"], alsoOr, columns: { status: "status.name", type: "type.code", client: "company.name", group: "company.agency_group_id" } }
+        { search: ["name", "client_name"], alsoOr, columns: { status: "status.name", type: "type.code", client: "company.name", group: "company.agency_group_id",
+          // Its client's Sales Rep (Sean, Oct 2026).
+          rep: "company.sales_rep_id" } }
       ),
     params
   );
