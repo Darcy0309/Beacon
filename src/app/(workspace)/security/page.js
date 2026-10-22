@@ -51,7 +51,7 @@ export default async function SecurityPage({ searchParams }) {
         {me?.status === "active" ? (
           <Card>
             <SectionHeader label="My Profile" icon={UserRound} />
-            <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email, bio: me.bio ?? "" }} staff={me.role !== "client"} />
+            <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email, bio: me.bio ?? "", birthday: me.birthday ?? null }} staff={me.role !== "client"} />
           </Card>
         ) : null}
 

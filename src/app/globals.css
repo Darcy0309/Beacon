@@ -258,6 +258,33 @@ html[data-wallpaper] .back-link {
 }
 html[data-wallpaper][data-style="modern"] .back-link { background-color: var(--card); }
 
+/* Meet the Team (team-grid.jsx): someone on the phones now, a softly pulsing dot. */
+.status-pulse { box-shadow: 0 0 0 0 color-mix(in srgb, var(--neon-emerald) 60%, transparent); animation: status-pulse 1.8s ease-out infinite; }
+@keyframes status-pulse { to { box-shadow: 0 0 0 8px transparent; } }
+/* A birthday: a warm glow round the card, a swaying bunch of flowers and confetti drifting down. */
+.bday-card { border-color: color-mix(in srgb, #f472b6 55%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in srgb, #f472b6 25%, transparent), 0 10px 30px -12px color-mix(in srgb, #f472b6 55%, transparent); }
+.bday-banner { border-color: color-mix(in srgb, #f472b6 50%, transparent); background: linear-gradient(90deg, color-mix(in srgb, #f472b6 14%, var(--card)), color-mix(in srgb, #facc15 10%, var(--card))); }
+.bday-flower { display: inline-block; transform-origin: 50% 90%; animation: bday-sway 2.6s ease-in-out infinite; }
+@keyframes bday-sway { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg) scale(1.06); } }
+.bday-confetti {
+  position: absolute; inset: -40% 0 auto 0; height: 140%; pointer-events: none; opacity: 0.55;
+  background-image:
+    radial-gradient(circle, #f472b6 0 2px, transparent 2.5px), radial-gradient(circle, #facc15 0 2px, transparent 2.5px),
+    radial-gradient(circle, #38bdf8 0 1.5px, transparent 2px), radial-gradient(circle, #a78bfa 0 2px, transparent 2.5px);
+  background-size: 46px 52px, 58px 44px, 38px 60px, 64px 50px;
+  background-position: 0 0, 20px 12px, 9px 30px, 33px 5px;
+  animation: bday-confetti 7s linear infinite;
+}
+@keyframes bday-confetti { to { background-position: 0 104px, 20px 100px, 9px 150px, 33px 105px; } }
+/* The gifts to pick from, each moving on its own beat; the chosen one bounces higher. */
+.gift-emoji { display: inline-block; animation: gift-bob 2.2s ease-in-out infinite; }
+.gift-option[aria-checked="true"] .gift-emoji { animation: gift-pick 0.9s ease-in-out infinite; }
+@keyframes gift-bob { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-4px) rotate(-4deg); } }
+@keyframes gift-pick { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .status-pulse, .bday-flower, .bday-confetti, .gift-emoji, .gift-option[aria-checked="true"] .gift-emoji { animation: none; }
+}
+
 /* The accent rail along the top edge. Dimmed only when the animated streak
    is present, so it keeps the tile's hue while the streak is on another edge. */
 [data-accent-edge]::before {

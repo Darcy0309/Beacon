@@ -7,7 +7,8 @@ import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field, formHelpers } from "@/components/ui/field";
+import { Field, Select, formHelpers } from "@/components/ui/field";
+import { MONTH_NAMES } from "@/lib/team";
 import { updateMyProfile } from "@/features/auth/actions";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -46,6 +47,23 @@ export default function ProfileForm({ me, staff = false }) {
           <Input name="mobile" type="tel" defaultValue={dv("mobile")} aria-invalid={invalid("mobile")} autoComplete="tel" />
         </Field>
       </div>
+      {staff ? (
+        // The day the team wishes them happy birthday on Meet the Team (no year asked).
+        <div className="grid grid-cols-2 gap-3 sm:max-w-sm" data-birthday>
+          <Field label="Birthday" error={fe("birthday_month")} hint="Optional: the team sees it on your birthday">
+            <Select name="birthday_month" defaultValue={me.birthday ? String(Number(me.birthday.slice(5, 7))) : ""} aria-label="Birthday month">
+              <option value="">Month</option>
+              {MONTH_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+            </Select>
+          </Field>
+          <Field label="Day" error={fe("birthday_day")}>
+            <Select name="birthday_day" defaultValue={me.birthday ? String(Number(me.birthday.slice(8, 10))) : ""} aria-label="Birthday day" aria-invalid={invalid("birthday_day")}>
+              <option value="">Day</option>
+              {Array.from({ length: 31 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
+            </Select>
+          </Field>
+        </div>
+      ) : null}
       {staff ? (
         <Field label="About me" error={fe("bio")} hint="A line or two clients read on Meet the Team, e.g. what you work on and how long you've been here.">
           <Textarea name="bio" rows={2} maxLength={280} defaultValue={dv("bio")} aria-invalid={invalid("bio")} data-bio />

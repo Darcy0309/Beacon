@@ -10,6 +10,7 @@ import { check, currentAppUser, fail, logActivity, ok, requestOrigin, s } from "
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { cross, rules, safeInternalPath, schemas } from "@/lib/validate";
+import { birthdayOf } from "@/lib/team";
 
 const DISABLED_MESSAGE = "This account has been disabled. Contact an administrator.";
 
@@ -242,11 +243,18 @@ export async function updateMyProfile(prevState, formData) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (!me) return fail("You are signed out.");
+  // Staff: their birthday (month and day; the year is never kept), for Meet the Team.
+  let birthday;
+  try {
+    birthday = birthdayOf(s(formData, "birthday_month"), s(formData, "birthday_day"));
+  } catch (err) {
+    return fail(err.message, { birthday_day: err.message }, values);
+  }
   const { data, error } = await supabase
     .from("users")
     .update({ first_name: s(formData, "first_name"), last_name: s(formData, "last_name"), phone: s(formData, "phone"), mobile: s(formData, "mobile"),
-      // Staff: a line about themselves, for Meet the Team.
-      ...(me.role === "client" ? {} : { bio: s(formData, "bio") }) })
+      // Staff: a line about themselves and their birthday, for Meet the Team.
+      ...(me.role === "client" ? {} : { bio: s(formData, "bio"), ...(formData.has("birthday_month") ? { birthday } : {}) }) })
     .eq("id", me.id)
     .select("id");
   if (error) return fail(error, null, values);

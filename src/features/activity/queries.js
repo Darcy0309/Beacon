@@ -83,6 +83,7 @@ const ACTION_LABEL = {
   "profile.photo": "Added their photo",
   "profile.photo_remove": "Removed their photo",
   "company.branding": "Changed a client's branding",
+  "settings.team": "Changed Meet the Team's spotlight",
   "production.goal": "Set production goals",
   "settings.pay": "Changed the pay rules",
   "settings.idle": "Changed the sign-out after inactivity",

@@ -391,6 +391,9 @@ export const schemas = {
     phone: [phone],
     mobile: [phone],
     bio: [max(280)],
+    // A birthday as month and day (the year is never asked): checked together by birthdayOf().
+    birthday_month: [int({ min: 1, max: 12 })],
+    birthday_day: [int({ min: 1, max: 31 })],
   },
 
   // A client's website (their branding).
