@@ -29,8 +29,15 @@ const monthTips = (months) =>
  * business's "YYYY-MM-DD") marks the current month; the server's own clock
  * runs on UTC, a month ahead on the last evening of one.
  */
-export default function XdateMonths({ data, href, selected, today, compact = false }) {
-  const { months, undated, totals } = data;
+export default function XdateMonths({ data, href, selected, today, compact = false, only = null }) {
+  const { months, undated } = data;
+  // Renewal months picked (X-Dates filters; Sean, Oct 2026): the others faded on the chart, left out of the table and its totals.
+  const picked = only?.length ? new Set(only) : null;
+  const counted = picked ? months.filter((m) => picked.has(m.month)) : months;
+  const totals = picked
+    ? Object.fromEntries(["total", ...SEGMENTS.map((s) => s.key)].map((k) => [k, counted.reduce((n, m) => n + m[k], 0)]))
+    : data.totals;
+  const none = { total: 0, ...Object.fromEntries(SEGMENTS.map((s) => [s.key, 0])) };
   const max = Math.max(1, ...months.map((m) => m.total));
   const thisMonth = today ? Number(today.slice(5, 7)) : new Date().getMonth() + 1;
   const isOpen = (month, bucket) => selected?.month === month && (selected?.bucket ?? null) === bucket;
@@ -69,7 +76,8 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
       {/* Hovering a month (or focusing one of its colours) shows its figures above its column. */}
       <TipLayer tips={monthTips(months)} className={cn("flex items-stretch gap-1.5 sm:gap-3", compact ? "h-44" : "h-60")}>
         {months.map((m, i) => (
-          <div key={m.month} data-tip={m.month} data-month-column={m.month} className="group/month relative flex min-w-0 flex-1 flex-col items-center gap-2">
+          <div key={m.month} data-tip={m.month} data-month-column={m.month} data-picked={picked ? picked.has(m.month) || undefined : undefined}
+            className={cn("group/month relative flex min-w-0 flex-1 flex-col items-center gap-2 transition-opacity", picked && !picked.has(m.month) && "opacity-25")}>
             <div className="flex min-h-0 w-full flex-1 flex-col justify-end rounded-t transition-colors group-hover/month:bg-foreground/[0.04]">
               {m.total ? (
                 <div
@@ -119,7 +127,7 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
             </TableRow>
           </TableHeader>
           <TableBody>
-            {[...months, ...(undated.total ? [undated] : [])].map((m) => (
+            {[...counted, ...(undated.total && !picked ? [undated] : [])].map((m) => (
               <TableRow key={m.month} className={cn(selected?.month === m.month && "bg-primary/5")}>
                 <TableCell className={cn("font-medium", m.month === thisMonth && "text-primary")}>
                   {m.label}{m.month === thisMonth ? <span className="ml-2 text-xs font-normal text-muted-foreground">this month</span> : null}
@@ -129,10 +137,10 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
               </TableRow>
             ))}
             <TableRow className="border-t-2 font-semibold">
-              <TableCell>All months</TableCell>
-              <TableCell className="text-right tabular-nums">{(totals.total + undated.total).toLocaleString()}</TableCell>
+              <TableCell>{picked ? "These months" : "All months"}</TableCell>
+              <TableCell className="text-right tabular-nums">{(totals.total + (picked ? none : undated).total).toLocaleString()}</TableCell>
               {SEGMENTS.map((s) => (
-                <TableCell key={s.key} className="text-right tabular-nums">{(totals[s.key] + undated[s.key]).toLocaleString()}</TableCell>
+                <TableCell key={s.key} className="text-right tabular-nums">{(totals[s.key] + (picked ? none : undated)[s.key]).toLocaleString()}</TableCell>
               ))}
             </TableRow>
           </TableBody>

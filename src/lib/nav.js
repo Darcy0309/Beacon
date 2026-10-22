@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
-  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge,
 } from "lucide-react";
 
 export const ROLES = {
@@ -98,6 +98,8 @@ export const navGroups = [
       { href: "/reports/pay", label: "Pay & Hours", icon: Clock, roles: ["admin", "manager", "agent"] },
       // One person's day by the hour: calls, leads and appointments; agents see their own.
       { href: "/reports/hourly", label: "Hourly Progress", icon: Timer, roles: ["admin", "manager", "agent"] },
+      // A manager's Pipeline Report (Sean, Oct 2026): their projects' renewals by manager, as on X-Dates by Month.
+      { href: "/reports/pipeline", label: "Pipeline Report", icon: Gauge, roles: ["manager"] },
       // Each project against its lead and appointment goals: owed, ahead, days to go.
       { href: "/reports/goals", label: "Project Goals", icon: Goal, roles: ["admin", "manager"] },
       // Every update clients make to their appointments, as they come in.

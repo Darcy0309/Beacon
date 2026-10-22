@@ -1,23 +1,24 @@
 import Link from "@/components/shared/intent-link";
-import { ArrowLeft, CalendarSearch, ListChecks, X } from "lucide-react";
+import { ArrowLeft, CalendarSearch, Gauge, ListChecks, X } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
-import ParamSelect from "@/components/shared/param-select";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import XdateMonths from "@/features/reports/components/xdate-months";
-import { getXdateMonthLeads, getXdatesByMonth, MONTHS, XDATE_BUCKETS } from "@/features/reports/queries";
+import { getPipelineManagers, getPipelineReport, getXdateMonthLeadsFiltered, getXdatesFiltered, MONTHS, XDATE_BUCKETS } from "@/features/reports/queries";
+import PipelineReport from "@/features/reports/components/pipeline-report";
+import XdateFilterBar from "@/features/reports/components/xdate-filter-bar";
+import { getSalesReps } from "@/features/users/queries";
+import { filterParams, pipelineMonths, readXdateFilters } from "@/lib/pipeline";
 import { getLookups } from "@/lib/server/lookups";
-import { getBusinessToday } from "@/lib/server/business-day";
+import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { pageInfo, readListParams } from "@/lib/paging";
 import { mediumDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
-
-const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
 
 /**
  * X-dates by month: for the whole book, one client or one project, how many
@@ -28,34 +29,39 @@ const idParam = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
 export default async function XdatesReport({ searchParams }) {
   const sp = await searchParams;
   // A client's people come here from their own project's month bars (Sean, Oct 2026): Row Level Security
-  // keeps it to their projects; the client picker is ours.
+  // keeps it to their projects; the client, Sales Rep and manager pickers, and the Pipeline Report, are ours.
   const me = await getCurrentUser();
   const isClient = me?.role === "client";
-  const companyId = isClient ? null : idParam(sp?.client);
-  const projectId = idParam(sp?.project);
+  const read = readXdateFilters(sp);
+  const filters = isClient ? { ...read, companyId: null, repId: null, userIds: [] } : read;
   const month = /^(0|[1-9]|1[0-2])$/.test(sp?.month ?? "") ? Number(sp.month) : null;
   const bucket = XDATE_BUCKETS[sp?.bucket] ? sp.bucket : null;
   const list = readListParams(sp);
 
-  const [options, data, names, today] = await Promise.all([
+  const todayP = getBusinessToday();
+  const [options, data, names, today, tz, reps, managers, pipeline] = await Promise.all([
     getLookups(),
-    getXdatesByMonth({ projectId, companyId }),
-    month === null ? null : getXdateMonthLeads({ month, bucket, projectId, companyId, page: list.page, perPage: list.perPage }),
-    getBusinessToday(),
+    getXdatesFiltered(filters),
+    month === null ? null : getXdateMonthLeadsFiltered({ month, bucket, filters, page: list.page, perPage: list.perPage }),
+    todayP,
+    getBusinessTimeZone(),
+    isClient ? [] : getSalesReps(),
+    isClient ? [] : getPipelineManagers(),
+    // The Pipeline Report (Sean, Oct 2026): the filtered names by project and manager, for the months picked (the next three to begin with).
+    isClient ? null : Promise.all([todayP, getBusinessTimeZone()]).then(([t, zone]) => {
+      const months = pipelineMonths(filters.months, t);
+      return getPipelineReport({ filters, months, timeZone: zone }).then((rows) => ({ rows, months }));
+    }),
   ]);
 
-  const client = options.companies.find((c) => c.id === companyId);
-  const projects = options.projects.filter((p) => !companyId || p.company_id === companyId);
-  const project = options.projects.find((p) => p.id === projectId);
-  const scope = project?.name ?? client?.name ?? (isClient ? me?.company?.name ?? "Your projects" : "The whole book");
+  const client = options.companies.find((c) => c.id === filters.companyId);
+  const chosen = options.projects.filter((p) => filters.projectIds.includes(p.id));
+  const project = chosen.length === 1 ? chosen[0] : null;
+  const scope = project?.name ?? (chosen.length > 1 ? `${chosen.length} projects` : null) ?? client?.name
+    ?? (isClient ? me?.company?.name ?? "Your projects" : "The whole book");
 
-  // Links keep the client and project, and open one month's names.
-  const scoped = () => {
-    const p = new URLSearchParams();
-    if (companyId) p.set("client", String(companyId));
-    if (projectId) p.set("project", String(projectId));
-    return p;
-  };
+  // Links keep the filters, and open one month's names.
+  const scoped = () => filterParams(filters);
   const href = (m, b) => {
     const p = scoped();
     p.set("month", String(m));
@@ -79,20 +85,20 @@ export default async function XdatesReport({ searchParams }) {
         ) : null}
         <Card>
           <SectionHeader label="Renewals by Month" icon={CalendarSearch} />
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--panel-border)] px-5 py-3">
-            {isClient ? null : (
-              <ParamSelect name="client" label="Client" value={companyId ? String(companyId) : ""} placeholder="All clients"
-                clears={["page", "month", "bucket", "project"]}
-                options={options.companies.map((c) => ({ value: String(c.id), label: c.name }))} />
-            )}
-            <ParamSelect name="project" label="Project" value={projectId ? String(projectId) : ""} placeholder="All projects"
-              clears={["page", "month", "bucket"]}
-              options={projects.map((p) => ({ value: String(p.id), label: p.name }))} />
-          </div>
+          <XdateFilterBar filters={filters} showClient={!isClient} showManagers={!isClient}
+            options={{ companies: options.companies, projects: options.projects, reps, managers }} />
           <div className="p-5">
-            <XdateMonths data={data} href={href} today={today} selected={month === null ? null : { month, bucket }} />
+            <XdateMonths data={data} href={href} today={today} selected={month === null ? null : { month, bucket }} only={filters.months} />
           </div>
         </Card>
+
+        {pipeline ? (
+          <Card id="pipeline" className="scroll-mt-24">
+            <SectionHeader label="Pipeline Report" icon={Gauge} />
+            <PipelineReport rows={pipeline.rows} months={pipeline.months} today={today} linkTo="project"
+              fileName={`PipelineReport_${today}.csv`} />
+          </Card>
+        ) : null}
 
         {names ? (
           <Card id="names" className="scroll-mt-24">
