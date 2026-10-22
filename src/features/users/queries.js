@@ -50,7 +50,7 @@ export async function listUsers(params) {
   const ids = [...enabled];
 
   const { rows, total } = await runPaged((p) => {
-    let query = supabase.from("users").select("*, company:companies(id, name)", { count: "exact" }).order("id");
+    let query = supabase.from("users").select("*, company:companies!users_company_id_fkey(id, name)", { count: "exact" }).order("id");
     if (mfaFilter === "true") query = query.in("id", ids);
     else if (mfaFilter === "false" && ids.length) query = query.not("id", "in", `(${ids.join(",")})`);
     return paged(query, p, {
@@ -209,4 +209,13 @@ export async function getMyWorkload() {
   const supabase = await createClient();
   const { data } = await supabase.from("user_workload").select("*").eq("user_id", me.id).maybeSingle();
   return { leads: Number(data?.lead_count) || 0, appts: Number(data?.appt_count) || 0 };
+}
+
+/** Who can own a client (its Sales Rep) or hear about it: the active administrators and managers. */
+export async function getSalesReps() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("users").select("id, first_name, last_name, email, role")
+    .in("role", ["admin", "manager"]).eq("status", "active").order("first_name").order("last_name");
+  if (error) throw error;
+  return (data ?? []).map((u) => ({ id: u.id, name: fullName(u), role: ROLE_LABEL[u.role] ?? u.role }));
 }

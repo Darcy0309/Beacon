@@ -30,7 +30,7 @@ export const getCurrentUser = cache(async function getCurrentUser() {
 
   const { data } = await supabase
     .from("users")
-    .select("*, company:companies(id, name, logo_path, website, subscription_end)")
+    .select("*, company:companies!users_company_id_fkey(id, name, logo_path, website, subscription_end)")
     .eq("auth_id", authId)
     .maybeSingle();
   if (!data) return null;
