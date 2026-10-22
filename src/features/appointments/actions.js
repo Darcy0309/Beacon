@@ -3,7 +3,10 @@
 /** Setting and managing appointments. */
 
 import { revalidatePath } from "next/cache";
-import { check, currentAppUser, fail, idFrom, n, ok, removeRecord, s } from "@/lib/server/action-helpers";
+import { after } from "next/server";
+import { check, currentAppUser, fail, idFrom, n, ok, removeRecord, requestOrigin, s } from "@/lib/server/action-helpers";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { flushOutbox } from "@/lib/server/outbox";
 import { createClient } from "@/lib/supabase/server";
 import { cross, schemas } from "@/lib/validate";
 import { STATUS_KEYS, parseAmount, soldLines } from "@/lib/appointment-updates";
@@ -146,6 +149,12 @@ export async function updateAppointmentStatus(prevState, formData) {
     p_appointment_id: id, p_status: status, p_note: note, p_potential_premium: potential, p_sold_lines: lines,
   });
   if (error) return fail(error);
+  // Its emails (to the administrators and the manager who set it) go out at once, after the answer.
+  const origin = await requestOrigin();
+  after(async () => {
+    const admin = createAdminClient();
+    if (admin) await flushOutbox(admin, origin).catch((err) => console.error("[outbox]", err?.message ?? err));
+  });
   const leadId = idFrom(formData, "lead_id");
   revalidatePath("/appointments");
   revalidatePath("/");

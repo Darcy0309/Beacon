@@ -52,6 +52,8 @@ const A2 = book(L2, P1, sql(`select '${today}'::date + 5`)); // still to come: P
 const A3 = book(L3, P2, businessBack(4));               // gone by long enough for the 2nd reminder
 const A4 = book(L4, P1, businessBack(2));               // a second gone by, to update to Invalid
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${L1}, '${today}'::date + 40)`);
+const AGENT_EMAIL = `agent-${Date.now()}@example.test`;
+sql(`insert into public.project_profiles (project_id, agent_email) values (${P2}, ${lit(AGENT_EMAIL)})`);
 const carrier = sql("select name from public.agencies where deleted_at is null and name is not null order by name limit 1");
 
 const mail = await startMailCatcher(2525);
@@ -94,6 +96,10 @@ try {
   check("saved: Valid-Quoting at $25,000", sql(`select client_result || ' ' || quoted_premium::int from public.appointments where id = ${A1}`) === "valid_quoting 25000");
   const note = sql(`select note from public.appointment_updates where appointment_id = ${A1} order by id desc limit 1`);
   check("…its note kept, stamped with the day and their name", note.includes("need loss runs") && note.length > `${TAG} Quoting GL and WC, need loss runs`.length, note);
+  // The body (quoted-printable: soft line breaks joined); the subject is encoded for its "·".
+  const updateMail = (to) => mail.messages.find((m) => m.to.some((t) => t.includes(to)) && /Potential premium \$25,000/.test(String(m.raw ?? "").replace(/=\r?\n/g, "")));
+  check("…and emailed: the administrators and the manager who set it", Boolean(await until(() => (updateMail("admin@beacon.test") && updateMail("sean@beacon.test")) || null, { timeout: 15000 })),
+    JSON.stringify(mail.messages.map((m) => m.to)));
   check("…the administrators and the manager who set it are told", sql(`select count(distinct user_id) from public.notifications where link = '/leads/${L1}?tab=updates' and title like 'Appointment update: Valid-Quoting%' and user_id in (${ADMIN}, ${SEAN})`) === "2");
   check("…and the row shows it", Boolean(await when(client, `/Valid-Quoting/.test(document.querySelector('[data-client-appt="${A1}"]')?.innerText ?? '') && /\\$25,000/.test(document.querySelector('[data-client-appt="${A1}"]')?.innerText ?? '')`)));
 
@@ -144,6 +150,9 @@ try {
   const callResult = await client.ev("document.querySelector('[data-client-call-result]')?.innerText.replace(/\\s+/g, ' ') ?? ''");
   check("the Call Result: the result, the appointment's day and time, how it went", /Appointment/.test(callResult) && /10:00 AM/.test(callResult) && /Sold Account/.test(callResult), callResult);
   check("…the project calendar in view", Boolean(await client.ev("!!document.querySelector('[data-project-calendar]')")));
+  await client.go(`/leads/${L1}?tab=updates`, 6000);
+  const theirs = (await when(client, "document.querySelector('[data-appointment-updates]')?.innerText.replace(/\\s+/g, ' ')")) ?? "";
+  check("…the lead's Appointment Updates, open to the client too", /Sold Account/.test(theirs) && /Valid-Quoting/.test(theirs) && /need loss runs/.test(theirs), theirs.slice(0, 200));
   check("…and not the call result buttons (Stays on my list)", !/Stays on my list/i.test(await client.ev("document.body.innerText")));
   const clientAuth = sql(`select auth_id from public.users where id = ${CLIENT}`);
   const reminder = sql(`set local role authenticated;
@@ -167,12 +176,13 @@ try {
   const notes = sql(`select string_agg(body, ' || ' order by id) from public.notifications where user_id = ${CLIENT} and link like '/appointments?update=%' and (link = '/appointments?update=${A3}')`);
   check("the 4th day's reminder, for one still at No Status", /by tomorrow in order to receive credit if it was invalid/.test(notes), notes);
   check("…none for those already updated", sql(`select count(*) from public.notifications where user_id = ${CLIENT} and link in ('/appointments?update=${A1}', '/appointments?update=${A4}')`) === "0", run);
-  check("…queued to email", sql(`select count(*) from public.appointment_nudges where appointment_id = ${A3} and nudge = 2`) === "1");
+  check("…queued to email: the client's people and the project's agent", sql(`select count(*) from public.email_outbox where kind = 'appointment_nudge' and link = '/appointments?update=${A3}'`) === "2");
   sql(`select public.nudge_appointment_updates(('${nudgeDay}'::date + time '11:00') at time zone public.business_tz())`);
-  check("…once only", sql(`select count(*) from public.appointment_nudges where appointment_id = ${A3}`) === "1");
+  check("…once only", sql(`select count(*) from public.email_outbox where kind = 'appointment_nudge' and link = '/appointments?update=${A3}'`) === "2");
   const res = await fetch(`${APP_URL}/api/appointments/nudge`, { method: "POST", headers: { "content-type": "application/json", "x-push-secret": SECRET }, body: "{}" }).then((r) => r.json());
   const email = await until(() => mail.messages.find((m) => m.to.some((t) => t.includes("client@beacon.test")) && linkTo(m)) ?? null, { timeout: 10000 });
   check("…and emailed, with a link to update it", Boolean(email) && linkTo(email), JSON.stringify(res));
+  check("…and to the project's agent (its Project Info)", Boolean(await until(() => mail.messages.find((m) => m.to.some((t) => t.includes(AGENT_EMAIL)) && linkTo(m)) ?? null, { timeout: 10000 })));
   check("…a reminder's link opens its update", await (async () => {
     await client.go(`/appointments?update=${A3}&project=${P2}`, 5000);
     return Boolean(await when(client, `!!document.querySelector('[data-update-dialog="${A3}"]')`));
@@ -185,6 +195,9 @@ try {
   sql(`delete from public.notifications where link like '/leads/%?tab=updates' and link in (select '/leads/' || id || '?tab=updates' from public.leads where company_name like ${like})`);
   sql(`delete from public.notifications where link in ('/appointments?update=${A1}', '/appointments?update=${A2}', '/appointments?update=${A3}', '/appointments?update=${A4}')`);
   sql(`delete from public.appointment_nudges where appointment_id in (${A1}, ${A2}, ${A3}, ${A4})`);
+  sql(`delete from public.email_outbox where link like '/appointments?update=%' and link in ('/appointments?update=${A1}', '/appointments?update=${A2}', '/appointments?update=${A3}', '/appointments?update=${A4}')
+    or link in (select '/leads/' || id || '?tab=updates' from public.leads where company_name like ${like})`);
+  sql(`delete from public.project_profiles where project_id = ${P2}`);
   sql(`delete from public.appointments where lead_id in (select id from public.leads where company_name like ${like})`);
   sql(`delete from public.insurance_details where lead_id in (select id from public.leads where company_name like ${like})`);
   sql(`delete from public.leads where company_name like ${like}`);

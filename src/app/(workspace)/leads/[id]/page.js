@@ -213,8 +213,8 @@ export default async function LeadSheet({ params, searchParams }) {
         : null,
       // Its appointments with how each went (a client's Call Result, and the update to make).
       client ? getLeadAppointments(lead.id) : [],
-      // Every update a client made to them: administrators and managers read them on the lead.
-      seesInternal ? getLeadAppointmentUpdates(lead.id) : [],
+      // Every update made to them: administrators and managers, and the client's own people (Sean, Oct 2026).
+      seesInternal || client ? getLeadAppointmentUpdates(lead.id) : [],
     ]);
   });
   const [lead, activity, me, results, openAppt, today, tz, rest] = await Promise.all([
@@ -649,7 +649,7 @@ export default async function LeadSheet({ params, searchParams }) {
           <Tabs
             label="History"
             // From an update's notification (?tab=updates): its history open.
-            initial={sp?.tab === "updates" && seesInternal ? "updates" : undefined}
+            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : undefined}
             panelClassName="min-h-44"
             tabs={[
               {
@@ -721,8 +721,8 @@ export default async function LeadSheet({ params, searchParams }) {
                   <Empty icon={CalendarClock}>No appointments yet.</Empty>
                 ),
               },
-              // Every update the client made to its appointments (Sean, Oct 2026): what, when, by whom and why.
-              ...(seesInternal
+              // Every update made to its appointments (Sean, Oct 2026): what, when, by whom and why; for the client too.
+              ...(seesInternal || client
                 ? [{
                     id: "updates",
                     label: "Appointment Updates",
@@ -758,7 +758,7 @@ export default async function LeadSheet({ params, searchParams }) {
                         </table>
                       </div>
                     ) : (
-                      <Empty icon={CalendarClock}>The client has not updated this lead&apos;s appointments yet.</Empty>
+                      <Empty icon={CalendarClock}>{client ? "No updates yet: use Update status on the Call Result." : "The client has not updated this lead's appointments yet."}</Empty>
                     ),
                   }]
                 : []),

@@ -272,13 +272,21 @@ function shapeUpdate(u) {
   };
 }
 
-/** Every update to a lead's appointments, newest first (its page's history, for staff). */
+/**
+ * Every update to a lead's appointments, newest first: its page's Appointment Updates, for
+ * administrators and managers and the client's own people (lead_client_updates(), which names who
+ * made each one; a client cannot read the staff).
+ */
 export async function getLeadAppointmentUpdates(leadId) {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("appointment_updates").select(UPDATE_COLUMNS)
-    .eq("lead_id", Number(leadId)).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(200);
+  const { data, error } = await supabase.rpc("lead_client_updates", { p_lead_id: Number(leadId) });
   if (error) throw error;
-  return (data ?? []).map(shapeUpdate);
+  return (data ?? []).map((u) => ({
+    id: u.id, appointmentId: u.appointment_id, status: u.status, previous: u.previous_status, note: u.note,
+    potential: u.potential_premium == null ? null : Number(u.potential_premium),
+    total: u.total_premium == null ? null : Number(u.total_premium), lines: u.sold_lines ?? null, at: u.created_at,
+    by: u.by_name ?? "—", byClient: Boolean(u.by_client), apptDate: u.appt_date ?? null, apptTime: u.appt_time ?? null,
+  }));
 }
 
 /**
