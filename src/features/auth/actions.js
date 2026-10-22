@@ -244,7 +244,9 @@ export async function updateMyProfile(prevState, formData) {
   if (!me) return fail("You are signed out.");
   const { data, error } = await supabase
     .from("users")
-    .update({ first_name: s(formData, "first_name"), last_name: s(formData, "last_name"), phone: s(formData, "phone"), mobile: s(formData, "mobile") })
+    .update({ first_name: s(formData, "first_name"), last_name: s(formData, "last_name"), phone: s(formData, "phone"), mobile: s(formData, "mobile"),
+      // Staff: a line about themselves, for Meet the Team.
+      ...(me.role === "client" ? {} : { bio: s(formData, "bio") }) })
     .eq("id", me.id)
     .select("id");
   if (error) return fail(error, null, values);
@@ -252,4 +254,23 @@ export async function updateMyProfile(prevState, formData) {
   await logActivity(supabase, "profile.update", { entity: "user", entityId: me.id });
   revalidatePath("/security");
   return ok({ id: me.id });
+}
+
+/**
+ * Your photo (Meet the Team, and beside your name): a picture you put in the
+ * public-images bucket under user/<your id>/, or null to take it away.
+ */
+export async function setMyPhoto(path) {
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("You are signed out.");
+  const next = path ? String(path) : null;
+  if (next && !new RegExp(`^user/${me.id}/[A-Za-z0-9._-]{1,80}$`).test(next)) return fail("That picture is not yours.");
+  const { data, error } = await supabase.from("users").update({ photo_path: next }).eq("id", me.id).select("id");
+  if (error) return fail(error);
+  if (!data?.length) return fail("Your photo could not be saved. Sign in again and try once more.");
+  await logActivity(supabase, next ? "profile.photo" : "profile.photo_remove", { entity: "user", entityId: me.id });
+  revalidatePath("/security");
+  revalidatePath("/team");
+  return ok({ path: next });
 }

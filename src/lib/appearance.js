@@ -99,6 +99,84 @@ export function fitImage(file, max = 1920) {
   });
 }
 
+/** The loading line's two colours for an uploaded picture ["#rrggbb", "#rrggbb"], kept beside it. */
+export const APPEARANCE_TINT_KEY = "lighthouse.appearance.tint";
+const HEX = /^#[0-9a-f]{6}$/;
+
+export function readTint() {
+  try {
+    const t = JSON.parse(localStorage.getItem(APPEARANCE_TINT_KEY) ?? "null");
+    return Array.isArray(t) && t.length === 2 && t.every((c) => HEX.test(c)) ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+export function keepTint(tint) {
+  try {
+    if (tint) localStorage.setItem(APPEARANCE_TINT_KEY, JSON.stringify(tint));
+    else localStorage.removeItem(APPEARANCE_TINT_KEY);
+  } catch {
+    // Without it the line keeps the theme's colours.
+  }
+}
+
+const hsl = (r, g, b) => {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, s, l];
+};
+const hex = (h, s, l) => {
+  const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = (n) => Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1))));
+  return `#${[f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+};
+
+/**
+ * A picture's two strongest colours, made bright enough for the loading line:
+ * the hue it has most of (counting colourful pixels more than greys), and the
+ * next one well apart from it (or a neighbour of the first, for a picture of
+ * one colour). Null for a picture with hardly any colour (it keeps the theme's).
+ */
+export function pictureTint(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = c.height = 40;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, 40, 40);
+      const px = ctx.getImageData(0, 0, 40, 40).data;
+      const buckets = Array.from({ length: 12 }, () => ({ w: 0, s: 0, l: 0, x: 0, y: 0 }));
+      let total = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        const [h, s, l] = hsl(px[i], px[i + 1], px[i + 2]);
+        if (s < 0.18 || l < 0.1 || l > 0.94) continue;
+        const w = s * (1 - Math.abs(l - 0.5));
+        const b = buckets[Math.floor(h / 30) % 12];
+        // Hue is an angle: averaged as a direction, so reds either side of 0° agree.
+        b.w += w; b.s += s * w; b.l += l * w;
+        b.x += Math.cos((h * Math.PI) / 180) * w; b.y += Math.sin((h * Math.PI) / 180) * w;
+        total += w;
+      }
+      if (total < 40) return resolve(null);
+      const colour = (b) => {
+        const h = ((Math.atan2(b.y, b.x) * 180) / Math.PI + 360) % 360;
+        return { h, hex: hex(h, Math.max(0.7, b.s / b.w), Math.min(0.62, Math.max(0.5, b.l / b.w))) };
+      };
+      const ranked = buckets.map((b, i) => ({ ...b, i })).filter((b) => b.w > 0).sort((p, q) => q.w - p.w);
+      const first = colour(ranked[0]);
+      const apart = ranked.slice(1).find((b) => b.w > ranked[0].w * 0.12 && Math.min(Math.abs(b.i - ranked[0].i), 12 - Math.abs(b.i - ranked[0].i)) >= 2);
+      resolve([first.hex, apart ? colour(apart).hex : hex((first.h + 35) % 360, 0.75, 0.58)]);
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
 /** Put an appearance on the page, and keep it (best-effort: private browsing may not). */
 export function applyAppearance(a, { keep = true } = {}) {
   const d = document.documentElement;
@@ -106,6 +184,15 @@ export function applyAppearance(a, { keep = true } = {}) {
   const image = a.wallpaper === "custom" ? readImage() : null;
   if (image) d.style.setProperty("--wp-image", `url("${image}")`);
   else d.style.removeProperty("--wp-image");
+  // An uploaded picture's own colours for the loading line; the others are in globals.css.
+  const tint = image ? readTint() : null;
+  if (tint) {
+    d.style.setProperty("--progress-a", tint[0]);
+    d.style.setProperty("--progress-b", tint[1]);
+  } else {
+    d.style.removeProperty("--progress-a");
+    d.style.removeProperty("--progress-b");
+  }
   if (a.wallpaper && a.wallpaper !== "classic") d.dataset.wallpaper = a.wallpaper;
   else delete d.dataset.wallpaper;
   d.style.setProperty("--wp-blur", `${clampBlur(a.blur)}px`);
@@ -125,6 +212,7 @@ export function applyAppearance(a, { keep = true } = {}) {
 /** The same, as a script run before the page draws: no flash of the default look. */
 export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};if(a.style==="classic")d.dataset.style="classic";`
   + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
-  + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i)d.style.setProperty("--wp-image",'url("'+i+'")');}}`
+  + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i){d.style.setProperty("--wp-image",'url("'+i+'")');`
+  + `var t=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_TINT_KEY)})||"null");if(t&&/^#[0-9a-f]{6}$/.test(t[0])&&/^#[0-9a-f]{6}$/.test(t[1])){d.style.setProperty("--progress-a",t[0]);d.style.setProperty("--progress-b",t[1]);}}}}`
   + `var b=Math.min(${MAX_BLUR},Math.max(0,Math.round(Number(a.blur)||0)));d.style.setProperty("--wp-blur",b+"px");d.style.setProperty("--wp-blur-scale",String(1+b/160));`
   + `d.style.setProperty("--dim-light",String(c(a.light)));d.style.setProperty("--lift-dark",String(c(a.dark)));if(c(a.light)||c(a.dark))d.dataset.brightness="";}catch(e){}`;

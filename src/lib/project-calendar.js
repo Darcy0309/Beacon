@@ -55,13 +55,18 @@ export function weeklyBlock({ projectId, days, from, to, project = null }) {
 }
 
 /**
- * What a calendar has on `day`, in the order of the day: blocked time and
- * appointments, each { kind, key, start, end, ... } (an all-day block first).
+ * What a calendar has on `day`, in the order of the day: blocked time, notes
+ * on its times and appointments, each { kind, key, start, end, ... } (an
+ * all-day block first).
  */
-export function eventsOn(day, { appointments = [], blocks = [] }) {
+export function eventsOn(day, { appointments = [], blocks = [], notes = [] }) {
   const out = [];
   for (const b of blocks) {
     if (blockOn(b, day)) out.push({ kind: "block", key: `b${b.id}`, start: b.start ?? -1, end: b.end ?? 1440, block: b });
+  }
+  // A note on a time of day: there at its time, for the half hour it names.
+  for (const n of notes) {
+    if (n.date === day && n.start != null) out.push({ kind: "note", key: `n${n.id}`, start: n.start, end: n.start + 30, note: n });
   }
   for (const a of appointments) {
     if (a.date !== day) continue;
@@ -71,11 +76,17 @@ export function eventsOn(day, { appointments = [], blocks = [] }) {
   return out.sort((x, y) => x.start - y.start || x.key.localeCompare(y.key));
 }
 
-/** Per day from `from` to `to`: how many appointments, and whether any of it is blocked ("day" or "part"). */
-export function dayMarks({ appointments = [], blocks = [] }, from, to) {
+/** Per day from `from` to `to`: how many appointments and notes, and whether any of it is blocked ("day" or "part"). */
+export function dayMarks({ appointments = [], blocks = [], notes = [] }, from, to) {
   const marks = {};
   for (const a of appointments) {
     if (a.date >= from && a.date <= to) (marks[a.date] ||= { appointments: 0, blocked: null }).appointments += 1;
+  }
+  for (const n of notes) {
+    if (n.date >= from && n.date <= to) {
+      const m = (marks[n.date] ||= { appointments: 0, blocked: null });
+      m.notes = (m.notes ?? 0) + 1;
+    }
   }
   for (const b of blocks) {
     for (let d = b.startsOn < from ? from : b.startsOn; d <= b.endsOn && d <= to; d = addDays(d, 1)) {
@@ -98,7 +109,8 @@ export function slotClashes({ date, time, duration = 30, exceptId = null }, cale
   if (!date || start == null) return [];
   const end = start + (Number(duration) || 30);
   return eventsOn(date, calendar)
-    .filter((e) => e.start < end && e.end > start && !(e.kind === "appointment" && e.appointment.id === exceptId))
+    // A note says something about a time without keeping it free: never in the way.
+    .filter((e) => e.kind !== "note" && e.start < end && e.end > start && !(e.kind === "appointment" && e.appointment.id === exceptId))
     .map((e) => (e.kind === "block"
       ? { kind: "block", text: e.block.weekly
           ? `No appointments on ${weekdayList([weekdayOf(date)], { plural: true })} (the client's days to avoid, in Project Info)`

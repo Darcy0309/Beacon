@@ -1,8 +1,10 @@
 import Link from "@/components/shared/intent-link";
 import {
   Target, CalendarCheck, Users, Percent, FolderOpen, PhoneCall, Eye,
-  Activity, CalendarClock, ListChecks, Radio, FolderKanban, PieChart, CheckCheck, UserCheck,
+  Activity, CalendarClock, ListChecks, Radio, FolderKanban, PieChart, CheckCheck, UserCheck, CalendarX2,
 } from "lucide-react";
+import { subscriptionNotice } from "@/lib/subscription";
+import { mediumDate } from "@/lib/format";
 import Topbar from "@/components/layout/topbar";
 import ResultBadge from "@/components/shared/result-badge";
 import StatTile from "@/components/shared/stat-tile";
@@ -430,6 +432,8 @@ export default async function Dashboard({ searchParams }) {
     </>
   );
 
+  const notice = client ? subscriptionNotice(me?.company?.subscription_end, businessToday) : null;
+
   return (
     <>
       <Topbar
@@ -453,6 +457,15 @@ export default async function Dashboard({ searchParams }) {
                 options={manager.team.map((r) => ({ value: r.userId, label: r.name }))} />
               <Link href="/" className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Back to my dashboard</Link>
             </span>
+          </div>
+        ) : null}
+
+        {/* A client's subscription near its end, or past it (as the old client bulletin warned, within 30 days). */}
+        {client && notice ? (
+          <div data-subscription-notice={notice.ended ? "ended" : notice.daysLeft}
+            className={`flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${notice.ended ? "border-rose-400/45 bg-rose-400/8" : "border-amber-400/45 bg-amber-400/8"}`}>
+            <CalendarX2 className={`size-4 ${notice.ended ? "text-rose-400" : "text-amber-400"}`} />
+            <span>Your Lighthouse subscription <strong>{notice.text}</strong>{me?.company?.subscription_end ? ` (${mediumDate(me.company.subscription_end)})` : ""}. Contact your account manager to renew.</span>
           </div>
         ) : null}
 

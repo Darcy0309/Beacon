@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
-  CalendarSearch, Banknote, Clock, ClipboardList,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal,
 } from "lucide-react";
 
 export const ROLES = {
@@ -71,6 +71,10 @@ export const navGroups = [
       { href: "/qa", label: "Quality QA", icon: ClipboardCheck, roles: ["admin", "agent"] },
       { href: "/bulletin", label: "Bulletin Board", icon: Megaphone, roles: ["admin", "manager", "agent"] },
       { href: "/documents", label: "Documents", icon: FileText, roles: ALL },
+      // The staff with their photos, as the old Meet DCM (a client's own people first).
+      { href: "/team", label: "Meet the Team", icon: UsersRound, roles: ALL },
+      // A client's logo and website, shown in their workspace.
+      { href: "/branding", label: "Branding", icon: Palette, roles: ["client"] },
     ],
   },
   {
@@ -87,6 +91,10 @@ export const navGroups = [
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.
       { href: "/reports/pay", label: "Pay & Hours", icon: Clock, roles: ["admin", "manager", "agent"] },
+      // One person's day by the hour: calls, leads and appointments; agents see their own.
+      { href: "/reports/hourly", label: "Hourly Progress", icon: Timer, roles: ["admin", "manager", "agent"] },
+      // Each project against its lead and appointment goals: owed, ahead, days to go.
+      { href: "/reports/goals", label: "Project Goals", icon: Goal, roles: ["admin", "manager"] },
       { href: "/alerts", label: "Alert Engine", icon: BellRing, roles: ["admin"] },
     ],
   },

@@ -44,6 +44,8 @@ export default function ProjectForm({ project, options, trigger }) {
         amount_paid: project.amount_paid ?? "",
         start_date: project.start_date ?? "",
         end_date: project.end_date ?? "",
+        lead_goal: project.lead_goal ?? "",
+        appt_goal: project.appt_goal ?? "",
       }
     : null;
   const { fe, invalid, dv } = formHelpers(state, record);
@@ -183,6 +185,12 @@ export default function ProjectForm({ project, options, trigger }) {
             </Field>
             <Field label="End date" error={fe("end_date")}>
               <DatePicker name="end_date" defaultValue={dv("end_date")} invalid={invalid("end_date")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
+            </Field>
+            <Field label="Lead goal" error={fe("lead_goal")} hint="Leads to develop between the dates">
+              <Input name="lead_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("lead_goal")} aria-invalid={invalid("lead_goal")} data-lead-goal />
+            </Field>
+            <Field label="Appointment goal" error={fe("appt_goal")} hint="Appointments to set between the dates">
+              <Input name="appt_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("appt_goal")} aria-invalid={invalid("appt_goal")} data-appt-goal />
             </Field>
 
             <Field label="Description" error={fe("description")} className="sm:col-span-2">

@@ -60,6 +60,8 @@ try {
   await page.click('[data-desktop-wallpaper="photo-fjord"]');
   check("picked: the photo covers the screen", (await html(page, "dataset.wallpaper")) === "photo-fjord" && (await bodyImage(page)).includes("/wallpapers/fjord.webp"), await bodyImage(page));
   check("…and it is there to load", (await page.ev("fetch('/wallpapers/fjord.webp').then((r) => r.ok && r.headers.get('content-type'))")) === "image/webp");
+  const lineColour = () => page.ev("getComputedStyle(document.documentElement).getPropertyValue('--progress-a').trim()");
+  check("the loading line takes the photo's colours", (await lineColour()) === "#2da1ed", await lineColour());
   if (SHOTS) await page.screenshot(`${SHOTS}/appearance-photo.png`);
   section("The wallpaper blurred, not the page");
   await page.fill("[data-wallpaper-blur-slider]", "12");
@@ -113,6 +115,10 @@ try {
   await page.send("DOM.setFileInputFiles", { nodeId, files: [PICTURE] });
   check("uploaded: it is the wallpaper", Boolean(await until(() => page.ev("document.documentElement.dataset.wallpaper === 'custom'"), { timeout: 8000 }))
     && (await bodyImage(page)).includes("data:image/jpeg"));
+  const tint = await page.ev("localStorage.getItem('lighthouse.appearance.tint')");
+  check("…the loading line in the picture's own colours (or the theme's, for a picture with little colour)",
+    tint === null || tint === "null" ? !(await page.ev("document.documentElement.style.getPropertyValue('--progress-a')"))
+      : JSON.parse(tint)[0] === (await page.ev("document.documentElement.style.getPropertyValue('--progress-a')")), tint);
   check("…kept on the computer, with a swatch to pick it again", Boolean(await page.ev("(localStorage.getItem('lighthouse.appearance.image') ?? '').startsWith('data:image/jpeg')"))
     && Boolean(await page.ev("!!document.querySelector('[data-desktop-wallpaper=\"custom\"]')")));
   await page.click("[data-appearance-dialog] button", "Done");
@@ -120,7 +126,8 @@ try {
   check("…and on again when a page opens", (await html(page, "dataset.wallpaper")) === "custom" && (await bodyImage(page)).includes("data:image/jpeg"));
   await openAppearance(page);
   await page.click("[data-remove-wallpaper]");
-  check("Remove takes it away", !(await page.ev("localStorage.getItem('lighthouse.appearance.image')")) && (await html(page, "dataset.wallpaper")) !== "custom");
+  check("Remove takes it away, its colours too", !(await page.ev("localStorage.getItem('lighthouse.appearance.image')")) && (await html(page, "dataset.wallpaper")) !== "custom"
+    && !(await page.ev("localStorage.getItem('lighthouse.appearance.tint')")) && !(await page.ev("document.documentElement.style.getPropertyValue('--progress-a')")));
 
   section("Back to the original");
   await openAppearance(page);

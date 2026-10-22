@@ -11,6 +11,8 @@ import FilterTable from "@/components/shared/filter-table";
 import ProjectForm from "@/features/projects/components/project-form";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import ProjectTeam from "@/features/projects/components/project-team";
+import ProjectGoals from "@/features/projects/components/project-goals";
+import { goalProgress, projectDays } from "@/lib/project-goals";
 import XdateMonths from "@/features/reports/components/xdate-months";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,6 +128,11 @@ export default async function ProjectDetail({ params, searchParams }) {
       icon: PhoneCall, accent: "var(--neon-amber)", series: overview.calls14d, bars: true },
   ];
 
+  // Its goals for its dates: leads developed and appointments set, against what it has done (lead_stats()).
+  const goalDays = projectDays({ start: raw.start_date, end: raw.end_date, today });
+  const leadGoal = goalProgress({ goal: raw.lead_goal, done: s.leads, share: goalDays.share });
+  const apptGoal = goalProgress({ goal: raw.appt_goal, done: s.appointments, share: goalDays.share });
+
   const xdateHref = (m, b) => `/reports/x-dates?project=${p.id}&month=${m}${b ? `&bucket=${b}` : ""}#names`;
   const rates = { id: p.id, name: p.name, lead: Number(raw.lead_rate ?? 0), appointment: Number(raw.appointment_rate ?? 0), confirmation: Number(raw.confirmation_rate ?? 0) };
 
@@ -177,6 +184,8 @@ export default async function ProjectDetail({ params, searchParams }) {
             </div>
           </div>
         </Card>
+
+        <ProjectGoals leads={leadGoal} appts={apptGoal} days={goalDays} hint={admin ? "No goals set. Edit the project to give it a lead or appointment goal." : null} />
 
         {/* The figures in one even row; then the call results beside the calendar, each as tall as the other. */}
         <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:flex" data-from="xl">

@@ -9,6 +9,18 @@ import { createClient } from "@/lib/supabase/server";
 
 const BLOCK_COLUMNS = "id, starts_on, ends_on, start_time, end_time, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)";
 
+const NOTE_COLUMNS = "id, on_date, at_time, body, by:users!calendar_notes_created_by_fkey(first_name, last_name, role)";
+
+// A note on a time of day as the calendar shows it; `project`: the calendar it is on, when several are shown together.
+function shapeNote(n) {
+  const by = one(n.by);
+  return {
+    id: n.id, date: n.on_date, start: minutesOf(n.at_time), text: n.body,
+    by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || null : null, byClient: by?.role === "client",
+    ...(n.project ? { project: one(n.project)?.name ?? null } : {}),
+  };
+}
+
 // A block as the calendar shows it; `project`: the calendar it is on, when several are shown together.
 function shapeBlock(b) {
   const by = one(b.by);
@@ -34,7 +46,7 @@ export async function getProjectCalendar({ projectId, from, to }) {
   const { data: calendarId } = await supabase.rpc("calendar_project", { p_project_id: Number(projectId) });
   if (!calendarId) return null;
   const asked = Number(projectId);
-  const [project, appts, blocks, mine] = await Promise.all([
+  const [project, appts, blocks, mine, notes] = await Promise.all([
     // With the weekdays the client takes no appointments on (its Project Info).
     supabase.from("projects").select("id, name, profile:project_profiles(avoid_days)").eq("id", calendarId).maybeSingle(),
     supabase.from("appointments")
@@ -49,12 +61,16 @@ export async function getProjectCalendar({ projectId, from, to }) {
     asked !== calendarId
       ? supabase.from("project_profiles").select("own, avoid_days").eq("project_id", asked).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Notes on its times ("Hour Text"): what someone wrote against a time of day.
+    supabase.from("calendar_notes").select(NOTE_COLUMNS).eq("project_id", calendarId).gte("on_date", from).lte("on_date", to)
+      .order("on_date").order("at_time").limit(2000),
   ]);
   if (!project.data) return null;
   // Personal calendars connected to this one are read again, once this answer has gone, when they have gone stale.
   after(() => refreshStaleFeeds(calendarId).catch((err) => console.error("[calendar sync]", err?.message ?? err)));
   if (appts.error) throw appts.error;
   if (blocks.error) throw blocks.error;
+  if (notes.error) throw notes.error;
   const avoid = mine.data?.own ? mine.data.avoid_days : one(project.data.profile)?.avoid_days;
   const weekly = weeklyBlock({ projectId: calendarId, days: avoid, from, to });
   return {
@@ -67,7 +83,18 @@ export async function getProjectCalendar({ projectId, from, to }) {
       company: one(a.lead)?.company_name ?? null, leadId: one(a.lead)?.id ?? null,
     })),
     blocks: [...(weekly ? [weekly] : []), ...(blocks.data ?? []).map(shapeBlock)],
+    notes: (notes.data ?? []).map(shapeNote),
   };
+}
+
+/** The notes on the times of several project calendars shown together, each with its project. */
+export async function getNotesAcross({ projectIds, from, to }) {
+  if (!projectIds?.length) return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("calendar_notes").select(`${NOTE_COLUMNS}, project:projects(name)`)
+    .in("project_id", projectIds).gte("on_date", from).lte("on_date", to).order("on_date").order("at_time").limit(2000);
+  if (error) throw error;
+  return (data ?? []).map(shapeNote);
 }
 
 /**

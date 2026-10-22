@@ -119,3 +119,21 @@ export async function getProductionReport({ from, to, projectId = null, userId =
 
 /** The business's time zone, which "today" and each day of the production report follow. */
 export { getBusinessTimeZone } from "@/lib/server/business-day";
+
+/**
+ * One person's day by the hour (Hourly Progress; the old AE hourly progress
+ * report): { hours: [{ hour, calls, leads, appointments }], first, last,
+ * month: { calls, leads, appointments } }. Agents may ask only for their own.
+ */
+export async function getHourlyProgress({ userId, day }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("hourly_progress", { p_user_id: Number(userId), p_day: day });
+  if (error) throw error;
+  const n = (v) => Number(v) || 0;
+  return {
+    hours: (data?.hours ?? []).map((h) => ({ hour: n(h.hour), calls: n(h.calls), leads: n(h.leads), appointments: n(h.appointments) })),
+    first: data?.first ?? null,
+    last: data?.last ?? null,
+    month: { calls: n(data?.month?.calls), leads: n(data?.month?.leads), appointments: n(data?.month?.appointments) },
+  };
+}

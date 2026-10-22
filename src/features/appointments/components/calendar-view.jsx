@@ -1,11 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
+import { removeCalendarNote } from "@/features/calendar/actions";
 import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight, Ban,
-  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText,
-} from "lucide-react";
+  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText, StickyNote, X } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import ToneBadge from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +20,7 @@ import {
 import { telHref } from "@/lib/format";
 import LeadFiles from "@/features/leads/components/lead-files";
 import { useRole } from "@/components/layout/role-provider";
-import { blockDays, blockHours, blockOn } from "@/lib/project-calendar";
+import { blockDays, blockHours, blockOn, clockOf } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
@@ -50,6 +53,9 @@ const UNTIMED = 24 * 60;
 const blocksDay = blockOn;
 // Its note and who blocked it; a busy time from someone's own calendar says only whose.
 const blockNote = (b) => (b.synced ? (b.by ? `${b.by}'s calendar` : "A connected calendar") : [b.note, b.by ? `by ${b.by}` : null].filter(Boolean).join(" · "));
+// A note on a time of day ("Hour Text"): what it says, who wrote it, and on which calendar when several are shown.
+const NOTED = "var(--neon-violet)";
+const noteTitle = (n) => [clockOf(n.start), n.text, n.by ? `by ${n.by}` : null, n.project].filter(Boolean).join(" · ");
 const blockTitle = (b) => [b.synced ? "Busy" : "Blocked", blockHours(b), blockNote(b), b.project].filter(Boolean).join(" · ");
 const BLOCKED_FILL = {
   borderColor: "color-mix(in srgb, var(--neon-amber) 40%, transparent)",
@@ -267,7 +273,7 @@ function AppointmentDialog({ a, onClose }) {
 /* --------------------------------------------------------------------------
    Day and week: an hour grid with appointments placed by start time.
    -------------------------------------------------------------------------- */
-function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null, blocks = null }) {
+function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null, blocks = null, notes = null }) {
   const [nowMin, setNowMin] = useState(null);
 
   // The "now" line, refreshed every minute, on the business's clock: "today"
@@ -291,10 +297,11 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
   const shownBlocks = (blocks ?? []).filter((b) => days.some((d) => blocksDay(b, d.date)));
   const dayLong = shownBlocks.filter((b) => b.start == null);
   const partial = shownBlocks.filter((b) => b.start != null);
+  const shownNotes = (notes ?? []).filter((n) => n.start != null && days.some((d) => d.date === n.date));
 
   // Widen the window to fit anything outside the usual working day.
-  const startHour = Math.min(DEFAULT_START_HOUR, ...timed.map((a) => Math.floor(a.startMin / 60)), ...partial.map((b) => Math.floor(b.start / 60)));
-  const endHour = Math.max(DEFAULT_END_HOUR, ...timed.map((a) => Math.ceil(endOf(a) / 60)), ...partial.map((b) => Math.ceil(b.end / 60)));
+  const startHour = Math.min(DEFAULT_START_HOUR, ...timed.map((a) => Math.floor(a.startMin / 60)), ...partial.map((b) => Math.floor(b.start / 60)), ...shownNotes.map((n) => Math.floor(n.start / 60)));
+  const endHour = Math.max(DEFAULT_END_HOUR, ...timed.map((a) => Math.ceil(endOf(a) / 60)), ...partial.map((b) => Math.ceil(b.end / 60)), ...shownNotes.map((n) => Math.ceil((n.start + 30) / 60)));
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   const height = hours.length * HOUR_PX;
   const top = (min) => ((min - startHour * 60) / 60) * HOUR_PX;
@@ -418,6 +425,15 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
                       {blockNote(b) ? <span className="block truncate font-normal text-muted-foreground">{blockNote(b)}</span> : null}
                     </div>
                   ))}
+                  {/* Notes on the day's times: a tag at the right of the slot, above the appointments so it is always read. */}
+                  {shownNotes.filter((n) => n.date === d.date).map((n) => (
+                    <div key={`n${n.id}`} data-calendar-note={n.id} title={noteTitle(n)}
+                      className="absolute right-0.5 z-10 flex max-w-[60%] items-center gap-1 rounded border bg-popover px-1 py-px text-[0.62rem] leading-tight shadow-sm"
+                      style={{ top: top(n.start) + 1, borderColor: `color-mix(in srgb, ${NOTED} 55%, transparent)` }}>
+                      <StickyNote className="size-3 shrink-0" style={{ color: NOTED }} />
+                      <span className="truncate">{n.text}</span>
+                    </div>
+                  ))}
                   {placed.map((a) => {
                     const blockTop = top(a.startMin);
                     const blockHeight = (Math.max(a.duration, MIN_BLOCK_MIN) / 60) * HOUR_PX;
@@ -513,7 +529,7 @@ function Block({ a, dense = false, compact = false }) {
 /* --------------------------------------------------------------------------
    Month: heat-mapped grid with a side panel for the selected day.
    -------------------------------------------------------------------------- */
-function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null, blocks = null }) {
+function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null, blocks = null, notes = null }) {
   const dayOf = (a) => Number(String(a.date).slice(8, 10));
   // Opened from a notification: show that appointment's day.
   const focusRow = focusId == null ? null : rows.find((a) => a.id === focusId);
@@ -533,6 +549,8 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
   const dayRows = selected ? rows.filter((a) => dayOf(a) === selected) : [];
   // What is blocked out on the day picked: all day first, then by the hour.
   const dayBlocks = selected ? (blocks ?? []).filter((b) => blocksDay(b, isoOf(selected))).sort((a, b) => (a.start ?? -1) - (b.start ?? -1)) : [];
+  const dayNotes = selected ? (notes ?? []).filter((n) => n.date === isoOf(selected)).sort((a, b) => a.start - b.start) : [];
+  const notedDays = new Set((notes ?? []).map((n) => n.date));
   const tips = useMemo(() => appointmentTips(rows), [rows]);
 
   // Month overview: appointments grouped by day, in date order.
@@ -585,7 +603,10 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
                 >
                   <span className="flex items-center justify-between">
                     <span className={cn("text-xs font-semibold tabular-nums", isToday || isSelected ? "text-primary" : "text-foreground/80")}>{d}</span>
-                    {blocked ? <span className="text-[0.52rem] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--neon-amber)" }}>{blocked === "day" ? "Blocked" : "Part"}</span> : null}
+                    <span className="flex items-center gap-1">
+                      {notedDays.has(isoOf(d)) ? <StickyNote className="size-3" style={{ color: NOTED }} aria-label="Notes" data-day-noted /> : null}
+                      {blocked ? <span className="text-[0.52rem] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--neon-amber)" }}>{blocked === "day" ? "Blocked" : "Part"}</span> : null}
+                    </span>
                   </span>
                   {n ? (
                     <span className="mt-auto flex items-center justify-between">
@@ -618,6 +639,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
           {selected ? (
             <>
               {dayBlocks.map((b) => <BlockedRow key={b.id} b={b} />)}
+              {dayNotes.map((n) => <NoteRow key={`n${n.id}`} n={n} />)}
               {dayRows.map((a) => <ApptRow key={a.id} a={a} />)}
               {dayRows.length === 0 && (
                 <p className="py-6 text-center text-sm text-muted-foreground">
@@ -678,6 +700,39 @@ function BlockedRow({ b }) {
           {[b.startsOn !== b.endsOn ? blockDays(b) : null, blockNote(b), b.project].filter(Boolean).join(" · ") || "No appointments in this time"}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A note on a time of the day picked: when, what, by whom, and on which project's calendar when several are shown. */
+function NoteRow({ n }) {
+  const router = useRouter();
+  const [asking, setAsking] = useState(false);
+  const [pending, start] = useTransition();
+  const remove = () =>
+    start(async () => {
+      const f = new FormData();
+      f.set("id", String(n.id));
+      const result = await removeCalendarNote(f);
+      if (result.ok) {
+        toast.success("Note taken off");
+        setAsking(false);
+        router.refresh();
+      } else toast.error(result.error);
+    });
+  return (
+    <div data-note-row={n.id} className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2"
+      style={{ background: `color-mix(in srgb, ${NOTED} 8%, transparent)` }}>
+      <span className="h-9 w-[3px] shrink-0 rounded-full" style={{ background: NOTED }} />
+      <StickyNote className="size-4 shrink-0" style={{ color: NOTED }} />
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium"><span className="tabular-nums">{clockOf(n.start)}</span> · <span className="break-words">{n.text}</span></div>
+        <div className="truncate text-xs text-muted-foreground">{[n.by ? `by ${n.by}` : null, n.project].filter(Boolean).join(" · ") || "Note"}</div>
+      </div>
+      <button type="button" onClick={() => setAsking(true)} disabled={pending} aria-label="Take this note off the calendar" title="Take it off the calendar" data-remove-note
+        className="shrink-0 rounded text-muted-foreground transition-colors hover:text-destructive"><X className="size-4" /></button>
+      <ConfirmDialog open={asking} onOpenChange={setAsking} pending={pending} title="Take this note off the calendar?"
+        description={`${clockOf(n.start)}: ${n.text}`} confirm="Take it off" onConfirm={remove} />
     </div>
   );
 }

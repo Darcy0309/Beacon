@@ -3,7 +3,7 @@
 /** Clients (companies). */
 
 import { revalidatePath } from "next/cache";
-import { check, deleteRow, fail, idFrom, logActivity, n, ok, s } from "@/lib/server/action-helpers";
+import { check, currentAppUser, deleteRow, fail, idFrom, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { cross, schemas } from "@/lib/validate";
 
@@ -49,4 +49,48 @@ export async function saveCompany(prevState, formData) {
 
 export async function deleteCompany(formData) {
   return deleteRow("companies", formData, ["/clients", "/projects", "/leads", "/appointments", "/calendar"], { action: "company.delete", entity: "company", name: "name" });
+}
+
+/**
+ * A client's branding (their logo and website): their own people set it from
+ * Branding, an administrator any client's from its page (`companyId`). The
+ * logo is a picture put in the public-images bucket under company/<id>/.
+ */
+async function brand(supabase, companyId, change) {
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("You are signed out.");
+  const { data: mine } = await supabase.from("users").select("company_id").eq("id", me.id).maybeSingle();
+  const target = me.role === "admin" ? companyId ?? mine?.company_id : mine?.company_id;
+  if (me.role !== "admin" && me.role !== "client") return fail("Only a client's own people, or an administrator, can change its branding.");
+  if (!target) return fail("There is no client account to brand.");
+  const { data: now, error: readError } = await supabase.from("companies").select("id, logo_path, website").eq("id", target).maybeSingle();
+  if (readError) return fail(readError);
+  if (!now) return fail("That client is not yours to change.");
+  const next = { logo_path: now.logo_path, website: now.website, ...change };
+  const { data, error } = await supabase.rpc("set_company_branding", { p_logo_path: next.logo_path, p_website: next.website, p_company_id: target });
+  if (error) return fail(error);
+  await logActivity(supabase, "company.branding", { entity: "company", entityId: target, detail: "logo_path" in change ? (change.logo_path ? "Logo" : "Logo removed") : "Website" });
+  revalidatePath("/", "layout");
+  return ok(data);
+}
+
+/** The logo: a path in the bucket, or null to take it away. */
+export async function setCompanyLogo(path, companyId = null) {
+  const supabase = await createClient();
+  return brand(supabase, companyId ? Number(companyId) : null, { logo_path: path ? String(path) : null });
+}
+
+/** The website, from the Branding form. */
+export async function saveCompanyWebsite(prevState, formData) {
+  const { values, failed } = check(formData, schemas.branding);
+  if (failed) return failed;
+  const supabase = await createClient();
+  const result = await brand(supabase, n(formData, "company_id"), { website: s(formData, "website") });
+  return result.ok ? result : { ...result, fieldErrors: /website/i.test(result.error ?? "") ? { website: result.error } : null, values };
+}
+
+/** An administrator sets a client's logo from its page: bound to the client there. */
+export async function setClientLogo(companyId, path) {
+  const supabase = await createClient();
+  return brand(supabase, Number(companyId), { logo_path: path ? String(path) : null });
 }

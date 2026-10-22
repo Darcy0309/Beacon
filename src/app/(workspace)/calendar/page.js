@@ -9,7 +9,8 @@ import ParamSelect from "@/components/shared/param-select";
 import BlockedTime from "@/features/calendar/components/blocked-time";
 import { dayMarks } from "@/lib/project-calendar";
 import CalendarSync from "@/features/calendar/components/calendar-sync";
-import { getBlocksAcross, getCalendarProjects, getMyCalendarFeed, getProjectCalendar } from "@/features/calendar/queries";
+import { getBlocksAcross, getCalendarProjects, getMyCalendarFeed, getNotesAcross, getProjectCalendar } from "@/features/calendar/queries";
+import { AddNoteButton } from "@/features/calendar/components/project-calendar";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -60,12 +61,15 @@ export default async function CalendarPage({ searchParams }) {
   const month = Number(anchor.slice(5, 7)) - 1;
   const rangeStart = view === "day" ? anchor : addDays(anchor, -weekdayOf(anchor));
   const rangeEnd = addDays(rangeStart, (view === "day" ? 1 : 7) - 1);
-  const [projectCalendar, myFeed, together, shownData] = await Promise.all([
+  const [projectCalendar, myFeed, together, shownData, notesTogether] = await Promise.all([
     openId ? getProjectCalendar({ projectId: openId, from: monthGrid(shown.from)[0], to: shown.to }) : null,
     openId ? getMyCalendarFeed(openId) : null,
     togetherIds?.length ? getBlocksAcross({ projectIds: togetherIds, from: monthGrid(shown.from)[0], to: shown.to }) : null,
     view === "month" ? getCalendarMonth(year, month, projectIds) : getCalendarRange(rangeStart, rangeEnd, projectIds),
+    // Notes on the times of several calendars shown together, as their blocked time.
+    togetherIds?.length ? getNotesAcross({ projectIds: togetherIds, from: monthGrid(shown.from)[0], to: shown.to }) : null,
   ]);
+  const notes = projectCalendar?.notes ?? notesTogether;
   const blocks = projectCalendar?.blocks ?? together;
   const upcoming = (blocks ?? []).filter((b) => b.endsOn >= today).sort((a, b) => a.startsOn.localeCompare(b.startsOn));
   const blockedDays = blocks
@@ -122,6 +126,7 @@ export default async function CalendarPage({ searchParams }) {
             {scope?.shared ? <span className="text-xs text-muted-foreground" data-calendar-scope>Shared with {scope.shared}</span> : null}
             {projectCalendar ? (
               <BlockedTime projectId={projectCalendar.projectId} blocks={upcoming} today={today}>
+                <AddNoteButton projectId={projectCalendar.projectId} day={anchor < today ? today : anchor} />
                 <CalendarSync projectId={projectCalendar.projectId} feed={myFeed} />
               </BlockedTime>
             ) : together ? (
@@ -152,6 +157,7 @@ export default async function CalendarPage({ searchParams }) {
           focusId={focusId}
           blockedDays={blockedDays}
           blocks={blocks}
+          notes={notes}
         />
       </div>
     </>

@@ -713,7 +713,7 @@ option {
   border-radius: 9999px;
   opacity: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--primary), transparent) 0 0 / 50% 100% no-repeat;
+  background: linear-gradient(90deg, transparent, var(--progress-a, var(--primary)), var(--progress-b, var(--primary)), transparent) 0 0 / 50% 100% no-repeat;
   transition: opacity 0.15s ease;
 }
 .nav-loading.is-pending {
@@ -744,8 +744,8 @@ option {
   position: absolute;
   inset: 0 auto 0 0;
   border-radius: 0 9999px 9999px 0;
-  background: linear-gradient(90deg, var(--primary), #8b5cf6) 0 0 / 100vw 100% no-repeat;
-  box-shadow: 0 0 10px color-mix(in oklab, var(--primary) 55%, transparent), 0 0 3px color-mix(in oklab, var(--primary) 70%, transparent);
+  background: linear-gradient(90deg, var(--progress-a, var(--primary)), var(--progress-b, #8b5cf6)) 0 0 / 100vw 100% no-repeat;
+  box-shadow: 0 0 10px color-mix(in oklab, var(--progress-a, var(--primary)) 55%, transparent), 0 0 3px color-mix(in oklab, var(--progress-a, var(--primary)) 70%, transparent);
 }
 .nav-progress-fill { animation: nav-progress-grow 14s cubic-bezier(0.05, 0.75, 0.15, 1) 0.12s both; }
 .nav-progress-finish { animation: nav-progress-finish 0.25s ease-out both; }
@@ -758,6 +758,32 @@ option {
   to   { width: 100%; }
 }
 html[data-navigating] body { cursor: progress; }
+
+/* The loading lines (the bar along the top, and a sidebar item's sweep) in each wallpaper's own
+   colours. An uploaded picture's are taken from it (pictureTint, appearance.js) and set on <html>. */
+html[data-wallpaper="mist"] { --progress-a: #5b8def; --progress-b: #8b8fd6; }
+html[data-wallpaper="dawn"] { --progress-a: #f5926b; --progress-b: #e46ba0; }
+html[data-wallpaper="lagoon"] { --progress-a: #14b8a6; --progress-b: #3b82f6; }
+html[data-wallpaper="orchid"] { --progress-a: #d65cc4; --progress-b: #7c5cf0; }
+html[data-wallpaper="meadow"] { --progress-a: #84cc16; --progress-b: #14b89a; }
+html[data-wallpaper="ember"] { --progress-a: #f97316; --progress-b: #f5b024; }
+html[data-wallpaper="nebula"] { --progress-a: #5b6cff; --progress-b: #b45cf0; }
+html[data-wallpaper="signature"] { --progress-a: #3b82f6; --progress-b: #b45ccf; }
+html[data-wallpaper="photo-fjord"] { --progress-a: #2da1ed; --progress-b: #4447e4; }
+html[data-wallpaper="photo-canyon"] { --progress-a: #d96b26; --progress-b: #e4b444; }
+html[data-wallpaper="photo-highlands"] { --progress-a: #a7d926; --progress-b: #3fbf6a; }
+html[data-wallpaper="photo-northern-lights"] { --progress-a: #08f75d; --progress-b: #44e4db; }
+html[data-wallpaper="photo-alpine"] { --progress-a: #5a87e2; --progress-b: #6d44e4; }
+html[data-wallpaper="photo-valley"] { --progress-a: #d9b326; --progress-b: #5a8be2; }
+html[data-wallpaper="photo-coast"] { --progress-a: #26bbd9; --progress-b: #446ce4; }
+html[data-wallpaper="photo-city"] { --progress-a: #e9ac54; --progress-b: #e46b44; }
+html[data-wallpaper="photo-sunset"] { --progress-a: #f08a24; --progress-b: #e4447a; }
+html[data-wallpaper="photo-dunes"] { --progress-a: #e15c1e; --progress-b: #e4b444; }
+html[data-wallpaper="photo-lake"] { --progress-a: #2bbcda; --progress-b: #446ce4; }
+html[data-wallpaper="photo-golden-field"] { --progress-a: #d9a926; --progress-b: #e47a2c; }
+html[data-wallpaper="live-waves"] { --progress-a: #06b6d4; --progress-b: #8b5cf6; }
+html[data-wallpaper="live-glow"] { --progress-a: #06b6d4; --progress-b: #8b5cf6; }
+html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4b5fd; }
 
 /* The page loader (page-loader.jsx): the Signature sphere breathing, a cyan light running
    around it one way and a purple one the other, each a comet with a fading tail. */

@@ -136,12 +136,14 @@ export default async function AppointmentsPage({ searchParams }) {
           <SectionHeader
             label={custom ? "Appointments" : "The Next 7 Days"}
             icon={CalendarClock}
-            action={
+            // Staff book appointments by hand (one set by email or text, not from a call); the
+            // client's people see theirs, set by us, and record how each went.
+            action={staff ? (
               <AppointmentForm
                 options={options}
                 trigger={<Button size="sm"><CalendarClock /> New appointment</Button>}
               />
-            }
+            ) : null}
           />
           {/* Filters: the appointment days, then client, project, who set it and status. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--panel-border)] px-5 py-3" data-appointment-filters>

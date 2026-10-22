@@ -57,6 +57,41 @@ export async function removeCalendarBlock(formData) {
 }
 
 /**
+ * A note on a time of day on a project's calendar (the old "Hour Text"): it
+ * says something about the time (a reserved slot, someone back at 2) without
+ * keeping appointments off it. Anyone who can see the calendar can add one.
+ */
+export async function addCalendarNote(prevState, formData) {
+  const { values, failed } = check(formData, schemas.calendarNote);
+  if (failed) return failed;
+  const at = minutesOf(values.at_time);
+  if (at == null) return fail("Choose the time", { at_time: "Choose a time" }, values);
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("Sign in again to do that.");
+  const { data, error } = await supabase.from("calendar_notes").insert({
+    project_id: Number(values.project_id), on_date: values.on_date, at_time: asTime(at), body: values.body.trim(),
+  }).select("id, project_id").single();
+  if (error) return fail(/row-level security/i.test(error.message) ? "That calendar is not yours to change." : error, null, values);
+  await logActivity(supabase, "calendar.note", { entity: "project", entityId: data.project_id, detail: `${values.on_date} ${values.at_time}`, userId: me.id });
+  revalidatePath("/calendar");
+  return ok({ id: data.id });
+}
+
+/** Take a note off a calendar. */
+export async function removeCalendarNote(formData) {
+  const id = idFrom(formData);
+  if (!id) return fail("Missing note.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("calendar_notes").delete().eq("id", id).select("id, project_id");
+  if (error) return fail(error);
+  if (!data?.length) return fail("That is already gone, or not yours to remove.");
+  await logActivity(supabase, "calendar.note_remove", { entity: "project", entityId: data[0].project_id });
+  revalidatePath("/calendar");
+  return ok({ id });
+}
+
+/**
  * Connect my own calendar to a project's calendar by its private link
  * (Google, Outlook or iCloud): the link is read once here, so a wrong one is
  * said at once, then kept (mine alone to read) and its busy times put on

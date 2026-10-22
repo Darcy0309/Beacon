@@ -270,6 +270,9 @@ export const schemas = {
     amount_paid: [num({ min: 0, max: 100000000 })],
     start_date: [date],
     end_date: [date],
+    // What it is to deliver between those dates: leads (developed) and appointments.
+    lead_goal: [int({ min: 0, max: 1000000 })],
+    appt_goal: [int({ min: 0, max: 1000000 })],
     // Lead delivery: addresses separated by commas (a leading "_" sends that one a link).
     email: [max(500), rules.custom((v) => {
       const { bad } = parseDeliveryAddresses(v);
@@ -387,6 +390,20 @@ export const schemas = {
     last_name: [max(40)],
     phone: [phone],
     mobile: [phone],
+    bio: [max(280)],
+  },
+
+  // A client's website (their branding).
+  branding: {
+    website: [max(200)],
+  },
+
+  // A note on a time of day on a project's calendar.
+  calendarNote: {
+    project_id: [required("Missing project"), id],
+    on_date: [required("Choose the day"), date],
+    at_time: [required("Choose the time"), time12],
+    body: [required("Write the note"), max(300)],
   },
 
   bulletin: {

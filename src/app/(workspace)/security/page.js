@@ -1,9 +1,11 @@
-import { ShieldCheck, History, KeyRound, UserRound } from "lucide-react";
+import { ShieldCheck, History, KeyRound, UserRound, Camera } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import TwoFactorSetup from "@/features/auth/components/two-factor-setup";
 import PasswordForm from "@/features/auth/components/password-form";
 import ProfileForm from "@/features/auth/components/profile-form";
+import PictureUpload from "@/components/shared/picture-upload";
+import { setMyPhoto } from "@/features/auth/actions";
 import { Card } from "@/components/ui/card";
 import { listActivity } from "@/features/activity/queries";
 import { getMyTwoFactor } from "@/features/auth/queries";
@@ -49,7 +51,18 @@ export default async function SecurityPage({ searchParams }) {
         {me?.status === "active" ? (
           <Card>
             <SectionHeader label="My Profile" icon={UserRound} />
-            <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email }} />
+            <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email, bio: me.bio ?? "" }} staff={me.role !== "client"} />
+          </Card>
+        ) : null}
+
+        {/* Staff: their photo, on Meet the Team for the clients to put a face to the name. */}
+        {me?.status === "active" && me.role !== "client" ? (
+          <Card data-my-photo>
+            <SectionHeader label="My Photo" icon={Camera} />
+            <div className="p-5">
+              <PictureUpload folder={`user/${me.id}`} path={me.photo_path} name={[me.first_name, me.last_name].filter(Boolean).join(" ")} save={setMyPhoto}
+                label="Clients see it on Meet the Team. A clear head-and-shoulders picture works best." />
+            </div>
           </Card>
         ) : null}
 

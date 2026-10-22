@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Field, formHelpers } from "@/components/ui/field";
 import { updateMyProfile } from "@/features/auth/actions";
 
@@ -15,7 +16,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * Your own contact details, on My Security: name, phone, mobile. The sign-in
  * email is shown but stays an administrator's to change.
  */
-export default function ProfileForm({ me }) {
+export default function ProfileForm({ me, staff = false }) {
   const [state, action, pending] = useActionState(updateMyProfile, EMPTY);
   const router = useRouter();
   const { fe, invalid, dv } = formHelpers(state, me);
@@ -45,6 +46,11 @@ export default function ProfileForm({ me }) {
           <Input name="mobile" type="tel" defaultValue={dv("mobile")} aria-invalid={invalid("mobile")} autoComplete="tel" />
         </Field>
       </div>
+      {staff ? (
+        <Field label="About me" error={fe("bio")} hint="A line or two clients read on Meet the Team, e.g. what you work on and how long you've been here.">
+          <Textarea name="bio" rows={2} maxLength={280} defaultValue={dv("bio")} aria-invalid={invalid("bio")} data-bio />
+        </Field>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs text-muted-foreground">You sign in as {me.email}. An administrator can change that.</span>
         <Button type="submit" size="sm" disabled={pending}><Save /> {pending ? "Saving…" : "Save details"}</Button>

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, readAppearance, readImage } from "@/lib/appearance";
+import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
@@ -56,6 +56,8 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         toast.error("That picture is too big to keep in this browser. Try a smaller one.");
         return;
       }
+      // The loading line takes the picture's own colours.
+      keepTint(await pictureTint(fitted));
       setImage(fitted);
       change({ wallpaper: "custom" });
       toast.success("Your picture is up");
@@ -68,6 +70,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
   };
   const removeImage = () => {
     keepImage(null);
+    keepTint(null);
     setImage(null);
     if (a.wallpaper === "custom") change({ wallpaper: "classic" });
   };

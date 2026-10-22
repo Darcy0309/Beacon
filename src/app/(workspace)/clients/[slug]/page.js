@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FolderKanban, Target, CalendarCheck, Percent } from "lucide-react";
+import { ArrowLeft, FolderKanban, Target, CalendarCheck, Percent, Palette } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatTile from "@/components/shared/stat-tile";
@@ -20,6 +20,11 @@ import { getClientDashboard, getClientPipeline, getClientSales } from "@/feature
 import SalePipeline from "@/features/dashboard/components/sale-pipeline";
 import { PIPELINE_PERIODS, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
 import PeriodSwitch from "@/features/dashboard/components/period-switch";
+import PictureUpload from "@/components/shared/picture-upload";
+import WebsiteForm from "@/features/clients/components/website-form";
+import { setClientLogo } from "@/features/clients/actions";
+import { imageUrl } from "@/lib/images";
+import { subscriptionNotice } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -55,6 +60,7 @@ export default async function ClientProfile({ params, searchParams }) {
     getClientSales({ companyId: c.id }),
   ]);
   const s = stats.total;
+  const notice = subscriptionNotice(c.endsOn, today);
   const of = (p) => stats.byProject[p.id] ?? shapeStats(null);
 
   // Counted by call result (lead_stats()): where each name stands, not how many were loaded.
@@ -84,7 +90,14 @@ export default async function ClientProfile({ params, searchParams }) {
           <div className="p-6">
             <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--panel-border)] pb-5">
               <div className="flex items-center gap-4">
-                <span className="flex size-14 items-center justify-center rounded-xl text-base font-bold text-white" style={{ background: c.color }}>{c.initials}</span>
+                {c.logoPath ? (
+                  <span className="flex h-14 w-24 items-center justify-center rounded-xl bg-white p-1.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imageUrl(c.logoPath)} alt={`${c.name} logo`} className="max-h-full max-w-full object-contain" />
+                  </span>
+                ) : (
+                  <span className="flex size-14 items-center justify-center rounded-xl text-base font-bold text-white" style={{ background: c.color }}>{c.initials}</span>
+                )}
                 <div>
                   <h2 className="text-lg font-bold tracking-tight">{c.name}</h2>
                   <p className="text-sm text-muted-foreground">{c.city}</p>
@@ -92,6 +105,8 @@ export default async function ClientProfile({ params, searchParams }) {
               </div>
               <div className="flex items-center gap-2">
                 <ToneBadge tone={{ Active: "emerald", Paused: "amber", Completed: "sky" }[c.status] ?? "slate"}>{c.status}</ToneBadge>
+                {/* Its subscription near its end, or past it (the old client bulletin's warning). */}
+                {notice ? <span data-subscription-notice><ToneBadge tone={notice.ended ? "rose" : "amber"}>Subscription {notice.text}</ToneBadge></span> : null}
                 <ClientForm client={c.raw} groups={groups} zones={zones} />
               </div>
             </div>
@@ -124,6 +139,16 @@ export default async function ClientProfile({ params, searchParams }) {
         </div>
         {/* What the client records from our appointments, as they see it (Sean, Oct 2026). */}
         <SalePipeline sales={sales} companyId={c.id} thisMonth={Number(today.slice(5, 7))} />
+
+        {/* Its branding, as the client sets it from their own Branding page. */}
+        <Card data-client-branding>
+          <SectionHeader label="Branding" icon={Palette} />
+          <div className="grid grid-cols-1 items-end gap-5 p-5 lg:grid-cols-2">
+            <PictureUpload kind="logo" folder={`company/${c.id}`} path={c.logoPath} name={c.name} save={setClientLogo.bind(null, c.id)}
+              label="Shown in the client's workspace. They can change it themselves from Branding." />
+            <WebsiteForm website={c.website} companyId={c.id} />
+          </div>
+        </Card>
 
         <Card>
           <SectionHeader label="Projects" icon={FolderKanban} href="/projects" action="All projects" />

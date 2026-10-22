@@ -3,24 +3,26 @@
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowRight, Ban, CalendarCheck, CalendarRange, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ArrowRight, Ban, CalendarCheck, CalendarRange, ChevronLeft, ChevronRight, StickyNote, X } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import SectionHeader from "@/components/shared/section-header";
 import DatePicker from "@/components/shared/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { addMonths, formatIso, monthGrid, monthStart, sameMonth } from "@/lib/dates";
-import { BLOCK_TIMES, blockDays, blockHours, dayMarks, eventsOn } from "@/lib/project-calendar";
+import { BLOCK_TIMES, blockDays, blockHours, clockOf, dayMarks, eventsOn } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
-import { addCalendarBlock, removeCalendarBlock } from "@/features/calendar/actions";
+import { addCalendarBlock, addCalendarNote, removeCalendarBlock, removeCalendarNote } from "@/features/calendar/actions";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const BLOCKED = "var(--neon-amber)";
+export const NOTED = "var(--neon-violet)";
 
 /** Block out days, or a time of day on them, on this calendar. */
 export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
@@ -90,6 +92,55 @@ export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
 }
 
 /**
+ * A note on a time of day on this calendar (the old "Hour Text"): it says
+ * something about the time without keeping appointments off it.
+ */
+export function NoteDialog({ open, onOpenChange, projectId, day, onDone }) {
+  const [state, action, pending] = useActionState(addCalendarNote, EMPTY);
+  const { fe, invalid } = formHelpers(state, null);
+  const handled = useRef(null);
+  useEffect(() => {
+    if (state === handled.current) return;
+    handled.current = state;
+    if (state?.ok) {
+      toast.success("Note added to the calendar");
+      onDone();
+    } else if (state?.error && !state?.fieldErrors) toast.error(state.error);
+  }, [state, onDone]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add a note</DialogTitle>
+          <DialogDescription>A note on a time of day, for everyone who sees this calendar. It does not block the time: appointments can still be set then.</DialogDescription>
+        </DialogHeader>
+        <form action={action} noValidate className="flex flex-col gap-4" data-note-form>
+          <input type="hidden" name="project_id" value={projectId} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Day" required error={fe("on_date")}>
+              <DatePicker name="on_date" required defaultValue={day} key={`n${day}${open}`} invalid={invalid("on_date")} aria-label="Day" />
+            </Field>
+            <Field label="Time" required error={fe("at_time")}>
+              <Select name="at_time" defaultValue="9:00 AM" aria-invalid={invalid("at_time")} aria-label="Time">
+                {BLOCK_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
+            </Field>
+          </div>
+          <Field label="Note" required error={fe("body")} hint="e.g. Keep for Mike's callback, owner back at 2">
+            <Textarea name="body" rows={3} maxLength={300} aria-invalid={invalid("body")} data-note-body />
+          </Field>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button type="submit" disabled={pending}><StickyNote /> {pending ? "Saving…" : "Add note"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
  * A project's calendar: the month at a glance (days with appointments
  * marked and counted, blocked days shaded), and the chosen day's
  * appointments and blocked time beside it. Time is blocked out and taken
@@ -107,6 +158,8 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
   const [blocking, setBlocking] = useState(false);
   const [removing, startRemoving] = useTransition();
   const [asking, setAsking] = useState(null); // the block about to be taken off
+  const [noting, setNoting] = useState(false);
+  const [askingNote, setAskingNote] = useState(null); // the note about to be taken off
   const calendarId = initial.projectId;
 
   // What the page arrives with is fresh after every change: months read since are read again.
@@ -126,13 +179,25 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
     };
   }, [covered, extra, month, grid, calendarId]);
 
-  const data = covered ? initial : extra[month] ?? { appointments: [], blocks: [] };
+  const data = covered ? initial : extra[month] ?? { appointments: [], blocks: [], notes: [] };
   const marks = useMemo(() => dayMarks(data, grid[0], grid[41]), [data, grid]);
   const events = eventsOn(selected, data);
   const reload = () => {
     setBlocking(false);
+    setNoting(false);
     router.refresh();
   };
+  const removeNote = (id) =>
+    startRemoving(async () => {
+      const f = new FormData();
+      f.set("id", String(id));
+      const result = await removeCalendarNote(f);
+      if (result.ok) {
+        toast.success("Note taken off");
+        setAskingNote(null);
+        router.refresh();
+      } else toast.error(result.error);
+    });
   const remove = (id) =>
     startRemoving(async () => {
       const f = new FormData();
@@ -184,6 +249,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
                   <span className="mt-px flex h-1.5 items-center gap-px">
                     {m?.appointments ? <span className="rounded-full bg-primary px-[3px] text-[0.5rem] font-bold leading-[0.6rem] text-primary-foreground">{m.appointments}</span> : null}
                     {m?.blocked === "part" ? <span className="h-1 w-2 rounded-full" style={{ background: BLOCKED }} /> : null}
+                    {m?.notes ? <span className="size-1 rounded-full" style={{ background: NOTED }} data-day-notes={m.notes} /> : null}
                   </span>
                 </button>
               );
@@ -192,6 +258,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6rem] text-muted-foreground">
             <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-primary" /> Appointments</span>
             <span className="flex items-center gap-1"><span className="h-1 w-2 rounded-full" style={{ background: BLOCKED }} /> Blocked out</span>
+            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: NOTED }} /> Notes</span>
           </div>
         </div>
 
@@ -202,7 +269,19 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
             <span className="shrink-0 text-[0.62rem] text-muted-foreground">{events.filter((e) => e.kind === "appointment").length} appt{events.filter((e) => e.kind === "appointment").length === 1 ? "" : "s"}</span>
           </div>
           <ul className={cn("max-h-52 flex-1 space-y-1 overflow-y-auto", removing && "opacity-60")}>
-            {events.map((e) => e.kind === "block" ? (
+            {events.map((e) => e.kind === "note" ? (
+              <li key={e.key} data-calendar-note={e.note.id} className="flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-xs"
+                style={{ borderColor: `color-mix(in srgb, ${NOTED} 45%, transparent)`, background: `color-mix(in srgb, ${NOTED} 8%, transparent)` }}>
+                <StickyNote className="mt-0.5 size-3.5 shrink-0" style={{ color: NOTED }} />
+                <span className="min-w-0 flex-1">
+                  <span className="font-semibold tabular-nums">{clockOf(e.note.start)}</span>
+                  <span className="block whitespace-pre-line break-words">{e.note.text}</span>
+                  {e.note.by ? <span className="block truncate text-muted-foreground">by {e.note.by}</span> : null}
+                </span>
+                <button type="button" onClick={() => setAskingNote(e.note)} disabled={removing} aria-label="Take this note off the calendar" title="Take it off the calendar" data-remove-note
+                  className="shrink-0 rounded text-muted-foreground transition-colors hover:text-destructive"><X className="size-3.5" /></button>
+              </li>
+            ) : e.kind === "block" ? (
               <li key={e.key} data-block={e.block.id} data-synced={e.block.synced || undefined} data-weekly={e.block.weekly || undefined} className="flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-xs"
                 style={{ borderColor: `color-mix(in srgb, ${BLOCKED} 45%, transparent)`, background: `color-mix(in srgb, ${BLOCKED} 8%, transparent)` }}>
                 <Ban className="mt-0.5 size-3.5 shrink-0" style={{ color: BLOCKED }} />
@@ -235,16 +314,40 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
             ))}
             {events.length === 0 ? <li className="py-4 text-center text-xs text-muted-foreground">Nothing on this day.</li> : null}
           </ul>
-          <Button type="button" size="sm" variant="outline" className="mt-2 w-full" onClick={() => setBlocking(true)} disabled={selected < today} data-block-out>
-            <Ban /> Block out time
-          </Button>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => setBlocking(true)} disabled={selected < today} data-block-out>
+              <Ban /> Block out
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setNoting(true)} data-add-note>
+              <StickyNote /> Add note
+            </Button>
+          </div>
         </div>
       </div>
       <BlockDialog open={blocking} onOpenChange={setBlocking} projectId={calendarId} day={selected < today ? today : selected} onDone={reload} />
+      <NoteDialog open={noting} onOpenChange={setNoting} projectId={calendarId} day={selected} onDone={reload} />
+      <ConfirmDialog open={askingNote !== null} onOpenChange={(o) => !o && setAskingNote(null)} pending={removing}
+        title="Take this note off the calendar?"
+        description={askingNote ? `${clockOf(askingNote.start)}: ${askingNote.text}` : null}
+        confirm="Take it off" onConfirm={() => removeNote(askingNote.id)} />
       <ConfirmDialog open={asking !== null} onOpenChange={(o) => !o && setAsking(null)} pending={removing}
         title="Take this block off the calendar?"
         description={asking ? `${blockDays(asking)} · ${blockHours(asking)}${asking.note ? ` · ${asking.note}` : ""}. The time opens up for appointments again.` : null}
         confirm="Take it off" onConfirm={() => remove(asking.id)} />
     </Card>
+  );
+}
+
+/** "Add note" on its own (the full calendar's toolbar): the note dialog for this calendar, on `day` to begin with. */
+export function AddNoteButton({ projectId, day }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)} data-add-note>
+        <StickyNote /> Add note
+      </Button>
+      <NoteDialog open={open} onOpenChange={setOpen} projectId={projectId} day={day} onDone={() => { setOpen(false); router.refresh(); }} />
+    </>
   );
 }

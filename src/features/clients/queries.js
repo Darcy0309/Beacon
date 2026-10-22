@@ -52,6 +52,10 @@ export async function getClients() {
     zone: one(c.zone)?.name ?? null,
     start: c.subscription_start ? mediumDate(c.subscription_start) : null,
     end: c.subscription_end ? mediumDate(c.subscription_end) : null,
+    endsOn: c.subscription_end ?? null,
+    // Its branding: the logo (a path in the public-images bucket) and website.
+    logoPath: c.logo_path ?? null,
+    website: c.website ?? null,
     // The carrier group it belongs to, if any (an insurance company from the list).
     groupId: one(c.group)?.id ?? null,
     group: one(c.group)?.name ?? null,

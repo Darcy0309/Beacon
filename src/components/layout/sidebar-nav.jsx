@@ -15,6 +15,7 @@ import { signOut } from "@/features/auth/actions";
 import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import { useSidebar } from "@/components/layout/sidebar-provider";
 import { cn } from "@/lib/utils";
+import { imageUrl } from "@/lib/images";
 
 /**
  * A thin sweep along the bottom of a sidebar item while the page it opens is
@@ -98,6 +99,13 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
           <div className="mt-2 text-[0.6rem] font-bold uppercase leading-[1.5] tracking-[0.2em] text-primary">
             Lighthouse Platform
           </div>
+          {/* A client's own logo (Branding), under ours. */}
+          {role === "client" && user?.company?.logo_path ? (
+            <div className="mt-3 flex h-12 items-center rounded-lg bg-white/90 px-2.5 py-1.5 dark:bg-white/85" data-client-logo>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageUrl(user.company.logo_path)} alt={`${user.company.name ?? "Client"} logo`} className="max-h-full max-w-full object-contain" />
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -152,8 +160,11 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
 
       <div className={cn("border-t border-sidebar-border", collapsed ? "flex flex-col items-center gap-2 p-2" : "p-3")}>
         <div className={cn("flex items-center gap-3", collapsed && "flex-col gap-2")}>
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-blue)] text-xs font-bold text-[var(--background)]">
-            {initials}
+          <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-blue)] text-xs font-bold text-[var(--background)]">
+            {user?.photo_path ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl(user.photo_path)} alt="" className="size-full object-cover" data-my-avatar />
+            ) : initials}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1 text-sm leading-tight">
