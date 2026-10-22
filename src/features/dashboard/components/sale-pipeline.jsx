@@ -6,6 +6,8 @@ import { LineChart, Pencil, Target } from "lucide-react";
 import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
 import SectionHeader from "@/components/shared/section-header";
+import ParamSelect from "@/components/shared/param-select";
+import { formatIso } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -16,17 +18,20 @@ const short = (n) => (n >= 1e6 ? `$${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n 
 
 /**
  * The Sale Pipeline (Sean, Oct 2026): what the client records from our
- * appointments, like a ticker. The line is the premium written so far this
- * year, month by month; the dashed one, where the year's goal would have them
- * by then. Under it: premium written, in the pipe (quoted, still quoting),
- * the goal (theirs to set, or an administrator's on their page), and the
- * close ratio (sold of pending, quoting, quoted-not sold and sold).
+ * appointments, like a ticker. Twelve months from the month their campaign
+ * started (the project's start date), the line the premium written so far,
+ * month by month; the dashed one, where the year's goal would have them by
+ * then. Under it: premium written (Sold Account totals), in the pipe
+ * (potential premium on those Valid-Quoting), the goal (theirs to set, or an
+ * administrator's on their page), and the close ratio (sold of the valid
+ * appointments). All their projects together, or one, from the list.
  *
  *   sales      getClientSales()
  *   companyId  set on an administrator's view of a client
- *   thisMonth  1 to 12: the line runs to here
+ *   thisMonth  1 to 12, the month we are in among the twelve (sales.current when given): the line runs to here
  */
-export default function SalePipeline({ sales, companyId = null, thisMonth, canSetGoal = true }) {
+export default function SalePipeline({ sales, companyId = null, thisMonth: monthOfYear, canSetGoal = true }) {
+  const thisMonth = sales.current ?? monthOfYear;
   const [hover, setHover] = useState(null);
   const months = sales.months.length ? sales.months : Array.from({ length: 12 }, (_, i) => ({ month: i + 1, label: "", written: 0 }));
   // Running total: the ticker climbs as premium is written.
@@ -47,17 +52,26 @@ export default function SalePipeline({ sales, companyId = null, thisMonth, canSe
   const at = hover ? points.find((p) => p.month === hover) : null;
 
   const stats = [
-    ["Premium written", money(sales.written), `this year (${sales.year})`, "var(--neon-emerald)", "written"],
-    ["In the pipe", money(sales.pipe), "quoted, still quoting", "var(--neon-blue)", "pipe"],
+    ["Premium written", money(sales.written), sales.start ? `since ${formatIso(sales.start, "month")}` : `this year (${sales.year})`, "var(--neon-emerald)", "written"],
+    ["In the pipe", money(sales.pipe), "potential, still quoting", "var(--neon-blue)", "pipe"],
     ["My goal", sales.goal == null ? "Not set" : money(sales.goal),
       sales.goal ? `${Math.round((sales.written / sales.goal) * 100)}% of it written` : "for the year", "var(--neon-amber)", "goal"],
     ["Close ratio", `${sales.closeRatio}%`, `${sales.sold} sold of ${sales.considered}`, "var(--neon-violet)", "close"],
   ];
 
   return (
-    <Card className="flex flex-col" data-sale-pipeline>
-      <SectionHeader label="Sale Pipeline" icon={LineChart}
-        action={canSetGoal ? <GoalButton year={sales.year} goal={sales.goal} companyId={companyId} /> : null} />
+    <Card className="flex flex-col" data-sale-pipeline data-sale-start={sales.start ?? undefined}>
+      <SectionHeader wrap label="Sale Pipeline" icon={LineChart}
+        action={
+          <span className="flex flex-wrap items-center gap-2">
+            {/* Every project of theirs together, or one (Sean, Oct 2026). */}
+            {sales.projects?.length > 1 ? (
+              <ParamSelect name="sp" label="Project" placeholder="All projects" value={sales.projectId ? String(sales.projectId) : ""}
+                options={sales.projects.map((p) => ({ value: String(p.id), label: p.name }))} clears={[]} />
+            ) : null}
+            {canSetGoal ? <GoalButton year={sales.year} goal={sales.goal} companyId={companyId} /> : null}
+          </span>
+        } />
       <div className="flex flex-1 flex-col gap-4 p-5">
         <div className="relative min-h-48 flex-1" onMouseLeave={() => setHover(null)}>
           <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full min-h-48 w-full overflow-visible" role="img"
@@ -86,7 +100,7 @@ export default function SalePipeline({ sales, companyId = null, thisMonth, canSe
           {at ? (
             <div className="pointer-events-none absolute top-1 rounded-md border border-[var(--panel-border)] bg-popover px-2.5 py-1.5 text-xs shadow-md"
               style={{ left: `clamp(0px, calc(${((at.month - 1) / 11) * 100}% - 4rem), calc(100% - 9rem))` }} data-sale-tip>
-              <div className="font-semibold">{at.label} {sales.year}</div>
+              <div className="font-semibold">{at.key ? formatIso(`${at.key}-01`, "month") : `${at.label} ${sales.year}`}</div>
               <div className="tabular-nums">{money(at.written)} written · {money(at.total)} so far</div>
               {sales.goal ? <div className="tabular-nums text-muted-foreground">Goal pace {money(pace(at.month))}</div> : null}
             </div>
@@ -112,7 +126,7 @@ export default function SalePipeline({ sales, companyId = null, thisMonth, canSe
         {sales.goal ? (
           <p className="flex items-center gap-1.5 text-[0.7rem] text-muted-foreground">
             <span aria-hidden className="inline-block w-4 border-t-2 border-dashed" style={{ borderColor: "var(--neon-amber)" }} />
-            On pace for the goal: {short(sales.goal)} by December.
+            On pace for the goal: {short(sales.goal)} by {points.at(-1)?.label || "December"}.
           </p>
         ) : null}
       </div>
@@ -150,7 +164,7 @@ function GoalButton({ year, goal, companyId }) {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Premium goal for {year}</DialogTitle>
-            <DialogDescription>The premium you aim to write this year from our appointments.</DialogDescription>
+            <DialogDescription>The premium you aim to write from our appointments in the twelve months from {year}&apos;s campaign start.</DialogDescription>
           </DialogHeader>
           <form onSubmit={save} className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-sm">

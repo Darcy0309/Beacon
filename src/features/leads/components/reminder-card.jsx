@@ -27,7 +27,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * ([{ label, href }]) adding it to one's own calendar: Google, Outlook, or
  * the .ics file (Apple, Outlook on a desktop).
  */
-export default function ReminderCard({ leadId, company, upcoming }) {
+export default function ReminderCard({ leadId, company, upcoming, client = false }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(setReminder, EMPTY);
@@ -61,7 +61,7 @@ export default function ReminderCard({ leadId, company, upcoming }) {
     <Card data-reminders className="p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-          <AlarmClock className="size-3.5 text-primary" /> Call-back reminder
+          <AlarmClock className="size-3.5 text-primary" /> {client ? "Reminder" : "Call-back reminder"}
         </span>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
@@ -69,8 +69,12 @@ export default function ReminderCard({ leadId, company, upcoming }) {
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Remind me to call {company}</DialogTitle>
-              <DialogDescription>A notification will link you back to this lead at the time you choose.</DialogDescription>
+              <DialogTitle>{client ? `Remind me about ${company}` : `Remind me to call ${company}`}</DialogTitle>
+              <DialogDescription>
+                {client
+                  ? "It goes on your Lighthouse calendar, and a notification links you back to this lead at the time you choose."
+                  : "A notification will link you back to this lead at the time you choose."}
+              </DialogDescription>
             </DialogHeader>
             <form action={formAction} noValidate className="flex flex-col gap-4">
               <input type="hidden" name="lead_id" value={leadId} />
@@ -89,7 +93,7 @@ export default function ReminderCard({ leadId, company, upcoming }) {
                   </Select>
                 </Field>
               </div>
-              <Field label="Note" error={fe("note")} hint="e.g. Ask for Henry; he decides on the renewal">
+              <Field label="Note" error={fe("note")} hint={client ? "e.g. Follow up on the quote with Henry" : "e.g. Ask for Henry; he decides on the renewal"}>
                 <Textarea name="note" rows={2} maxLength={300} defaultValue={dv("note")} aria-invalid={invalid("note")} />
               </Field>
               <DialogFooter>
@@ -126,7 +130,7 @@ export default function ReminderCard({ leadId, company, upcoming }) {
       ) : null}
       <ConfirmDialog open={asking !== null} onOpenChange={(o) => !o && setAsking(null)} pending={cancelling}
         title="Cancel this reminder?"
-        description={asking ? `${asking.when}${asking.note ? ` · ${asking.note}` : ""}. You will not be reminded to call back.` : null}
+        description={asking ? `${asking.when}${asking.note ? ` · ${asking.note}` : ""}. You will not be reminded${client ? "" : " to call back"}.` : null}
         confirm="Cancel the reminder" icon={<X />} onConfirm={() => cancel(asking.id)} />
     </Card>
   );

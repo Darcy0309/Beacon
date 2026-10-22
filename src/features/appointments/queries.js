@@ -212,3 +212,87 @@ export async function getAppointmentFilters() {
     statuses: (statuses.data ?? []).map((s) => ({ value: s.name, label: s.name })),
   };
 }
+
+/** One row of client_appointments(), shaped for the lists. */
+function shapeClientAppointment(r) {
+  const { time, ampm } = splitTime(r.appt_time);
+  return {
+    id: r.id, leadId: r.lead_id, co: r.company ?? "—", location: [r.city, r.state].filter(Boolean).join(", ") || null,
+    projectId: r.project_id, project: r.project ?? "—", agent: r.agent ?? "—", developedAt: r.developed_at,
+    date: r.appt_date, time, ampm, apptTime: r.appt_time, status: r.status, xdate: r.xdate,
+    manager: r.manager ?? "—", managerId: r.manager_id,
+    update: r.update_status, updateLabel: r.update_label, updateAt: r.update_at, updateBy: r.update_by,
+    potential: r.potential_premium == null ? null : Number(r.potential_premium),
+    total: r.total_premium == null ? null : Number(r.total_premium),
+    soldLines: r.sold_lines ?? null, dueOn: r.due_on, lastNote: r.last_note ?? null,
+  };
+}
+
+/**
+ * Appointments as a client's list shows them (Sean, Oct 2026), by their day
+ * from `from` to `to`: client_appointments(), which gives the manager's name
+ * (a client cannot read the staff) and each one's update. `status`: only
+ * those showing it.
+ */
+export async function getClientAppointments({ from, to, projectId = null, status = null, companyId = null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("client_appointments", {
+    p_from: from, p_to: to, p_project_id: projectId ? Number(projectId) : null, p_status: status || null, p_company_id: companyId ? Number(companyId) : null,
+  });
+  if (error) throw error;
+  return (data ?? []).map(shapeClientAppointment);
+}
+
+/** A lead's appointments (newest first), as the client's list shows them: for its page. */
+export async function getLeadAppointments(leadId) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("client_appointments", { p_from: "2000-01-01", p_to: "2100-01-01", p_lead_id: Number(leadId) });
+  if (error) throw error;
+  return (data ?? []).map(shapeClientAppointment);
+}
+
+const UPDATE_COLUMNS = `id, appointment_id, lead_id, status, previous_status, note, potential_premium, sold_lines, total_premium, created_at,
+  by:users!appointment_updates_created_by_fkey(first_name, last_name, role),
+  appointment:appointments(appt_date, appt_time, setter:users!appointments_user_id_fkey(first_name, last_name)),
+  lead:leads(id, company_name), project:projects(id, name), company:companies(id, name)`;
+
+function shapeUpdate(u) {
+  const by = one(u.by);
+  const appt = one(u.appointment);
+  const setter = one(appt?.setter);
+  return {
+    id: u.id, appointmentId: u.appointment_id, leadId: u.lead_id, status: u.status, previous: u.previous_status, note: u.note,
+    potential: u.potential_premium == null ? null : Number(u.potential_premium),
+    total: u.total_premium == null ? null : Number(u.total_premium), lines: u.sold_lines ?? null, at: u.created_at,
+    by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || "—" : "—", byClient: by?.role === "client",
+    apptDate: appt?.appt_date ?? null, apptTime: appt?.appt_time ?? null,
+    manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—",
+    co: one(u.lead)?.company_name ?? "—", project: one(u.project)?.name ?? "—", client: one(u.company)?.name ?? "—",
+    companyId: one(u.company)?.id ?? null,
+  };
+}
+
+/** Every update to a lead's appointments, newest first (its page's history, for staff). */
+export async function getLeadAppointmentUpdates(leadId) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("appointment_updates").select(UPDATE_COLUMNS)
+    .eq("lead_id", Number(leadId)).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(200);
+  if (error) throw error;
+  return (data ?? []).map(shapeUpdate);
+}
+
+/**
+ * Appointment Updates (administrators, Data & Insights): every update as it
+ * came in, newest first, from `from` to `to` (the business's days), for one
+ * client or status if asked.
+ */
+export async function getAppointmentUpdatesFeed({ from, to, companyId = null, status = null }) {
+  const supabase = await createClient();
+  let q = supabase.rpc("appointment_updates_between", { p_from: from, p_to: to }).select(UPDATE_COLUMNS)
+    .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1000);
+  if (companyId) q = q.eq("company_id", Number(companyId));
+  if (status) q = q.eq("status", status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map(shapeUpdate);
+}

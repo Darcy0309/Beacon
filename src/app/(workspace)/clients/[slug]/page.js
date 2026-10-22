@@ -57,7 +57,7 @@ export default async function ClientProfile({ params, searchParams }) {
     // As the client's own dashboard has them (Sean, Oct 2026): how their appointments turned out, and what is coming up.
     getClientDashboard({ companyId: c.id }).then((d) => d.results),
     getClientPipeline({ months: up, companyId: c.id }),
-    getClientSales({ companyId: c.id }),
+    getClientSales({ companyId: c.id, projectId: /^[1-9]\d{0,17}$/.test(sp?.sp ?? "") ? sp.sp : null }),
   ]);
   const s = stats.total;
   const notice = subscriptionNotice(c.endsOn, today);

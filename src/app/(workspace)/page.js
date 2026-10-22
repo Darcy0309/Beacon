@@ -172,7 +172,8 @@ export default async function Dashboard({ searchParams }) {
   const clientDashP = client ? todayP.then((t) => getClientDashboard({ from: clientPeriodFrom(cp, t) })) : null;
   const clientPipelineP = client ? getClientPipeline({ months: up }) : null;
   // Row two (Sean, Oct 2026): the Sale Pipeline, and their calendar as a manager's (the month chosen, ?cm=).
-  const clientSalesP = client ? getClientSales() : null;
+  // The Sale Pipeline: all their projects, or the one chosen (?sp=).
+  const clientSalesP = client ? getClientSales({ projectId: /^[1-9]\d{0,17}$/.test(sp?.sp ?? "") ? sp.sp : null }) : null;
   // Row three (Sean, Oct 2026): Recent Activity, the last week to begin with (?af=, ?ato=), by project (?ap=) and type (?at=).
   const id = (v) => (typeof v === "string" && /^[1-9]\d{0,17}$/.test(v) ? Number(v) : null);
   const activityChosen = { project: id(sp?.ap), type: sp?.at === "lead" || sp?.at === "appointment" ? sp.at : null };

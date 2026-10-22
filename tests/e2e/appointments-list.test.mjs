@@ -76,9 +76,10 @@ try {
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1600, height: 1100 });
   await client.go("/appointments", 4000);
-  const theirs = await until(async () => { const r = await client.ev(`[...document.querySelectorAll('[data-appt-row]')].map((r) => r.innerText).filter((t) => t.includes(${JSON.stringify(TAG)}))`); return r.length ? r : null; });
+  // Their own list (Sean, Oct 2026): as Recent Activity has it, each with how it went (client-appointments.jsx).
+  const theirs = await until(async () => { const r = await client.ev(`[...document.querySelectorAll('[data-client-appt]')].map((r) => r.innerText).filter((t) => t.includes(${JSON.stringify(TAG)}))`); return r.length ? r : null; });
   check("sees their own appointments, not another client's", (theirs ?? []).some((t) => t.includes("Arizona Cleanpros")) && !(theirs ?? []).some((t) => t.includes("Cactus Roofing")), JSON.stringify(theirs));
-  check("…each opening the appointment on their calendar", (await client.ev(`document.querySelector('[data-appt-row="${A.id}"]')?.getAttribute('href')`)) === `/calendar?view=day&d=${inDays(1)}&a=${A.id}`);
+  check("…each company opening its lead sheet", (await client.ev(`document.querySelector('[data-client-appt="${A.id}"] [data-appt-lead]')?.getAttribute('href')`))?.startsWith(`/leads/${A.lead}`));
   check("…with no client or manager filter", await client.ev(`!/All clients|Everyone/.test(document.querySelector('[data-appointment-filters]').innerText)`));
 } finally {
   browser.close();

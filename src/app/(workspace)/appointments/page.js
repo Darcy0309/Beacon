@@ -6,13 +6,16 @@ import SectionHeader from "@/components/shared/section-header";
 import AppointmentForm from "@/features/appointments/components/appointment-form";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getAppointmentFilters, getWeekAppointments, listAppointments } from "@/features/appointments/queries";
+import { getAppointmentFilters, getClientAppointments, getWeekAppointments, listAppointments } from "@/features/appointments/queries";
+import ClientAppointments from "@/features/appointments/components/client-appointments";
+import { getCarrierNames } from "@/features/insurance/queries";
+import { UPDATE_STATUSES } from "@/lib/appointment-updates";
+import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { addDays, daysBetween, formatRange, fromIso, isIsoDate } from "@/lib/dates";
 import Link from "@/components/shared/intent-link";
 import ParamSelect from "@/components/shared/param-select";
 import DateRangePicker from "@/components/shared/date-range-picker";
 import { getCurrentUser } from "@/lib/server/session";
-import { getBusinessToday } from "@/lib/server/business-day";
 import { getLookups } from "@/lib/server/lookups";
 
 export const dynamic = "force-dynamic";
@@ -68,13 +71,17 @@ export default async function AppointmentsPage({ searchParams }) {
   // and the filters are known, alongside the week's appointments.
   const id = (v) => (typeof v === "string" && /^[1-9]\d{0,17}$/.test(v) ? v : "");
   const pick = ([today, me, filters]) => {
-    let from = isIsoDate(sp?.from) ? sp.from : today;
-    let to = isIsoDate(sp?.to) ? sp.to : addDays(from, 6);
+    // A client's list (Sean, Oct 2026): two months either side of today, to update the ones gone by.
+    const client = me?.role === "client";
+    let from = isIsoDate(sp?.from) ? sp.from : client ? addDays(today, -60) : today;
+    let to = isIsoDate(sp?.to) ? sp.to : client ? addDays(today, 60) : addDays(from, 6);
     if (to < from) [from, to] = [to, from];
     if (daysBetween(from, to) > 366) to = addDays(from, 366);
     const chosen = {
       client: id(sp?.client), project: id(sp?.project), manager: me?.role !== "client" ? id(sp?.manager) : "",
       status: filters.statuses.some((o) => o.value === sp?.status) ? sp.status : "",
+      // A client's: how the appointments went (their Update Status).
+      update: me?.role === "client" && UPDATE_STATUSES.some(([k]) => k === sp?.update_status) ? sp.update_status : "",
     };
     return { from, to, chosen };
   };
@@ -83,9 +90,15 @@ export default async function AppointmentsPage({ searchParams }) {
   const filtersP = getAppointmentFilters();
   const listP = Promise.all([todayP, meP, filtersP]).then((got) => {
     const { from, to, chosen } = pick(got);
+    // A client's list is their own (client_appointments(): with the manager, and each one's update).
+    if (got[1]?.role === "client") {
+      return getClientAppointments({ from, to, projectId: chosen.project || null, status: chosen.update || null })
+        .then((clientRows) => ({ rows: [], capped: false, clientRows }));
+    }
     return listAppointments({ from, to, clientId: chosen.client || null, projectId: chosen.project || null, userId: chosen.manager || null, status: chosen.status || null });
   });
-  const [{ rows, groups }, options, today, me, filters, list] = await Promise.all([getWeekAppointments(), getLookups(), todayP, meP, filtersP, listP]);
+  const extrasP = meP.then((me) => (me?.role === "client" ? Promise.all([getCarrierNames(), getBusinessTimeZone()]) : [[], null]));
+  const [{ rows, groups }, options, today, me, filters, list, [carriers, tz]] = await Promise.all([getWeekAppointments(), getLookups(), todayP, meP, filtersP, listP, extrasP]);
   const staff = me?.role !== "client";
   const { from, to, chosen } = pick([today, me, filters]);
   const custom = isIsoDate(sp?.from) || isIsoDate(sp?.to);
@@ -134,7 +147,7 @@ export default async function AppointmentsPage({ searchParams }) {
 
         <Card data-appointment-list>
           <SectionHeader
-            label={custom ? "Appointments" : "The Next 7 Days"}
+            label={custom || !staff ? "Appointments" : "The Next 7 Days"}
             icon={CalendarClock}
             // Staff book appointments by hand (one set by email or text, not from a call); the
             // client's people see theirs, set by us, and record how each went.
@@ -155,16 +168,27 @@ export default async function AppointmentsPage({ searchParams }) {
             {staff ? <ParamSelect name="client" label="Client" placeholder="All clients" value={chosen.client} options={filters.clients} clears={["project"]} /> : null}
             <ParamSelect name="project" label="Project" placeholder="All projects" value={chosen.project} options={projectOptions} clears={[]} />
             {staff ? <ParamSelect name="manager" label="Manager" placeholder="Everyone" value={chosen.manager} options={filters.managers} clears={[]} /> : null}
-            <ParamSelect name="status" label="Status" placeholder="Any status" value={chosen.status} options={filters.statuses} clears={[]} />
+            {staff ? <ParamSelect name="status" label="Status" placeholder="Any status" value={chosen.status} options={filters.statuses} clears={[]} /> : (
+              <ParamSelect name="update_status" label="Update status" placeholder="Any update" value={chosen.update}
+                options={UPDATE_STATUSES.map(([value, label]) => ({ value, label }))} clears={["update"]} />
+            )}
             {custom || Object.values(chosen).some(Boolean) ? (
               <Link href="/appointments" className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline" data-clear-filters>Clear</Link>
             ) : null}
             <span className="ml-auto text-xs tabular-nums text-muted-foreground" data-appointment-count>
-              {list.rows.length.toLocaleString()} appointment{list.rows.length === 1 ? "" : "s"} · {formatRange(from, to)}
+              {(list.clientRows ?? list.rows).length.toLocaleString()} appointment{(list.clientRows ?? list.rows).length === 1 ? "" : "s"} · {formatRange(from, to)}
             </span>
           </div>
           {list.capped ? <p className="border-b border-[var(--panel-border)] px-5 py-2 text-xs text-muted-foreground">Showing the first 2,000: narrow the days or filters to see the rest.</p> : null}
-          {list.rows.length ? (
+          {list.clientRows ? (
+            list.clientRows.length ? (
+              <ClientAppointments rows={list.clientRows} carriers={carriers} today={today} timeZone={tz}
+                openId={/^[1-9]\d{0,17}$/.test(sp?.update ?? "") ? Number(sp.update) : null} back={listAddress("/appointments", sp)} />
+            ) : (
+              <p className="p-8 text-center text-sm text-muted-foreground">No appointments match these filters.</p>
+            )
+          ) : null}
+          {list.clientRows ? null : list.rows.length ? (
             <div className="hidden grid-cols-[4rem_minmax(0,1.6fr)_minmax(0,1.1fr)_minmax(0,1.3fr)_minmax(0,1fr)_7.5rem_minmax(0,1fr)] gap-x-4 border-b border-[var(--panel-border)] px-5 py-2 text-[0.6rem] font-bold uppercase tracking-[0.12em] text-muted-foreground lg:grid">
               {COLUMNS.map((c) => <span key={c} className={c === "Status" ? "text-center" : c === "Set by" ? "text-right" : undefined}>{c}</span>)}
             </div>

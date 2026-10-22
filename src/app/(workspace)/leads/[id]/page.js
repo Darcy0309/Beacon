@@ -21,6 +21,9 @@ import { calendarLinks } from "@/lib/appointment-links";
 import { reminderEvent } from "@/lib/reminder-event";
 import { publicOrigin } from "@/lib/origin";
 import ProjectCalendar from "@/features/calendar/components/project-calendar";
+import UpdateStatus from "@/features/appointments/components/update-status";
+import { getLeadAppointmentUpdates, getLeadAppointments } from "@/features/appointments/queries";
+import { lineLabel, money, overdue, statusColor, statusLabel } from "@/lib/appointment-updates";
 import { getProjectCalendar } from "@/features/calendar/queries";
 import ResendButton from "@/features/delivery/components/resend-button";
 import { getCarrierNames } from "@/features/insurance/queries";
@@ -185,6 +188,7 @@ export default async function LeadSheet({ params, searchParams }) {
     const r = lead.raw;
     const staff = ["admin", "manager", "agent"].includes(me?.role);
     const seesInternal = ["admin", "manager"].includes(me?.role);
+    const client = me?.role === "client";
     return Promise.all([
       // Working a call list: where the list stands. And whether the caller is on
       // this name's project, which (like being its rep) lets them record on it.
@@ -192,7 +196,8 @@ export default async function LeadSheet({ params, searchParams }) {
       listId ? getWorkProject(listId) : null,
       r.project && staff ? getWorkProject(r.project.id) : null,
       staff ? getEmailSender(me) : null,
-      staff ? getCarrierNames() : [],
+      // The carriers: staff's coverage fields, a client's Sold Account lines.
+      staff || client ? getCarrierNames() : [],
       seesInternal ? getAssignableStaff() : [],
       listLeadFiles(await createClient(), lead.id),
       // The cargo list, for the Business tab's Cargo field.
@@ -202,9 +207,14 @@ export default async function LeadSheet({ params, searchParams }) {
       // Held back from the client by QA: its manager (or an administrator) fixes it and says so here.
       seesInternal ? getLeadHold(lead.id) : null,
       // The project's calendar, at hand while on the phone: this month and the two after (others are read as they are opened).
-      staff && r.project?.id
+      // A client's people too (Sean, Oct 2026): their project's calendar, kept in view.
+      (staff || client) && r.project?.id
         ? getProjectCalendar({ projectId: r.project.id, from: monthGrid(monthStart(today))[0], to: monthGrid(addMonths(monthStart(today), 2))[41] })
         : null,
+      // Its appointments with how each went (a client's Call Result, and the update to make).
+      client ? getLeadAppointments(lead.id) : [],
+      // Every update a client made to them: administrators and managers read them on the lead.
+      seesInternal ? getLeadAppointmentUpdates(lead.id) : [],
     ]);
   });
   const [lead, activity, me, results, openAppt, today, tz, rest] = await Promise.all([
@@ -221,7 +231,10 @@ export default async function LeadSheet({ params, searchParams }) {
   const seesInternal = ["admin", "manager"].includes(me?.role);
 
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar] = rest;
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates] = rest;
+  const client = me?.role === "client";
+  // A client's Call Result: the lead's latest appointment, as their Appointments list has it.
+  const latestAppt = leadAppts[0] ?? null;
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
 
@@ -551,10 +564,11 @@ export default async function LeadSheet({ params, searchParams }) {
           <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1">
             {hold?.status === "failed" ? <HoldNotice hold={hold} /> : null}
             {seesInternal && people.length ? <SendLead leadId={lead.id} company={lead.co} people={people} /> : null}
-            {canRecord ? (
+            {canRecord || client ? (
               <ReminderCard
                 leadId={lead.id}
                 company={lead.co}
+                client={client}
                 upcoming={activity.reminders.filter((m) => !m.sent && m.userId === me?.id).map((m) => ({
                   id: m.id, when: stamp(m.remindAt), note: m.note,
                   // To put on my own calendar, with the lead to open from it.
@@ -600,6 +614,32 @@ export default async function LeadSheet({ params, searchParams }) {
                 Results on this name are recorded by {lead.rep === "Unassigned" ? "the reps on its project." : /\.$/.test(lead.rep) ? lead.rep : `${lead.rep}.`}
               </Card>
             ) : null}
+            {client ? (
+              // The client's Call Result (Sean, Oct 2026): where the name stands, and its appointment with how it went.
+              <Card className="overflow-hidden" data-client-call-result>
+                <div className="border-b border-[var(--panel-border)] px-4 py-2 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">Call Result</div>
+                <div className="space-y-2 px-4 py-3 text-sm">
+                  <Fact label="Result">{r.result ? <ToneBadge tone={r.result.viable ? "cyan" : "slate"}>{r.result.name}</ToneBadge> : null}</Fact>
+                  <Fact label="Appointment">{latestAppt ? <span className="tabular-nums" data-appt-when>{shortDate(latestAppt.date)}{latestAppt.apptTime ? ` · ${latestAppt.apptTime}` : ""}</span> : null}</Fact>
+                  {latestAppt ? (
+                    <>
+                      <Fact label="Status">{latestAppt.status}</Fact>
+                      <Fact label="Update status">
+                        <span className="inline-flex items-center gap-1.5 font-semibold" data-lead-update={latestAppt.update}>
+                          <span aria-hidden className="size-2 rounded-full" style={{ background: statusColor(latestAppt.update) }} />{latestAppt.updateLabel}
+                        </span>
+                      </Fact>
+                      {latestAppt.update === "no_status" ? (
+                        <p className={cn("text-xs", overdue(latestAppt.update, latestAppt.dueOn, today) ? "font-semibold text-rose-400" : "text-muted-foreground")}>
+                          {overdue(latestAppt.update, latestAppt.dueOn, today) ? `Overdue: was due ${shortDate(latestAppt.dueOn)}` : `Update it by ${shortDate(latestAppt.dueOn)}`}
+                        </p>
+                      ) : null}
+                      <UpdateStatus appt={{ ...latestAppt, co: lead.co }} carriers={carriers} />
+                    </>
+                  ) : null}
+                </div>
+              </Card>
+            ) : null}
             {calendar ? <ProjectCalendar projectId={r.project.id} initial={calendar} today={today} leadLinks /> : null}
           </div>
         </div>
@@ -608,6 +648,8 @@ export default async function LeadSheet({ params, searchParams }) {
         <Card className="overflow-hidden">
           <Tabs
             label="History"
+            // From an update's notification (?tab=updates): its history open.
+            initial={sp?.tab === "updates" && seesInternal ? "updates" : undefined}
             panelClassName="min-h-44"
             tabs={[
               {
@@ -679,6 +721,47 @@ export default async function LeadSheet({ params, searchParams }) {
                   <Empty icon={CalendarClock}>No appointments yet.</Empty>
                 ),
               },
+              // Every update the client made to its appointments (Sean, Oct 2026): what, when, by whom and why.
+              ...(seesInternal
+                ? [{
+                    id: "updates",
+                    label: "Appointment Updates",
+                    count: apptUpdates.length,
+                    content: apptUpdates.length ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[44rem] text-sm" data-appointment-updates>
+                          <thead><tr><th className={TH}>Updated</th><th className={TH}>Status</th><th className={TH}>Appointment</th><th className={TH}>Premium</th><th className={TH}>Notes</th><th className={TH}>By</th></tr></thead>
+                          <tbody className="divide-y divide-[var(--panel-border)]">
+                            {apptUpdates.map((u) => (
+                              <tr key={u.id} data-list-row data-update-row={u.id}>
+                                <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(u.at)}</td>
+                                <td className={TD}>
+                                  <span className="inline-flex items-center gap-1.5 font-semibold">
+                                    <span aria-hidden className="size-2 rounded-full" style={{ background: statusColor(u.status) }} />{statusLabel(u.status)}
+                                  </span>
+                                  {u.previous ? <div className="text-xs text-muted-foreground">was {statusLabel(u.previous)}</div> : null}
+                                </td>
+                                <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{u.apptDate ? `${shortDate(u.apptDate)}${u.apptTime ? ` · ${u.apptTime}` : ""}` : "—"}</td>
+                                <td className={cn(TD, "tabular-nums")}>
+                                  {u.total != null ? (
+                                    <>
+                                      <strong>{money(u.total)}</strong> written
+                                      {(u.lines ?? []).map((l) => <div key={l.line} className="text-xs text-muted-foreground">{lineLabel(l.line)} {money(l.premium)} · {l.carrier}</div>)}
+                                    </>
+                                  ) : u.potential != null ? <>{money(u.potential)} potential</> : "—"}
+                                </td>
+                                <td className={cn(TD, "max-w-80 whitespace-pre-line break-words")}>{u.note ?? <span className="text-muted-foreground">—</span>}</td>
+                                <td className={cn(TD, "text-muted-foreground")}>{u.by}{u.byClient ? " (client)" : ""}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <Empty icon={CalendarClock}>The client has not updated this lead&apos;s appointments yet.</Empty>
+                    ),
+                  }]
+                : []),
               ...(staff
                 ? [{
                     id: "deliveries",

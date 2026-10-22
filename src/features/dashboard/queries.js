@@ -506,21 +506,34 @@ export async function getClientPipeline({ months = 3, companyId = null } = {}) {
  * written this year, in the pipe, their goal for the year, the close ratio, and the premium written
  * month by month. `companyId`: one client's (an administrator); else the client's own.
  */
-export async function getClientSales({ companyId = null } = {}) {
+export async function getClientSales({ companyId = null, projectId = null } = {}) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("client_sales", { p_company_id: companyId });
+  const [{ data, error }, projects] = await Promise.all([
+    supabase.rpc("client_sales", { p_company_id: companyId, p_project_id: projectId ? Number(projectId) : null }),
+    // Its projects, to show one at a time (a client's own, by Row Level Security).
+    (companyId ? supabase.from("projects").select("id, name, start_date").eq("company_id", companyId)
+      : supabase.from("projects").select("id, name, start_date"))
+      .is("deleted_at", null).order("name").limit(500),
+  ]);
   if (error) throw error;
+  if (projects.error) throw projects.error;
   const sold = Number(data?.sold ?? 0);
   const considered = Number(data?.considered ?? 0);
   return {
     year: Number(data?.year ?? new Date().getFullYear()),
+    // The twelve months shown: from the campaign's start month (the project's start date).
+    start: data?.start ?? null,
+    started: data?.started ?? null,
+    current: data?.current == null ? null : Number(data.current),
     written: Number(data?.written ?? 0),
     pipe: Number(data?.pipe ?? 0),
     goal: data?.goal == null ? null : Number(data.goal),
     sold,
     considered,
     closeRatio: considered ? Math.round((sold / considered) * 1000) / 10 : 0,
-    months: (data?.months ?? []).map((m) => ({ month: Number(m.month), label: m.label, written: Number(m.written) })),
+    months: (data?.months ?? []).map((m) => ({ month: Number(m.month), key: m.key, label: m.label, written: Number(m.written) })),
+    projects: (projects.data ?? []).map((p) => ({ id: p.id, name: p.name, start: p.start_date })),
+    projectId: projectId ? Number(projectId) : null,
   };
 }
 

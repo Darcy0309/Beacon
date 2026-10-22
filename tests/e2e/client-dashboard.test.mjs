@@ -46,9 +46,9 @@ sql(`update public.leads set result_id = ${resultNamed("Appointment")} where id 
 sql(`update public.leads set result_id = ${resultNamed("Appointment-Invalid")} where id = ${ids[3]}`);
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${ids[4]}, '${month(1)}'), (${ids[5]}, '${month(1)}'), (${ids[6]}, '${month(2)}'),
   (${lastId}, '${month(1)}'), (${ids[0]}, '${month(1)}')`);
-// Three appointments set, as the client sees them (through QA): one quoting, one sold.
-// The quoting one quoted at $50,000; the sold one written at $30,000, this month.
-for (const [i, result, quoted, written] of [[0, null, null, null], [1, "quoting", 50000, null], [2, "sold", 32000, 30000]]) {
+// Three appointments set, as the client sees them (through QA): one still to come, one Valid-Quoting, one sold.
+// The quoting one with a potential premium of $50,000; the sold one written at $30,000, this month.
+for (const [i, result, quoted, written] of [[0, null, null, null], [1, "valid_quoting", 50000, null], [2, "sold", 32000, 30000]]) {
   sql(`insert into public.appointments (lead_id, project_id, appt_date, appt_time, qa_status, client_result, quoted_premium, written_premium, client_result_at)
     values (${ids[i]}, ${P1}, current_date + 3, '10:00 AM', 'passed', ${result ? lit(result) : "null"}, ${quoted ?? "null"}, ${written ?? "null"}, ${result ? "now()" : "null"})`);
 }
@@ -85,9 +85,10 @@ try {
 
   section("Appointment Results");
   const results = await client.ev(`Object.fromEntries([...document.querySelectorAll('[data-client-result]')].map((r) => [r.dataset.clientResult, r.innerText.replace(/\\s+/g, ' ')]))`);
-  check("each outcome with its count, Pending until the client updates it; Invalid for an Appointment-Invalid name",
-    /Pending 1/.test(results.pending) && /Quoting 1/.test(results.quoting) && /Sold Account 1/.test(results.sold)
-    && /Quoted-Not Sold 0/.test(results.quoted_not_sold) && /Valid-Not Quoting 0/.test(results.valid_not_quoting) && /Invalid Appointment 1/.test(results.invalid), JSON.stringify(results));
+  check("each status with its count, Pending Appointment while still to come; Invalid for an Appointment-Invalid name",
+    /Pending Appointment 1/.test(results.pending_appointment) && /Valid-Quoting 1/.test(results.valid_quoting) && /Sold Account 1/.test(results.sold)
+    && /Quoted-Not Sold 0/.test(results.quoted_not_sold) && /Valid-Not Quoting 0/.test(results.valid_not_quoting) && /Invalid 1/.test(results.invalid)
+    && /No Status 0/.test(results.no_status), JSON.stringify(results));
 
   section("Upcoming Pipeline");
   const months = () => client.ev(`[...document.querySelectorAll('[data-pipeline-month]')].map((m) => m.innerText.replace(/\\s+/g, ' '))`);
@@ -100,8 +101,8 @@ try {
   section("Row two: the Sale Pipeline");
   await client.go("/", 4000);
   const stat = (k) => client.ev(`document.querySelector('[data-sale-stat="${k}"]')?.innerText.replace(/\\s+/g, ' ')`);
-  check("premium written this year, in the pipe, and the close ratio (sold of pending, quoting, quoted-not sold and sold)",
-    /\$30,000/.test((await stat("written")) ?? "") && /\$50,000/.test((await stat("pipe")) ?? "") && /33\.3%/.test((await stat("close")) ?? "") && /1 sold of 3/.test((await stat("close")) ?? ""),
+  check("premium written, in the pipe (potential, Valid-Quoting), and the close ratio (sold of the valid appointments)",
+    /\$30,000/.test((await stat("written")) ?? "") && /\$50,000/.test((await stat("pipe")) ?? "") && /50%/.test((await stat("close")) ?? "") && /1 sold of 2/.test((await stat("close")) ?? ""),
     JSON.stringify([await stat("written"), await stat("pipe"), await stat("close")]));
   check("…drawn like a ticker", Boolean(await client.ev("!!document.querySelector('[data-sale-pipeline] [data-ticker]')")));
   check("…the goal not set yet", /Not set/.test((await stat("goal")) ?? ""), await stat("goal"));

@@ -1,3 +1,4 @@
+import { UPDATE_STATUSES } from "@/lib/appointment-updates";
 import { CalendarCheck, ClipboardList, Target, TrendingUp } from "lucide-react";
 import { addDays, addMonths } from "@/lib/dates";
 
@@ -25,13 +26,11 @@ export function clientPeriodFrom(key, today) {
 }
 
 /** The outcomes a client records on an appointment, in Sean's order. */
+// How their appointments went, in the statuses they give them (Appointments › Update status):
+// still to come first, then the ones gone by with no status yet.
 export const CLIENT_RESULTS = [
-  ["pending", "Pending", "var(--muted-foreground)"],
-  ["quoting", "Quoting", "var(--neon-blue)"],
-  ["quoted_not_sold", "Quoted-Not Sold", "var(--neon-amber)"],
-  ["valid_not_quoting", "Valid-Not Quoting", "var(--neon-violet)"],
-  ["invalid", "Invalid Appointment", "var(--neon-rose)"],
-  ["sold", "Sold Account", "var(--neon-emerald)"],
+  ...UPDATE_STATUSES.filter(([k]) => k === "pending_appointment"),
+  ...UPDATE_STATUSES.filter(([k]) => k !== "pending_appointment"),
 ];
 
 /** Tile 1: the leads developed for them (never the names still to call), and each DB dev project's. */

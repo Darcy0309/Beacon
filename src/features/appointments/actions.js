@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { check, currentAppUser, fail, idFrom, n, ok, removeRecord, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { cross, schemas } from "@/lib/validate";
+import { STATUS_KEYS, parseAmount, soldLines } from "@/lib/appointment-updates";
 
 export async function createAppointment(prevState, formData) {
   const { values, failed } = check(formData, schemas.appointment, cross.appointment);
@@ -106,4 +107,48 @@ export async function deleteAppointment(formData) {
   revalidatePath("/appointments");
   revalidatePath("/calendar");
   return ok({ id });
+}
+
+/**
+ * A client's update to an appointment (Sean, Oct 2026): its status, a note,
+ * the potential premium while Valid-Quoting, and for Sold Account each
+ * policy line's premium and carrier (`lines`: JSON from the form). The
+ * database checks it is theirs, keeps the update and tells the
+ * administrators and the manager who set it.
+ */
+export async function updateAppointmentStatus(prevState, formData) {
+  const id = idFrom(formData, "appointment_id");
+  if (!id) return fail("Missing appointment.");
+  const status = s(formData, "status");
+  if (!STATUS_KEYS.includes(status ?? "")) return fail("Choose how the appointment went", { status: "Choose one" });
+  const note = s(formData, "note");
+  if ((note ?? "").length > 2000) return fail("Keep the note under 2,000 characters", { note: "Under 2,000 characters" });
+  let potential = null;
+  let lines = null;
+  if (status === "valid_quoting") {
+    potential = parseAmount(s(formData, "potential_premium"));
+    if (Number.isNaN(potential)) return fail("Enter the potential premium as an amount", { potential_premium: "An amount, like 12,500" });
+  }
+  if (status === "sold") {
+    let boxes = {};
+    try {
+      boxes = JSON.parse(String(formData.get("lines") ?? "{}"));
+    } catch {
+      return fail("Enter the premium on each policy line sold");
+    }
+    const sold = soldLines(boxes);
+    if (sold.error) return fail(sold.error, { lines: sold.error });
+    lines = sold.lines;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("update_appointment_status", {
+    p_appointment_id: id, p_status: status, p_note: note, p_potential_premium: potential, p_sold_lines: lines,
+  });
+  if (error) return fail(error);
+  const leadId = idFrom(formData, "lead_id");
+  revalidatePath("/appointments");
+  revalidatePath("/");
+  if (leadId) revalidatePath(`/leads/${leadId}`);
+  return ok(data);
 }
