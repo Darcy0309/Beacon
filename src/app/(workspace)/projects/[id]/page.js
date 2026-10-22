@@ -12,7 +12,7 @@ import ProjectForm from "@/features/projects/components/project-form";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import ProjectTeam from "@/features/projects/components/project-team";
 import ProjectGoals from "@/features/projects/components/project-goals";
-import { goalProgress, projectDays } from "@/lib/project-goals";
+import { projectDays, projectGoals } from "@/lib/project-goals";
 import XdateMonths from "@/features/reports/components/xdate-months";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { clientSlug } from "@/lib/format";
 import { pageInfo, readListParams } from "@/lib/paging";
 import { listLeads } from "@/features/leads/queries";
-import { getProject, getProjectOverview, getProjectTeam, getOfficeOptions } from "@/features/projects/queries";
+import { getProject, getProjectMonthCounts, getProjectOverview, getProjectTeam, getOfficeOptions } from "@/features/projects/queries";
 import { getXdatesByMonth } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
@@ -73,7 +73,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getBlockedDays({ projectIds: scope?.ids ?? [pid], from: span(today).first, to: span(today).last }),
   ]));
 
-  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked]] = await Promise.all([
+  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked], monthCounts] = await Promise.all([
     meP,
     getProject(id),
     getProjectOverview(id),
@@ -91,6 +91,8 @@ export default async function ProjectDetail({ params, searchParams }) {
     getResultBreakdown(pid),
     scopeP,
     daysP,
+    // This month's, for a goal a month (managers and administrators read it).
+    meP.then((me) => (role(me).canManage ? getProjectMonthCounts([pid]) : {})),
   ]);
   if (!p) notFound();
   const { admin, canManage } = role(me);
@@ -130,8 +132,7 @@ export default async function ProjectDetail({ params, searchParams }) {
 
   // Its goals for its dates: leads developed and appointments set, against what it has done (lead_stats()).
   const goalDays = projectDays({ start: raw.start_date, end: raw.end_date, today });
-  const leadGoal = goalProgress({ goal: raw.lead_goal, done: s.leads, share: goalDays.share });
-  const apptGoal = goalProgress({ goal: raw.appt_goal, done: s.appointments, share: goalDays.share });
+  const { leads: leadGoal, appts: apptGoal } = projectGoals({ raw, done: s, month: canManage ? monthCounts[p.id] ?? { leads: 0, appointments: 0 } : null, days: goalDays });
 
   const xdateHref = (m, b) => `/reports/x-dates?project=${p.id}&month=${m}${b ? `&bucket=${b}` : ""}#names`;
   const rates = { id: p.id, name: p.name, lead: Number(raw.lead_rate ?? 0), appointment: Number(raw.appointment_rate ?? 0), confirmation: Number(raw.confirmation_rate ?? 0) };
@@ -154,6 +155,7 @@ export default async function ProjectDetail({ params, searchParams }) {
                   <p className="text-sm text-muted-foreground">
                     <Link href={`/clients/${clientSlug(p.client)}`} className="transition-colors hover:text-primary hover:underline">{p.client}</Link>
                     {team.length ? ` · ${team.map((r) => r.short).join(", ")}` : " · nobody assigned"}
+                    {p.salesRep ? <span data-project-sales-rep> · Sales Rep {p.salesRep}</span> : null}
                   </p>
                 </div>
               </div>

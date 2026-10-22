@@ -31,13 +31,27 @@ export async function saveCompany(prevState, formData) {
     subscription_end: s(formData, "subscription_end"),
     // The carrier group it belongs to (an insurance company), or none.
     agency_group_id: n(formData, "agency_group_id"),
+    // Who owns it (Sean, Oct 2026), and so all its projects.
+    sales_rep_id: n(formData, "sales_rep_id"),
   };
   // A state as its two letters ("az" -> "AZ").
   if (payload.state) payload.state = payload.state.toUpperCase();
-  const { error } = id
-    ? await supabase.from("companies").update(payload).eq("id", id)
-    : await supabase.from("companies").insert(payload);
+  const { data: saved, error } = id
+    ? await supabase.from("companies").update(payload).eq("id", id).select("id").maybeSingle()
+    : await supabase.from("companies").insert(payload).select("id").maybeSingle();
   if (error) return fail(error, null, values);
+
+  // Who hears about it (Sean, Oct 2026): the people ticked, each by notification or by email too.
+  if (saved?.id && formData.get("watchers_shown") === "1") {
+    const watchers = formData.getAll("watch").map(Number).filter((v) => Number.isInteger(v) && v > 0)
+      .map((userId) => ({ company_id: saved.id, user_id: userId, by_email: formData.get(`watch_by_${userId}`) === "email" }));
+    const { error: clearError } = await supabase.from("client_watchers").delete().eq("company_id", saved.id);
+    if (clearError) return fail(clearError, null, values);
+    if (watchers.length) {
+      const { error: watchError } = await supabase.from("client_watchers").insert(watchers);
+      if (watchError) return fail(watchError, null, values);
+    }
+  }
 
   await logActivity(supabase, id ? "company.update" : "company.create", { entity: "company", entityId: id ?? null, detail: payload.name });
   // New clients are offered on Projects and Users & Access too.

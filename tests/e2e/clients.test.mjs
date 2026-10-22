@@ -104,11 +104,11 @@ try {
   section("The Clients page: clients in rows");
   await admin.go("/clients", 5000);
   const heads = await until(() => admin.ev(`[...document.querySelectorAll('thead th')].map((h) => h.textContent.trim())`).then((h) => h.length && h));
-  check("a table: client, contact, state, time zone, start date, end date, status", JSON.stringify(heads) === JSON.stringify(["Client", "Contact", "State", "Time zone", "Start date", "End date", "Status"]), JSON.stringify(heads));
+  check("a table: client, contact, state, time zone, start date, end date, Sales Rep, status", JSON.stringify(heads) === JSON.stringify(["Client", "Contact", "State", "Time zone", "Start date", "End date", "Sales Rep", "Status"]), JSON.stringify(heads));
   const rowOf = (name) => admin.ev(`(() => { const r = [...document.querySelectorAll('tr[data-client-row]')].find((x) => x.querySelector('[data-client-link]')?.textContent === ${JSON.stringify(name)}); return r ? [...r.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()) : null; })()`);
   const myRow = await rowOf(NAME);
   check("the client's row has them all, its agency group under its name", myRow?.[1] === "Bret Godsey" && myRow[2] === "AZ" && myRow[3] === "MST" && myRow[4] === "Jan 26, 2026" && myRow[5] === "Dec 31, 2026"
-    && /^active$/i.test(myRow[6]) && myRow[0].includes(NAME) && myRow[0].includes(GROUP), JSON.stringify(myRow));
+    && myRow[6] === "—" && /^active$/i.test(myRow[7]) && myRow[0].includes(NAME) && myRow[0].includes(GROUP), JSON.stringify(myRow));
   const names = () => admin.ev(`[...document.querySelectorAll('tr[data-client-row] [data-client-link]')].map((a) => a.textContent)`);
   const pick = (label, value) => admin.ev(`(() => { const sel = document.querySelector('select[aria-label="Filter by ${label}"]'); if (!sel) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, ${JSON.stringify(value)}); sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
   check("it filters by agency group", (await pick("Agency group", GROUP)) && Boolean(await until(async () => { const n = await names(); return n.includes(NAME) && !n.includes(`${NAME} Elsewhere`); })), JSON.stringify(await names()));

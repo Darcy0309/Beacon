@@ -46,6 +46,8 @@ export default function ProjectForm({ project, options, trigger }) {
         end_date: project.end_date ?? "",
         lead_goal: project.lead_goal ?? "",
         appt_goal: project.appt_goal ?? "",
+        lead_goal_month: project.lead_goal_month ?? "",
+        appt_goal_month: project.appt_goal_month ?? "",
       }
     : null;
   const { fe, invalid, dv } = formHelpers(state, record);
@@ -186,10 +188,16 @@ export default function ProjectForm({ project, options, trigger }) {
             <Field label="End date" error={fe("end_date")}>
               <DatePicker name="end_date" defaultValue={dv("end_date")} invalid={invalid("end_date")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
             </Field>
-            <Field label="Lead goal" error={fe("lead_goal")} hint="Leads to develop between the dates">
+            <Field label="Leads per month" error={fe("lead_goal_month")} hint="The client's goal each month">
+              <Input name="lead_goal_month" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("lead_goal_month")} aria-invalid={invalid("lead_goal_month")} data-lead-goal-month />
+            </Field>
+            <Field label="Appointments per month" error={fe("appt_goal_month")} hint="e.g. 5 a month is 60 a year">
+              <Input name="appt_goal_month" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("appt_goal_month")} aria-invalid={invalid("appt_goal_month")} data-appt-goal-month />
+            </Field>
+            <Field label="Lead goal (total)" error={fe("lead_goal")} hint="Leave empty: per month × the project's months">
               <Input name="lead_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("lead_goal")} aria-invalid={invalid("lead_goal")} data-lead-goal />
             </Field>
-            <Field label="Appointment goal" error={fe("appt_goal")} hint="Appointments to set between the dates">
+            <Field label="Appointment goal (total)" error={fe("appt_goal")} hint="Leave empty: per month × the project's months">
               <Input name="appt_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("appt_goal")} aria-invalid={invalid("appt_goal")} data-appt-goal />
             </Field>
 

@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { clientSlug, mediumDate } from "@/lib/format";
 import { getClientBySlug, getAgencyGroups, getTimeZones } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
+import { getSalesReps } from "@/features/users/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getAppointmentDays, getBlockedDays, getLeadStats } from "@/features/stats/queries";
 import CalendarTile from "@/features/stats/components/calendar-tile";
@@ -43,7 +44,7 @@ export default async function ClientProfile({ params, searchParams }) {
   const { slug } = await params;
   const sp = await searchParams;
   const up = pipelineMonths(sp?.up);
-  const [c, projects, today, groups, zones] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups(), getTimeZones()]);
+  const [c, projects, today, groups, zones, reps] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups(), getTimeZones(), getSalesReps()]);
   if (!c) notFound();
 
   const clientProjects = projects.filter((p) => p.clientId === c.id);
@@ -107,10 +108,11 @@ export default async function ClientProfile({ params, searchParams }) {
                 <ToneBadge tone={{ Active: "emerald", Paused: "amber", Completed: "sky" }[c.status] ?? "slate"}>{c.status}</ToneBadge>
                 {/* Its subscription near its end, or past it (the old client bulletin's warning). */}
                 {notice ? <span data-subscription-notice><ToneBadge tone={notice.ended ? "rose" : "amber"}>Subscription {notice.text}</ToneBadge></span> : null}
-                <ClientForm client={c.raw} groups={groups} zones={zones} />
+                <ClientForm client={c.raw} groups={groups} zones={zones} reps={reps} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 pt-5 sm:grid-cols-3">
+              <Field label="Sales Rep">{c.salesRep ? <span data-client-sales-rep>{c.salesRep}</span> : null}</Field>
               <Field label="Account manager">{c.manager}</Field>
               <Field label="Primary contact">{c.contact}</Field>
               <Field label="Agency group"><span data-agency-group>{c.group}</span></Field>

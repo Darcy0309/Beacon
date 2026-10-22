@@ -127,6 +127,19 @@ try {
   await admin.click("button", "Edit");
   check("the project form takes the goals, as saved", Boolean(await when(admin, "document.querySelector('input[name=lead_goal]')?.value === '40' && document.querySelector('input[name=appt_goal]')?.value === '10'")));
   await admin.ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), true");
+  // A goal a month (Sean, Oct 2026): the average a month against it, and this month so far; and the
+  // overall goal from it when none is set (a 30-day project: one month, so 5).
+  sql(`update public.projects set lead_goal_month = 5 where id = ${P}`);
+  await admin.go(`/projects/${P}`, 5000);
+  const monthly = (await when(admin, "document.querySelector('[data-goal=\"Leads\"] [data-goal-month]')?.innerText.replace(/\\s+/g, ' ')")) ?? "";
+  check("a goal a month: the average a month against it, and this month so far", /Avg 2 a month · goal 5 · behind/.test(monthly) && /This month 0 of 5/.test(monthly), monthly);
+  sql(`update public.projects set lead_goal = null where id = ${P}`);
+  await admin.go(`/projects/${P}`, 5000);
+  check("…the overall goal from it when none is set", /Leads 2 of 5/.test((await when(admin, "document.querySelector('[data-project-goals]')?.innerText.replace(/\\s+/g, ' ')")) ?? ""));
+  sql(`update public.projects set lead_goal = 40, lead_goal_month = null where id = ${P}`);
+  // A month's bar on X-Dates by Month, from the project: back to it (Sean, Oct 2026).
+  await admin.go(`/reports/x-dates?project=${P}&month=1#names`, 5000);
+  check("X-Dates by Month, opened from a project, goes back to it", (await when(admin, "document.querySelector('[data-back-to-project]')?.getAttribute('href')")) === `/projects/${P}`);
   await admin.go("/reports/goals", 5000);
   const row = (await when(admin, `document.querySelector('[data-goal-row="${P}"]')?.innerText.replace(/\\s+/g, ' ')`)) ?? "";
   check("Project Goals lists it, behind pace", /Behind/.test(row) && /38 still owed/.test(row) && /20 days to go/.test(row), row);

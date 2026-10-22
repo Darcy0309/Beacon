@@ -29,6 +29,8 @@ export async function saveProject(prevState, formData) {
     // Its goals for those dates (the old project questionnaire's lead and appointment goals).
     lead_goal: n(formData, "lead_goal"),
     appt_goal: n(formData, "appt_goal"),
+    lead_goal_month: n(formData, "lead_goal_month"),
+    appt_goal_month: n(formData, "appt_goal_month"),
     amount_paid: n(formData, "amount_paid"),
     email: s(formData, "email"),
     // A checkbox sends nothing when unticked; the hidden "off" before it always does.

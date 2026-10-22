@@ -27,7 +27,8 @@ export const CLIENT_STATUS = { active: "Active", paused: "Paused", completed: "C
 export async function getClients() {
   const supabase = await createClient();
   const [{ data, error }, roll] = await Promise.all([
-    supabase.from("companies").select("*, group:agencies(id, name), zone:timezones(id, name)").order("name"),
+    supabase.from("companies").select(`*, group:agencies(id, name), zone:timezones(id, name),
+      sales_rep:users!companies_sales_rep_id_fkey(id, first_name, last_name), watchers:client_watchers(user_id, by_email)`).order("name"),
     companyRollups(supabase),
   ]);
   if (error) throw error;
@@ -59,8 +60,12 @@ export async function getClients() {
     // The carrier group it belongs to, if any (an insurance company from the list).
     groupId: one(c.group)?.id ?? null,
     group: one(c.group)?.name ?? null,
+    // Who owns it (Sean, Oct 2026): its Sales Rep, an administrator or manager; and who hears about it.
+    salesRepId: one(c.sales_rep)?.id ?? null,
+    salesRep: one(c.sales_rep) ? shortName(one(c.sales_rep)) : null,
     // As saved, for the edit form.
-    raw: { ...c, group: undefined, zone: undefined, status: c.status === "inactive" ? "paused" : c.status },
+    raw: { ...c, group: undefined, zone: undefined, sales_rep: undefined, watchers: (c.watchers ?? []).map((w) => ({ id: w.user_id, email: w.by_email })),
+      status: c.status === "inactive" ? "paused" : c.status },
   }));
 }
 

@@ -273,6 +273,9 @@ export const schemas = {
     // What it is to deliver between those dates: leads (developed) and appointments.
     lead_goal: [int({ min: 0, max: 1000000 })],
     appt_goal: [int({ min: 0, max: 1000000 })],
+    // …and a month (Sean, Oct 2026): the overall goal follows from it when none is given.
+    lead_goal_month: [int({ min: 0, max: 100000 })],
+    appt_goal_month: [int({ min: 0, max: 100000 })],
     // Lead delivery: addresses separated by commas (a leading "_" sends that one a link).
     email: [max(500), rules.custom((v) => {
       const { bad } = parseDeliveryAddresses(v);
@@ -601,6 +604,8 @@ export const schemas = {
     timezone_id: [id],
     subscription_start: [date],
     subscription_end: [date],
+    // Its Sales Rep: an administrator or manager.
+    sales_rep_id: [id],
   },
 };
 

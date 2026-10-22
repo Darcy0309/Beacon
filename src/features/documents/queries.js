@@ -17,7 +17,8 @@ export async function listDocuments(params) {
         paged(
           supabase
             .from("documents")
-            .select(`*, company:companies${inner(Boolean(p.filters?.client))}(name), project:projects(name)`, { count: "exact" })
+            .select(`*, company:companies${inner(Boolean(p.filters?.client))}(name), project:projects(name, contact_name),
+              lead:leads(id, company_name, producer_name)`, { count: "exact" })
             .order("created_at", { ascending: false })
             .order("id", { ascending: false }),
           p,
@@ -37,6 +38,12 @@ export async function listDocuments(params) {
       name: d.name,
       type: d.file_type ?? "—",
       client: one(d.company)?.name ?? "—",
+      // What it is attached to (Sean, Oct 2026): the business (its lead), the project and the project's agent
+      // (the lead's own producer when an import gave one, else the project's, as the lead sheet says).
+      leadId: one(d.lead)?.id ?? null,
+      business: one(d.lead)?.company_name ?? null,
+      project: one(d.project)?.name ?? null,
+      agent: one(d.lead)?.producer_name || one(d.project)?.contact_name || null,
       size: fileSize(d.size_bytes),
       date: shortDate(d.created_at),
       // A file kept with a lead (its Policy Files) opens; an older record has no file to open.

@@ -1,5 +1,5 @@
 import Link from "@/components/shared/intent-link";
-import { CalendarSearch, ListChecks, X } from "lucide-react";
+import { ArrowLeft, CalendarSearch, ListChecks, X } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
@@ -65,6 +65,13 @@ export default async function XdatesReport({ searchParams }) {
     <>
       <Topbar title="X-Dates by Month" sub={scope} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
+        {/* Opened from a project (its X-Dates by Month, a month's bar): back to it (Sean, Oct 2026). */}
+        {project ? (
+          <Link href={`/projects/${project.id}`} data-back-to-project
+            className="back-link inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
+            <ArrowLeft className="size-3.5" /> Back to project
+          </Link>
+        ) : null}
         <Card>
           <SectionHeader label="Renewals by Month" icon={CalendarSearch} />
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-[var(--panel-border)] px-5 py-3">

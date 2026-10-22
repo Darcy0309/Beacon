@@ -21,7 +21,8 @@ const TYPES = [{ value: "lead", label: "Leads" }, { value: "appointment", label:
  *
  *   rows       getClientActivity()
  *   range      { from, to } shown; `custom` when chosen
- *   projects   [{ id, name }] theirs, for the filter
+ *   projects   [{ id, name }] theirs as campaigns (a DB dev project and the appointment
+ *              project it promotes to, together), for the filter
  *   chosen     { project, type } from the address
  *   params     the dashboard's other params, kept by the date form
  */

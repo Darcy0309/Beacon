@@ -61,6 +61,8 @@ sql(`insert into public.pay_events (user_id, project_id, lead_id, kind, amount, 
   (${SEAN}, ${P1}, ${ids[0]}, 'lead', 12, now() - interval '1 hour'),
   (${SEAN}, ${P2}, ${ids[6]}, 'lead', 12, now() - interval '10 days')`);
 sql(`insert into public.pay_events (user_id, project_id, lead_id, appointment_id, kind, amount) values (${SEAN}, ${P1}, ${ids[2]}, ${apptId}, 'appointment', 40)`);
+// And a lead developed on the DB dev list itself, three weeks back (Recent Activity by campaign).
+sql(`insert into public.pay_events (user_id, project_id, lead_id, kind, amount, created_at) values (${SEAN}, ${DBDV}, ${ids[3]}, 'lead', 12, now() - interval '20 days')`);
 sql(`insert into public.lead_notes (lead_id, notes) values (${ids[2]}, ${lit(`${TAG} INTERNAL call after 3pm`)})`);
 sql(`update public.leads set client_note = ${lit(`${TAG} owner prefers mornings`)} where id = ${ids[2]}`);
 
@@ -135,11 +137,15 @@ try {
   check("…and nothing else under row two", !(await client.ev("!!document.querySelector('[data-months-chart]')")) && !/Delivery by Campaign|Leads by Call Result/i.test(await client.text()));
   const lastMonth = sql("select (current_date - 30)::text");
   await client.go(`/?af=${lastMonth}&ato=${sql("select current_date::text")}`, 4000);
-  check("a wider range takes in the older lead", (await rows()).length === 3, JSON.stringify(await rows()));
+  check("a wider range takes in the older leads", (await rows()).length === 4, JSON.stringify(await rows()));
   await client.go(`/?af=${lastMonth}&ato=${sql("select current_date::text")}&at=appointment`, 4000);
   check("…by type: appointments only", (await rows()).length === 1, JSON.stringify(await rows()));
   await client.go(`/?af=${lastMonth}&ato=${sql("select current_date::text")}&ap=${P2}`, 4000);
   check("…by project", (await rows()).length === 1 && /Contractors/.test((await rows())[0]), JSON.stringify(await rows()));
+  // By campaign (Sean, Oct 2026): the DB dev list and the appointment project it promotes to, as one.
+  await client.go(`/?af=${lastMonth}&ato=${sql("select current_date::text")}&ap=${P1}`, 4000);
+  const both = await rows();
+  check("…by campaign: the DB dev list's leads and the appointment project's together", both.length === 3 && both.some((r) => /Maricopa DBDev/.test(r)) && both.some((r) => /Appointment/.test(r)), JSON.stringify(both));
 
   section("A note to the manager who developed it");
   await client.go("/", 4000);

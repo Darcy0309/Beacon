@@ -14,6 +14,7 @@ import { chartRange } from "@/lib/production-chart";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getAgencyGroups, getClients, getClientsOverview, getTimeZones } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
+import { getSalesReps } from "@/features/users/queries";
 import TrendTile from "@/features/clients/components/trend-tile";
 import BreakdownTile from "@/features/clients/components/breakdown-tile";
 
@@ -41,7 +42,7 @@ export default async function ClientsPage({ searchParams }) {
   // ?lr= and ?ar=: the range of the Leads chart and of the Appointments chart (a month to begin with).
   const range = (v) => chartRange(typeof v === "string" && v !== "custom" ? v : "1M", today);
   const ranges = { leads: range(sp?.lr), appts: range(sp?.ar) };
-  const [clients, groups, zones, overview] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getClientsOverview(ranges)]);
+  const [clients, groups, zones, overview, reps] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getClientsOverview(ranges), getSalesReps()]);
 
   const active = clients.filter((c) => c.status === "Active");
   const paused = clients.filter((c) => c.status === "Paused").length;
@@ -83,22 +84,24 @@ export default async function ClientsPage({ searchParams }) {
         </div>
 
         <Card>
-          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} />} />
+          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} reps={reps} />} />
           <FilterTable
-            columns={["Client", "Contact", "State", "Time zone", "Start date", "End date", "Status"]}
+            columns={["Client", "Contact", "State", "Time zone", "Start date", "End date", "Sales Rep", "Status"]}
             filters={[
               { key: "status", label: "Status", kind: "chips" },
               { key: "state", label: "State", kind: "select" },
               { key: "zone", label: "Time zone", kind: "select" },
               { key: "group", label: "Agency group", kind: "select" },
               { key: "manager", label: "Account manager", kind: "select" },
+              // Who owns the client (Sean, Oct 2026).
+              { key: "rep", label: "Sales Rep", kind: "select" },
             ]}
             placeholder="Search clients, contacts, cities…"
             empty="No client accounts yet. Add the first with New client."
             rows={clients.map((c) => ({
               id: c.id,
-              search: [c.name, c.contact, c.city, c.state, c.zone, c.group, c.manager, c.email, c.phone].filter((v) => v && v !== "—").join(" "),
-              facets: { status: c.status, state: c.state ?? "", zone: c.zone ?? "", group: c.group ?? "", manager: c.manager },
+              search: [c.name, c.contact, c.city, c.state, c.zone, c.group, c.manager, c.salesRep, c.email, c.phone].filter((v) => v && v !== "—").join(" "),
+              facets: { status: c.status, state: c.state ?? "", zone: c.zone ?? "", group: c.group ?? "", manager: c.manager, rep: c.salesRep ?? "Not set" },
               node: (
                 <LinkRow href={`/clients/${clientSlug(c.name)}`} data-client-row={c.id}>
                   <TableCell>
@@ -115,6 +118,7 @@ export default async function ClientsPage({ searchParams }) {
                   <TableCell>{c.zone ?? "—"}</TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{c.start ?? "—"}</TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{c.end ?? "—"}</TableCell>
+                  <TableCell className={c.salesRep ? "whitespace-nowrap" : "text-muted-foreground"} data-sales-rep-cell>{c.salesRep ?? "—"}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[c.status] ?? "slate"}>{c.status}</ToneBadge></TableCell>
                 </LinkRow>
               ),

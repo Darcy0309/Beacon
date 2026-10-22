@@ -8,6 +8,7 @@ import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
+import Link from "@/components/shared/intent-link";
 import { listDocuments } from "@/features/documents/queries";
 import { getCurrentUser } from "@/lib/server/session";
 import { readListParams, pageInfo } from "@/lib/paging";
@@ -25,6 +26,9 @@ export default async function DocumentsPage({ searchParams }) {
   ]);
   // Clients can read their documents but not remove them (documents_write is staff only).
   const canDelete = ["admin", "manager", "agent"].includes(me?.role);
+  // A client's documents are all their own company's: no Client column for them.
+  const client = me?.role === "client";
+  const dash = <span className="text-muted-foreground">—</span>;
 
   // Tiles describe the whole library; the table shows one page of it.
   const byType = {};
@@ -55,10 +59,10 @@ export default async function DocumentsPage({ searchParams }) {
         <Card>
           <SectionHeader label="All Documents" icon={Files} />
           <FilterTable
-            columns={["Name", "Type", "Client", "Size", "Uploaded", { label: "Action", className: "text-right" }]}
+            columns={["Name", "Business", "Project", "Agent", "Type", ...(client ? [] : ["Client"]), "Size", "Uploaded", { label: "Action", className: "text-right" }]}
             filters={[
               { key: "type", label: "Type", options: types.map((t) => ({ value: t, label: t })) },
-              { key: "client", label: "Client", kind: "select", options: clientNames.map((c) => ({ value: c, label: c })) },
+              ...(client ? [] : [{ key: "client", label: "Client", kind: "select", options: clientNames.map((c) => ({ value: c, label: c })) }]),
             ]}
             placeholder="Search documents…"
             empty="No documents yet."
@@ -82,8 +86,14 @@ export default async function DocumentsPage({ searchParams }) {
                         )}
                       </div>
                     </TableCell>
+                    {/* What it is attached to: the business (opening its lead sheet), the project and its agent. */}
+                    <TableCell data-document-business>
+                      {d.leadId ? <Link href={`/leads/${d.leadId}`} className="font-medium hover:text-primary hover:underline">{d.business ?? "Lead"}</Link> : dash}
+                    </TableCell>
+                    <TableCell className="max-w-56 truncate" title={d.project ?? undefined} data-document-project>{d.project ?? dash}</TableCell>
+                    <TableCell data-document-agent>{d.agent ?? dash}</TableCell>
                     <TableCell><ToneBadge tone={typeTone[d.type] ?? "slate"}>{d.type}</ToneBadge></TableCell>
-                    <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>
+                    {client ? null : <TableCell className={d.client === "—" ? "text-muted-foreground" : ""}>{d.client}</TableCell>}
                     <TableCell className="tabular-nums text-muted-foreground">{d.size}</TableCell>
                     <TableCell className="text-muted-foreground">{d.date}</TableCell>
                     <TableCell className="text-right">

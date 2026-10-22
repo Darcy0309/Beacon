@@ -41,7 +41,7 @@ import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
-import { getClientActivity, getClientDashboard, getClientPipeline, getClientSales } from "@/features/dashboard/queries";
+import { getClientActivity, getClientCampaigns, getClientDashboard, getClientPipeline, getClientSales } from "@/features/dashboard/queries";
 import ClientActivity from "@/features/dashboard/components/client-activity";
 import SalePipeline from "@/features/dashboard/components/sale-pipeline";
 import { CLIENT_PERIODS, PIPELINE_PERIODS, appointmentsTile, clientPeriod, clientPeriodFrom, leadsTile, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
@@ -181,8 +181,9 @@ export default async function Dashboard({ searchParams }) {
     const custom = isIsoDate(sp?.af) && isIsoDate(sp?.ato);
     const to = custom && sp.ato <= t ? sp.ato : t;
     const from = custom ? (sp.af > to ? to : daysBetween(sp.af, to) > 366 ? addDays(to, -366) : sp.af) : addDays(t, -6);
-    return getClientActivity({ from, to, projectId: activityChosen.project, kind: activityChosen.type })
-      .then((rows) => ({ rows, range: { from, to, custom } }));
+    // Its project filter by campaign: a DB dev project and the appointment project it promotes to, together.
+    return Promise.all([getClientActivity({ from, to, projectId: activityChosen.project, kind: activityChosen.type }), getClientCampaigns()])
+      .then(([rows, campaigns]) => ({ rows, range: { from, to, custom }, campaigns }));
   }) : null;
   const clientScheduleP = client ? basics.then(([businessToday, , tz]) => {
     const cm = typeof sp?.cm === "string" && isIsoDate(`${sp.cm}-01`) ? `${sp.cm}-01` : monthStart(businessToday);
@@ -597,7 +598,7 @@ export default async function Dashboard({ searchParams }) {
 
         {client ? (
           // A client's only row under the second (Sean, Oct 2026): what was developed for them lately.
-          <ClientActivity rows={clientActivity.rows} range={clientActivity.range} projects={clientDash.projects}
+          <ClientActivity rows={clientActivity.rows} range={clientActivity.range} projects={clientActivity.campaigns}
             chosen={activityChosen} params={otherParams(sp)} timeZone={tz} />
         ) : (
         /* recent leads + the side panel this role gets */

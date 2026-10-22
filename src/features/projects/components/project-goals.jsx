@@ -29,6 +29,19 @@ export function GoalBar({ label, g, compact = false }) {
           ? g.extra ? `Goal met, ${g.extra.toLocaleString()} over` : "Goal met"
           : [`${g.owed.toLocaleString()} still owed`, g.status === "behind" ? `${(g.expected - g.done).toLocaleString()} behind pace` : g.status === "on pace" ? "on pace" : null].filter(Boolean).join(" · ")}
       </div>
+      {/* The goal a month (Sean, Oct 2026): the project's average a month against it, and this month so far. */}
+      {g.month ? (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs" data-goal-month={g.month.status ?? "none"}>
+          {g.month.avg != null ? (
+            <span style={{ color: TONE[g.month.status] }} className="font-semibold tabular-nums">
+              Avg {g.month.avg.toLocaleString()} a month · goal {g.month.perMonth.toLocaleString()}{g.month.status ? ` · ${g.month.status}` : ""}
+            </span>
+          ) : <span className="text-muted-foreground">Goal {g.month.perMonth.toLocaleString()} a month</span>}
+          {g.month.thisMonth != null ? (
+            <span className="tabular-nums text-muted-foreground">This month {g.month.thisMonth.toLocaleString()} of {g.month.perMonth.toLocaleString()}</span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

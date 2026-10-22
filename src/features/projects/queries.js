@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const projectSelect = ({ company = false, type = false, status = false } = {}) => `
   *,
-  company:companies${inner(company)}(id, name, group:agencies(id, name)),
+  company:companies${inner(company)}(id, name, group:agencies(id, name), sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name)),
   type:project_types${inner(type)}(id, code, description),
   status:project_statuses${inner(status)}(id, name),
   assignments:project_assignments(ae:users!project_assignments_ae_user_id_fkey(id, first_name, last_name, email)),
@@ -25,6 +25,8 @@ function toProjectView(p) {
     clientId: company?.id ?? null,
     // The carrier group its client belongs to, if any.
     group: one(company?.group)?.name ?? null,
+    // Its client's Sales Rep (Sean, Oct 2026): the client's, for every project of it.
+    salesRep: one(company?.sales_rep) ? shortName(one(company.sales_rep)) : null,
     type: one(p.type)?.code ?? "—",
     leads: p.leads?.[0]?.count ?? 0,
     status: one(p.status)?.name ?? "—",
@@ -193,4 +195,13 @@ export async function getOfficeOptions() {
   if (clients.error) throw clients.error;
   if (zones.error) throw zones.error;
   return { clientOffices: Object.fromEntries((clients.data ?? []).map((c) => [c.id, c])), timezones: zones.data ?? [] };
+}
+
+/** This month's leads and appointments developed on each project asked for: { [id]: { leads, appointments } }. */
+export async function getProjectMonthCounts(projectIds) {
+  if (!projectIds?.length) return {};
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("project_month_counts", { p_project_ids: projectIds.map(Number) });
+  if (error) throw error;
+  return Object.fromEntries((data ?? []).map((r) => [r.project_id, { leads: Number(r.leads) || 0, appointments: Number(r.appointments) || 0 }]));
 }

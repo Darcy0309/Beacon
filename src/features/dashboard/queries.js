@@ -1,6 +1,7 @@
 /** Dashboard tiles and the Reports page. */
 
 import "server-only";
+import { campaignsOf } from "@/lib/campaigns";
 import { shapeReps } from "@/features/users/queries";
 import { addDays, todayIn } from "@/lib/dates";
 import { appointmentKind, cityState, shortDate, splitTime, timeRank } from "@/lib/format";
@@ -553,4 +554,18 @@ export async function getClientActivity({ from, to, projectId = null, kind = nul
     company: r.company ?? "—", location: cityState(r), projectId: r.project_id, project: r.project ?? "—",
     agent: r.agent ?? "—", manager: r.manager ?? "—", managerId: r.manager_id ?? null, xdate: shortDate(r.xdate),
   }));
+}
+
+/**
+ * A client's projects as campaigns, for Recent Activity's project filter (Sean, Oct 2026): a DB dev
+ * project and the appointment project it promotes to as one, [{ id, name, projectIds }] (campaignsOf()).
+ * The caller's own (a client), or `companyId`'s.
+ */
+export async function getClientCampaigns({ companyId = null } = {}) {
+  const supabase = await createClient();
+  let q = supabase.from("projects").select("id, name, appt_project_id").is("deleted_at", null).order("name").limit(500);
+  if (companyId) q = q.eq("company_id", companyId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return campaignsOf((data ?? []).map((p) => ({ id: p.id, name: p.name, apptProjectId: p.appt_project_id })));
 }

@@ -25,14 +25,28 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * chosen from: the national carrier group it belongs to, for reports.
  * `zones`: the time zones ([{ id, name }]) it can be in. Its start and end
  * dates and its status (Active, Paused, Completed) show on the Clients list.
+ * `reps`: the administrators and managers ([{ id, name, role }]) who can be its
+ * Sales Rep (Sean, Oct 2026) and can hear about it: those ticked get the
+ * notifications about the client and its projects, by notification or by
+ * email too; with nobody ticked, its Sales Rep does.
  */
-export default function ClientForm({ client, groups = [], zones = [] }) {
+export default function ClientForm({ client, groups = [], zones = [], reps = [] }) {
   const isEdit = Boolean(client?.id);
   const router = useNavigationRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(saveCompany, EMPTY);
   const { fe, invalid, dv } = formHelpers(state, client ?? { status: "active" });
   const problem = state?.error && !state?.fieldErrors ? state.error : null;
+  // Who hears about it, as the form has it: { [userId]: "notification" | "email" }.
+  const saved = Object.fromEntries((client?.watchers ?? []).map((w) => [w.id, w.email ? "email" : "notification"]));
+  const [watch, setWatch] = useState(saved);
+  const [rep, setRep] = useState(String(client?.sales_rep_id ?? ""));
+  useEffect(() => {
+    if (!open) return;
+    setWatch(saved);
+    setRep(String(client?.sales_rep_id ?? ""));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nobody = Object.keys(watch).length === 0;
 
   useEffect(() => {
     if (!state?.ok) return;
@@ -112,6 +126,13 @@ export default function ClientForm({ client, groups = [], zones = [] }) {
             <Field label="End date" error={fe("subscription_end")}>
               <DatePicker name="subscription_end" defaultValue={dv("subscription_end")} invalid={invalid("subscription_end")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
             </Field>
+            {/* Who owns the client, and so all its projects (Sean, Oct 2026). */}
+            <Field label="Sales Rep" error={fe("sales_rep_id")} className="sm:col-span-2">
+              <Select name="sales_rep_id" value={rep} onChange={(e) => setRep(e.target.value)} aria-invalid={invalid("sales_rep_id")} data-sales-rep>
+                <option value="">Not set</option>
+                {reps.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.role}</option>)}
+              </Select>
+            </Field>
             <Field label="Status" error={fe("status")} className="sm:col-span-2">
               <Select name="status" defaultValue={dv("status", "active")}>
                 <option value="active">Active</option>
@@ -120,6 +141,42 @@ export default function ClientForm({ client, groups = [], zones = [] }) {
               </Select>
             </Field>
           </div>
+          {reps.length ? (
+            <fieldset className="rounded-lg border border-[var(--panel-border)] p-3" data-client-watchers>
+              <legend className="px-1 text-xs font-medium">Notifications about this client and its projects</legend>
+              <input type="hidden" name="watchers_shown" value="1" />
+              <p className="mb-2 text-xs text-muted-foreground">
+                {nobody ? "Nobody ticked: the Sales Rep gets them, as notifications." : "Those ticked get them: new appointments, the client's appointment updates, feedback and files they add."}
+              </p>
+              <ul className="space-y-1.5">
+                {reps.map((r) => {
+                  const on = r.id in watch;
+                  return (
+                    <li key={r.id} className="flex flex-wrap items-center justify-between gap-2" data-watcher={r.id}>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="watch" value={r.id} checked={on} className="size-4 accent-[var(--primary)]"
+                          onChange={(e) => setWatch((w) => {
+                            const next = { ...w };
+                            if (e.target.checked) next[r.id] = "notification";
+                            else delete next[r.id];
+                            return next;
+                          })} />
+                        {r.name}
+                        <span className="text-xs text-muted-foreground">{r.role}{String(r.id) === rep ? " · Sales Rep" : ""}</span>
+                      </label>
+                      {on ? (
+                        <Select name={`watch_by_${r.id}`} value={watch[r.id]} onChange={(e) => setWatch((w) => ({ ...w, [r.id]: e.target.value }))}
+                          className="h-8 w-auto text-xs" aria-label={`How ${r.name} hears of it`} data-watch-by={r.id}>
+                          <option value="notification">Notification</option>
+                          <option value="email">Notification + email</option>
+                        </Select>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </fieldset>
+          ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={pending}>{pending ? "Saving…" : isEdit ? "Save changes" : "Add client"}</Button>

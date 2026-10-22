@@ -7,10 +7,10 @@ import ParamSelect from "@/components/shared/param-select";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GoalBar } from "@/features/projects/components/project-goals";
-import { getProjects } from "@/features/projects/queries";
+import { getProjectMonthCounts, getProjects } from "@/features/projects/queries";
 import { getLeadStats } from "@/features/stats/queries";
 import { getBusinessToday } from "@/lib/server/business-day";
-import { goalProgress, projectDays } from "@/lib/project-goals";
+import { projectDays, projectGoals } from "@/lib/project-goals";
 import { shapeStats } from "@/lib/lead-stats";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,8 @@ export default async function GoalsReport({ searchParams }) {
   const sp = await searchParams;
   const show = SHOW.some(([k]) => k === sp?.show) ? sp.show : "open";
   const [projects, today] = await Promise.all([getProjects(), getBusinessToday()]);
-  const withGoals = projects.filter((p) => !p.raw.deleted_at && (p.raw.lead_goal || p.raw.appt_goal));
+  const withGoals = projects.filter((p) => !p.raw.deleted_at && (p.raw.lead_goal || p.raw.appt_goal || p.raw.lead_goal_month || p.raw.appt_goal_month));
+  const monthCounts = await getProjectMonthCounts(withGoals.map((p) => p.id));
   // Counted as on each project's page (lead_stats(), by client: one read for each client's projects).
   const counted = await Promise.all([
     ...[...new Set(withGoals.map((p) => p.clientId).filter(Boolean))].map((companyId) => getLeadStats({ companyId })),
@@ -40,11 +41,10 @@ export default async function GoalsReport({ searchParams }) {
     .map((p) => {
       const s = byProject[p.id] ?? shapeStats(null);
       const days = projectDays({ start: p.raw.start_date, end: p.raw.end_date, today });
-      const leads = goalProgress({ goal: p.raw.lead_goal, done: s.leads, share: days.share });
-      const appts = goalProgress({ goal: p.raw.appt_goal, done: s.appointments, share: days.share });
+      const { leads, appts } = projectGoals({ raw: p.raw, done: s, month: monthCounts[p.id] ?? { leads: 0, appointments: 0 }, days });
       // The project's standing: behind if either goal is, met when every goal it has is.
       const goals = [leads, appts].filter(Boolean);
-      const status = goals.some((g) => g.status === "behind") ? "behind"
+      const status = goals.some((g) => g.status === "behind" || g.month?.status === "behind") ? "behind"
         : goals.every((g) => g.status === "met") ? "met"
         : goals.some((g) => g.status === "on pace") ? "on pace" : null;
       return { p, days, leads, appts, status, owed: goals.reduce((n, g) => n + g.owed, 0) };
