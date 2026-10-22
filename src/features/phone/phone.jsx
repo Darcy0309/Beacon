@@ -548,8 +548,10 @@ export function PhoneProvider({ children, tracked = false }) {
         // The phone's window: over the page but not in its way (the page stays usable during a call), dragged
         // anywhere by any part of it that is not a button, docked above the phone button until it is.
         <div data-phone-window data-placed={placed ? "" : undefined}
-          className={cn("fixed z-40 print:hidden", !placed && "bottom-4 right-4")}
-          style={placed ? { left: pos.x, top: pos.y } : undefined}>
+          // Above an open dialog too (a call started from an appointment's window), and still pressable:
+          // an open dialog turns the page's pointer events off (dialog.jsx keeps it open for the phone).
+          className={cn("fixed z-[60] print:hidden", !placed && "bottom-4 right-4")}
+          style={{ pointerEvents: "auto", ...(placed ? { left: pos.x, top: pos.y } : {}) }}>
           {/* Made to look like a phone, so it stands out over the page (Sean, Oct 2026; globals.css): its side buttons. */}
           <span aria-hidden className="phone-side-key phone-side-key-left top-[5.5rem] h-7" />
           <span aria-hidden className="phone-side-key phone-side-key-left top-[8.75rem] h-12" />

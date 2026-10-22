@@ -78,6 +78,9 @@ const MOTION = {
  * blurred, 0 (clear) to 1 (the usual), and `veilBlur` how far it blurs at 1 (px); `side`: on a desktop, at the right
  * edge rather than the middle (Appearance, so the page shows beside it).
  */
+// Whether an event outside a dialog came from the phone's window, which floats over it.
+const onPhone = (e) => Boolean(e?.target?.closest?.("[data-phone-window]") || e?.detail?.originalEvent?.target?.closest?.("[data-phone-window]"));
+
 function DialogContent({ className, children, veil = 1, veilBlur = 3, side = false, ...props }) {
   const { open, setOpen } = useContext(DialogState);
   const reduced = useReducedMotion();
@@ -102,7 +105,11 @@ function DialogContent({ className, children, veil = 1, veilBlur = 3, side = fal
           {/* Centres the box on a desktop and seats it on the bottom edge on a
               phone; clicks pass through it to the overlay. */}
           <div className={cn("pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4", side && "sm:justify-end sm:pr-6")}>
-            <DialogPrimitive.Content forceMount asChild {...props}>
+            <DialogPrimitive.Content forceMount asChild {...props}
+              // The phone floats over a dialog (a call from an appointment's window): pressing it leaves the dialog open.
+              onPointerDownOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onPointerDownOutside?.(e))}
+              onInteractOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onInteractOutside?.(e))}
+              onFocusOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onFocusOutside?.(e))}>
               <motion.div
                 data-dialog-content
                 {...moves}
