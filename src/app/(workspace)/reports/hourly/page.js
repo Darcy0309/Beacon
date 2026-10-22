@@ -3,9 +3,9 @@ import Link from "@/components/shared/intent-link";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import ParamSelect from "@/components/shared/param-select";
-import DatePicker from "@/components/shared/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import HourlyDayPicker from "@/features/reports/components/hourly-day-picker";
 import { getHourlyProgress } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
@@ -64,11 +64,7 @@ export default async function HourlyProgress({ searchParams }) {
           <div className="space-y-5 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Button asChild size="icon" variant="outline"><Link href={link(addDays(day, -1))} aria-label="The day before"><ChevronLeft /></Link></Button>
-              <form method="get" action="/reports/hourly" className="flex items-center gap-2" data-hourly-day>
-                {canPick ? <input type="hidden" name="user" value={userId} /> : null}
-                <DatePicker name="day" defaultValue={day} max="today" aria-label="Day" className="w-44" />
-                <Button type="submit" size="sm" variant="outline">Show</Button>
-              </form>
+              <HourlyDayPicker day={day} today={today} />
               {day < today ? <Button asChild size="icon" variant="outline"><Link href={link(addDays(day, 1))} aria-label="The day after"><ChevronRight /></Link></Button> : null}
               {day !== today ? <Link href={link(today)} className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Today</Link> : null}
             </div>

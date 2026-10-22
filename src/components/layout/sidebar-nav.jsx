@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useLinkStatus } from "next/link";
 import Link from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
-import { LogOut, PanelLeftClose } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
 import SignatureLogo from "@/components/brand/signature-logo";
@@ -44,6 +44,29 @@ function SignOutIcon() {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <g className="signout-arrow">{arrow}</g>
       <g className="signout-arrow signout-arrow-trail">{arrow}</g>
+    </svg>
+  );
+}
+
+/**
+ * The collapse control's panel (Lucide's PanelLeftClose, in parts): on hover
+ * the sidebar's edge folds in and the chevron streams left into it, two copies
+ * half a beat apart, clipped at the edge (globals.css, .collapse-button).
+ */
+function CollapseIcon() {
+  const clip = useId();
+  const chevron = <path d="m16 15-3-3 3-3" />;
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-4" aria-hidden>
+      <defs>
+        <clipPath id={clip}><rect x="7.5" y="3" width="14" height="18" /></clipPath>
+      </defs>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M9 3v18" className="collapse-edge" />
+      <g clipPath={`url(#${clip})`}>
+        <g className="collapse-chevron">{chevron}</g>
+        <g className="collapse-chevron collapse-chevron-trail">{chevron}</g>
+      </g>
     </svg>
   );
 }
@@ -90,9 +113,9 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                 onClick={toggle}
                 aria-label="Collapse sidebar"
                 title="Collapse sidebar"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/55 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground active:scale-95"
+                className="collapse-button flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/55 outline-none transition-[color,background-color,transform] hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-2 focus-visible:ring-primary/60 active:scale-90"
               >
-                <PanelLeftClose className="size-4" />
+                <CollapseIcon />
               </button>
             )}
           </div>
@@ -134,7 +157,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                       collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",
                       active
                         ? "border border-primary/45 bg-primary/10 text-foreground shadow-[0_0_20px_-6px_var(--primary)]"
-                        : "border border-transparent text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        : "nav-item border border-transparent text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                     )}
                   >
                     <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "")} />

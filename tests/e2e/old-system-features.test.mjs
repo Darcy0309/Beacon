@@ -11,6 +11,7 @@ import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 import { adminClient } from "../support/auth.mjs";
+import { formatIso } from "../../src/lib/dates.js";
 
 const TAG = `OLD-TEST ${Date.now()}`;
 // A picture to upload: the app's own notification icon.
@@ -160,6 +161,19 @@ try {
   check("an administrator picks anyone's", Boolean(await until(async () => (await bar(admin, 9)) === "3", { timeout: 20000 })));
   await admin.go(`/reports/hourly?user=${AGENT}&day=${sql(`select '${today}'::date - 1`)}`, 4000);
   check("…on any day before", Boolean(await until(async () => (await bar(admin, 9)) === "0", { timeout: 20000 })));
+  // The title and the day field always say the same day, however it was reached.
+  const shown = () => admin.ev(`({ title: document.querySelector('[data-topbar-title]')?.parentElement?.parentElement?.querySelector('p')?.textContent ?? '',
+    field: document.querySelector('[data-hourly-day] input[name=day]')?.value ?? '', url: new URLSearchParams(location.search).get('day') })`);
+  const agree = (s, iso) => s.field === iso && s.title.endsWith(formatIso(iso, "long")) && (s.url ?? today) === iso;
+  const yesterday = sql(`select '${today}'::date - 1`);
+  check("the day before: title and field agree", agree(await shown(), yesterday), JSON.stringify(await shown()));
+  await admin.click('a[aria-label="The day after"]');
+  check("the arrow on to today: both say today", Boolean(await until(async () => agree(await shown(), today), { timeout: 20000 })), JSON.stringify(await shown()));
+  const twoBack = sql(`select '${today}'::date - 2`);
+  await admin.fill('[data-hourly-day] input[aria-label="Day"]', `${Number(twoBack.slice(5, 7))}/${Number(twoBack.slice(8, 10))}/${twoBack.slice(0, 4)}`);
+  await admin.key("Enter");
+  check("a day typed in the field: shown at once, no Show button, the title with it", Boolean(await until(async () => agree(await shown(), twoBack), { timeout: 20000 }))
+    && !(await admin.ev("[...document.querySelectorAll('[data-hourly-day] ~ button, form[data-hourly-day] button')].some((b) => b.textContent.trim() === 'Show')")), JSON.stringify(await shown()));
 
   section("A note on a calendar's time");
   await client.go(`/calendar?project=${P}&view=month&d=${today}`, 6000);

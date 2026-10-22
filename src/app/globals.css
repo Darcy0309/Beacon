@@ -747,6 +747,42 @@ option {
   animation-delay: -0.95s;
 }
 
+/* Collapse the sidebar: on hover the panel's edge folds in and the chevron
+   streams left into it, as the sign-out arrow streams out of its door. */
+.collapse-button .collapse-edge { transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.collapse-button:hover .collapse-edge,
+.collapse-button:focus-visible .collapse-edge { transform: translateX(-2.5px); }
+.collapse-chevron-trail { opacity: 0; }
+@keyframes chevron-flow {
+  0%   { transform: translateX(5px); opacity: 0; }
+  35%  { opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translateX(-6px); opacity: 0; }
+}
+.collapse-button:hover .collapse-chevron,
+.collapse-button:focus-visible .collapse-chevron {
+  animation: chevron-flow 1s linear -0.45s infinite;
+}
+.collapse-button:hover .collapse-chevron-trail,
+.collapse-button:focus-visible .collapse-chevron-trail {
+  animation-delay: -0.95s;
+}
+
+/* A sidebar item under the pointer: a left border in a deep shade of the
+   background's own colour (the loading line's, an uploaded picture's when it
+   has one, else the theme's), drawn inside the item so nothing shifts. In the
+   dark theme the shade is lighter, to stay visible on the dark sidebar. */
+.nav-item {
+  --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 62%, black);
+  transition-property: color, background-color, border-color, box-shadow;
+}
+.dark .nav-item { --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 78%, black); }
+/* With a pointer that hovers (as Tailwind's hover: is), so a tap on a phone never leaves it on. */
+@media (hover: hover) {
+  .nav-item:hover { box-shadow: inset 3px 0 0 var(--nav-edge); }
+}
+.nav-item:focus-visible { box-shadow: inset 3px 0 0 var(--nav-edge); }
+
 /* A sidebar item whose page is still loading: a light sweeping along its foot. */
 .nav-loading {
   position: absolute;
@@ -922,9 +958,11 @@ html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4
   .animate-grow-height, .animate-grow-width, .animate-rise,
   .animate-badge-shake, .animate-bell-ring, .animate-popover-in, .appt-focus,
   .drop-target, .drop-landed,
-  .signout-button .signout-arrow {
+  .signout-button .signout-arrow,
+  .collapse-button .collapse-chevron {
     animation: none !important;
   }
+  .collapse-button .collapse-edge { transition: none; }
 }
 
 /* ---------------------------------------------------------------------------
