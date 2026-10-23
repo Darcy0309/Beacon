@@ -157,10 +157,10 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                       collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",
                       active
                         ? "border border-primary/45 bg-primary/10 text-foreground shadow-[0_0_20px_-6px_var(--primary)]"
-                        : "nav-item border border-transparent text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                        : "nav-item group border border-transparent text-sidebar-foreground/65 hover:border-primary/45 hover:bg-primary/10 hover:text-foreground"
                     )}
                   >
-                    <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "")} />
+                    <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "transition-colors group-hover:text-primary")} />
                     {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
                     {!collapsed && item.badge ? (
                       <span

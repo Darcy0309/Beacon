@@ -768,26 +768,25 @@ option {
   animation-delay: -0.95s;
 }
 
-/* A sidebar item under the pointer stands up off the sidebar: a left border in
-   a deep shade of the background's own colour (the loading line's, an uploaded
-   picture's when it has one, else the theme's), a light top edge and a darker
-   foot like a bevel, and a soft shadow under it tinted the same colour, as it
-   lifts a little. All drawn inside the item's box or below it, so nothing
-   shifts. In the dark theme the shade is lighter, to stay visible on the dark
-   sidebar, and the bevel softer. */
+/* A sidebar item under the pointer stands up off the sidebar in the SELECTED
+   item's colour, so hover and selection read as one family: the primary tint and
+   border (set in sidebar-nav.jsx), a left border in the primary colour itself, a
+   light top edge and a darker foot like a bevel, and a soft shadow under it tinted
+   primary like the selected item's glow, as it lifts a little. All drawn inside
+   the item's box or below it, so nothing shifts. In the dark theme the bevel is
+   softer. */
 .nav-item {
-  --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 62%, black);
+  --nav-edge: var(--primary);
   --nav-bevel: rgb(255 255 255 / 0.75);
   --nav-foot: rgb(15 23 42 / 0.08);
-  --nav-drop: color-mix(in oklab, var(--nav-edge) 30%, transparent);
+  --nav-drop: color-mix(in oklab, var(--primary) 35%, transparent);
   transition-property: color, background-color, border-color, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .dark .nav-item {
-  --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 78%, black);
   --nav-bevel: rgb(255 255 255 / 0.07);
   --nav-foot: rgb(0 0 0 / 0.35);
-  --nav-drop: rgb(0 0 0 / 0.55);
+  --nav-drop: color-mix(in oklab, var(--primary) 40%, transparent);
 }
 .nav-item:focus-visible {
   box-shadow:
