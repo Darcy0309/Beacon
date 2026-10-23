@@ -768,50 +768,25 @@ option {
   animation-delay: -0.95s;
 }
 
-/* A sidebar item under the pointer stands up off the sidebar in the SELECTED
-   item's colour, so hover and selection read as one family: the primary tint and
-   border (set in sidebar-nav.jsx), a left border in the primary colour itself, a
-   light top edge and a darker foot like a bevel, and a soft shadow under it tinted
-   primary like the selected item's glow, as it lifts a little. All drawn inside
-   the item's box or below it, so nothing shifts. In the dark theme the bevel is
-   softer. */
+/* A sidebar item under the pointer looks just like the selected one: its
+   primary tint, border and icon (set in sidebar-nav.jsx) and the same glow as
+   the selected item's shadow-[0_0_20px_-6px_var(--primary)], nothing darker
+   added, as it lifts a little off the sidebar; a press sets it back down. */
 .nav-item {
-  --nav-edge: var(--primary);
-  --nav-bevel: rgb(255 255 255 / 0.75);
-  --nav-foot: rgb(15 23 42 / 0.08);
-  --nav-drop: color-mix(in oklab, var(--primary) 35%, transparent);
   transition-property: color, background-color, border-color, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.dark .nav-item {
-  --nav-bevel: rgb(255 255 255 / 0.07);
-  --nav-foot: rgb(0 0 0 / 0.35);
-  --nav-drop: color-mix(in oklab, var(--primary) 40%, transparent);
-}
 .nav-item:focus-visible {
-  box-shadow:
-    inset 3px 0 0 var(--nav-edge),
-    inset 0 1px 0 var(--nav-bevel),
-    inset 0 -1px 0 var(--nav-foot),
-    0 1px 2px var(--nav-foot),
-    0 6px 12px -6px var(--nav-drop),
-    0 12px 20px -12px var(--nav-drop);
+  box-shadow: 0 0 20px -6px var(--primary);
   transform: translate(2px, -1px);
 }
 /* With a pointer that hovers (as Tailwind's hover: is), so a tap on a phone never leaves it raised. */
 @media (hover: hover) {
   .nav-item:hover {
-    box-shadow:
-      inset 3px 0 0 var(--nav-edge),
-      inset 0 1px 0 var(--nav-bevel),
-      inset 0 -1px 0 var(--nav-foot),
-      0 1px 2px var(--nav-foot),
-      0 6px 12px -6px var(--nav-drop),
-      0 12px 20px -12px var(--nav-drop);
+    box-shadow: 0 0 20px -6px var(--primary);
     transform: translate(2px, -1px);
   }
-  /* Pressed: back down onto the sidebar. */
-  .nav-item:active { transform: translate(1px, 0); box-shadow: inset 3px 0 0 var(--nav-edge), inset 0 1px 2px var(--nav-foot); }
+  .nav-item:active { transform: translate(1px, 0); }
 }
 @media (prefers-reduced-motion: reduce) {
   .nav-item:hover, .nav-item:focus-visible, .nav-item:active { transform: none; }
