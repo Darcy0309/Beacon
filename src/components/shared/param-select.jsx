@@ -68,7 +68,8 @@ export default function ParamSelect({ name, label, value = "", options, placehol
           className="max-h-[min(20rem,60svh)] min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(28rem,92vw)] overflow-y-auto"
         >
           <DropdownMenuRadioGroup value={value ? String(value) : ALL} onValueChange={choose}>
-            <DropdownMenuRadioItem value={ALL}>{placeholder}</DropdownMenuRadioItem>
+            {/* placeholder={null}: no blank choice (the page gives its own, e.g. a value meaning all). */}
+            {placeholder === null ? null : <DropdownMenuRadioItem value={ALL}>{placeholder}</DropdownMenuRadioItem>}
             {options.map((o) => (
               <DropdownMenuRadioItem key={o.value} value={String(o.value)} className="break-words">
                 {o.label}

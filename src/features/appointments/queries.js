@@ -253,7 +253,7 @@ export async function getLeadAppointments(leadId) {
 
 const UPDATE_COLUMNS = `id, appointment_id, lead_id, status, previous_status, note, potential_premium, sold_lines, total_premium, created_at,
   by:users!appointment_updates_created_by_fkey(first_name, last_name, role),
-  appointment:appointments(appt_date, appt_time, setter:users!appointments_user_id_fkey(first_name, last_name)),
+  appointment:appointments(appt_date, appt_time, setter:users!appointments_user_id_fkey(id, first_name, last_name)),
   lead:leads(id, company_name), project:projects(id, name), company:companies(id, name)`;
 
 function shapeUpdate(u) {
@@ -266,7 +266,7 @@ function shapeUpdate(u) {
     total: u.total_premium == null ? null : Number(u.total_premium), lines: u.sold_lines ?? null, at: u.created_at,
     by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || "—" : "—", byClient: by?.role === "client",
     apptDate: appt?.appt_date ?? null, apptTime: appt?.appt_time ?? null,
-    manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—",
+    manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—", managerId: setter?.id ?? null,
     co: one(u.lead)?.company_name ?? "—", project: one(u.project)?.name ?? "—", client: one(u.company)?.name ?? "—",
     companyId: one(u.company)?.id ?? null,
   };
@@ -294,11 +294,13 @@ export async function getLeadAppointmentUpdates(leadId) {
  * came in, newest first, from `from` to `to` (the business's days), for one
  * client or status if asked.
  */
-export async function getAppointmentUpdatesFeed({ from, to, companyId = null, status = null }) {
+export async function getAppointmentUpdatesFeed({ from, to, companyId = null, companyIds = null, status = null }) {
   const supabase = await createClient();
   let q = supabase.rpc("appointment_updates_between", { p_from: from, p_to: to }).select(UPDATE_COLUMNS)
     .order("created_at", { ascending: false }).order("id", { ascending: false }).limit(1000);
   if (companyId) q = q.eq("company_id", Number(companyId));
+  // A Sales Rep's clients (none: nothing).
+  if (companyIds) q = q.in("company_id", companyIds.length ? companyIds : [0]);
   if (status) q = q.eq("status", status);
   const { data, error } = await q;
   if (error) throw error;

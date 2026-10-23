@@ -8,6 +8,9 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getAppointmentUpdatesFeed } from "@/features/appointments/queries";
 import { getClients } from "@/features/clients/queries";
+import UpdateMessage from "@/features/appointments/components/update-message";
+import { getAssignableStaff, getSalesReps } from "@/features/users/queries";
+import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { UPDATE_STATUSES, lineLabel, money, statusColor, statusLabel } from "@/lib/appointment-updates";
 import { addDays, daysBetween, formatIso, formatRange, isIsoDate } from "@/lib/dates";
@@ -19,18 +22,25 @@ export const dynamic = "force-dynamic";
  * appointment, as it comes in, newest first: when, the client and the
  * business, the appointment, the status (and what it was), the premium,
  * the note, who updated it and the manager who set it. The last 30 days to
- * begin with; by client and status.
+ * begin with; by client and status, and by the clients' Sales Rep: the one
+ * signed in to begin with, when they have clients of their own, else all.
+ * Beside the manager, a button to send the update on, with a note and a
+ * link to the lead, to them or anyone on staff.
  */
 export default async function AppointmentUpdates({ searchParams }) {
   const sp = await searchParams;
-  const [today, tz, clients] = await Promise.all([getBusinessToday(), getBusinessTimeZone(), getClients()]);
+  const [today, tz, allClients, me, reps, staff] = await Promise.all([getBusinessToday(), getBusinessTimeZone(), getClients(), getCurrentUser(), getSalesReps(), getAssignableStaff()]);
+  // The Sales Rep: as chosen ("all" for everyone's), else the one signed in if they have clients.
+  const repParam = sp?.rep === "all" ? "all" : reps.some((r) => String(r.id) === sp?.rep) ? sp.rep : null;
+  const rep = repParam ?? (allClients.some((c) => c.salesRepId === me?.id) ? String(me.id) : "all");
+  const clients = rep === "all" ? allClients : allClients.filter((c) => String(c.salesRepId) === rep);
   let from = isIsoDate(sp?.from) ? sp.from : addDays(today, -30);
   let to = isIsoDate(sp?.to) ? sp.to : today;
   if (to < from) [from, to] = [to, from];
   if (daysBetween(from, to) > 366) from = addDays(to, -366);
   const client = /^[1-9]\d{0,17}$/.test(sp?.client ?? "") ? sp.client : "";
   const status = UPDATE_STATUSES.some(([k]) => k === sp?.status) ? sp.status : "";
-  const rows = await getAppointmentUpdatesFeed({ from, to, companyId: client || null, status: status || null });
+  const rows = await getAppointmentUpdatesFeed({ from, to, companyId: client || null, companyIds: rep === "all" ? null : clients.map((c) => c.id), status: status || null });
   const when = (iso) => new Intl.DateTimeFormat("en-US", { timeZone: tz, month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
   const kept = Object.entries(sp ?? {}).filter(([k, v]) => !["from", "to"].includes(k) && typeof v === "string");
   const sold = rows.filter((u) => u.status === "sold").reduce((t, u) => t + (u.total ?? 0), 0);
@@ -47,6 +57,8 @@ export default async function AppointmentUpdates({ searchParams }) {
               <span className="text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground">Updated</span>
               <DateRangePicker key={`${from}:${to}`} defaultFrom={from} defaultTo={to} active={isIsoDate(sp?.from) || isIsoDate(sp?.to)} />
             </form>
+            <ParamSelect name="rep" label="Sales Rep" value={rep} placeholder={null} clears={["client"]}
+              options={[{ value: "all", label: "All" }, ...reps.map((r) => ({ value: String(r.id), label: r.id === me?.id ? `${r.name} (me)` : r.name }))]} />
             <ParamSelect name="client" label="Client" placeholder="All clients" value={client} options={clients.map((c) => ({ value: String(c.id), label: c.name }))} />
             <ParamSelect name="status" label="Status" placeholder="Any status" value={status} options={UPDATE_STATUSES.map(([value, label]) => ({ value, label }))} />
           </div>
@@ -91,7 +103,19 @@ export default async function AppointmentUpdates({ searchParams }) {
                       </TableCell>
                       <TableCell className="max-w-96 whitespace-pre-line break-words text-sm">{u.note ?? <span className="text-muted-foreground">—</span>}</TableCell>
                       <TableCell className="whitespace-nowrap">{u.by}</TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">{u.manager}</TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {u.manager}
+                        <UpdateMessage staff={staff} update={{
+                          id: u.id, leadId: u.leadId, co: u.co, client: u.client, manager: u.manager, managerId: u.managerId, statusText: statusLabel(u.status),
+                          summary: [
+                            `${u.client} · ${u.project}`,
+                            `${statusLabel(u.status)}${u.previous ? ` (was ${statusLabel(u.previous)})` : ""}, updated ${when(u.at)} by ${u.by}`,
+                            u.apptDate ? `Appointment ${formatIso(u.apptDate, "short")}${u.apptTime ? ` · ${u.apptTime}` : ""}` : null,
+                            u.total != null ? `Written ${money(u.total)}` : u.potential != null ? `Potential ${money(u.potential)}` : null,
+                            u.note ? `Their note: ${u.note}` : null,
+                          ].filter(Boolean).join("\n"),
+                        }} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

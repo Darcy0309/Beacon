@@ -171,6 +171,27 @@ try {
   check("Appointment Updates lists them as they came in", (await admin.ev("document.querySelectorAll('[data-update-row]').length")) === 3
     && /Sold Account/.test(feed) && /Invalid/.test(feed), feed.slice(0, 300));
 
+  section("Appointment Updates by Sales Rep, and sending one on");
+  sql(`update public.companies set sales_rep_id = ${ADMIN} where id = ${company}`);
+  await admin.go("/reports/appointment-updates", 6000);
+  const repShown = await when(admin, "document.querySelector('button[data-param=\"rep\"]')?.textContent.trim()");
+  const mine = await admin.ev(`[...document.querySelectorAll('[data-update-row]')].map((r) => r.innerText).join(' ')`);
+  check("to begin with, the signed-in admin's own clients (they are this client's Sales Rep)", /\(me\)/.test(repShown ?? "") && mine.includes(`${TAG} Insurance`), repShown);
+  await admin.go(`/reports/appointment-updates?rep=${SEAN}`, 5000);
+  check("another Sales Rep: not this client's", !(await admin.ev(`document.body.innerText.includes(${JSON.stringify(`${TAG} Insurance`)})`)));
+  await admin.go(`/reports/appointment-updates?rep=all&client=${company}`, 5000);
+  check("All: everyone's", Boolean(await when(admin, "document.querySelectorAll('[data-update-row]').length === 3")));
+  await admin.click("[data-update-message]");
+  await when(admin, "!!document.querySelector('[data-update-message-form]')");
+  check("the button by the manager: to that manager to begin with, the update and a link to the lead",
+    (await admin.ev("document.querySelector('[data-update-message-form] select[name=user_ids]')?.value")) === String(SEAN)
+    && /Mesa|Churches|Contractors/.test(await admin.ev("document.querySelector('[data-update-summary]')?.innerText ?? ''")),
+    JSON.stringify(await admin.ev("({ to: document.querySelector('[data-update-message-form] select[name=user_ids]')?.value, n: document.querySelectorAll('[data-update-message]').length, dialog: document.querySelector('[role=dialog]')?.innerText.slice(0, 200) })")));
+  await admin.fill("[data-update-message-form] textarea[name=note]", `${TAG} please call them back and reschedule`);
+  await admin.ev("document.querySelector('[data-update-message-form]').requestSubmit()");
+  const sent = await until(() => sql(`select coalesce((select title || ' | ' || link || ' | ' || body from public.notifications where user_id = ${SEAN} and body like ${lit(`%${TAG} please call them back%`)} order by id desc limit 1), '')`) || null, { timeout: 15000 });
+  check("…sent to them: the update, the note, a link to the lead", /^Appointment update: /.test(sent ?? "") && /\/leads\/\d+\?tab=updates/.test(sent) && sent.includes("Note: "), sent);
+
   section("Reminders to update: the 2nd and 4th business day");
   const run = sql(`select public.nudge_appointment_updates(('${nudgeDay}'::date + time '10:00') at time zone public.business_tz())`);
   const notes = sql(`select string_agg(body, ' || ' order by id) from public.notifications where user_id = ${CLIENT} and link like '/appointments?update=%' and (link = '/appointments?update=${A3}')`);
@@ -192,6 +213,7 @@ try {
   await mail.close?.();
   const like = lit(`${TAG}%`);
   sql(`update public.users set company_id = ${clientCompany} where id = ${CLIENT}`);
+  sql(`delete from public.notifications where body like ${lit(`%${TAG}%`)}`);
   sql(`delete from public.notifications where link like '/leads/%?tab=updates' and link in (select '/leads/' || id || '?tab=updates' from public.leads where company_name like ${like})`);
   sql(`delete from public.notifications where link in ('/appointments?update=${A1}', '/appointments?update=${A2}', '/appointments?update=${A3}', '/appointments?update=${A4}')`);
   sql(`delete from public.appointment_nudges where appointment_id in (${A1}, ${A2}, ${A3}, ${A4})`);
