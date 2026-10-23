@@ -768,16 +768,18 @@ option {
   animation-delay: -0.95s;
 }
 
-/* A sidebar item under the pointer: only a left border, in the selected
-   item's border colour, drawn inside the item so nothing shifts. */
+/* A sidebar item under the pointer: a left border in the selected item's
+   border colour, drawn inside the item so nothing shifts, on a light shade of
+   the sidebar's own text colour, so it shows on any background. */
 .nav-item {
   --nav-edge: color-mix(in oklab, var(--primary) 45%, transparent);
+  --nav-hover: color-mix(in oklab, var(--sidebar-foreground) 8%, transparent);
   transition-property: color, background-color, border-color, box-shadow;
 }
-.nav-item:focus-visible { box-shadow: inset 3px 0 0 var(--nav-edge); }
+.nav-item:focus-visible { box-shadow: inset 3px 0 0 var(--nav-edge); background-color: var(--nav-hover); }
 /* With a pointer that hovers (as Tailwind's hover: is), so a tap on a phone never leaves it on. */
 @media (hover: hover) {
-  .nav-item:hover { box-shadow: inset 3px 0 0 var(--nav-edge); }
+  .nav-item:hover { box-shadow: inset 3px 0 0 var(--nav-edge); background-color: var(--nav-hover); }
 }
 
 /* A sidebar item whose page is still loading: a light sweeping along its foot. */
