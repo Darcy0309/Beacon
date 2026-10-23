@@ -768,20 +768,55 @@ option {
   animation-delay: -0.95s;
 }
 
-/* A sidebar item under the pointer: a left border in a deep shade of the
-   background's own colour (the loading line's, an uploaded picture's when it
-   has one, else the theme's), drawn inside the item so nothing shifts. In the
-   dark theme the shade is lighter, to stay visible on the dark sidebar. */
+/* A sidebar item under the pointer stands up off the sidebar: a left border in
+   a deep shade of the background's own colour (the loading line's, an uploaded
+   picture's when it has one, else the theme's), a light top edge and a darker
+   foot like a bevel, and a soft shadow under it tinted the same colour, as it
+   lifts a little. All drawn inside the item's box or below it, so nothing
+   shifts. In the dark theme the shade is lighter, to stay visible on the dark
+   sidebar, and the bevel softer. */
 .nav-item {
   --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 62%, black);
-  transition-property: color, background-color, border-color, box-shadow;
+  --nav-bevel: rgb(255 255 255 / 0.75);
+  --nav-foot: rgb(15 23 42 / 0.08);
+  --nav-drop: color-mix(in oklab, var(--nav-edge) 30%, transparent);
+  transition-property: color, background-color, border-color, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.dark .nav-item { --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 78%, black); }
-/* With a pointer that hovers (as Tailwind's hover: is), so a tap on a phone never leaves it on. */
+.dark .nav-item {
+  --nav-edge: color-mix(in oklab, var(--progress-a, var(--primary)) 78%, black);
+  --nav-bevel: rgb(255 255 255 / 0.07);
+  --nav-foot: rgb(0 0 0 / 0.35);
+  --nav-drop: rgb(0 0 0 / 0.55);
+}
+.nav-item:focus-visible {
+  box-shadow:
+    inset 3px 0 0 var(--nav-edge),
+    inset 0 1px 0 var(--nav-bevel),
+    inset 0 -1px 0 var(--nav-foot),
+    0 1px 2px var(--nav-foot),
+    0 6px 12px -6px var(--nav-drop),
+    0 12px 20px -12px var(--nav-drop);
+  transform: translate(2px, -1px);
+}
+/* With a pointer that hovers (as Tailwind's hover: is), so a tap on a phone never leaves it raised. */
 @media (hover: hover) {
-  .nav-item:hover { box-shadow: inset 3px 0 0 var(--nav-edge); }
+  .nav-item:hover {
+    box-shadow:
+      inset 3px 0 0 var(--nav-edge),
+      inset 0 1px 0 var(--nav-bevel),
+      inset 0 -1px 0 var(--nav-foot),
+      0 1px 2px var(--nav-foot),
+      0 6px 12px -6px var(--nav-drop),
+      0 12px 20px -12px var(--nav-drop);
+    transform: translate(2px, -1px);
+  }
+  /* Pressed: back down onto the sidebar. */
+  .nav-item:active { transform: translate(1px, 0); box-shadow: inset 3px 0 0 var(--nav-edge), inset 0 1px 2px var(--nav-foot); }
 }
-.nav-item:focus-visible { box-shadow: inset 3px 0 0 var(--nav-edge); }
+@media (prefers-reduced-motion: reduce) {
+  .nav-item:hover, .nav-item:focus-visible, .nav-item:active { transform: none; }
+}
 
 /* A sidebar item whose page is still loading: a light sweeping along its foot. */
 .nav-loading {
