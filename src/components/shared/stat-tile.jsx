@@ -37,6 +37,7 @@ export default function StatTile({
       {/* accent wash from the top-right corner */}
       <div
         aria-hidden
+        data-tile-wash
         className="pointer-events-none absolute inset-0 opacity-70"
         style={{
           background: `radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, ${accent} 16%, transparent), transparent 62%)`,
@@ -47,6 +48,7 @@ export default function StatTile({
         <div className="flex items-start gap-2.5">
           {Icon ? (
             <span
+              data-tile-icon
               className="flex size-8 shrink-0 items-center justify-center rounded-md border"
               style={{
                 borderColor: `color-mix(in srgb, ${accent} 35%, transparent)`,
@@ -67,7 +69,7 @@ export default function StatTile({
           </span>
         </div>
 
-        <div className="mt-3 stat-value" style={{ color: accent }}>
+        <div className="mt-3 stat-value" data-tile-value style={{ color: accent }}>
           <CountUp value={value} />
         </div>
         {/* The action (a period switch) shares the note's line: tiles keep their figures level and stay short. */}
@@ -88,7 +90,7 @@ export default function StatTile({
           values={series}
           color={accent}
           bars={bars}
-          className="mt-auto block h-16 w-full shrink-0"
+          className="tile-spark mt-auto block h-16 w-full shrink-0"
         />
       ) : null}
 

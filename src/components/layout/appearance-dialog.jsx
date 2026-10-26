@@ -1,16 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, ImageUp, Monitor, Moon, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
+import { Check, Image as ImageIcon, ImageUp, Monitor, Moon, Palette, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage } from "@/lib/appearance";
+import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
 const THEMES = [["light", "Light", Sun], ["dark", "Dark", Moon], ["system", "System", Monitor]];
+// What "Default" looks like in each style (its own page, menu and accent), for its swatch.
+const STYLE_DEFAULT_COLORS = {
+  executive: { page: "#f5f3ee", menu: "#e2dccf", accent: "#1f3a8a" },
+  modern: { page: "#f6f7f9", menu: "#ffffff", accent: "#2b6cb0" },
+  classic: { page: "#f4f8fb", menu: "#fbfdfe", accent: "#0891b2" },
+};
+const STYLE_NOTES = {
+  executive: "Warm and refined: soft cards, serif titles",
+  modern: "Calm colours, soft cards, easy-to-read labels",
+  classic: "The original look: neon edges, capital labels",
+};
 
 /**
  * Appearance (Sean, Oct 2026): the theme, a wallpaper behind the workspace (the
@@ -80,6 +91,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
     applyAppearance(merged);
   };
   const dark = resolvedTheme === "dark";
+  const custom = a.tone === "custom" ? toneFromColor(a.toneColor) : null;
   // The slider reads as brightness: 70% to 100% for light (dimmed), 100% to 130% for dark (lifted).
   const percent = dark ? Math.round(100 + a.dark * 100) : Math.round(100 - a.light * 100);
   const setPercent = (p) => change(dark ? { dark: (Number(p) - 100) / 100 } : { light: (100 - Number(p)) / 100 });
@@ -114,16 +126,38 @@ export default function AppearanceDialog({ open, onOpenChange }) {
 
         <section className="space-y-2">
           <h3 className="eyebrow text-muted-foreground">Style</h3>
-          <div role="radiogroup" aria-label="Style" className="grid grid-cols-2 gap-2">
+          <div role="radiogroup" aria-label="Style" className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             {STYLES.map(([k, label]) => (
               <button key={k} type="button" role="radio" aria-checked={a.style === k} onClick={() => change({ style: k })} data-style-pick={k}
                 className={cn("rounded-lg border px-3 py-2 text-left transition-colors",
                   a.style === k ? "border-primary bg-primary/10" : "border-[var(--panel-border)] hover:border-primary/40")}>
                 <span className={cn("block text-sm font-medium", a.style === k ? "text-primary" : "")}>{label}</span>
-                <span className="block text-xs text-muted-foreground">{k === "modern" ? "Calm colours, soft cards, easy-to-read labels" : "The original look: neon edges, capital labels"}</span>
+                <span className="block text-xs text-muted-foreground">{STYLE_NOTES[k]}</span>
               </button>
             ))}
           </div>
+        </section>
+
+        {/* The page's colour: the background, the menu a shade deeper and a matching accent (Sean, Oct 2026). */}
+        <section className="space-y-2" data-tones>
+          <h3 className="eyebrow flex items-center gap-1.5 text-muted-foreground"><Palette className="size-3.5 text-primary" /> Colours</h3>
+          <div role="radiogroup" aria-label="Colours" className="grid grid-cols-4 gap-3 sm:grid-cols-7">
+            <ToneSwatch label="Default" on={!a.tone} onPick={() => change({ tone: null })} colors={STYLE_DEFAULT_COLORS[a.style] ?? STYLE_DEFAULT_COLORS.executive} k="default" />
+            {TONES.map(([k, label, page, menu, accent]) => (
+              <ToneSwatch key={k} k={k} label={label} on={a.tone === k} onPick={() => change({ tone: k, wallpaper: "classic" })} colors={{ page, menu, accent }} />
+            ))}
+            <label className="group flex cursor-pointer flex-col items-center gap-1.5 text-[0.7rem] font-medium" data-tone-pick="custom" title="Pick any colour">
+              <span className={cn("relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border transition-transform group-hover:scale-[1.04]",
+                a.tone === "custom" ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")}
+                style={a.tone === "custom" && custom ? { background: `linear-gradient(90deg, ${custom.menu} 0 30%, ${custom.page} 30%)` } : { background: "conic-gradient(from 90deg, #e88, #ec8, #8c8, #8ce, #a8e, #e88)" }}>
+                {a.tone === "custom" && custom ? <span className="absolute bottom-1.5 right-1.5 size-3 rounded-full" style={{ background: custom.accent }} /> : null}
+                <input type="color" value={a.toneColor ?? "#2f6b8a"} onChange={(e) => change({ tone: "custom", toneColor: e.target.value, wallpaper: "classic" })}
+                  aria-label="Your own colour" className="absolute inset-0 cursor-pointer opacity-0" data-tone-color />
+              </span>
+              <span className={a.tone === "custom" ? "text-primary" : "text-muted-foreground"}>Custom</span>
+            </label>
+          </div>
+          <p className="text-xs text-muted-foreground">The page, a deeper shade for the menu and a matching accent. In the dark theme only the accent changes.</p>
         </section>
 
         <section className="space-y-2">
@@ -229,7 +263,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </section>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === "modern" && a.wallpaper === "classic" && !a.light && !a.dark && !a.blur}
+          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur}
             data-appearance-reset>
             <RotateCcw /> Back to the original
           </Button>
@@ -237,5 +271,21 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** One colour to pick: the page with the menu down its left and a dot of the accent (Default: the style's own). */
+function ToneSwatch({ k, label, on, onPick, colors }) {
+  return (
+    <button type="button" role="radio" aria-checked={on} onClick={onPick} data-tone-pick={k}
+      className="group flex flex-col items-center gap-1.5 text-[0.7rem] font-medium">
+      <span className={cn("relative flex h-11 w-full items-center justify-center overflow-hidden rounded-xl border transition-transform group-hover:scale-[1.04] group-active:scale-95",
+        on ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")}
+        style={colors ? { background: `linear-gradient(90deg, ${colors.menu} 0 30%, ${colors.page} 30%)` } : { background: "var(--background)" }}>
+        {colors ? <span className="absolute bottom-1.5 right-1.5 size-3 rounded-full" style={{ background: colors.accent }} /> : null}
+        {on ? <Check className="relative size-4" style={{ color: colors?.accent ?? "var(--primary)" }} /> : null}
+      </span>
+      <span className={on ? "text-primary" : "text-muted-foreground"}>{label}</span>
+    </button>
   );
 }

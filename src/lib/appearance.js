@@ -32,20 +32,74 @@ const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...PHOTO_WALLPAPERS, ...LIVE_WALLP
 export const MAX_SHIFT = 0.3;
 export const MAX_BLUR = 24;
 const clampBlur = (v) => Math.min(MAX_BLUR, Math.max(0, Math.round(Number(v) || 0)));
-export const STYLES = [["modern", "Modern"], ["classic", "Classic"]];
-export const DEFAULT_APPEARANCE = { style: "modern", wallpaper: "classic", light: 0, dark: 0, blur: 0 };
+export const STYLES = [["executive", "Executive"], ["modern", "Modern"], ["classic", "Classic"]];
+const STYLE_KEYS = new Set(STYLES.map(([k]) => k));
+export const DEFAULT_APPEARANCE = { style: "executive", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null };
+// Saved before Executive was the default (Sean, Oct 2026): a saved "modern" was then simply the default, so it moves to Executive once.
+const APPEARANCE_VERSION = 2;
+
+/**
+ * The page's colours (Sean, Oct 2026): each a page background, the left menu a
+ * shade deeper, and an accent for buttons, the chosen item and key figures (a
+ * lighter one in the dark theme, where the page itself stays dark).
+ *   [key, label, page, menu, accent, accent in the dark theme]
+ */
+export const TONES = [
+  ["paper", "Paper", "#f5f3ee", "#e2dccf", "#1f3a8a", "#8fa8ec"],
+  ["sand", "Sand", "#efe6d6", "#ddcfb6", "#7a4b1e", "#e0b483"],
+  ["terracotta", "Terracotta", "#f3e1d7", "#e3c3b1", "#a8452a", "#f0a083"],
+  ["blush", "Blush", "#f6e4e6", "#e8c8cd", "#a33a55", "#f09ab0"],
+  ["lavender", "Lavender", "#ebe6f5", "#d6cdea", "#5b3fa8", "#b9a4f0"],
+  ["periwinkle", "Periwinkle", "#e3e8f8", "#c9d2ef", "#2f4fb8", "#9fb3f5"],
+  ["sky", "Sky", "#e1eef6", "#c3dbea", "#1d6a96", "#7fc0e8"],
+  ["sage", "Sage", "#e6ece3", "#cdd8c8", "#3f6b45", "#9cc9a2"],
+  ["mint", "Mint", "#e0f1ec", "#c2e1d7", "#1d7a63", "#7ad7bc"],
+  ["butter", "Butter", "#f6f0d8", "#e8ddb3", "#8a6a12", "#e6c766"],
+  ["stone", "Stone", "#e9e9e7", "#d4d4d0", "#2c2f36", "#c9ccd3"],
+  ["slate", "Slate", "#dfe3e9", "#c5ccd6", "#1e3a5f", "#93b4dc"],
+];
+const TONE_KEYS = new Set(TONES.map(([k]) => k).concat("custom"));
+const HEX6 = /^#[0-9a-f]{6}$/i;
+
+/**
+ * A colour of their own made into a set like the others: a pale page in its
+ * hue, the menu a shade deeper, a deep accent (and a light one for the dark
+ * theme). Greys stay grey.
+ */
+export function toneFromColor(color) {
+  if (!HEX6.test(color ?? "")) return null;
+  const [h, s] = hsl(...[1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16)));
+  const sat = s * 100;
+  const tint = (sMax, l) => hex(h, Math.min(sat, sMax) / 100, l);
+  return {
+    page: tint(45, 0.935),
+    menu: tint(32, 0.85),
+    accent: hex(h, sat < 8 ? sat / 100 : Math.min(0.7, Math.max(0.45, s)), 0.32),
+    accentDark: hex(h, sat < 8 ? sat / 100 : 0.65, 0.72),
+  };
+}
+
+/** The four colours of the tone chosen, or null for the style's own. */
+export function toneColors(a) {
+  if (a?.tone === "custom") return toneFromColor(a.toneColor);
+  const t = TONES.find(([k]) => k === a?.tone);
+  return t ? { page: t[2], menu: t[3], accent: t[4], accentDark: t[5] } : null;
+}
 
 const clamp = (v) => Math.min(MAX_SHIFT, Math.max(0, Number(v) || 0));
 
 export function readAppearance() {
   try {
     const a = JSON.parse(localStorage.getItem(APPEARANCE_KEY) ?? "{}") ?? {};
+    const style = a.v !== APPEARANCE_VERSION && a.style === "modern" ? "executive" : STYLE_KEYS.has(a.style) ? a.style : "executive";
     return {
-      style: a.style === "classic" ? "classic" : "modern",
+      style,
       wallpaper: KNOWN.has(a.wallpaper) && (a.wallpaper !== "custom" || readImage()) ? a.wallpaper : "classic",
       light: clamp(a.light),
       dark: clamp(a.dark),
       blur: clampBlur(a.blur),
+      tone: TONE_KEYS.has(a.tone) && (a.tone !== "custom" || HEX6.test(a.toneColor ?? "")) ? a.tone : null,
+      toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor.toLowerCase() : null,
     };
   } catch {
     return { ...DEFAULT_APPEARANCE };
@@ -180,7 +234,18 @@ export function pictureTint(src) {
 /** Put an appearance on the page, and keep it (best-effort: private browsing may not). */
 export function applyAppearance(a, { keep = true } = {}) {
   const d = document.documentElement;
+  // Executive builds on Modern: Modern's rules, then its own (html[data-executive]).
   d.dataset.style = a.style === "classic" ? "classic" : "modern";
+  if (a.style === "executive" || !STYLE_KEYS.has(a.style)) d.dataset.executive = "";
+  else delete d.dataset.executive;
+  // The colours: the page, the menu and the accent (TONES), as variables globals.css reads.
+  const tone = toneColors(a);
+  for (const [prop, key] of [["--tone-page", "page"], ["--tone-menu", "menu"], ["--tone-accent", "accent"], ["--tone-accent-dark", "accentDark"]]) {
+    if (tone) d.style.setProperty(prop, tone[key]);
+    else d.style.removeProperty(prop);
+  }
+  if (tone) d.dataset.tone = a.tone;
+  else delete d.dataset.tone;
   const image = a.wallpaper === "custom" ? readImage() : null;
   if (image) d.style.setProperty("--wp-image", `url("${image}")`);
   else d.style.removeProperty("--wp-image");
@@ -203,14 +268,22 @@ export function applyAppearance(a, { keep = true } = {}) {
   else delete d.dataset.brightness;
   if (!keep) return;
   try {
-    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ style: a.style === "classic" ? "classic" : "modern", wallpaper: a.wallpaper, blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark) }));
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : "executive", wallpaper: a.wallpaper,
+      blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark), tone: tone ? a.tone : null, toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor : null,
+      // A colour of their own, worked out, for the script that puts it on before the page draws.
+      toneVars: tone && a.tone === "custom" ? [tone.page, tone.menu, tone.accent, tone.accentDark] : undefined }));
   } catch {
     // Kept for this visit only.
   }
 }
 
 /** The same, as a script run before the page draws: no flash of the default look. */
-export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};if(a.style==="classic")d.dataset.style="classic";`
+// Executive unless Modern (saved since it stopped being the default) or Classic was chosen; then the colours (TONES, or their own).
+const TONE_SCRIPT_TABLE = JSON.stringify(Object.fromEntries(TONES.map(([k, , page, menu, accent, accentDark]) => [k, [page, menu, accent, accentDark]])));
+export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";d.dataset.executive="";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
+  + `if(a.style==="classic"){d.dataset.style="classic";delete d.dataset.executive;}else if(a.style==="modern"&&a.v===${APPEARANCE_VERSION})delete d.dataset.executive;`
+  + `var T=${TONE_SCRIPT_TABLE},k=a.tone,tc=null;if(k==="custom"&&a.toneVars&&/^#[0-9a-f]{6}$/i.test(a.toneVars[0]))tc=a.toneVars;else if(typeof k==="string"&&T[k])tc=T[k];`
+  + `if(tc){d.dataset.tone=k;["--tone-page","--tone-menu","--tone-accent","--tone-accent-dark"].forEach(function(p,j){if(/^#[0-9a-f]{6}$/i.test(tc[j]))d.style.setProperty(p,tc[j]);});}`
   + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
   + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i){d.style.setProperty("--wp-image",'url("'+i+'")');`
   + `var t=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_TINT_KEY)})||"null");if(t&&/^#[0-9a-f]{6}$/.test(t[0])&&/^#[0-9a-f]{6}$/.test(t[1])){d.style.setProperty("--progress-a",t[0]);d.style.setProperty("--progress-b",t[1]);}}}}`

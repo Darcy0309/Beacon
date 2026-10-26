@@ -17,9 +17,9 @@ export default function SectionHeader({ label, icon: Icon, action, href, classNa
       )}
     >
       <div className={cn("flex items-center gap-2.5", !wrap && "min-w-0")}>
-        <span aria-hidden className="h-3.5 w-[3px] rounded-full bg-primary" />
-        {Icon ? <Icon className="size-3.5 shrink-0 text-primary" /> : null}
-        <span className={cn("eyebrow", !wrap && "truncate")}>{label}</span>
+        <span aria-hidden data-section-tick className="h-3.5 w-[3px] rounded-full bg-primary" />
+        {Icon ? <Icon data-section-icon className="size-3.5 shrink-0 text-primary" /> : null}
+        <span data-section-label className={cn("eyebrow", !wrap && "truncate")}>{label}</span>
       </div>
       {href ? (
         <Link

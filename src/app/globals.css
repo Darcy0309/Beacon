@@ -1360,6 +1360,226 @@ html[data-style="modern"] th[data-th] {
   background: color-mix(in oklab, var(--muted) 70%, transparent);
 }
 
+/* ---------------------------------------------------------------------------
+   Executive (Sean, Oct 2026), the default style: Modern's calm, made warm and refined. A paper-
+   white page, white cards with a soft shadow and a hairline edge, the left menu a shade deeper for
+   contrast, one deep navy accent used sparingly; serif titles (Fraunces) over Inter, tiles with
+   bold dark figures. The dark theme is a deep warm charcoal with the menu darker still.
+   html[data-executive] is set with data-style="modern", so Modern's rules hold and these refine them.
+   --------------------------------------------------------------------------- */
+html[data-style][data-executive] {
+  --radius: 0.875rem;
+  --background: hsl(43 27% 95%);
+  --foreground: hsl(222 15% 13%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 15% 13%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 15% 13%);
+  --primary: hsl(225 63% 33%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(40 20% 93%);
+  --secondary-foreground: hsl(222 15% 18%);
+  --muted: hsl(40 20% 94%);
+  --muted-foreground: hsl(36 6% 44%);
+  --accent: hsl(34 70% 42%);
+  --accent-foreground: hsl(222 15% 10%);
+  --border: hsl(40 18% 87%);
+  --input: hsl(40 15% 84%);
+  --ring: hsl(225 63% 33%);
+  --sidebar: hsl(40 22% 85%);
+  --sidebar-foreground: hsl(222 8% 24%);
+  --sidebar-primary: hsl(225 63% 33%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(40 18% 80%);
+  --sidebar-accent-foreground: hsl(222 15% 16%);
+  --sidebar-border: hsl(40 16% 78%);
+  --sidebar-ring: hsl(225 63% 33%);
+  --panel-border: hsl(40 18% 89%);
+  --grid-line: transparent;
+  --neon-cyan: hsl(196 45% 38%);
+  --neon-blue: hsl(224 50% 42%);
+  --neon-emerald: hsl(152 38% 34%);
+  --neon-amber: hsl(34 70% 40%);
+  --neon-violet: hsl(262 32% 46%);
+  --neon-magenta: hsl(320 32% 44%);
+  --neon-rose: hsl(354 50% 46%);
+  --chart-viable: hsl(224 50% 42%);
+  --chart-win: hsl(262 32% 52%);
+  --chart-done: hsl(40 10% 80%);
+  --shadow-card: 0 1px 2px rgb(28 31 38 / 0.05), 0 8px 24px -14px rgb(28 31 38 / 0.18);
+}
+html[data-style][data-executive].dark {
+  --background: hsl(30 6% 9%);
+  --foreground: hsl(40 15% 92%);
+  --card: hsl(30 5% 12.5%);
+  --card-foreground: hsl(40 15% 92%);
+  --popover: hsl(30 5% 13.5%);
+  --popover-foreground: hsl(40 15% 92%);
+  --primary: hsl(224 70% 74%);
+  --primary-foreground: hsl(222 30% 10%);
+  --secondary: hsl(30 5% 17%);
+  --secondary-foreground: hsl(40 15% 92%);
+  --muted: hsl(30 5% 16%);
+  --muted-foreground: hsl(35 8% 64%);
+  --accent: hsl(38 70% 62%);
+  --accent-foreground: hsl(30 10% 10%);
+  --border: hsl(30 5% 20%);
+  --input: hsl(30 5% 24%);
+  --ring: hsl(224 70% 74%);
+  --sidebar: hsl(30 6% 6.5%);
+  --sidebar-foreground: hsl(40 10% 84%);
+  --sidebar-primary: hsl(224 70% 74%);
+  --sidebar-primary-foreground: hsl(222 30% 10%);
+  --sidebar-accent: hsl(30 5% 14%);
+  --sidebar-accent-foreground: hsl(40 15% 92%);
+  --sidebar-border: hsl(30 5% 13%);
+  --sidebar-ring: hsl(224 70% 74%);
+  --panel-border: hsl(30 5% 18%);
+  --neon-cyan: hsl(194 45% 62%);
+  --neon-blue: hsl(224 70% 74%);
+  --neon-emerald: hsl(152 38% 58%);
+  --neon-amber: hsl(38 70% 62%);
+  --neon-violet: hsl(262 45% 74%);
+  --neon-magenta: hsl(320 40% 70%);
+  --neon-rose: hsl(354 60% 68%);
+  --chart-viable: hsl(224 70% 74%);
+  --chart-win: hsl(262 45% 74%);
+  --chart-done: hsl(30 5% 30%);
+  --shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.03), 0 10px 28px -16px rgb(0 0 0 / 0.7);
+}
+
+/* The colours (Appearance › Colours; TONES in lib/appearance.js): the page, the menu a shade deeper
+   and the accent; in the dark theme the page stays dark and only the accent follows. */
+html[data-style][data-tone]:not(.dark) {
+  --background: var(--tone-page);
+  --sidebar: var(--tone-menu);
+  --sidebar-accent: color-mix(in oklab, var(--tone-menu) 90%, black);
+  --sidebar-border: color-mix(in oklab, var(--tone-menu) 88%, black);
+  --primary: var(--tone-accent);
+  --ring: var(--tone-accent);
+  --sidebar-primary: var(--tone-accent);
+  --sidebar-ring: var(--tone-accent);
+  --muted: color-mix(in oklab, var(--tone-page) 55%, white);
+  --secondary: color-mix(in oklab, var(--tone-page) 55%, white);
+  --border: color-mix(in oklab, var(--tone-page) 88%, black);
+  --panel-border: color-mix(in oklab, var(--tone-page) 92%, black);
+  --progress-a: var(--tone-accent);
+  --progress-b: color-mix(in oklab, var(--tone-accent) 55%, white);
+}
+html[data-style][data-tone].dark {
+  --primary: var(--tone-accent-dark);
+  --ring: var(--tone-accent-dark);
+  --sidebar-primary: var(--tone-accent-dark);
+  --sidebar-ring: var(--tone-accent-dark);
+  --progress-a: var(--tone-accent-dark);
+  --progress-b: color-mix(in oklab, var(--tone-accent-dark) 60%, white);
+}
+
+/* No grid or glow behind the pages unless a wallpaper is chosen. */
+html[data-style][data-executive]:not([data-wallpaper]) [data-workspace-backdrop] { display: none; }
+
+/* Titles in the serif: the page's, each panel's, each dialog's. */
+html[data-style][data-executive] [data-topbar-title] {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+html[data-style][data-executive] [data-section-label] {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+}
+html[data-style][data-executive] [data-dialog-title] {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+html[data-style][data-executive] [data-section-tick] { display: none; }
+html[data-style][data-executive] [data-section-icon] { color: var(--muted-foreground); }
+
+/* Cards: a hairline edge with the soft shadow. */
+html[data-style][data-executive] [data-panel] { border-color: var(--panel-border); }
+
+/* Stat tiles: no wash or icon box; a small grey label, a bold dark figure, a faint line in the accent. */
+html[data-style][data-executive] [data-tile-wash],
+html[data-style][data-executive] [data-tile-icon] { display: none; }
+html[data-style][data-executive] [data-panel] .stat-label {
+  color: var(--muted-foreground) !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding-top: 0;
+}
+html[data-style][data-executive] [data-tile-value] {
+  color: var(--foreground) !important;
+  font-family: var(--font-inter), Inter, sans-serif;
+  font-size: 2.3rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+html[data-style][data-executive] .tile-spark { opacity: 0.5; }
+html[data-style][data-executive] .tile-spark :is(path, line, polyline, rect) { stroke: var(--primary); }
+html[data-style][data-executive] .tile-spark rect { fill: var(--primary); }
+html[data-style][data-executive] .tile-spark stop { stop-color: var(--primary); }
+
+/* Buttons: the accent solid with a fine highlight; outline ones plain until hovered. */
+html[data-style][data-executive] [data-button] { border-radius: 0.625rem; }
+html[data-style][data-executive] [data-button][data-variant="default"] {
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.14);
+}
+html[data-style][data-executive] [data-button][data-variant="outline"] {
+  border-color: var(--border);
+  background-color: var(--card);
+  color: var(--foreground);
+}
+html[data-style][data-executive] [data-button][data-variant="outline"]:hover {
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--border));
+  color: var(--primary);
+}
+
+/* Fields on white, so they read on the warm page. */
+html[data-style][data-executive] :is(input, select, textarea)[class*="bg-background"] { background-color: var(--card); }
+
+/* Tags (ToneBadge): soft fills, a squarer corner, no outline. */
+html[data-style][data-executive] [data-badge] {
+  border-color: transparent;
+  background-color: color-mix(in oklab, currentColor 12%, transparent);
+  border-radius: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  font-weight: 600;
+}
+
+/* Filter and period chips (the rounded-full border px-3 py-1 pills across the pages): plain text,
+   the chosen one raised on white like a segmented control; no hop on hover. */
+html[data-style][data-executive] .rounded-full.border.px-3.py-1 {
+  border-color: transparent;
+  background-color: transparent;
+  color: var(--muted-foreground);
+  border-radius: 0.5rem;
+  translate: none;
+}
+html[data-style][data-executive] .rounded-full.border.px-3.py-1:hover { background-color: var(--muted); color: var(--foreground); }
+html[data-style][data-executive] .rounded-full.border.px-3.py-1:is(.border-primary, [aria-pressed="true"], [aria-current="true"]) {
+  background-color: var(--card);
+  color: var(--foreground);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(28 31 38 / 0.12), 0 0 0 1px var(--border);
+}
+
+/* The menu's chosen item: raised on white, in the accent. */
+html[data-style][data-executive] [data-nav-active] {
+  background-color: var(--card);
+  border-color: var(--sidebar-border);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(28 31 38 / 0.1);
+}
+html[data-style][data-executive].dark [data-nav-active] { background-color: var(--sidebar-accent); }
+
 /* The sign-in page's dock (login-dock.jsx): a row of badges on frosted glass along the foot of
    the page, like a Mac's Dock. The one under the pointer grows (--grow, set as it moves), lifting
    out of the bar, and shows what it stands for. */

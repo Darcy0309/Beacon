@@ -135,6 +135,45 @@ try {
   check("no wallpaper, no brightness change", !(await html(page, "dataset.wallpaper")) && !(await html(page, "hasAttribute('data-brightness')"))
     && (await page.ev("getComputedStyle(document.querySelector('.brightness-veil')).display")) === "none");
   await page.click('[data-theme-pick="dark"]');
+
+  section("Executive, the default style, and the colours (Sean, Oct 2026)");
+  {
+    const fresh = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 950 });
+    await fresh.go("/", 4000);
+    await fresh.ev("localStorage.removeItem('lighthouse.appearance'); true");
+    await fresh.go("/projects", 5000);
+    const look = () => fresh.ev(`(() => { const d = document.documentElement, cs = getComputedStyle(d);
+      return { style: d.dataset.style, executive: 'executive' in d.dataset, tone: d.dataset.tone ?? null, bg: cs.getPropertyValue('--background').trim(),
+        title: getComputedStyle(document.querySelector('[data-topbar-title]')).fontFamily }; })()`);
+    const first = await look();
+    check("nothing chosen: Executive, with its serif titles", first.executive && first.style === "modern" && /Fraunces|display/i.test(first.title), JSON.stringify(first));
+    // Someone who had saved Modern back when it was the default moves to Executive, once.
+    await fresh.ev(`localStorage.setItem('lighthouse.appearance', JSON.stringify({ style: 'modern', wallpaper: 'classic' })); true`);
+    await fresh.go("/projects", 4000);
+    check("Modern saved before it stopped being the default: Executive now", (await look()).executive);
+
+    await openAppearance(fresh);
+    check("the styles: Executive, Modern and Classic", (await fresh.ev("[...document.querySelectorAll('[data-style-pick]')].map((b) => b.dataset.stylePick).join()")) === "executive,modern,classic"
+      && (await fresh.ev("document.querySelector('[data-style-pick=executive]').getAttribute('aria-checked')")) === "true");
+    check("twelve colours, a Default and a Custom", (await fresh.ev("document.querySelectorAll('[data-tone-pick]').length")) === 14);
+    await fresh.click("[data-tone-pick=sage]");
+    const sage = await until(async () => { const l = await look(); return l.tone === "sage" ? l : null; });
+    check("Sage: the page, a deeper menu and a green accent, at once", Boolean(sage)
+      // Its deep green on a light page; in the dark theme the page stays dark and the accent is the lighter green.
+      && (await fresh.ev("getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()")) === ((await fresh.ev("document.documentElement.classList.contains('dark')")) ? "#9cc9a2" : "#3f6b45"),
+      JSON.stringify(sage));
+    await fresh.ev(`(() => { const i = document.querySelector('[data-tone-color]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '#8a2be2');
+      i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+    check("a colour of their own: worked into a page, menu and accent", Boolean(await until(async () => (await look()).tone === "custom"))
+      && /^#[0-9a-f]{6}$/.test(await fresh.ev("document.documentElement.style.getPropertyValue('--tone-menu')")));
+    await fresh.click("[data-style-pick=modern]");
+    check("Modern chosen: Executive off", !(await until(async () => !(await look()).executive ? true : null) === null));
+    await fresh.key("Escape");
+    await fresh.go("/projects", 4000);
+    const kept = await look();
+    check("kept after a reload, before the page draws: Modern, their own colour", !kept.executive && kept.tone === "custom", JSON.stringify(kept));
+    await fresh.ev("localStorage.removeItem('lighthouse.appearance'); true");
+  }
 } finally {
   browser.close();
 }

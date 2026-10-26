@@ -152,6 +152,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                     href={item.href}
                     onClick={onNavigate}
                     title={collapsed ? item.label : undefined}
+                    data-nav-active={active || undefined}
                     className={cn(
                       "relative flex items-center rounded-lg text-sm font-medium transition-all duration-150",
                       collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",

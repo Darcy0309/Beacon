@@ -1,5 +1,5 @@
 import "./globals.css";
-import { Inter } from "next/font/google";
+import { Fraunces, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import Backdrop from "@/components/brand/backdrop";
@@ -13,6 +13,13 @@ const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-inter",
+  display: "swap",
+});
+// The Executive style's titles: page and panel headings, dialog titles (Sean, Oct 2026).
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -36,7 +43,7 @@ export default async function RootLayout({ children }) {
   }
 
   return (
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
+    <html lang="en" suppressHydrationWarning className={`${inter.variable} ${fraunces.variable}`}>
       <body className="antialiased">
         {/* Each person's wallpaper and brightness (Appearance), on before the page draws. */}
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
