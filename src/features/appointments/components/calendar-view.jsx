@@ -595,7 +595,19 @@ function Block({ a, dense = false, compact = false }) {
 /* --------------------------------------------------------------------------
    Month: heat-mapped grid with a side panel for the selected day.
    -------------------------------------------------------------------------- */
-function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null, blocks = null, notes = null }) {
+function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null, blocks = null, notes = null, today = null }) {
+  // Each day's appointments as the dashboard's calendar marks them (Sean, Oct 2026): confirmed or
+  // gone by in the accent, still to come and not confirmed yet in the awaiting colour.
+  const kinds = useMemo(() => {
+    const out = {};
+    for (const a of rows ?? []) {
+      const d = Number(String(a.date).slice(8, 10));
+      const k = (out[d] ??= { appt: 0, waiting: 0 });
+      if (!a.confirmed && today && a.date >= today) k.waiting += 1;
+      else k.appt += 1;
+    }
+    return out;
+  }, [rows, today]);
   const dayOf = (a) => Number(String(a.date).slice(8, 10));
   // Opened from a notification: show that appointment's day.
   const focusRow = focusId == null ? null : rows.find((a) => a.id === focusId);
@@ -676,9 +688,11 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
                   </span>
                   {n ? (
                     <span className="mt-auto flex items-center justify-between">
-                      <span className="flex gap-0.5">
-                        {Array.from({ length: Math.min(n, 3) }).map((_, k) => (
-                          <span key={k} className="size-1.5 rounded-full bg-primary transition-transform duration-150 group-hover:scale-150" />
+                      <span className="flex gap-0.5" data-day-dots>
+                        {/* Up to three dots, those awaiting confirmation first, in the dashboard's colours. */}
+                        {[...Array(kinds[d]?.waiting ?? 0).fill("waiting"), ...Array(kinds[d]?.appt ?? 0).fill("appt")].slice(0, 3).map((k, j) => (
+                          <span key={j} data-dot={k} className="size-1.5 rounded-full transition-transform duration-150 group-hover:scale-150"
+                            style={{ background: k === "waiting" ? "var(--event-waiting)" : "var(--event-appt)" }} />
                         ))}
                       </span>
                       <span className="text-[0.6rem] font-bold tabular-nums text-primary">{n}</span>
@@ -687,6 +701,11 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
                 </button>
               );
             })}
+          </div>
+          {/* What the dots mean, as on the dashboard's calendar. */}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.7rem] text-muted-foreground" data-dot-legend>
+            <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full" style={{ background: "var(--event-appt)" }} /> Appointment</span>
+            <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full" style={{ background: "var(--event-waiting)" }} /> Awaiting confirmation</span>
           </div>
         </div>
       </Card>

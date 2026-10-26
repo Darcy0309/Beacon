@@ -55,6 +55,8 @@ function toApptView(a) {
     email: lead?.email ?? null,
     location: cityState(lead),
     kind,
+    // Confirmed (the confirmation call made); one not yet, still to come, is awaiting it.
+    confirmed: Boolean(a.confirmed_at),
     project: one(lead?.project)?.name ?? null,
     client: one(one(lead?.project)?.company)?.name ?? null,
     // What the client is told about it, written as it was set.

@@ -27,6 +27,7 @@ export default function TipLayer({ tips, delay = 0, className, children, ...rest
   const tipRef = useRef(null);
   const timer = useRef(null);
   const [shown, setShown] = useState(null); // { key, row, x, top, bottom }
+  const anchorRef = useRef(null); // what the tip points at, to tell a real scroll from a nudge
   const [place, setPlace] = useState(null); // { left, top }
 
   const hide = useCallback(() => {
@@ -39,6 +40,7 @@ export default function TipLayer({ tips, delay = 0, className, children, ...rest
     const target = el instanceof Element ? el.closest("[data-tip]") : null;
     if (!target || !wrapRef.current?.contains(target) || !tips?.[target.getAttribute("data-tip")]) return hide();
     const anchor = target.querySelector("[data-tip-anchor]") ?? target;
+    anchorRef.current = anchor;
     const r = anchor.getBoundingClientRect();
     const next = {
       key: target.getAttribute("data-tip"),
@@ -66,13 +68,23 @@ export default function TipLayer({ tips, delay = 0, className, children, ...rest
     setPlace({ left, top });
   }, [shown]);
 
-  // A scroll moves what it points at: let it go.
+  // A scroll that carries what it points at away lets it go. A small one (the browser settling
+  // the page by a few pixels as the tip opens) moves the tip with it, or it would close as it appears.
   useEffect(() => {
     if (!shown) return undefined;
-    window.addEventListener("scroll", hide, true);
+    const onScroll = () => {
+      const r = anchorRef.current?.getBoundingClientRect();
+      const x = r ? r.left + r.width / 2 : 0;
+      if (r && Math.abs(r.top - shown.top) < 12 && Math.abs(x - shown.x) < 12) {
+        if (r.top !== shown.top || x !== shown.x) setShown((now) => (now ? { ...now, x, top: r.top, bottom: r.bottom } : now));
+        return;
+      }
+      hide();
+    };
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", hide);
     return () => {
-      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", hide);
     };
   }, [shown, hide]);
