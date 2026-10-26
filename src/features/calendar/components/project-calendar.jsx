@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { addMonths, formatIso, monthGrid, monthStart, sameMonth } from "@/lib/dates";
-import { BLOCK_TIMES, blockDays, blockHours, clockOf, dayMarks, eventsOn } from "@/lib/project-calendar";
+import { BLOCK_TIMES, blockDays, blockHours, dayMarks, eventsOn, noteTime } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 import { addCalendarBlock, addCalendarNote, removeCalendarBlock, removeCalendarNote } from "@/features/calendar/actions";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
@@ -93,12 +93,15 @@ export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
 
 /**
  * A note on a time of day on this calendar (the old "Hour Text"): it says
- * something about the time without keeping appointments off it.
+ * something about the time without keeping appointments off it. It can run
+ * until a later time: `from`/`until` ("10:00 AM") start it at a stretch
+ * dragged across the calendar's hours.
  */
-export function NoteDialog({ open, onOpenChange, projectId, day, onDone }) {
+export function NoteDialog({ open, onOpenChange, projectId, day, from = "9:00 AM", until = "", onDone }) {
   const [state, action, pending] = useActionState(addCalendarNote, EMPTY);
   const { fe, invalid } = formHelpers(state, null);
   const handled = useRef(null);
+  const bodyRef = useRef(null);
   useEffect(() => {
     if (state === handled.current) return;
     handled.current = state;
@@ -110,25 +113,32 @@ export function NoteDialog({ open, onOpenChange, projectId, day, onDone }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      {/* A stretch dragged on the calendar comes with its day and times: straight to writing the note. */}
+      <DialogContent className="max-w-md" onOpenAutoFocus={until ? (e) => { e.preventDefault(); bodyRef.current?.focus(); } : undefined}>
         <DialogHeader>
           <DialogTitle>Add a note</DialogTitle>
           <DialogDescription>A note on a time of day, for everyone who sees this calendar. It does not block the time: appointments can still be set then.</DialogDescription>
         </DialogHeader>
         <form action={action} noValidate className="flex flex-col gap-4" data-note-form>
           <input type="hidden" name="project_id" value={projectId} />
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Day" required error={fe("on_date")}>
-              <DatePicker name="on_date" required defaultValue={day} key={`n${day}${open}`} invalid={invalid("on_date")} aria-label="Day" />
+          <Field label="Day" required error={fe("on_date")}>
+            <DatePicker name="on_date" required defaultValue={day} key={`n${day}${open}`} invalid={invalid("on_date")} aria-label="Day" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3" key={`t${from}${until}${open}`}>
+            <Field label="From" required error={fe("at_time")}>
+              <Select name="at_time" defaultValue={from} aria-invalid={invalid("at_time")} aria-label="Time">
+                {BLOCK_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </Select>
             </Field>
-            <Field label="Time" required error={fe("at_time")}>
-              <Select name="at_time" defaultValue="9:00 AM" aria-invalid={invalid("at_time")} aria-label="Time">
+            <Field label="Until" error={fe("until_time")} hint="Optional">
+              <Select name="until_time" defaultValue={until} aria-invalid={invalid("until_time")} aria-label="Until" data-note-until>
+                <option value="">—</option>
                 {BLOCK_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
               </Select>
             </Field>
           </div>
           <Field label="Note" required error={fe("body")} hint="e.g. Keep for Mike's callback, owner back at 2">
-            <Textarea name="body" rows={3} maxLength={300} aria-invalid={invalid("body")} data-note-body />
+            <Textarea ref={bodyRef} name="body" rows={3} maxLength={300} aria-invalid={invalid("body")} data-note-body />
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -274,7 +284,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
                 style={{ borderColor: `color-mix(in srgb, ${NOTED} 45%, transparent)`, background: `color-mix(in srgb, ${NOTED} 8%, transparent)` }}>
                 <StickyNote className="mt-0.5 size-3.5 shrink-0" style={{ color: NOTED }} />
                 <span className="min-w-0 flex-1">
-                  <span className="font-semibold tabular-nums">{clockOf(e.note.start)}</span>
+                  <span className="font-semibold tabular-nums">{noteTime(e.note)}</span>
                   <span className="block whitespace-pre-line break-words">{e.note.text}</span>
                   {e.note.by ? <span className="block truncate text-muted-foreground">by {e.note.by}</span> : null}
                 </span>
@@ -328,7 +338,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
       <NoteDialog open={noting} onOpenChange={setNoting} projectId={calendarId} day={selected} onDone={reload} />
       <ConfirmDialog open={askingNote !== null} onOpenChange={(o) => !o && setAskingNote(null)} pending={removing}
         title="Take this note off the calendar?"
-        description={askingNote ? `${clockOf(askingNote.start)}: ${askingNote.text}` : null}
+        description={askingNote ? `${noteTime(askingNote)}: ${askingNote.text}` : null}
         confirm="Take it off" onConfirm={() => removeNote(askingNote.id)} />
       <ConfirmDialog open={asking !== null} onOpenChange={(o) => !o && setAsking(null)} pending={removing}
         title="Take this block off the calendar?"

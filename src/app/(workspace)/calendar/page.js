@@ -158,6 +158,8 @@ export default async function CalendarPage({ searchParams }) {
           blockedDays={blockedDays}
           blocks={blocks}
           notes={notes}
+          // A project's calendar open: drag across its hours to add a note.
+          noteProjectId={projectCalendar?.projectId ?? null}
         />
       </div>
     </>

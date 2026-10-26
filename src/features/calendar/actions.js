@@ -66,14 +66,16 @@ export async function addCalendarNote(prevState, formData) {
   if (failed) return failed;
   const at = minutesOf(values.at_time);
   if (at == null) return fail("Choose the time", { at_time: "Choose a time" }, values);
+  const until = values.until_time ? minutesOf(values.until_time) : null;
+  if (until != null && until <= at) return fail("The end must be after the start", { until_time: "After the start" }, values);
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (!me) return fail("Sign in again to do that.");
   const { data, error } = await supabase.from("calendar_notes").insert({
-    project_id: Number(values.project_id), on_date: values.on_date, at_time: asTime(at), body: values.body.trim(),
+    project_id: Number(values.project_id), on_date: values.on_date, at_time: asTime(at), until_time: until == null ? null : asTime(until), body: values.body.trim(),
   }).select("id, project_id").single();
   if (error) return fail(/row-level security/i.test(error.message) ? "That calendar is not yours to change." : error, null, values);
-  await logActivity(supabase, "calendar.note", { entity: "project", entityId: data.project_id, detail: `${values.on_date} ${values.at_time}`, userId: me.id });
+  await logActivity(supabase, "calendar.note", { entity: "project", entityId: data.project_id, detail: `${values.on_date} ${values.at_time}${values.until_time ? `–${values.until_time}` : ""}`, userId: me.id });
   revalidatePath("/calendar");
   return ok({ id: data.id });
 }

@@ -188,6 +188,33 @@ try {
   await client.go(`/calendar?project=${P}&view=day&d=${today}`, 6000);
   check("…on the day's grid at its time", Boolean(await until(() => client.ev(`!!document.querySelector('[data-calendar-note="${noteId}"]')`))));
   check("…without blocking the time", sql(`select count(*) from public.calendar_blocks where project_id = ${P}`) === "0");
+
+  // Dragging down the day's hours, 10 AM to the 11:30 slot, opens a note on that stretch of time.
+  const lineOf = (label) => client.ev(`(() => { const s = [...document.querySelectorAll('span')].find((x) => x.textContent.trim() === ${JSON.stringify(label)} && x.closest('.w-14'));
+    const col = document.querySelector('[data-day-column="${today}"]').getBoundingClientRect();
+    return s ? { y: s.parentElement.getBoundingClientRect().top, x: col.left + col.width / 3 } : null; })()`);
+  // Bring 10 AM into view once, then read both lines where they are.
+  await client.ev(`[...document.querySelectorAll('span')].find((x) => x.textContent.trim() === '10 AM' && x.closest('.w-14'))?.scrollIntoView({ block: 'center' })`);
+  await sleep(300);
+  const ten = await lineOf("10 AM");
+  const eleven = await lineOf("11 AM");
+  const mouse = (type, x, y) => client.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons: type === "mouseReleased" ? 0 : 1, clickCount: 1 });
+  await mouse("mouseMoved", ten.x, ten.y + 6);
+  await mouse("mousePressed", ten.x, ten.y + 6);
+  await mouse("mouseMoved", ten.x, eleven.y + 20);
+  await mouse("mouseMoved", ten.x, eleven.y + 34);
+  check("dragging marks the stretch: 10:00 to 12:00", /10:00 AM\s*–\s*12:00 PM/.test(await client.ev("document.querySelector('[data-drag-selection]')?.textContent ?? ''")),
+    await client.ev("document.querySelector('[data-drag-selection]')?.textContent ?? 'none'"));
+  await mouse("mouseReleased", ten.x, eleven.y + 34);
+  await until(() => client.ev("!!document.querySelector('[data-note-form]')"));
+  check("…and opens a note on it, from and until", (await client.ev("document.querySelector('[data-note-form] select[name=at_time]').value")) === "10:00 AM"
+    && (await client.ev("document.querySelector('[data-note-form] select[name=until_time]').value")) === "12:00 PM");
+  check("…ready to write the note", Boolean(await until(() => client.ev("document.activeElement?.matches('[data-note-body]') || null"))));
+  await client.fill("[data-note-form] [data-note-body]", `${TAG} Owner out 10 to noon`);
+  await client.click("[data-note-form] button[type=submit]", "Add note");
+  const rangeId = await until(() => sql(`select coalesce(max(id)::text, '') from public.calendar_notes where body = ${lit(`${TAG} Owner out 10 to noon`)}`) || null);
+  check("…saved from 10 until 12", Boolean(rangeId) && sql(`select at_time || '-' || until_time from public.calendar_notes where id = ${rangeId}`) === "10:00:00-12:00:00");
+  check("…a band across those hours on the grid", Boolean(await until(() => client.ev(`!!document.querySelector('[data-calendar-note-band="${rangeId}"]')`), { timeout: 15000 })));
   await admin.go(`/calendar?project=${P}&view=month&d=${today}`, 6000);
   check("staff see it on the month: its day marked", Boolean(await until(() => admin.ev("!!document.querySelector('[data-day-noted]')"), { timeout: 20000 })));
   await admin.go(`/projects/${P}`, 5000);

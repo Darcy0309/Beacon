@@ -782,6 +782,12 @@ option {
   .nav-item:hover { box-shadow: inset 3px 0 0 var(--nav-edge); background-color: var(--nav-hover); }
 }
 
+/* The menu's words in the logo's blues (Sean, Oct 2026): its items in the deep navy, the group
+   headings in the lighter steel blue and bold; light versions of both in the dark theme. */
+:root { --nav-text: #1f2566; --nav-group: #3f6c94; }
+.dark { --nav-text: #d3d8f0; --nav-group: #8db2cc; }
+html[data-style] [data-nav-group] { font-weight: 700; }
+
 /* A sidebar item whose page is still loading: a light sweeping along its foot. */
 .nav-loading {
   position: absolute;
@@ -1474,6 +1480,36 @@ html[data-style][data-tone].dark {
   --progress-a: var(--tone-accent-dark);
   --progress-b: color-mix(in oklab, var(--tone-accent-dark) 60%, white);
 }
+
+/* A chart's two lines (production-chart.jsx): leads and appointments, well apart. As before in
+   Modern and Classic; in Executive the accent and a warm orange; with a colour chosen, its accent and
+   its own second colour (TONES). */
+:root { --series-leads: var(--neon-cyan); --series-appts: var(--neon-emerald); }
+html[data-style][data-executive] { --series-leads: var(--primary); --series-appts: hsl(24 74% 46%); }
+html[data-style][data-executive].dark { --series-appts: hsl(28 80% 64%); }
+html[data-style][data-tone]:not(.dark) { --series-leads: var(--tone-accent); --series-appts: var(--tone-contrast); }
+html[data-style][data-tone].dark { --series-leads: var(--tone-accent-dark); --series-appts: var(--tone-contrast-dark); }
+/* Hourly Progress: calls as quiet grey bars, the leads and appointments in them in the chart pair. */
+:root { --hourly-calls: var(--neon-cyan); --hourly-leads: var(--neon-emerald); --hourly-appts: var(--neon-violet); }
+html[data-style][data-executive] { --hourly-calls: color-mix(in oklab, var(--muted-foreground) 70%, var(--card)); --hourly-leads: var(--series-leads); --hourly-appts: var(--series-appts); }
+
+/* The kinds of thing on a schedule's calendar (my-schedule.jsx), each its own colour, well apart:
+   an appointment in the accent (so it follows the colour chosen), awaiting confirmation amber, a
+   reminder teal, a message from an administrator magenta. Where a colour chosen would sit too close
+   to one of them, that one moves. As before in Modern and Classic. */
+:root { --event-appt: var(--neon-emerald); --event-waiting: var(--neon-amber); --event-reminder: var(--neon-cyan); --event-message: var(--neon-violet); }
+html[data-style][data-executive] { --event-appt: var(--primary); --event-waiting: hsl(38 90% 46%); --event-reminder: hsl(178 58% 33%); --event-message: hsl(312 45% 46%); }
+html[data-style][data-executive].dark { --event-waiting: hsl(40 90% 60%); --event-reminder: hsl(176 50% 56%); --event-message: hsl(312 50% 72%); }
+html[data-style][data-tone]:is([data-tone="mint"], [data-tone="sky"]) { --event-reminder: hsl(330 55% 46%); }
+html[data-style][data-tone]:is([data-tone="mint"], [data-tone="sky"]).dark { --event-reminder: hsl(330 60% 72%); }
+html[data-style][data-tone="sage"] { --event-reminder: hsl(205 70% 42%); }
+html[data-style][data-tone="sage"].dark { --event-reminder: hsl(205 65% 68%); }
+html[data-style][data-tone]:is([data-tone="lavender"], [data-tone="blush"]) { --event-message: hsl(200 70% 40%); }
+html[data-style][data-tone]:is([data-tone="lavender"], [data-tone="blush"]).dark { --event-message: hsl(200 65% 68%); }
+html[data-style][data-tone="butter"] { --event-waiting: hsl(14 85% 50%); }
+html[data-style][data-tone="butter"].dark { --event-waiting: hsl(16 85% 64%); }
+html[data-style][data-tone="terracotta"] { --event-waiting: hsl(46 95% 42%); }
+html[data-style][data-tone="terracotta"].dark { --event-waiting: hsl(48 90% 60%); }
 
 /* No grid or glow behind the pages unless a wallpaper is chosen. */
 html[data-style][data-executive]:not([data-wallpaper]) [data-workspace-backdrop] { display: none; }

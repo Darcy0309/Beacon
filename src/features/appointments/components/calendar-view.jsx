@@ -20,7 +20,8 @@ import {
 import { telHref } from "@/lib/format";
 import LeadFiles from "@/features/leads/components/lead-files";
 import { useRole } from "@/components/layout/role-provider";
-import { blockDays, blockHours, blockOn, clockOf } from "@/lib/project-calendar";
+import { blockDays, blockHours, blockOn, clockOf, noteTime } from "@/lib/project-calendar";
+import { NoteDialog } from "@/features/calendar/components/project-calendar";
 import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
@@ -55,7 +56,7 @@ const blocksDay = blockOn;
 const blockNote = (b) => (b.synced ? (b.by ? `${b.by}'s calendar` : "A connected calendar") : [b.note, b.by ? `by ${b.by}` : null].filter(Boolean).join(" · "));
 // A note on a time of day ("Hour Text"): what it says, who wrote it, and on which calendar when several are shown.
 const NOTED = "var(--neon-violet)";
-const noteTitle = (n) => [clockOf(n.start), n.text, n.by ? `by ${n.by}` : null, n.project].filter(Boolean).join(" · ");
+const noteTitle = (n) => [noteTime(n), n.text, n.by ? `by ${n.by}` : null, n.project].filter(Boolean).join(" · ");
 const blockTitle = (b) => [b.synced ? "Busy" : "Blocked", blockHours(b), blockNote(b), b.project].filter(Boolean).join(" · ");
 const BLOCKED_FILL = {
   borderColor: "color-mix(in srgb, var(--neon-amber) 40%, transparent)",
@@ -273,8 +274,21 @@ function AppointmentDialog({ a, onClose }) {
 /* --------------------------------------------------------------------------
    Day and week: an hour grid with appointments placed by start time.
    -------------------------------------------------------------------------- */
-function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null, blocks = null, notes = null }) {
+// A stretch dragged across the hours snaps to the half hour, inside the note dialog's times (6 AM to 9 PM).
+const DRAG_STEP = 30;
+const DRAG_FIRST = 360;
+const DRAG_LAST = 1260;
+
+/**
+ * The day or week by the hour. With `noteProjectId` (a project's calendar is open), dragging the
+ * mouse down a day's hours marks a stretch of time and opens a note on it, from and until (a click
+ * marks half an hour); appointments, notes and links under the pointer keep their own clicks.
+ */
+function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null, blocks = null, notes = null, noteProjectId = null }) {
+  const router = useRouter();
   const [nowMin, setNowMin] = useState(null);
+  const [drag, setDrag] = useState(null); // { date, a, b }: minutes where it began and where the pointer is
+  const [noting, setNoting] = useState(null); // { date, from, until }
 
   // The "now" line, refreshed every minute, on the business's clock: "today"
   // is the business's day, so the time across it must be the business's too.
@@ -298,13 +312,41 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
   const dayLong = shownBlocks.filter((b) => b.start == null);
   const partial = shownBlocks.filter((b) => b.start != null);
   const shownNotes = (notes ?? []).filter((n) => n.start != null && days.some((d) => d.date === n.date));
+  const noteEnd = (n) => (n.end != null ? n.end : n.start + 30);
 
   // Widen the window to fit anything outside the usual working day.
   const startHour = Math.min(DEFAULT_START_HOUR, ...timed.map((a) => Math.floor(a.startMin / 60)), ...partial.map((b) => Math.floor(b.start / 60)), ...shownNotes.map((n) => Math.floor(n.start / 60)));
-  const endHour = Math.max(DEFAULT_END_HOUR, ...timed.map((a) => Math.ceil(endOf(a) / 60)), ...partial.map((b) => Math.ceil(b.end / 60)), ...shownNotes.map((n) => Math.ceil((n.start + 30) / 60)));
+  const endHour = Math.max(DEFAULT_END_HOUR, ...timed.map((a) => Math.ceil(endOf(a) / 60)), ...partial.map((b) => Math.ceil(b.end / 60)), ...shownNotes.map((n) => Math.ceil(noteEnd(n) / 60)));
   const hours = Array.from({ length: endHour - startHour }, (_, i) => startHour + i);
   const height = hours.length * HOUR_PX;
   const top = (min) => ((min - startHour * 60) / 60) * HOUR_PX;
+
+  // The half hour under the pointer, in a day's column.
+  const minuteAt = (e) => {
+    const y = e.clientY - e.currentTarget.getBoundingClientRect().top;
+    const m = startHour * 60 + Math.floor(((y / HOUR_PX) * 60) / DRAG_STEP) * DRAG_STEP;
+    return Math.min(DRAG_LAST - DRAG_STEP, Math.max(DRAG_FIRST, m));
+  };
+  const dragStart = (e, date) => {
+    if (!noteProjectId || e.button !== 0 || e.pointerType === "touch") return;
+    if (e.target.closest("button, a, [data-calendar-note], [data-appointment-block]")) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    const m = minuteAt(e);
+    setDrag({ date, a: m, b: m });
+  };
+  const dragMove = (e, date) => {
+    if (!drag || drag.date !== date) return;
+    const m = minuteAt(e);
+    if (m !== drag.b) setDrag({ ...drag, b: m });
+  };
+  const dragEnd = () => {
+    if (!drag) return;
+    const from = Math.min(drag.a, drag.b);
+    const until = Math.max(drag.a, drag.b) + DRAG_STEP;
+    setNoting({ date: drag.date, from: clockOf(from), until: clockOf(until) });
+  };
+  const marked = drag ? { date: drag.date, from: Math.min(drag.a, drag.b), until: Math.max(drag.a, drag.b) + DRAG_STEP } : null;
 
   return (
     <Card>
@@ -313,6 +355,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
         icon={CalendarClock}
         action={
           <span className="text-[0.66rem] font-semibold tracking-[0.1em] text-muted-foreground">
+            {noteProjectId ? <span className="mr-2 hidden font-normal sm:inline" data-drag-hint>Drag across the hours to add a note ·</span> : null}
             {timed.length + untimed.length} scheduled
           </span>
         }
@@ -412,7 +455,24 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
             {days.map((d) => {
               const placed = layoutDay(timed.filter((a) => a.date === d.date));
               return (
-                <div key={d.date} className={cn("relative border-l border-[var(--panel-border)]", d.isToday && "bg-primary/[0.04]")}>
+                <div key={d.date} className={cn("relative border-l border-[var(--panel-border)]", d.isToday && "bg-primary/[0.04]", noteProjectId && "cursor-cell select-none")}
+                  data-day-column={d.date}
+                  onPointerDown={(e) => dragStart(e, d.date)} onPointerMove={(e) => dragMove(e, d.date)} onPointerUp={dragEnd}
+                  onPointerCancel={() => setDrag(null)}>
+                  {/* The stretch being dragged, or waiting on its note. */}
+                  {marked && marked.date === d.date ? (
+                    <div className="pointer-events-none absolute inset-x-0.5 z-20 rounded-md border-2 border-dashed px-1.5 py-0.5 text-[0.66rem] font-semibold"
+                      style={{ top: top(marked.from), height: ((marked.until - marked.from) / 60) * HOUR_PX, borderColor: NOTED, background: `color-mix(in srgb, ${NOTED} 14%, transparent)` }}
+                      data-drag-selection>
+                      {clockOf(marked.from)} – {clockOf(marked.until)}
+                    </div>
+                  ) : null}
+                  {/* Notes over a stretch of time: a soft band across it, behind the appointments. */}
+                  {shownNotes.filter((n) => n.date === d.date && n.end != null).map((n) => (
+                    <div key={`nb${n.id}`} aria-hidden className="pointer-events-none absolute inset-x-0.5 rounded border-l-2"
+                      style={{ top: top(n.start), height: ((n.end - n.start) / 60) * HOUR_PX, borderColor: NOTED, background: `color-mix(in srgb, ${NOTED} 9%, transparent)` }}
+                      data-calendar-note-band={n.id} />
+                  ))}
                   {/* Blocked hours, behind the appointments: a slot booked over one still shows on top of it. */}
                   {partial.filter((b) => blocksDay(b, d.date)).map((b) => (
                     <div key={b.id} data-blocked-time-block={b.id} title={blockTitle(b)}
@@ -467,6 +527,12 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
           </div>
         </div>
       </TipLayer>
+
+      {noteProjectId ? (
+        <NoteDialog open={noting !== null} projectId={noteProjectId} day={noting?.date ?? today} from={noting?.from} until={noting?.until ?? ""}
+          onOpenChange={(o) => { if (!o) { setNoting(null); setDrag(null); } }}
+          onDone={() => { setNoting(null); setDrag(null); router.refresh(); }} />
+      ) : null}
 
       {timed.length + untimed.length === 0 && (
         <p className="border-t border-[var(--panel-border)] py-6 text-center text-sm text-muted-foreground">
@@ -726,13 +792,13 @@ function NoteRow({ n }) {
       <span className="h-9 w-[3px] shrink-0 rounded-full" style={{ background: NOTED }} />
       <StickyNote className="size-4 shrink-0" style={{ color: NOTED }} />
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium"><span className="tabular-nums">{clockOf(n.start)}</span> · <span className="break-words">{n.text}</span></div>
+        <div className="text-sm font-medium"><span className="tabular-nums">{noteTime(n)}</span> · <span className="break-words">{n.text}</span></div>
         <div className="truncate text-xs text-muted-foreground">{[n.by ? `by ${n.by}` : null, n.project].filter(Boolean).join(" · ") || "Note"}</div>
       </div>
       <button type="button" onClick={() => setAsking(true)} disabled={pending} aria-label="Take this note off the calendar" title="Take it off the calendar" data-remove-note
         className="shrink-0 rounded text-muted-foreground transition-colors hover:text-destructive"><X className="size-4" /></button>
       <ConfirmDialog open={asking} onOpenChange={setAsking} pending={pending} title="Take this note off the calendar?"
-        description={`${clockOf(n.start)}: ${n.text}`} confirm="Take it off" onConfirm={remove} />
+        description={`${noteTime(n)}: ${n.text}`} confirm="Take it off" onConfirm={remove} />
     </div>
   );
 }

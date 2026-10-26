@@ -48,9 +48,10 @@ export default async function HourlyProgress({ searchParams }) {
   const link = (d) => `/reports/hourly?${new URLSearchParams({ ...(canPick ? { user: String(userId) } : {}), day: d })}`;
 
   const figures = [
-    ["Calls", total.calls, "var(--neon-cyan)"],
-    ["Leads", total.leads, "var(--neon-emerald)"],
-    ["Appointments", total.appointments, "var(--neon-violet)"],
+    // The chart's own colours (globals.css: --hourly-*), so the figures match their bars.
+    ["Calls", total.calls, "var(--hourly-calls)"],
+    ["Leads", total.leads, "var(--hourly-leads)"],
+    ["Appointments", total.appointments, "var(--hourly-appts)"],
     ["Calls an hour", busy ? (total.calls / busy).toFixed(1) : "0", "var(--neon-amber)", `over ${busy} hour${busy === 1 ? "" : "s"} with calls`],
   ];
 
@@ -86,10 +87,10 @@ export default async function HourlyProgress({ searchParams }) {
                   <div key={h.hour} className="group relative flex h-full flex-1 flex-col items-center justify-end" data-hour={h.hour} data-calls={h.calls}
                     title={`${clockOf(h.hour * 60)} – ${clockOf((h.hour + 1) * 60 % 1440)}: ${h.calls} call${h.calls === 1 ? "" : "s"}, ${h.leads} lead${h.leads === 1 ? "" : "s"}, ${h.appointments} appointment${h.appointments === 1 ? "" : "s"}`}>
                     {h.calls ? <span className="mb-0.5 text-[0.62rem] font-semibold tabular-nums text-muted-foreground">{h.calls}</span> : null}
-                    <div className="flex w-full flex-col justify-end overflow-hidden rounded-t-md bg-[var(--neon-cyan)]/70 transition-opacity group-hover:opacity-80"
+                    <div className="flex w-full flex-col justify-end overflow-hidden rounded-t-md bg-[var(--hourly-calls)]/70 transition-opacity group-hover:opacity-80"
                       style={{ height: `${(h.calls / top) * 85}%`, minHeight: h.leads || h.appointments ? 8 : 0 }}>
-                      {h.appointments ? <div className="w-full bg-[var(--neon-violet)]" style={{ height: 4 * h.appointments, maxHeight: "50%" }} /> : null}
-                      {h.leads ? <div className="w-full bg-[var(--neon-emerald)]" style={{ height: 4 * h.leads, maxHeight: "50%" }} /> : null}
+                      {h.appointments ? <div className="w-full bg-[var(--hourly-appts)]" style={{ height: 4 * h.appointments, maxHeight: "50%" }} /> : null}
+                      {h.leads ? <div className="w-full bg-[var(--hourly-leads)]" style={{ height: 4 * h.leads, maxHeight: "50%" }} /> : null}
                     </div>
                   </div>
                 ))}
@@ -98,9 +99,9 @@ export default async function HourlyProgress({ searchParams }) {
                 {hours.map((h) => <span key={h.hour} className="flex-1 text-center text-[0.6rem] text-muted-foreground">{hourLabel(h.hour)}</span>)}
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-[var(--neon-cyan)]/70" /> Calls</span>
-                <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-[var(--neon-emerald)]" /> Leads</span>
-                <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-[var(--neon-violet)]" /> Appointments</span>
+                <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-[var(--hourly-calls)]/70" /> Calls</span>
+                <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-[var(--hourly-leads)]" /> Leads</span>
+                <span className="flex items-center gap-1.5"><span className="size-2.5 rounded-sm bg-[var(--hourly-appts)]" /> Appointments</span>
                 <span className="ml-auto">{total.calls ? `First call ${time(data.first)} · last ${time(data.last)}` : "No calls this day."}</span>
               </div>
             </div>

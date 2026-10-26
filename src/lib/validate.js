@@ -412,6 +412,8 @@ export const schemas = {
     project_id: [required("Missing project"), id],
     on_date: [required("Choose the day"), date],
     at_time: [required("Choose the time"), time12],
+    // Optional: where the note's time ends (a stretch dragged across the calendar).
+    until_time: [time12],
     body: [required("Write the note"), max(300)],
   },
 

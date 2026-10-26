@@ -41,22 +41,23 @@ const APPEARANCE_VERSION = 2;
 /**
  * The page's colours (Sean, Oct 2026): each a page background, the left menu a
  * shade deeper, and an accent for buttons, the chosen item and key figures (a
- * lighter one in the dark theme, where the page itself stays dark).
- *   [key, label, page, menu, accent, accent in the dark theme]
+ * lighter one in the dark theme, where the page itself stays dark), and a second colour well
+ * apart from the accent, for a chart's second line (leads in the accent, appointments in it).
+ *   [key, label, page, menu, accent, accent in the dark theme, second, second in the dark theme]
  */
 export const TONES = [
-  ["paper", "Paper", "#f5f3ee", "#e2dccf", "#1f3a8a", "#8fa8ec"],
-  ["sand", "Sand", "#efe6d6", "#ddcfb6", "#7a4b1e", "#e0b483"],
-  ["terracotta", "Terracotta", "#f3e1d7", "#e3c3b1", "#a8452a", "#f0a083"],
-  ["blush", "Blush", "#f6e4e6", "#e8c8cd", "#a33a55", "#f09ab0"],
-  ["lavender", "Lavender", "#ebe6f5", "#d6cdea", "#5b3fa8", "#b9a4f0"],
-  ["periwinkle", "Periwinkle", "#e3e8f8", "#c9d2ef", "#2f4fb8", "#9fb3f5"],
-  ["sky", "Sky", "#e1eef6", "#c3dbea", "#1d6a96", "#7fc0e8"],
-  ["sage", "Sage", "#e6ece3", "#cdd8c8", "#3f6b45", "#9cc9a2"],
-  ["mint", "Mint", "#e0f1ec", "#c2e1d7", "#1d7a63", "#7ad7bc"],
-  ["butter", "Butter", "#f6f0d8", "#e8ddb3", "#8a6a12", "#e6c766"],
-  ["stone", "Stone", "#e9e9e7", "#d4d4d0", "#2c2f36", "#c9ccd3"],
-  ["slate", "Slate", "#dfe3e9", "#c5ccd6", "#1e3a5f", "#93b4dc"],
+  ["paper", "Paper", "#f5f3ee", "#e2dccf", "#1f3a8a", "#8fa8ec", "#c8641e", "#f0a060"],
+  ["sand", "Sand", "#efe6d6", "#ddcfb6", "#7a4b1e", "#e0b483", "#1d7a86", "#6cc4cf"],
+  ["terracotta", "Terracotta", "#f3e1d7", "#e3c3b1", "#a8452a", "#f0a083", "#1d7a86", "#6cc4cf"],
+  ["blush", "Blush", "#f6e4e6", "#e8c8cd", "#a33a55", "#f09ab0", "#1d7a86", "#6cc4cf"],
+  ["lavender", "Lavender", "#ebe6f5", "#d6cdea", "#5b3fa8", "#b9a4f0", "#b7791f", "#e8b860"],
+  ["periwinkle", "Periwinkle", "#e3e8f8", "#c9d2ef", "#2f4fb8", "#9fb3f5", "#c8641e", "#f0a060"],
+  ["sky", "Sky", "#e1eef6", "#c3dbea", "#1d6a96", "#7fc0e8", "#c8641e", "#f0a060"],
+  ["sage", "Sage", "#e6ece3", "#cdd8c8", "#3f6b45", "#9cc9a2", "#8e3b7a", "#d39ac6"],
+  ["mint", "Mint", "#e0f1ec", "#c2e1d7", "#1d7a63", "#7ad7bc", "#c4513a", "#f0957f"],
+  ["butter", "Butter", "#f6f0d8", "#e8ddb3", "#8a6a12", "#e6c766", "#3b4bb0", "#9aa6f0"],
+  ["stone", "Stone", "#e9e9e7", "#d4d4d0", "#2c2f36", "#c9ccd3", "#c8641e", "#f0a060"],
+  ["slate", "Slate", "#dfe3e9", "#c5ccd6", "#1e3a5f", "#93b4dc", "#c8641e", "#f0a060"],
 ];
 const TONE_KEYS = new Set(TONES.map(([k]) => k).concat("custom"));
 const HEX6 = /^#[0-9a-f]{6}$/i;
@@ -76,6 +77,9 @@ export function toneFromColor(color) {
     menu: tint(32, 0.85),
     accent: hex(h, sat < 8 ? sat / 100 : Math.min(0.7, Math.max(0.45, s)), 0.32),
     accentDark: hex(h, sat < 8 ? sat / 100 : 0.65, 0.72),
+    // The opposite hue (a warm orange for a grey), for a chart's second line.
+    contrast: hex(sat < 8 ? 24 : (h + 180) % 360, 0.62, 0.44),
+    contrastDark: hex(sat < 8 ? 28 : (h + 180) % 360, 0.7, 0.66),
   };
 }
 
@@ -83,7 +87,7 @@ export function toneFromColor(color) {
 export function toneColors(a) {
   if (a?.tone === "custom") return toneFromColor(a.toneColor);
   const t = TONES.find(([k]) => k === a?.tone);
-  return t ? { page: t[2], menu: t[3], accent: t[4], accentDark: t[5] } : null;
+  return t ? { page: t[2], menu: t[3], accent: t[4], accentDark: t[5], contrast: t[6], contrastDark: t[7] } : null;
 }
 
 const clamp = (v) => Math.min(MAX_SHIFT, Math.max(0, Number(v) || 0));
@@ -240,7 +244,8 @@ export function applyAppearance(a, { keep = true } = {}) {
   else delete d.dataset.executive;
   // The colours: the page, the menu and the accent (TONES), as variables globals.css reads.
   const tone = toneColors(a);
-  for (const [prop, key] of [["--tone-page", "page"], ["--tone-menu", "menu"], ["--tone-accent", "accent"], ["--tone-accent-dark", "accentDark"]]) {
+  for (const [prop, key] of [["--tone-page", "page"], ["--tone-menu", "menu"], ["--tone-accent", "accent"], ["--tone-accent-dark", "accentDark"],
+    ["--tone-contrast", "contrast"], ["--tone-contrast-dark", "contrastDark"]]) {
     if (tone) d.style.setProperty(prop, tone[key]);
     else d.style.removeProperty(prop);
   }
@@ -271,7 +276,7 @@ export function applyAppearance(a, { keep = true } = {}) {
     localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : "executive", wallpaper: a.wallpaper,
       blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark), tone: tone ? a.tone : null, toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor : null,
       // A colour of their own, worked out, for the script that puts it on before the page draws.
-      toneVars: tone && a.tone === "custom" ? [tone.page, tone.menu, tone.accent, tone.accentDark] : undefined }));
+      toneVars: tone && a.tone === "custom" ? [tone.page, tone.menu, tone.accent, tone.accentDark, tone.contrast, tone.contrastDark] : undefined }));
   } catch {
     // Kept for this visit only.
   }
@@ -279,11 +284,11 @@ export function applyAppearance(a, { keep = true } = {}) {
 
 /** The same, as a script run before the page draws: no flash of the default look. */
 // Executive unless Modern (saved since it stopped being the default) or Classic was chosen; then the colours (TONES, or their own).
-const TONE_SCRIPT_TABLE = JSON.stringify(Object.fromEntries(TONES.map(([k, , page, menu, accent, accentDark]) => [k, [page, menu, accent, accentDark]])));
+const TONE_SCRIPT_TABLE = JSON.stringify(Object.fromEntries(TONES.map(([k, , ...colors]) => [k, colors])));
 export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";d.dataset.executive="";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
   + `if(a.style==="classic"){d.dataset.style="classic";delete d.dataset.executive;}else if(a.style==="modern"&&a.v===${APPEARANCE_VERSION})delete d.dataset.executive;`
   + `var T=${TONE_SCRIPT_TABLE},k=a.tone,tc=null;if(k==="custom"&&a.toneVars&&/^#[0-9a-f]{6}$/i.test(a.toneVars[0]))tc=a.toneVars;else if(typeof k==="string"&&T[k])tc=T[k];`
-  + `if(tc){d.dataset.tone=k;["--tone-page","--tone-menu","--tone-accent","--tone-accent-dark"].forEach(function(p,j){if(/^#[0-9a-f]{6}$/i.test(tc[j]))d.style.setProperty(p,tc[j]);});}`
+  + `if(tc){d.dataset.tone=k;["--tone-page","--tone-menu","--tone-accent","--tone-accent-dark","--tone-contrast","--tone-contrast-dark"].forEach(function(p,j){if(/^#[0-9a-f]{6}$/i.test(tc[j]))d.style.setProperty(p,tc[j]);});}`
   + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
   + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i){d.style.setProperty("--wp-image",'url("'+i+'")');`
   + `var t=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_TINT_KEY)})||"null");if(t&&/^#[0-9a-f]{6}$/.test(t[0])&&/^#[0-9a-f]{6}$/.test(t[1])){d.style.setProperty("--progress-a",t[0]);d.style.setProperty("--progress-b",t[1]);}}}}`

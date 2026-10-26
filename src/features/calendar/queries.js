@@ -9,13 +9,13 @@ import { createClient } from "@/lib/supabase/server";
 
 const BLOCK_COLUMNS = "id, starts_on, ends_on, start_time, end_time, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)";
 
-const NOTE_COLUMNS = "id, on_date, at_time, body, by:users!calendar_notes_created_by_fkey(first_name, last_name, role)";
+const NOTE_COLUMNS = "id, on_date, at_time, until_time, body, by:users!calendar_notes_created_by_fkey(first_name, last_name, role)";
 
 // A note on a time of day as the calendar shows it; `project`: the calendar it is on, when several are shown together.
 function shapeNote(n) {
   const by = one(n.by);
   return {
-    id: n.id, date: n.on_date, start: minutesOf(n.at_time), text: n.body,
+    id: n.id, date: n.on_date, start: minutesOf(n.at_time), end: n.until_time ? minutesOf(n.until_time) : null, text: n.body,
     by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || null : null, byClient: by?.role === "client",
     ...(n.project ? { project: one(n.project)?.name ?? null } : {}),
   };

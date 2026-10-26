@@ -138,7 +138,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
             {collapsed ? (
               <div className="mx-auto mb-1 h-px w-6 bg-sidebar-border" />
             ) : (
-              <div className="px-2 pb-1.5 pt-1 text-[0.6rem] font-bold uppercase tracking-[0.18em] text-sidebar-foreground/40">
+              <div className="px-2 pb-1.5 pt-1 text-[0.6rem] font-bold uppercase tracking-[0.18em] text-[var(--nav-group)]" data-nav-group>
                 {group.label}
               </div>
             )}
@@ -158,7 +158,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                       collapsed ? "justify-center py-2.5" : "gap-3 px-3 py-2.5",
                       active
                         ? "border border-primary/45 bg-primary/10 text-foreground shadow-[0_0_20px_-6px_var(--primary)]"
-                        : "nav-item border border-transparent text-sidebar-foreground/65"
+                        : "nav-item border border-transparent text-[var(--nav-text)]"
                     )}
                   >
                     <Icon className={cn("size-4 shrink-0", active ? "text-primary" : "")} />

@@ -19,12 +19,12 @@ import { dashboardHref } from "@/features/dashboard/components/period-switch";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 
-// Each kind's colour and icon, on the calendar's dots and the list.
+// Each kind's colour and icon, on the calendar's dots and the list: the theme's own four, well apart (globals.css, --event-*).
 const KINDS = {
-  appointment: { color: "var(--neon-emerald)", icon: CalendarCheck, label: "Appointment" },
-  waiting: { color: "var(--neon-amber)", icon: CalendarCheck, label: "Awaiting confirmation" },
-  reminder: { color: "var(--neon-cyan)", icon: AlarmClock, label: "Reminder" },
-  message: { color: "var(--neon-violet)", icon: BellRing, label: "From an administrator" },
+  appointment: { color: "var(--event-appt)", icon: CalendarCheck, label: "Appointment" },
+  waiting: { color: "var(--event-waiting)", icon: CalendarCheck, label: "Awaiting confirmation" },
+  reminder: { color: "var(--event-reminder)", icon: AlarmClock, label: "Reminder" },
+  message: { color: "var(--event-message)", icon: BellRing, label: "From an administrator" },
 };
 const kindOf = (item) => (item.kind === "appointment" && item.waiting ? "waiting" : item.kind);
 

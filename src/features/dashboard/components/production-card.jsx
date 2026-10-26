@@ -6,8 +6,9 @@ import { hoursLabel } from "@/lib/pay";
 import { cn } from "@/lib/utils";
 import DailyGoals from "@/features/dashboard/components/daily-goals";
 
-const LEADS = "var(--neon-cyan)";
-const APPTS = "var(--neon-emerald)";
+// Leads and appointments in the theme's pair of chart colours (globals.css: --series-leads, --series-appts).
+const LEADS = "var(--series-leads)";
+const APPTS = "var(--series-appts)";
 
 /** How many, against the goal: "4 of 5 · 80%" and a bar; or that no goal was set. */
 function Meter({ label, done, goal, color, plural }) {

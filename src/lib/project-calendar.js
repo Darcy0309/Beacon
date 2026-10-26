@@ -25,6 +25,9 @@ export const clockOf = (minutes) => {
   return `${((h + 11) % 12) + 1}:${String(minutes % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 };
 
+/** A note's time: "10:00 AM", or "10:00 AM – 11:30 AM" for one over a stretch of time. */
+export const noteTime = (n) => (n?.end != null ? `${clockOf(n.start)} – ${clockOf(n.end)}` : clockOf(n?.start ?? 0));
+
 /** The times a block can start or end at: every half hour from 6 AM to 9 PM. */
 export const BLOCK_TIMES = Array.from({ length: 31 }, (_, i) => clockOf(360 + i * 30));
 

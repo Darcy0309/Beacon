@@ -24,8 +24,9 @@ import { cn } from "@/lib/utils";
 import { saveProductionGoal } from "@/features/dashboard/actions";
 import { dashboardHref } from "@/features/dashboard/components/period-switch";
 
-const LEADS = "var(--neon-cyan)";
-const APPTS = "var(--neon-emerald)";
+// The two lines in the theme's own pair of colours (globals.css: --series-leads, --series-appts), well apart.
+const LEADS = "var(--series-leads)";
+const APPTS = "var(--series-appts)";
 const HEIGHT = 240;
 const PAD = { left: 40, right: 16, top: 14, bottom: 28 };
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
