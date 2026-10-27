@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { REACH_ERROR, isNetworkError } from "@/lib/reach";
 
 /**
  * Finishes an email link whose tokens arrived in the URL fragment
@@ -30,9 +31,13 @@ export default function AuthComplete({ next }) {
         // or the sidebar and role checks keep treating them as signed out.
         window.location.replace(next);
       })
-      .catch(() => setFailed(true));
+      // Not there at all (offline) is not an expired link: say which.
+      .catch((e) => setFailed(isNetworkError(e) ? "offline" : true));
   }, [next]);
 
+  if (failed === "offline") {
+    return <p className="text-sm text-muted-foreground">{REACH_ERROR}</p>;
+  }
   if (failed) {
     return (
       <p className="text-sm text-muted-foreground">

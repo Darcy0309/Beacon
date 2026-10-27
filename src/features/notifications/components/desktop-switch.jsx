@@ -33,10 +33,15 @@ export default function DesktopSwitch({ className }) {
     ? pushing ? "Desktop notifications are on, even when Lighthouse is closed." : "Desktop notifications are on while Lighthouse is open."
     : SAYS[status];
 
+  // A test that does not show says so (Oct 2026: every error a notice).
+  const test = () => testDesktop() || toast.error("This browser couldn't show a desktop notification.");
+
   const on = async () => {
-    await turnOn();
-    if (window.Notification.permission === "granted") testDesktop();
-    else if (window.Notification.permission === "denied") toast.error("Your browser blocked desktop notifications.");
+    const subscribed = await turnOn();
+    if (window.Notification.permission === "granted") {
+      test();
+      if (!subscribed) toast.warning("Desktop notifications are on, but only while Lighthouse is open: this browser couldn't sign up for them when it's closed.");
+    } else if (window.Notification.permission === "denied") toast.error("Your browser blocked desktop notifications.");
   };
 
   return (
@@ -48,7 +53,7 @@ export default function DesktopSwitch({ className }) {
         <button type="button" onClick={on} className={link}>Turn on</button>
       ) : status === "on" ? (
         <span className="flex shrink-0 gap-3">
-          <button type="button" onClick={() => testDesktop()} className={link}>Test</button>
+          <button type="button" onClick={test} className={link}>Test</button>
           <button type="button" onClick={turnOff} className={link}>Turn off</button>
         </span>
       ) : null}

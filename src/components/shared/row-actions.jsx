@@ -14,6 +14,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { RowEditContext } from "@/components/shared/row-edit-context";
+import { reach } from "@/lib/reach";
 
 // A delete sets a flag (migration 20261104100000): the record is hidden, not erased.
 const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is erased: an administrator can restore it under Settings › Deleted records.";
@@ -54,7 +55,8 @@ export default function RowActions({
     startTransition(async () => {
       const f = new FormData();
       f.set("id", String(id));
-      const result = await action(f);
+      // A call that never gets there (offline) comes back failed too, and says so (Oct 2026).
+      const result = await reach(() => action(f));
       if (result?.ok) {
         toast.success(done);
         setConfirm(null);

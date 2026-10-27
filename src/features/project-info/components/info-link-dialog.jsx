@@ -9,6 +9,7 @@ import { Field, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
 import { makeInfoLink, resetInfoLink, sendInfoLink } from "@/features/project-info/actions";
+import { reach } from "@/lib/reach";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -39,7 +40,7 @@ export default function InfoLinkDialog({ projectId, defaultTo = "", defaultName 
   useEffect(() => {
     if (!open) return;
     startLoading(async () => {
-      const result = await makeInfoLink(form());
+      const result = await reach(() => makeInfoLink(form()));
       if (result.ok) setLink(result.data);
       else toast.error(result.error);
     });
@@ -65,7 +66,7 @@ export default function InfoLinkDialog({ projectId, defaultTo = "", defaultName 
   };
   const reset = () =>
     startResetting(async () => {
-      const result = await resetInfoLink(form());
+      const result = await reach(() => resetInfoLink(form()));
       if (result.ok) {
         setLink(result.data);
         setAsking(false);

@@ -63,3 +63,44 @@ export function countyZipLists(counties, states = []) {
 export function zipsOfCounties(counties, states = []) {
   return [...new Set(countyZipLists(counties, states).flatMap((c) => c.zips))];
 }
+
+/** Every county or city in these states, a list for each: [{ state, names }], names as kept ("Maricopa County, AZ"). */
+export function placesOf(kind, states) {
+  return (states ?? []).filter((st) => places.states[st]).map((st) => ({
+    state: st,
+    names: (kind === "counties" ? places.states[st].counties.map(([, n]) => n) : places.states[st].cities).map((n) => label(n, st)),
+  }));
+}
+
+/**
+ * A county or city as typed, checked against the Census's names: { name } as
+ * kept ("Maricopa County, AZ", "Mesa, AZ"), or { why } it can't be taken.
+ * One typed without its state is looked for in the states picked.
+ */
+export function checkPlace(kind, text, states = []) {
+  const t = String(text ?? "").trim();
+  const m = /^(.+?),\s*([A-Za-z]{2})$/.exec(t);
+  const want = (m ? m[1] : t).trim().toLowerCase();
+  const bare = (n) => n.toLowerCase().replace(/\s+(county|parish|borough|census area|municipality|city and borough)$/, "");
+  const noun = kind === "counties" ? "county" : "city";
+  const find = (st) => {
+    const s = places.states[st];
+    if (!s) return null;
+    if (kind === "counties") {
+      const hit = s.counties.find(([, n]) => n.toLowerCase() === want) ?? s.counties.find(([, n]) => bare(n) === bare(want));
+      return hit ? label(hit[1], st) : null;
+    }
+    const hit = s.cities.find((n) => n.toLowerCase() === want);
+    return hit ? label(hit, st) : null;
+  };
+  if (m) {
+    const st = m[2].toUpperCase();
+    if (!places.states[st]) return { why: `${t}: ${st} is not a state` };
+    return find(st) ? { name: find(st) } : { why: `${t}: no ${noun} by that name in ${st}` };
+  }
+  if (!states.length) return { why: `${t}: pick its state first, or type it as "${t}, AZ"` };
+  const hits = states.map(find).filter(Boolean);
+  if (hits.length === 1) return { name: hits[0] };
+  if (hits.length > 1) return { why: `${t} is in more than one state picked: choose it from the suggestions` };
+  return { why: `${t}: no ${noun} by that name in ${states.join(", ")}` };
+}

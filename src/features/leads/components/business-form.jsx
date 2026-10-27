@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { REACH_ERROR, isNetworkError } from "@/lib/reach";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, Select, formHelpers } from "@/components/ui/field";
@@ -12,17 +13,19 @@ import { AUTO_TYPES, TRAVEL_RADII, xmodText } from "@/lib/business";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
-// The SIC list, read once a page when the form first opens.
+// The SIC list, read once a page when the form first opens; one that couldn't be read is said, and read again next time.
 let sicList = null;
 async function loadSic() {
   if (sicList) return sicList;
   try {
     const res = await fetch("/api/sic-codes?format=json");
-    sicList = res.ok ? (await res.json()).codes ?? [] : [];
-  } catch {
-    sicList = [];
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "The SIC list could not be read. Try again.");
+    sicList = (await res.json()).codes ?? [];
+    return sicList;
+  } catch (e) {
+    toast.error(isNetworkError(e) ? REACH_ERROR : e.message, { id: "sic-list" });
+    return [];
   }
-  return sicList;
 }
 
 /**

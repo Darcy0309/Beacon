@@ -2,10 +2,12 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 import { Check, ChevronDown, X, Loader2, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { EMPLOYEE_KEYS, FIELDS, MONTHS, employeesRange } from "@/features/explore/criteria";
+import { employeeCount } from "@/lib/call-list-filter";
 import { cn } from "@/lib/utils";
 import { useReportPending } from "@/components/layout/navigation-progress";
 
@@ -48,13 +50,27 @@ export default function ExploreCriteria({ options, criteria }) {
     });
 
   const employees = employeesRange(criteria);
-  const setEmployees = ({ min, max, exclude }) =>
+  // What the page would leave out or turn round is said as it is typed (Oct 2026), not dropped without a word.
+  const setZips = (v) => {
+    const typed = String(v ?? "").split(/[\s,;]+/).map((z) => z.trim()).filter(Boolean);
+    const bad = typed.filter((z) => !/^\d{5}$/.test(z.slice(0, 5)));
+    if (bad.length) toast.warning(`Not a 5-digit ZIP, so left out: ${bad.slice(0, 5).join(", ")}${bad.length > 5 ? "…" : ""}`);
+    else if (typed.length > 100) toast.warning("Only the first 100 ZIP codes are used.");
+    apply((p) => (v ? p.set("zips", v) : p.delete("zips")));
+  };
+  const setEmployees = ({ min, max, exclude }) => {
+    if ((min && employeeCount(min) === null) || (max && employeeCount(max) === null)) {
+      toast.error("Employees: type a whole number, like 10.");
+      return;
+    }
+    if (min && max && employeeCount(min) > employeeCount(max)) toast.warning("Employees: the Min was more than the Max, so they were turned round.");
     apply((p) => {
       for (const k of EMPLOYEE_KEYS) p.delete(k);
       if (min) p.set("emp_min", min);
       if (max) p.set("emp_max", max);
       if ((min || max) && exclude) p.set("emp_not", "1");
     });
+  };
 
   const active = FIELDS.reduce((n, f) => n + (criteria[f.key]?.length ?? 0), 0) + (criteria.zips?.length ?? 0) + (employees ? 1 : 0);
 
@@ -74,7 +90,7 @@ export default function ExploreCriteria({ options, criteria }) {
             onClear={() => setList(field.key, [])}
           />
         ))}
-        <ZipInput value={(criteria.zips ?? []).join(", ")} onCommit={(v) => apply((p) => (v ? p.set("zips", v) : p.delete("zips")))} />
+        <ZipInput value={(criteria.zips ?? []).join(", ")} onCommit={setZips} />
         <EmployeesInput min={criteria.emp_min ?? ""} max={criteria.emp_max ?? ""} exclude={criteria.emp_not === "1"} onCommit={setEmployees} />
 
         <div className="ml-auto flex items-center gap-3">

@@ -14,6 +14,7 @@ import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/features/notifications/ac
 import { closePushed, offerDesktopOnce, pushSupported, showDesktop, syncPush, tabInFront, trackFrontTab } from "@/features/notifications/desktop";
 import { chimeOnce } from "@/features/notifications/sound";
 import DesktopSwitch from "@/features/notifications/components/desktop-switch";
+import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
 const SHOWN = 8;
@@ -181,7 +182,8 @@ export default function NotificationBell() {
       if (!n.read_at) {
         setItems((xs) => xs.filter((x) => x.id !== n.id));
         setUnread((u) => Math.max(0, u - 1));
-        markNotificationRead(formOf(n.id));
+        // Its own page reads it too, so a failure here needs no notice.
+        markNotificationRead(formOf(n.id)).catch(() => {});
       }
       router.push(`/notifications/${n.id}`);
     },
@@ -281,7 +283,13 @@ export default function NotificationBell() {
     setItems([]);
     setUnread(0);
     [...popups.current.keys()].forEach(dismissPopup);
-    await markAllNotificationsRead();
+    const r = await reach(() => markAllNotificationsRead());
+    if (!r.ok) {
+      // Still unread: bring them back, and say so.
+      toast.error(r.error);
+      load();
+      return;
+    }
     router.refresh(); // the inbox page, if it is open, shows them read too
   };
 

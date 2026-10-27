@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname } from "next/navigation";
 import { LogOut, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { signOutIdle } from "@/features/auth/actions";
 import { IDLE_MINUTES, IDLE_WARNING_MINUTES, idleSpan } from "@/lib/idle";
+import { isNetworkError } from "@/lib/reach";
 
 // Shared by every tab: activity in any of them keeps all of them signed in,
 // and signing out in one takes the others to the sign-in page.
@@ -52,7 +54,17 @@ export default function IdleGuard() {
     if (done.current) return;
     done.current = true;
     writeShared(SIGNED_OUT_KEY, Date.now());
-    startLeaving(() => signOutIdle(path, limitRef.current));
+    startLeaving(async () => {
+      try {
+        await signOutIdle(path, limitRef.current);
+      } catch (e) {
+        // Signing out ends in a redirect, which Next.js handles; only a call
+        // that never got there is a failure: say so, and try again shortly.
+        if (!isNetworkError(e)) throw e;
+        toast.error("Couldn't sign you out: Lighthouse can't be reached. Trying again shortly.", { id: "idle-sign-out" });
+        setTimeout(() => { done.current = false; }, 15_000);
+      }
+    });
   }, [path]);
 
   const ping = useCallback(async () => {
@@ -72,7 +84,9 @@ export default function IdleGuard() {
         done.current = true;
         window.location.assign("/login?error=idle");
       }
-    } catch {}
+    } catch {
+      // Offline: the connection notice says so, and the next activity pings again.
+    }
   }, []);
 
   const active = useCallback(() => {

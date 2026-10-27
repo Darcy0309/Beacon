@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { removeCalendarBlock } from "@/features/calendar/actions";
 import { BlockDialog } from "@/features/calendar/components/project-calendar";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
+import { reach } from "@/lib/reach";
 
 /**
  * A project calendar's blocked time, in a line: each block still to come
@@ -33,7 +34,7 @@ export default function BlockedTime({ projectId = null, blocks: every, today, ch
     startRemoving(async () => {
       const f = new FormData();
       f.set("id", String(id));
-      const result = await removeCalendarBlock(f);
+      const result = await reach(() => removeCalendarBlock(f));
       if (result.ok) {
         toast.success("Taken off the calendar");
         setAsking(null);

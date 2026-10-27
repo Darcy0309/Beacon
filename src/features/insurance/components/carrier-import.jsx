@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { importCarriers } from "@/features/insurance/actions";
 import { parseCsv } from "@/lib/csv";
 import { carrierNamesFromRows } from "@/lib/coverage";
+import { reach } from "@/lib/reach";
 
 /**
  * Import carrier names from a CSV (a column headed Carrier, Name or
@@ -23,13 +24,19 @@ export default function CarrierImport() {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const names = carrierNamesFromRows(parseCsv(await file.text()));
+    let names;
+    try {
+      names = carrierNamesFromRows(parseCsv(await file.text()));
+    } catch {
+      toast.error("That file couldn't be read. Save it from Excel as CSV and try again.");
+      return;
+    }
     if (!names.length) {
       toast.error("No carrier names found in that file.");
       return;
     }
     startTransition(async () => {
-      const result = await importCarriers(names);
+      const result = await reach(() => importCarriers(names));
       if (!result.ok) {
         toast.error(result.error);
         return;

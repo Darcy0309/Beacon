@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { reach } from "@/lib/reach";
 
 /**
  * Switch that persists through a server action.
@@ -27,7 +28,8 @@ export default function ToggleSwitch({ defaultChecked = false, name, id, action,
       const fd = new FormData();
       fd.set("id", String(id));
       fd.set(field, String(next));
-      const res = await action(fd);
+      // Offline, the switch goes back and says why, rather than taking the page down (Oct 2026).
+      const res = await reach(() => action(fd));
       if (res?.ok === false) {
         setOn(!next); // roll back
         toast.error(res.error ?? "Could not save that change.");

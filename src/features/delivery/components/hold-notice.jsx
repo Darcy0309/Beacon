@@ -7,6 +7,7 @@ import { Ban, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { markHoldFixed } from "@/features/delivery/hold-actions";
+import { reach } from "@/lib/reach";
 
 /**
  * On a lead sheet, when QA held its lead or appointment back from the client
@@ -20,7 +21,7 @@ export default function HoldNotice({ hold }) {
     start(async () => {
       const f = new FormData();
       f.set("id", String(hold.id));
-      const result = await markHoldFixed(f);
+      const result = await reach(() => markHoldFixed(f));
       if (result.ok) {
         toast.success("Marked fixed: it goes to the client with the next batch");
         router.refresh();

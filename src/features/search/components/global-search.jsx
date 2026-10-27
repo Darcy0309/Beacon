@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { navGroups, rolesForPath } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
+import { REACH_ERROR, isNetworkError } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
 const MIN_CHARS = 2;
@@ -113,9 +114,10 @@ export default function GlobalSearch() {
         const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { signal: ctrl.signal });
         const json = await res.json();
         setGroups(json.groups ?? []);
-        setError(json.error ?? "");
+        // A failed search with no reason given is still said, not shown as "No matches" (Oct 2026).
+        setError(json.error ?? (res.ok ? "" : "Search failed. Try again."));
       } catch (err) {
-        if (err.name !== "AbortError") setError("Search failed. Try again.");
+        if (err.name !== "AbortError") setError(isNetworkError(err) ? REACH_ERROR : "Search failed. Try again.");
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }

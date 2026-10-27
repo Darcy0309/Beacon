@@ -8,6 +8,7 @@ import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { reviewAppointmentQa } from "@/features/qa/actions";
+import { reach } from "@/lib/reach";
 
 /**
  * Appointments waiting for QA. Pass tells the client; Fail needs a reason,
@@ -28,7 +29,7 @@ export default function QaQueue({ items, me }) {
     if (!passed) f.set("note", note);
     setBusy(id);
     startTransition(async () => {
-      const result = await reviewAppointmentQa(f);
+      const result = await reach(() => reviewAppointmentQa(f));
       setBusy(null);
       if (result?.ok) {
         toast.success(passed ? "Passed: the client has been told" : "Failed: whoever set it has been told why");

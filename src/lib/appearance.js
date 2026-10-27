@@ -235,7 +235,7 @@ export function pictureTint(src) {
   });
 }
 
-/** Put an appearance on the page, and keep it (best-effort: private browsing may not). */
+/** Put an appearance on the page, and keep it (best-effort: private browsing may not). False when it couldn't be kept. */
 export function applyAppearance(a, { keep = true } = {}) {
   const d = document.documentElement;
   // Executive builds on Modern: Modern's rules, then its own (html[data-executive]).
@@ -271,14 +271,16 @@ export function applyAppearance(a, { keep = true } = {}) {
   d.style.setProperty("--lift-dark", String(clamp(a.dark)));
   if (clamp(a.light) || clamp(a.dark)) d.dataset.brightness = "";
   else delete d.dataset.brightness;
-  if (!keep) return;
+  if (!keep) return true;
   try {
     localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : "executive", wallpaper: a.wallpaper,
       blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark), tone: tone ? a.tone : null, toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor : null,
       // A colour of their own, worked out, for the script that puts it on before the page draws.
       toneVars: tone && a.tone === "custom" ? [tone.page, tone.menu, tone.accent, tone.accentDark, tone.contrast, tone.contrastDark] : undefined }));
+    return true;
   } catch {
     // Kept for this visit only.
+    return false;
   }
 }
 

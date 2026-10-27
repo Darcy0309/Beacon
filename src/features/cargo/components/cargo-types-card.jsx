@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { addCargoTypes, removeCargoType } from "@/features/cargo/actions";
 import { cargoNamesFromText } from "@/lib/business";
+import { reach } from "@/lib/reach";
 
 /**
  * The cargo list: what the Business tab's Cargo field offers to pick from.
@@ -24,7 +25,7 @@ export default function CargoTypesCard({ types }) {
 
   const add = (names, done) =>
     start(async () => {
-      const result = await addCargoTypes(names);
+      const result = await reach(() => addCargoTypes(names));
       if (!result.ok) return void toast.error(result.error);
       const { added, already } = result.data;
       toast.success(added ? `${added} cargo type${added === 1 ? "" : "s"} added${already ? `, ${already} already on the list` : ""}` : "Already on the list");
@@ -36,14 +37,20 @@ export default function CargoTypesCard({ types }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const names = cargoNamesFromText(await file.text());
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      return void toast.error("That file couldn't be read. Save it again as a CSV or text file and try again.");
+    }
+    const names = cargoNamesFromText(text);
     if (!names.length) return void toast.error("No cargo names found in that file: put one on each line.");
     add(names);
   };
 
   const remove = (t) =>
     start(async () => {
-      const result = await removeCargoType(t.id);
+      const result = await reach(() => removeCargoType(t.id));
       if (!result.ok) return void toast.error(result.error);
       toast.success(`${t.name} taken off the list`);
       router.refresh();

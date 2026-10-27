@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, ExternalLink, FileText, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
@@ -45,7 +46,12 @@ export default function FileViewer({ file, open: shown, onOpenChange }) {
           ) : kind === "image" ? (
             <div className="flex size-full items-center justify-center overflow-auto p-3">
               {/* eslint-disable-next-line @next/next/no-img-element -- a private file behind a short-lived link, not an optimizable asset */}
-              <img src={href} alt={file.name} onLoad={() => setLoaded(true)} className="max-h-full max-w-full object-contain" data-file-image />
+              <img src={href} alt={file.name} onLoad={() => setLoaded(true)} className="max-h-full max-w-full object-contain" data-file-image
+                // A picture that won't come (offline, the file gone) would leave the spinner turning (Oct 2026).
+                onError={() => {
+                  setLoaded(true);
+                  toast.error("Couldn't open this picture. Try again, or download it.");
+                }} />
             </div>
           ) : (
             <div className="flex size-full flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground" data-file-unshown>

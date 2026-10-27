@@ -18,6 +18,7 @@ import { BLOCK_TIMES, blockDays, blockHours, dayMarks, eventsOn, noteTime } from
 import { cn } from "@/lib/utils";
 import { addCalendarBlock, addCalendarNote, removeCalendarBlock, removeCalendarNote } from "@/features/calendar/actions";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
+import { REACH_ERROR, isNetworkError, reach } from "@/lib/reach";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -180,10 +181,14 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
   useEffect(() => {
     if (covered || extra[month]) return;
     let live = true;
+    // A month that can't be read is said, not shown as a month with nothing on it.
     fetch(`/api/project-calendar?project=${calendarId}&from=${grid[0]}&to=${grid[41]}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => live && data && setExtra((x) => ({ ...x, [month]: data })))
-      .catch(() => {});
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data) => live && setExtra((x) => ({ ...x, [month]: data })))
+      .catch((e) => live && toast.error(isNetworkError(e) ? REACH_ERROR : `Couldn't read ${formatIso(month, "month")} on the calendar. Try again.`));
     return () => {
       live = false;
     };
@@ -201,7 +206,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
     startRemoving(async () => {
       const f = new FormData();
       f.set("id", String(id));
-      const result = await removeCalendarNote(f);
+      const result = await reach(() => removeCalendarNote(f));
       if (result.ok) {
         toast.success("Note taken off");
         setAskingNote(null);
@@ -212,7 +217,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
     startRemoving(async () => {
       const f = new FormData();
       f.set("id", String(id));
-      const result = await removeCalendarBlock(f);
+      const result = await reach(() => removeCalendarBlock(f));
       if (result.ok) {
         toast.success("Taken off the calendar");
         setAsking(null);

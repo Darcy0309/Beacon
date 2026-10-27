@@ -88,7 +88,8 @@ export default function AppearanceDialog({ open, onOpenChange }) {
   const change = (next) => {
     const merged = { ...a, ...next };
     setA(merged);
-    applyAppearance(merged);
+    // Said once: a browser that keeps nothing (private browsing, storage off) shows it for this visit only.
+    if (!applyAppearance(merged)) toast.warning("This browser won't keep your appearance", { id: "appearance-kept", description: "It's on for this visit only (private browsing, or site storage turned off)." });
   };
   const dark = resolvedTheme === "dark";
   const custom = a.tone === "custom" ? toneFromColor(a.toneColor) : null;

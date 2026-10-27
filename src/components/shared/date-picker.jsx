@@ -21,6 +21,7 @@ const PRESETS = {
 };
 
 // A project's calendar for the visible month (appointments and blocked time), kept a minute too.
+// False when it could not be read, so the picker says so instead of "Reading…" for ever (Oct 2026).
 const projectCache = new Map();
 async function projectMonth(projectId, month) {
   const key = `${projectId}:${month}`;
@@ -29,12 +30,12 @@ async function projectMonth(projectId, month) {
   const grid = monthGrid(month);
   try {
     const res = await fetch(`/api/project-calendar?project=${projectId}&from=${grid[0]}&to=${grid[41]}`);
-    if (!res.ok) return null;
+    if (!res.ok) return false;
     const data = await res.json();
     projectCache.set(key, { at: Date.now(), data });
     return data;
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -52,6 +53,7 @@ async function appointmentMarks(month) {
     markCache.set(month, { at: Date.now(), days });
     return days;
   } catch {
+    // The dots are a hint: none, then.
     return {};
   }
 }
@@ -316,7 +318,9 @@ export default function DatePicker({
           {calendarProject ? (
             // The project's calendar for the day pointed at: booked times and blocked time, before choosing.
             <div className="mt-2 max-w-[17rem] border-t border-[var(--panel-border)] pt-2 text-[0.7rem]" data-picker-day onMouseLeave={() => setHoverDay(null)}>
-              {shownDay ? (
+              {projectData === false ? (
+                <div className="font-medium text-destructive" data-picker-unread>Couldn&apos;t read the project&apos;s calendar. Close the calendar and open it again to retry.</div>
+              ) : shownDay ? (
                 <>
                   <div className="font-semibold">{formatIso(shownDay, "medium")}</div>
                   {dayEvents.length ? dayEvents.map((e) => (

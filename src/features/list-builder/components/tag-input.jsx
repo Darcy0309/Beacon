@@ -14,9 +14,11 @@ import { cn } from "@/lib/utils";
  *
  *   value      the tags
  *   normalize  (text) => the tag, or null for one that is not taken (a ZIP that is not five digits)
+ *   onReject   (pieces) => told of those not taken, to say why
  *   suggest    async (text) => [names] to offer
+ *   addon      shown at the box's end (the List Builder's Browse list)
  */
-export default function TagInput({ value, onChange, placeholder, normalize = (t) => t, suggest = null, label, ...rest }) {
+export default function TagInput({ value, onChange, placeholder, normalize = (t) => t, suggest = null, label, addon = null, onReject = null, ...rest }) {
   const [text, setTextState] = useState("");
   const textRef = useRef("");
   const setText = (t) => { textRef.current = t; setTextState(t); };
@@ -27,16 +29,19 @@ export default function TagInput({ value, onChange, placeholder, normalize = (t)
   const add = (pieces) => {
     const next = [...value];
     const seen = new Set(next.map((v) => v.toLowerCase()));
+    const rejected = [];
     for (const raw of pieces) {
       const t = raw.replace(/\s+/g, " ").trim();
       if (!t) continue;
       const tag = normalize(t);
-      if (tag && !seen.has(tag.toLowerCase())) {
+      if (!tag) rejected.push(t);
+      else if (!seen.has(tag.toLowerCase())) {
         seen.add(tag.toLowerCase());
         next.push(tag);
       }
     }
     if (next.length !== value.length) onChange(next);
+    if (rejected.length) onReject?.(rejected);
   };
   // What a paste or a typed comma holds: a tag between each comma, line or semicolon.
   const split = (s) => s.split(/[,\n;]/);
@@ -109,6 +114,7 @@ export default function TagInput({ value, onChange, placeholder, normalize = (t)
             }, 150);
           }}
           className="h-6 min-w-24 flex-1 bg-transparent text-sm outline-none" data-tag-text />
+        {addon}
       </div>
       {offers.length ? (
         <ul role="listbox" aria-label={`${label}: suggestions`} className="absolute left-0 right-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border bg-popover p-1 shadow-lg" data-tag-offers>

@@ -13,6 +13,7 @@ import TipLayer from "@/components/shared/tip-layer";
 import DatePicker from "@/components/shared/date-picker";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { recordCallResult } from "@/features/work/actions";
+import { reach } from "@/lib/reach";
 import { APPOINTMENT_TIMES, DURATIONS } from "@/lib/validate";
 import { cn } from "@/lib/utils";
 import { sendsSheet } from "@/lib/delivery";
@@ -70,7 +71,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
     // The note boxes drop a stamped line left empty as the form is read.
     const form = new FormData(event.currentTarget);
     startTransition(async () => {
-      const result = await recordCallResult(null, form);
+      const result = await reach(() => recordCallResult(null, form));
       if (!result?.ok) {
         setState(result ?? EMPTY);
         if (result?.error && !result.fieldErrors) toast.error(result.error);

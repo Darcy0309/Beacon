@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { messageManager } from "@/features/dashboard/actions";
+import { reach } from "@/lib/reach";
 
 /**
  * The manager who developed a lead, on a client's Recent Activity (Sean, Oct
@@ -25,7 +26,7 @@ export default function MessageManager({ leadId, managerId, manager, company }) 
       f.set("lead_id", String(leadId));
       f.set("manager_id", String(managerId));
       f.set("body", body);
-      const result = await messageManager(f);
+      const result = await reach(() => messageManager(f));
       if (result.ok) {
         toast.success(`Sent to ${manager}`);
         setBody("");

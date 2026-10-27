@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { resendDelivery } from "@/features/delivery/actions";
+import { reach } from "@/lib/reach";
 
 /** "Send to client again": the lead's sheet to its project's delivery addresses, now. */
 export default function ResendButton({ leadId }) {
@@ -15,7 +16,7 @@ export default function ResendButton({ leadId }) {
     start(async () => {
       const f = new FormData();
       f.set("lead_id", String(leadId));
-      const r = await resendDelivery(f);
+      const r = await reach(() => resendDelivery(f));
       if (!r.ok) toast.error(r.error);
       else if (r.data.failed) toast.error(`Sent to ${r.data.sent} of ${r.data.addresses}; see why below.`);
       else toast.success(`Sent to the client (${r.data.sent} ${r.data.sent === 1 ? "address" : "addresses"})`);

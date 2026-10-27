@@ -15,7 +15,10 @@ export async function GET(request) {
   const rows = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("sic_codes").select("code, description").order("code").range(from, from + 999);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error("[sic codes]", error.message);
+      return NextResponse.json({ error: "The SIC list could not be read. Try again." }, { status: 502 });
+    }
     rows.push(...(data ?? []));
     if ((data ?? []).length < 1000) break;
   }

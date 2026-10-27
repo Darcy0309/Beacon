@@ -2,8 +2,8 @@
  * List Builder (Sean, Oct 2026): staff build a request for a client from the
  * SIC tree (a sector opened with +, a group ticked whole, a code found by
  * name), the employee size for each group, the territory (a state, a radius
- * around a ZIP, a county picked from the Census's names, a ZIP in it left
- * out) and what to leave out; it is kept with the client, its Sales
+ * around a ZIP, a county picked from the Census's names, as typed or from a
+ * list, a ZIP in it left out) and what to leave out; it is kept with the client, its Sales
  * Rep is told, and it exports its codes one to a line. A prospect fills one
  * in from a link without signing in; a link turned off is closed. A client
  * makes their own, and sees what they asked for before.
@@ -73,7 +73,14 @@ try {
   await setValue(admin, "[data-employees-min=\"17\"]", "10");
   await setValue(admin, "[data-employees-max=\"17\"]", "100");
   await admin.ev("[...document.querySelectorAll('[data-state-picker=\"States\"] button')].find((b) => b.textContent === 'AZ').click()");
+  // A radius too far, or around a ZIP the Census doesn't have: said, and not saved.
+  await setValue(admin, "[data-radius-miles]", "70000");
+  await setValue(admin, "[data-radius-zip]", "99999");
+  check("a radius over 250 miles is said, and not looked for", Boolean(await when(admin, "!!document.querySelector('[data-radius-error]') && document.querySelector('[data-radius-find]').disabled")));
   await setValue(admin, "[data-radius-miles]", "5");
+  await admin.ev("document.querySelector('[data-request-save]').click()");
+  check("…a ZIP that is not real is said, and not saved", Boolean(await when(admin, "[...document.querySelectorAll('[data-sonner-toast]')].some((t) => /99999 is not a real ZIP code/.test(t.textContent))"))
+    && /\/list-builder\/new/.test(await admin.url()));
   await setValue(admin, "[data-radius-zip]", "85201");
   await admin.ev("document.querySelector('[data-radius-find]').click()");
   const found = Number(await when(admin, "document.querySelector('[data-radius-found]')?.dataset.radiusFound ?? null"));
@@ -91,10 +98,31 @@ try {
   await admin.ev(`document.querySelector('[data-county-zip="85004"]').click()`);
   check("…one clicked is left out", Boolean(await when(admin, `document.querySelector('[data-county-zip="85004"]').getAttribute('aria-pressed') === 'true'
     && !!document.querySelector('[data-tag-input="exclude-zips"] [data-tag="85004"]')`)));
+  // …or ticked from the list of the state's counties.
+  await admin.ev(`document.querySelector('[data-tag-input="include-counties"] [data-place-browse]').click()`);
+  const azCounties = Number(await when(admin, `document.querySelectorAll('[data-place-list="counties"] [data-place]').length || null`));
+  check("Browse: every Arizona county, to tick", azCounties === 15, String(azCounties));
+  check("…the one picked already ticked", (await admin.ev(`document.querySelector('[data-place="Maricopa County, AZ"]').getAttribute('aria-selected')`)) === "true");
+  await admin.ev(`document.querySelector('[data-place="Pinal County, AZ"]').click()`);
+  check("…a tick adds it", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-counties"] [data-tag="Pinal County, AZ"]')`)));
+  await admin.ev(`document.querySelector('[data-place="Pinal County, AZ"]').click()`);
+  check("…taking the tick off takes it away", Boolean(await when(admin, `!document.querySelector('[data-tag-input="include-counties"] [data-tag="Pinal County, AZ"]')`)));
+  await admin.ev(`document.querySelector('[data-tag-input="include-counties"] [data-place-browse]').click()`);
+  await when(admin, `!document.querySelector('[data-place-list]')`);
   // Cities and ZIPs as tags: a comma makes one.
+  // What can't be taken is said: a city not in the state, a ZIP short of 5 digits; a ZIP off the Census map is kept, with a word.
+  const toastSays = (re) => when(admin, `[...document.querySelectorAll('[data-sonner-toast]')].some((t) => ${re}.test(t.textContent))`);
+  await setValue(admin, '[data-tag-input="include-cities"] [data-tag-text]', "Nowheresville,");
+  check("a city not in the state: said, and taken off", Boolean(await toastSays("/Nowheresville: no city by that name in AZ/"))
+    && Boolean(await when(admin, `!document.querySelector('[data-tag-input="include-cities"] [data-tag="Nowheresville"]')`)));
+  await setValue(admin, '[data-tag-input="include-zips"] [data-tag-text]', "123,");
+  check("a ZIP short of 5 digits: said", Boolean(await toastSays("/123: a ZIP code has 5 digits/")));
+  await setValue(admin, '[data-tag-input="include-zips"] [data-tag-text]', "85001,");
+  check("a PO box ZIP: kept, with a word to check it", Boolean(await toastSays("/85001 is not on the Census ZIP map/"))
+    && Boolean(await admin.ev(`!!document.querySelector('[data-tag-input="include-zips"] [data-tag="85001"]')`)));
   await setValue(admin, '[data-tag-input="include-cities"] [data-tag-text]', "Mesa,");
   await setValue(admin, '[data-tag-input="exclude-zips"] [data-tag-text]', "85203, 852");
-  check("a comma makes a tag: a city, a ZIP", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-cities"] [data-tag="Mesa"]')
+  check("a comma makes a tag: a city (by its full name), a ZIP", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-cities"] [data-tag="Mesa, AZ"]')
     && !!document.querySelector('[data-tag-input="exclude-zips"] [data-tag="85203"]')`))
     && (await admin.ev(`document.querySelector('[data-tag-input="exclude-zips"] [data-tag-text]').value`)) === "852");
   await setValue(admin, '[data-tag-input="exclude-zips"] [data-tag-text]', "");
@@ -105,7 +133,7 @@ try {
   check("…kept with the client and its Sales Rep", r.company_id === company && r.sales_rep_id === MIKE && r.source === "staff" && r.title === `${TAG} Contractors`, JSON.stringify(r));
   check("…the group's codes and the one found", ["1521", "1522", "1531", "1541", "1542", "1761"].every((c) => r.criteria.sic.includes(c)) && r.criteria.sic.length === 6, JSON.stringify(r.criteria.sic));
   check("…the size for 17, the state, the county, the city", r.criteria.employees["17"]?.min === 10 && r.criteria.employees["17"]?.max === 100
-    && r.criteria.include.states.join() === "AZ" && r.criteria.include.counties.join() === "Maricopa County, AZ" && r.criteria.include.cities.join() === "Mesa", JSON.stringify(r.criteria.include));
+    && r.criteria.include.states.join() === "AZ" && r.criteria.include.counties.join() === "Maricopa County, AZ" && r.criteria.include.cities.join() === "Mesa, AZ", JSON.stringify(r.criteria.include));
   check("…the radius's ZIPs and the county's, less those left out", r.criteria.zips.includes("85201") && r.criteria.zips.includes("85383")
     && !r.criteria.zips.includes("85203") && !r.criteria.zips.includes("85004") && r.criteria.exclude.zips.join() === "85004,85203", JSON.stringify(r.criteria.exclude));
   check("the Sales Rep is told", sql(`select count(*) from public.notifications where user_id = ${MIKE} and link = '/list-builder/${id}'`) === "1");

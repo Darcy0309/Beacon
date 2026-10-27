@@ -10,6 +10,7 @@ import { Field, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { connectCalendar, disconnectCalendar, syncCalendarNow } from "@/features/calendar/actions";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
+import { reach } from "@/lib/reach";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -47,14 +48,15 @@ export default function CalendarSync({ projectId, feed }) {
       toast.success(`${state.data.provider} connected: ${state.data.busy} busy time${state.data.busy === 1 ? "" : "s"} blocked out`);
       setOpen(false);
       router.refresh();
-    }
+      // A wrong link is said under it; anything else (signed out, not your calendar) here.
+    } else if (state?.error && !state?.fieldErrors) toast.error(state.error);
   }, [state, router]);
 
   const run = (fn, done) =>
     startWork(async () => {
       const f = new FormData();
       f.set("id", String(feed.id));
-      const result = await fn(f);
+      const result = await reach(() => fn(f));
       if (result.ok) {
         toast.success(done(result.data));
         setAsking(false);

@@ -12,3 +12,8 @@ export function zipsAround(zip, miles) {
   if (!/^\d{5}$/.test(String(zip ?? "")) || !m) return null;
   return zipsWithin(table.zips, String(zip), m);
 }
+
+/** Those of these ZIPs the Census's map doesn't have (made up, or a PO box ZIP, which has no area). */
+export function unmappedZips(zips) {
+  return (zips ?? []).filter((z) => !table.zips[z]);
+}

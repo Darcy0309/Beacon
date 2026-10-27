@@ -139,6 +139,8 @@ export async function resetInfoLink(formData) {
   if (failed) return failed;
   const url = await linkFor(info.project_id, await linkKey(admin, info.project_id, true));
   await logActivity(supabase, "project.info_link_reset", { entity: "project", entityId: info.project_id, detail: info.project_name, userId: me.id });
+  // The earlier links are stopped either way; without a secret there's no new one to say is ready (Oct 2026).
+  if (!url) return fail("Earlier links are stopped, but a new one could not be made: the server has no secret to sign it with.");
   return ok({ url, days: INFO_LINK_DAYS });
 }
 

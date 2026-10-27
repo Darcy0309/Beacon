@@ -40,6 +40,8 @@ export async function saveCompany(prevState, formData) {
     ? await supabase.from("companies").update(payload).eq("id", id).select("id").maybeSingle()
     : await supabase.from("companies").insert(payload).select("id").maybeSingle();
   if (error) return fail(error, null, values);
+  // Row Level Security answers an update it refuses with no row, not an error (Oct 2026: said, not "Client updated").
+  if (id && !saved) return fail("Nothing was saved: that client may have been deleted, or isn't yours to change.", null, values);
 
   // Who hears about it (Sean, Oct 2026): the people ticked, each by notification or by email too.
   if (saved?.id && formData.get("watchers_shown") === "1") {

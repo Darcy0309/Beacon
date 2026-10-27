@@ -15,6 +15,7 @@ import { addMonths, formatIso, monthGrid, sameMonth } from "@/lib/dates";
 import { APPOINTMENT_TIMES, REMINDER_TIMES } from "@/lib/validate";
 import { cn } from "@/lib/utils";
 import { moveScheduleItem } from "@/features/dashboard/actions";
+import { reach } from "@/lib/reach";
 import { dashboardHref } from "@/features/dashboard/components/period-switch";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -164,7 +165,7 @@ export default function MySchedule({ items, awaiting, month, today, params, allH
     f.set("time", time);
     setMoved({ key: item.key, day, time });
     setSelected(day);
-    const result = await moveScheduleItem(f);
+    const result = await reach(() => moveScheduleItem(f));
     if (result.ok) {
       toast.success(`Moved to ${formatIso(day, "long")} at ${time}`);
       setLanded(day);

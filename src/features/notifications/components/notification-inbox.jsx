@@ -3,10 +3,12 @@
 import { useState, useTransition } from "react";
 import Link from "@/components/shared/intent-link";
 import { useNavigationRouter } from "@/components/layout/navigation-progress";
+import { toast } from "sonner";
 import { Bell, BellOff, CheckCheck, ArrowUpRight, ChevronRight } from "lucide-react";
 import { KIND_ICONS, linkLabel } from "@/features/notifications/kinds";
 import { markNotificationRead, markAllNotificationsRead } from "@/features/notifications/actions";
 import { announceNotificationsChanged } from "@/features/notifications/active-chat";
+import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,7 +30,17 @@ export default function NotificationInbox({ rows, unread, empty }) {
     const f = new FormData();
     f.set("id", String(n.id));
     startTransition(async () => {
-      await markNotificationRead(f);
+      const r = await reach(() => markNotificationRead(f));
+      if (!r.ok) {
+        // Not marked after all: show it unread again, and say so.
+        setReadIds((s) => {
+          const next = new Set(s);
+          next.delete(n.id);
+          return next;
+        });
+        toast.error(r.error);
+        return;
+      }
       announceNotificationsChanged();
       router.refresh();
     });
@@ -43,7 +55,12 @@ export default function NotificationInbox({ rows, unread, empty }) {
   const markAll = () => {
     setAllRead(true);
     startTransition(async () => {
-      await markAllNotificationsRead();
+      const r = await reach(() => markAllNotificationsRead());
+      if (!r.ok) {
+        setAllRead(false);
+        toast.error(r.error);
+        return;
+      }
       announceNotificationsChanged();
       router.refresh();
     });

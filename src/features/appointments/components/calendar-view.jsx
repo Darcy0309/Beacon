@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
 import { removeCalendarNote } from "@/features/calendar/actions";
+import { reach } from "@/lib/reach";
 import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight, Ban,
@@ -798,7 +799,7 @@ function NoteRow({ n }) {
     start(async () => {
       const f = new FormData();
       f.set("id", String(n.id));
-      const result = await removeCalendarNote(f);
+      const result = await reach(() => removeCalendarNote(f));
       if (result.ok) {
         toast.success("Note taken off");
         setAsking(false);

@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { failHeldDelivery, sendHeldDeliveries } from "@/features/delivery/hold-actions";
+import { reach } from "@/lib/reach";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const when = (iso) => new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
@@ -76,9 +77,12 @@ export default function HeldDeliveries({ rows, summary }) {
       const f = new FormData();
       if (which === "all") f.set("all", "1");
       else for (const id of which) f.append("id", String(id));
-      const result = await sendHeldDeliveries(f);
+      const result = await reach(() => sendHeldDeliveries(f));
+      const asked = which === "all" ? rows.filter((r) => r.status === "held").length : which.length; // All leaves the ones held back.
       if (result.ok) {
-        toast.success(`${result.data.sent} sent to the client${result.data.sent === 1 ? "" : "s"}`);
+        // Some not sent (the email failed, or they had gone already): said, not counted as all sent (Oct 2026).
+        if (result.data.sent < asked) toast.warning(`${result.data.sent} of ${asked} sent to the clients; the rest still wait. Try them again.`);
+        else toast.success(`${result.data.sent} sent to the client${result.data.sent === 1 ? "" : "s"}`);
         setPicked(new Set());
         router.refresh();
       } else toast.error(result.error);

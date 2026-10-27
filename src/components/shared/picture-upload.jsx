@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { IMAGES_BUCKET, imageUrl, initialsOf, shrinkPicture } from "@/lib/images";
 import { cn } from "@/lib/utils";
+import { REACH_ERROR, isNetworkError, reach } from "@/lib/reach";
 
 /**
  * A picture to add, change or take away: a person's photo (round, cropped
@@ -27,7 +28,7 @@ export default function PictureUpload({ folder, path, name, kind = "photo", save
   const url = imageUrl(path);
 
   const keep = async (next) => {
-    const result = await save(next);
+    const result = await reach(() => save(next));
     if (!result?.ok) throw new Error(result?.error ?? "That could not be saved.");
     // The one replaced, out of the bucket (best-effort: a stray one does no harm).
     if (path && path !== next) await createClient().storage.from(IMAGES_BUCKET).remove([path]).catch(() => {});
@@ -40,12 +41,12 @@ export default function PictureUpload({ folder, path, name, kind = "photo", save
       const { blob, ext } = await shrinkPicture(file, photo ? { size: 400, square: true } : { size: 600 });
       const next = `${folder}/${Date.now().toString(36)}.${ext}`;
       const { error } = await createClient().storage.from(IMAGES_BUCKET).upload(next, blob, { contentType: blob.type, upsert: false });
-      if (error) throw new Error(/row-level|policy|unauthor/i.test(error.message) ? "That is not yours to change." : error.message);
+      if (error) throw new Error(/row-level|policy|unauthor/i.test(error.message) ? "That is not yours to change." : isNetworkError(error) ? REACH_ERROR : "Couldn't upload the picture. Try again.");
       await keep(next);
       toast.success(photo ? "Your photo is up" : "The logo is up");
       router.refresh();
     } catch (err) {
-      toast.error(err?.message ?? "That picture could not be used.");
+      toast.error(isNetworkError(err) ? REACH_ERROR : err?.message ?? "That picture could not be used.");
     } finally {
       setBusy(null);
       if (input.current) input.current.value = "";

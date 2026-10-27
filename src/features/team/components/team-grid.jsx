@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { GiftDialog, MessageDialog, ThanksDialog } from "@/features/team/components/team-dialogs";
 import { loadMemberRecent, setTeamSpotlight } from "@/features/team/actions";
 import { imageUrl, initialsOf } from "@/lib/images";
+import { reach } from "@/lib/reach";
 import { ROLES } from "@/lib/nav";
 import { TEAM_FILTERS, tenure } from "@/lib/team";
 import { cn } from "@/lib/utils";
@@ -220,7 +221,7 @@ function SpotlightSwitch({ on }) {
   return (
     <Button size="sm" variant="ghost" disabled={pending} data-spotlight-switch={on ? "hide" : "show"}
       onClick={() => start(async () => {
-        const r = await setTeamSpotlight(!on);
+        const r = await reach(() => setTeamSpotlight(!on));
         if (r.ok) router.refresh();
         else toast.error(r.error);
       })}>
@@ -234,7 +235,8 @@ function Profile({ member: m, client, today, timeZone, onClose, onAct, canMessag
   const [recent, setRecent] = useState(null);
   useEffect(() => {
     let live = true;
-    loadMemberRecent(m.id).then((r) => live && setRecent(r)).catch(() => live && setRecent([]));
+    // Not loaded (offline) says so, rather than "Nothing yet".
+    loadMemberRecent(m.id).then((r) => live && setRecent(r)).catch(() => live && setRecent(false));
     return () => {
       live = false;
     };
@@ -267,7 +269,9 @@ function Profile({ member: m, client, today, timeZone, onClose, onAct, canMessag
         </dl>
         <div>
           <div className="mb-1.5 text-xs font-medium text-muted-foreground">{client ? "Latest they developed for you" : "Latest they developed"}</div>
-          {recent === null ? <p className="text-xs text-muted-foreground">Loading…</p> : recent.length ? (
+          {recent === null ? <p className="text-xs text-muted-foreground">Loading…</p> : recent === false ? (
+            <p className="text-xs text-muted-foreground" data-profile-recent-failed>Couldn&apos;t load these. Close and open the profile to try again.</p>
+          ) : recent.length ? (
             <ul className="space-y-1" data-profile-recent>
               {recent.map((r) => (
                 <li key={`${r.leadId}-${r.at}`} className="flex items-center justify-between gap-2 text-sm">

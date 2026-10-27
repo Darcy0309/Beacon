@@ -15,6 +15,7 @@ import DatePicker from "@/components/shared/date-picker";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
 import { cancelReminder, setReminder } from "@/features/leads/actions";
 import { REMINDER_TIMES } from "@/lib/validate";
+import { reach } from "@/lib/reach";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -49,7 +50,7 @@ export default function ReminderCard({ leadId, company, upcoming, client = false
       const f = new FormData();
       f.set("id", String(id));
       f.set("lead_id", String(leadId));
-      const result = await cancelReminder(f);
+      const result = await reach(() => cancelReminder(f));
       if (result.ok) {
         toast.success("Reminder cancelled");
         setAsking(null);

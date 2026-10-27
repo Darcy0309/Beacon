@@ -126,7 +126,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
                           spellCheck={false} className="font-mono" aria-invalid={invalid("temp_password")} />
                         <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={() => setTemp(generateTempPassword())} aria-label="Generate a password"><Wand2 /></Button>
                         <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" aria-label="Copy the password"
-                          onClick={() => navigator.clipboard?.writeText(temp).then(() => toast.success("Copied"), () => {})}><Copy /></Button>
+                          onClick={() => (navigator.clipboard?.writeText(temp) ?? Promise.reject()).then(() => toast.success("Copied"), () => toast.error("Couldn't copy it. Select the password and copy it by hand."))}><Copy /></Button>
                       </div>
                     </Field>
                     <label className="flex items-center gap-2 text-sm">

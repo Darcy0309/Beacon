@@ -11,6 +11,7 @@ import { useRole } from "@/components/layout/role-provider";
 import { createClient } from "@/lib/supabase/client";
 import { replyToNotification, markThreadRead } from "@/features/notifications/actions";
 import { setActiveChat, announceNotificationsChanged } from "@/features/notifications/active-chat";
+import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
 const MAX = 1000;
@@ -78,7 +79,8 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
     marked.current.add("anchor");
     const f = new FormData();
     f.set("id", String(anchorId));
-    markThreadRead(f).then(announceNotificationsChanged);
+    // Quiet when it fails: they only stay unread until the next visit.
+    reach(() => markThreadRead(f)).then(announceNotificationsChanged);
   }, [messages, anchorId, anchorUnread]);
 
   // Keep the newest message in view.
@@ -139,7 +141,7 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
     f.set("id", String(target));
     f.set("body", body);
     startTransition(async () => {
-      const result = await replyToNotification(f);
+      const result = await reach(() => replyToNotification(f));
       if (result?.ok) {
         setExtra((xs) => xs.map((m) => (m.id === tempId ? result.data.message : m)));
       } else {

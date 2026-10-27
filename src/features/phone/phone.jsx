@@ -262,13 +262,15 @@ export function PhoneProvider({ children, tracked = false }) {
     lookingUp.current = digits;
     let gone = false;
     fetch(`/api/lead-options?q=${digits}`)
-      .then((r) => (r.ok ? r.json() : { leads: [] }))
+      // A lookup that fails is no answer, not "No lead with this number".
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then(({ leads }) => {
         if (gone) return;
         // A Call button names its lead (kept, whichever of its numbers was called); else the first with the number.
         setLead((was) => (was?.id ? leads?.find((l) => l.id === was.id) ?? was : leads?.[0] ?? null));
         setChecked(digits);
       })
+      // Naming the lead is a nicety: when it can't be read, the number is simply not named, and the call goes on.
       .catch(() => {});
     return () => {
       // A newer number (or the call starting) asks again.

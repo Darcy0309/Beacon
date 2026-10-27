@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ProjectInfoView from "@/features/project-info/components/project-info-view";
 import { glanceProjectInfo } from "@/features/project-info/actions";
+import { reach } from "@/lib/reach";
 
 /**
  * A quick look at a project's Project Info from My Projects (Sean, Oct 2026):
@@ -23,7 +24,7 @@ export default function ProjectInfoGlance({ projectId, name }) {
     setLoading(true);
     const f = new FormData();
     f.set("project_id", String(projectId));
-    glanceProjectInfo(f)
+    reach(() => glanceProjectInfo(f))
       .then((result) => {
         if (result?.ok) setInfo(result.data);
         else {

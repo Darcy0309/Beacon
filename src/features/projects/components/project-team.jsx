@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { redistributeProject, setProjectRep } from "@/features/projects/actions";
+import { reach } from "@/lib/reach";
 
 const form = (entries) => {
   const f = new FormData();
@@ -35,7 +36,7 @@ export default function ProjectTeam({ projectId, team, staff, canManage, canOpen
   const run = (key, action, data, success) => {
     setBusy(key);
     startTransition(async () => {
-      const res = await action(form(data));
+      const res = await reach(() => action(form(data)));
       setBusy(null);
       setConfirming(null);
       if (!res?.ok) {

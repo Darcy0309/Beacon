@@ -12,8 +12,10 @@ import { Field, Select } from "@/components/ui/field";
 import SectionHeader from "@/components/shared/section-header";
 import SicTree from "@/features/list-builder/components/sic-tree";
 import TagInput from "@/features/list-builder/components/tag-input";
-import { countyZips, radiusPreview, saveListRequest, submitProspectRequest, territorySuggest } from "@/features/list-builder/actions";
+import PlaceBrowser from "@/features/list-builder/components/place-browser";
+import { checkTerritory, countyZips, radiusPreview, saveListRequest, submitProspectRequest, territorySuggest } from "@/features/list-builder/actions";
 import { MAX_RADIUS_MILES, buildTree, criteriaSummary, groupOf } from "@/lib/list-builder";
+import { reach } from "@/lib/reach";
 import { US_STATES } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
 
@@ -77,6 +79,33 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
   const toggleZip = (z) => setExc((e) => ({ ...e, zips: e.zips.includes(z) ? e.zips.filter((x) => x !== z) : [...e.zips, z] }));
   // Counties and cities suggested from the states picked (every state when none are).
   const suggestFrom = (kind) => (q) => territorySuggest(kind, inc.states, q);
+  /**
+   * A territory box's tags, with what was just added checked against the
+   * Census: a county or city found is kept by its full name ("Maricopa County,
+   * AZ"), one not found comes off, and both are said; a ZIP not on the Census
+   * map is kept, with a word to check it (a PO box ZIP isn't on the map).
+   */
+  const tagsOf = (kind, side, setSide) => (v) => {
+    const added = v.filter((t) => !side[kind].includes(t));
+    setSide((x) => ({ ...x, [kind]: v }));
+    if (!added.length) return;
+    checkTerritory(kind, added, inc.states).then((r) => {
+      if (kind === "zips") {
+        const n = r.unmapped?.length ?? 0;
+        if (n) toast.warning(`${r.unmapped.join(", ")} ${n > 1 ? "are not on the Census ZIP map" : "is not on the Census ZIP map"}`, { description: "Check it is a real ZIP code (a PO box ZIP isn't on the map)." });
+        return;
+      }
+      const by = new Map((r.places ?? []).map((p) => [p.text, p]));
+      setSide((x) => {
+        const seen = new Set();
+        const next = x[kind].flatMap((t) => (by.has(t) ? (by.get(t).name ? [by.get(t).name] : []) : [t]))
+          .filter((t) => !seen.has(t.toLowerCase()) && seen.add(t.toLowerCase()));
+        return { ...x, [kind]: next };
+      });
+      for (const p of (r.places ?? []).filter((p) => p.why).slice(0, 3)) toast.error(p.why);
+    }).catch(() => {});
+  };
+  const badZips = (pieces) => toast.error(`${pieces.join(", ")}: a ZIP code has 5 digits`);
   const [pending, start] = useTransition();
   const [finding, startFinding] = useTransition();
 
@@ -92,27 +121,37 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
     employees: Object.fromEntries(groups.map((g) => [g.code, employees[g.code] ?? {}])),
     include: {
       states: inc.states, counties: inc.counties, cities: inc.cities, zips: inc.zips,
-      radius: radius.zip && Number(radius.miles) > 0 ? { zip: radius.zip.trim(), miles: Number(radius.miles) } : null,
+      radius: radius.zip && Number(radius.miles) > 0 ? { zip: radius.zip.trim(), miles: Math.min(MAX_RADIUS_MILES, Number(radius.miles)) } : null,
     },
     exclude: { states: exc.states, counties: exc.counties, cities: exc.cities, zips: exc.zips },
   });
 
+  // A radius goes so far, and around a whole ZIP; one that doesn't is said, not saved.
+  const tooFar = Number(radius.miles) > MAX_RADIUS_MILES;
+  const radiusProblem = tooFar ? `A radius goes up to ${MAX_RADIUS_MILES} miles`
+    : radius.zip && radius.zip.length !== 5 ? "The radius ZIP needs 5 digits"
+    : radius.zip && !(Number(radius.miles) > 0) ? "Give the radius in miles" : null;
+
   const findRadius = () => startFinding(async () => {
-    const r = await radiusPreview(radius.zip.trim(), radius.miles);
+    const r = await reach(() => radiusPreview(radius.zip.trim(), radius.miles));
     if (r.ok) setFound(r.data);
     else { setFound(null); toast.error(r.error); }
   });
 
   const save = () => start(async () => {
     if (!picked.size) { toast.error("Pick at least one industry"); return; }
+    if (radiusProblem) { toast.error(radiusProblem); return; }
+    const flipped = groups.find((g) => { const e = employees[g.code] ?? {}; return e.min !== "" && e.max !== "" && e.min != null && e.max != null && Number(e.min) > Number(e.max); });
+    if (flipped) { toast.error(`Employees for ${flipped.code}${flipped.name ? ` ${flipped.name}` : ""}: the "from" is more than the "to"`); return; }
     if (mode === "prospect") {
       if (!who.name.trim() || !who.email.trim()) { toast.error("Give your name and email, so we can reach you"); return; }
-      const r = await submitProspectRequest({ token, prospect: who, criteria: criteria(), notes });
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(who.email.trim())) { toast.error("That email address doesn't look right"); return; }
+      const r = await reach(() => submitProspectRequest({ token, prospect: who, criteria: criteria(), notes }));
       if (r.ok) setSent(true);
       else toast.error(r.error);
       return;
     }
-    const r = await saveListRequest({ id: initial?.id ?? null, companyId: companyId || null, title, criteria: criteria(), notes });
+    const r = await reach(() => saveListRequest({ id: initial?.id ?? null, companyId: companyId || null, title, criteria: criteria(), notes }));
     if (!r.ok) { toast.error(r.error); return; }
     toast.success(initial?.id ? "Request saved" : "Request kept");
     router.push(`/list-builder/${r.data.id}`);
@@ -189,8 +228,10 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
           <div className="space-y-4 p-5">
             <Field label="States"><StatePicker label="States" value={inc.states} onChange={(v) => setInc({ ...inc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Counties" hint="Type to find one, or type it and a comma"><TagInput label="Counties" suggest={suggestFrom("counties")} value={inc.counties} onChange={(v) => setInc({ ...inc, counties: v })} placeholder="e.g. Maricopa, Pinal" data-tag-input="include-counties" /></Field>
-              <Field label="Cities" hint="Type to find one, or type it and a comma"><TagInput label="Cities" suggest={suggestFrom("cities")} value={inc.cities} onChange={(v) => setInc({ ...inc, cities: v })} placeholder="e.g. Mesa, Tempe" data-tag-input="include-cities" /></Field>
+              <Field label="Counties" hint="Type to find one, or Browse the list"><TagInput label="Counties" suggest={suggestFrom("counties")} value={inc.counties} onChange={tagsOf("counties", inc, setInc)}
+                addon={<PlaceBrowser kind="counties" label="Counties" states={inc.states} value={inc.counties} onChange={(v) => setInc((x) => ({ ...x, counties: v }))} />} placeholder="e.g. Maricopa, Pinal" data-tag-input="include-counties" /></Field>
+              <Field label="Cities" hint="Type to find one, or Browse the list"><TagInput label="Cities" suggest={suggestFrom("cities")} value={inc.cities} onChange={tagsOf("cities", inc, setInc)}
+                addon={<PlaceBrowser kind="cities" label="Cities" states={inc.states} value={inc.cities} onChange={(v) => setInc((x) => ({ ...x, cities: v }))} />} placeholder="e.g. Mesa, Tempe" data-tag-input="include-cities" /></Field>
             </div>
             {countyLists.length ? (
               <div className="space-y-2" data-county-zips>
@@ -222,7 +263,7 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
               </div>
             ) : null}
             <Field label="ZIP codes" hint="Type or paste them, a comma between">
-              <TagInput label="ZIP codes" value={inc.zips} onChange={(v) => setInc({ ...inc, zips: v })} normalize={zipTag} placeholder="e.g. 85201, 85202" data-tag-input="include-zips" />
+              <TagInput label="ZIP codes" value={inc.zips} onChange={tagsOf("zips", inc, setInc)} onReject={badZips} normalize={zipTag} placeholder="e.g. 85201, 85202" data-tag-input="include-zips" />
             </Field>
             <div className="rounded-lg border border-[var(--panel-border)] p-3" data-radius>
               <div className="text-sm font-medium">A radius around a ZIP</div>
@@ -230,7 +271,7 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
                 <Field label="Miles" className="w-24"><Input inputMode="decimal" value={radius.miles} onChange={(e) => { setRadius({ ...radius, miles: e.target.value }); setFound(null); }} data-radius-miles /></Field>
                 <span className="pb-2 text-sm text-muted-foreground">of</span>
                 <Field label="ZIP" className="w-28"><Input inputMode="numeric" maxLength={5} value={radius.zip} onChange={(e) => { setRadius({ ...radius, zip: e.target.value.replace(/\D/g, "") }); setFound(null); }} data-radius-zip /></Field>
-                <Button type="button" variant="outline" size="sm" onClick={findRadius} disabled={finding || radius.zip.length !== 5 || !(Number(radius.miles) > 0)} data-radius-find>
+                <Button type="button" variant="outline" size="sm" onClick={findRadius} disabled={finding || radius.zip.length !== 5 || !(Number(radius.miles) > 0) || tooFar} data-radius-find>
                   {finding ? "Finding…" : "Find the ZIPs"}
                 </Button>
               </div>
@@ -239,7 +280,8 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
                   <summary className="cursor-pointer"><strong className="text-foreground">{found.count.toLocaleString()} ZIP codes</strong> within {radius.miles} miles of {radius.zip}</summary>
                   <p className="mt-1 break-words tabular-nums">{found.zips.map((z) => z.zip).join(", ")}{found.count > found.zips.length ? " …" : ""}</p>
                 </details>
-              ) : <p className="mt-2 text-xs text-muted-foreground">Up to {MAX_RADIUS_MILES} miles, from the Census Bureau&apos;s ZIP code points.</p>}
+              ) : tooFar ? <p role="alert" className="mt-2 text-xs font-medium text-destructive" data-radius-error>Up to {MAX_RADIUS_MILES} miles, please.</p>
+                : <p className="mt-2 text-xs text-muted-foreground">Up to {MAX_RADIUS_MILES} miles, from the Census Bureau&apos;s ZIP code points.</p>}
             </div>
           </div>
         </Card>
@@ -249,11 +291,13 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
           <div className="space-y-4 p-5">
             <Field label="States"><StatePicker label="Leave out states" value={exc.states} onChange={(v) => setExc({ ...exc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Counties"><TagInput label="Leave out counties" suggest={suggestFrom("counties")} value={exc.counties} onChange={(v) => setExc({ ...exc, counties: v })} placeholder="e.g. Pinal" data-tag-input="exclude-counties" /></Field>
-              <Field label="Cities"><TagInput label="Leave out cities" suggest={suggestFrom("cities")} value={exc.cities} onChange={(v) => setExc({ ...exc, cities: v })} placeholder="e.g. Apache Junction" data-tag-input="exclude-cities" /></Field>
+              <Field label="Counties"><TagInput label="Leave out counties" suggest={suggestFrom("counties")} value={exc.counties} onChange={tagsOf("counties", exc, setExc)}
+                addon={<PlaceBrowser kind="counties" label="Leave out counties" states={inc.states} value={exc.counties} onChange={(v) => setExc((x) => ({ ...x, counties: v }))} />} placeholder="e.g. Pinal" data-tag-input="exclude-counties" /></Field>
+              <Field label="Cities"><TagInput label="Leave out cities" suggest={suggestFrom("cities")} value={exc.cities} onChange={tagsOf("cities", exc, setExc)}
+                addon={<PlaceBrowser kind="cities" label="Leave out cities" states={inc.states} value={exc.cities} onChange={(v) => setExc((x) => ({ ...x, cities: v }))} />} placeholder="e.g. Apache Junction" data-tag-input="exclude-cities" /></Field>
             </div>
             <Field label="ZIP codes" hint="Taken out of the radius and the ZIPs above">
-              <TagInput label="Leave out ZIP codes" value={exc.zips} onChange={(v) => setExc({ ...exc, zips: v })} normalize={zipTag} placeholder="e.g. 85203" data-tag-input="exclude-zips" />
+              <TagInput label="Leave out ZIP codes" value={exc.zips} onChange={tagsOf("zips", exc, setExc)} onReject={badZips} normalize={zipTag} placeholder="e.g. 85203" data-tag-input="exclude-zips" />
             </Field>
           </div>
         </Card>

@@ -2,6 +2,7 @@ import "./globals.css";
 import { Fraunces, Inter } from "next/font/google";
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import ConnectionNotices from "@/components/layout/connection-notices";
 import Backdrop from "@/components/brand/backdrop";
 import { APPEARANCE_SCRIPT } from "@/lib/appearance";
 import { RoleProvider } from "@/components/layout/role-provider";
@@ -53,6 +54,7 @@ export default async function RootLayout({ children }) {
           <RoleProvider user={user} timeZone={timeZone}>
             {children}
             <Toaster />
+            <ConnectionNotices />
           </RoleProvider>
         </ThemeProvider>
       </body>

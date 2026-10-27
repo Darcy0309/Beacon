@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, RotateCcw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { isNetworkError } from "@/lib/reach";
 
 // Most failures here are a slow first call to the database, which succeeds on
 // a second try. Rather than leave the reader looking at an error and expecting
@@ -23,6 +24,8 @@ const RETRY_PATIENCE_MS = 20_000;
 export default function RouteError({ error, retry, reset }) {
   const [retrying, setRetrying] = useState(false);
   const again = retry ?? reset;
+  // Not reaching the server says so, not "something went wrong".
+  const network = isNetworkError(error);
 
   useEffect(() => {
     console.error(error);
@@ -59,9 +62,9 @@ export default function RouteError({ error, retry, reset }) {
           <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-amber-500/12 text-amber-600">
             <AlertTriangle className="size-6" />
           </span>
-          <h2 className="mt-4 text-lg font-semibold">Something went wrong</h2>
+          <h2 className="mt-4 text-lg font-semibold">{network ? "Couldn't reach Lighthouse" : "Something went wrong"}</h2>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            That screen could not be loaded. This is usually temporary — try again.
+            {network ? "Check your connection, then try again." : "That screen could not be loaded. This is usually temporary — try again."}
           </p>
           {error?.digest ? (
             <p className="mt-3 font-mono text-[0.7rem] text-muted-foreground">

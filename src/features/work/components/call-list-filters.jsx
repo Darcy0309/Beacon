@@ -10,10 +10,26 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, RENEWAL_LINES, XMOD_SIDES, cleanCriteria, describeCriteria, monthDay, monthWindow,
+  FILTER_FIELDS, MONTH_DAYS, MONTH_NAMES, RENEWAL_LINES, XMOD_SIDES, cleanCriteria, describeCriteria, employeeCount, monthDay, monthWindow,
 } from "@/lib/call-list-filter";
 import { cn } from "@/lib/utils";
 import { loadCallListOptions, saveCallListFilter } from "@/features/work/actions";
+import { reach } from "@/lib/reach";
+
+/**
+ * Why a filter can't be applied as it stands, or null (Oct 2026: said, not
+ * left off or turned round without a word).
+ */
+function problemWith(draft) {
+  const r = draft.renewal ?? {};
+  if (Boolean(r.from) !== Boolean(r.to)) return "Choose both renewal days, From and To, or neither.";
+  const typed = (v) => String(v ?? "").trim() !== "";
+  const min = draft.employees?.min;
+  const max = draft.employees?.max;
+  if ((typed(min) && employeeCount(min) === null) || (typed(max) && employeeCount(max) === null)) return "Employees: type a whole number, like 10.";
+  if (employeeCount(min) !== null && employeeCount(max) !== null && employeeCount(min) > employeeCount(max)) return "Employees: the Min is more than the Max.";
+  return null;
+}
 
 /** Include · Exclude, for one criterion. */
 function Mode({ exclude, onChange, label }) {
@@ -148,10 +164,14 @@ export default function CallListFilters({ projectId, rep = null, criteria, optio
     const f = new FormData();
     f.set("project_id", String(projectId));
     if (rep) f.set("rep", String(rep));
-    loadCallListOptions(f)
+    reach(() => loadCallListOptions(f))
       .then((result) => {
         if (result?.ok) setOpts(result.data ?? {});
-        else toast.error(result?.error ?? "The filter's choices could not be read.");
+        else {
+          toast.error(result?.error ?? "The filter's choices could not be read.");
+          // Closed, so it isn't asked again and again; opening it tries again.
+          setOpen(false);
+        }
       })
       .finally(() => setLoadingOpts(false));
   }, [open, opts, loadingOpts, projectId, rep]);
@@ -159,13 +179,14 @@ export default function CallListFilters({ projectId, rep = null, criteria, optio
   const clean = cleanCriteria(draft);
   const dirty = JSON.stringify(clean) !== JSON.stringify(cleanCriteria(criteria));
   const applied = describeCriteria(criteria, opts ?? {});
+  const problem = problemWith(draft);
 
   const save = (next) =>
     startSaving(async () => {
       const f = new FormData();
       f.set("project_id", String(projectId));
       f.set("criteria", JSON.stringify(cleanCriteria(next)));
-      const result = await saveCallListFilter(f);
+      const result = await reach(() => saveCallListFilter(f));
       if (result.ok) {
         toast.success(Object.keys(result.data.criteria).length ? "Filter applied to your list" : "Filter cleared");
         router.refresh();
@@ -311,7 +332,7 @@ export default function CallListFilters({ projectId, rep = null, criteria, optio
           <span className="text-xs text-muted-foreground" data-filter-lasts>
             {applied.length ? "Kept for today; your list starts in full again tomorrow morning." : "A filter you apply is kept for the rest of today."}
           </span>
-          <Button type="button" size="sm" disabled={saving || !dirty} onClick={() => save(draft)} data-apply-filters>
+          <Button type="button" size="sm" disabled={saving || (!dirty && !problem)} onClick={() => (problem ? toast.error(problem) : save(draft))} data-apply-filters>
             <Filter /> {saving ? "Applying…" : "Apply filters"}
           </Button>
         </div>

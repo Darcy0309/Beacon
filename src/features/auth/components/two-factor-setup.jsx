@@ -7,6 +7,7 @@ import { ShieldCheck, ShieldOff, Smartphone, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { startTwoFactor, confirmTwoFactor, disableTwoFactor } from "@/features/auth/actions";
+import { reach } from "@/lib/reach";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -22,7 +23,7 @@ export default function TwoFactorSetup({ enabled, factors }) {
   const [starting, startTransition] = useTransition();
   const [removing, removeTransition] = useTransition();
   const [state, confirmAction, confirming] = useActionState(async (prev, formData) => {
-    const result = await confirmTwoFactor(prev, formData);
+    const result = await reach(() => confirmTwoFactor(prev, formData));
     if (result.ok) {
       setSetup(null);
       toast.success("Two-factor is on. You'll be asked for a code next time you sign in.");
@@ -33,14 +34,14 @@ export default function TwoFactorSetup({ enabled, factors }) {
 
   const begin = () =>
     startTransition(async () => {
-      const result = await startTwoFactor();
+      const result = await reach(() => startTwoFactor());
       if (result.ok) setSetup(result.data);
       else toast.error(result.error ?? "Could not start the setup.");
     });
 
   const turnOff = () =>
     removeTransition(async () => {
-      const result = await disableTwoFactor();
+      const result = await reach(() => disableTwoFactor());
       if (result.ok) {
         toast.success("Two-factor is off.");
         router.refresh();

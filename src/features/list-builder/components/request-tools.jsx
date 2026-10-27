@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Field, Select } from "@/components/ui/field";
 import { createListLink, loadSicSheet, setListLinkActive, setListRequestStatus } from "@/features/list-builder/actions";
 import { STATUSES, codesCsv, territoryCsv } from "@/lib/list-builder";
+import { reach } from "@/lib/reach";
 
 const download = (name, text) => {
   const url = URL.createObjectURL(new Blob([`﻿${text}\r\n`], { type: "text/csv;charset=utf-8" }));
@@ -44,7 +45,7 @@ export function RequestStatus({ id, status }) {
       onChange={(e) => {
         const next = e.target.value;
         start(async () => {
-          const r = await setListRequestStatus(id, next);
+          const r = await reach(() => setListRequestStatus(id, next));
           if (r.ok) { toast.success("Updated"); router.refresh(); } else toast.error(r.error);
         });
       }}>
@@ -71,14 +72,14 @@ export function ProspectLinks({ links, reps, clients, origin }) {
     }
   };
   const make = () => start(async () => {
-    const r = await createListLink({ label, salesRepId: rep || null, companyId: client || null, days });
+    const r = await reach(() => createListLink({ label, salesRepId: rep || null, companyId: client || null, days }));
     if (!r.ok) { toast.error(r.error); return; }
     setLabel("");
     await copy(r.data.token);
     router.refresh();
   });
   const flip = (l) => start(async () => {
-    const r = await setListLinkActive(l.id, !l.active);
+    const r = await reach(() => setListLinkActive(l.id, !l.active));
     if (r.ok) router.refresh(); else toast.error(r.error);
   });
   return (
@@ -125,7 +126,7 @@ export function SicSheetUpload() {
     const f = new FormData();
     f.set("file", file);
     start(async () => {
-      const r = await loadSicSheet(f);
+      const r = await reach(() => loadSicSheet(f));
       if (r.ok) { toast.success(`${r.data.count.toLocaleString()} codes loaded`); router.refresh(); } else toast.error(r.error);
       if (ref.current) ref.current.value = "";
     });

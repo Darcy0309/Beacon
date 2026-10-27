@@ -5,6 +5,9 @@ const nextConfig = {
   // nodemailer (src/lib/server/mail.js) speaks SMTP over Node's sockets, and
   // web-push (src/lib/server/push.js) uses Node's crypto and https.
   serverExternalPackages: ["undici", "nodemailer", "web-push"],
+  // The dev server, opened at 127.0.0.1 too (the auth Site URL's host, as the
+  // password-reset test does): its scripts load there, not only on localhost.
+  allowedDevOrigins: ["127.0.0.1"],
   experimental: {
     serverActions: {
       // A lead list is posted to its server action whole. The 1 MB default

@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { importSicCodes } from "@/features/sic/actions";
 import { parseCsv } from "@/lib/csv";
 import { sicPairsFromRows } from "@/lib/sic";
+import { reach } from "@/lib/reach";
 
 /**
  * The SIC master list: how many codes it holds, a CSV to load (SIC Code and
@@ -27,13 +28,19 @@ export default function SicCodesCard({ count }) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
-    const pairs = sicPairsFromRows(parseCsv(await file.text()));
+    let pairs;
+    try {
+      pairs = sicPairsFromRows(parseCsv(await file.text()));
+    } catch {
+      toast.error("That file couldn't be read. Save it from Excel as CSV and try again.");
+      return;
+    }
     if (!pairs.length) {
       toast.error("No SIC codes found in that file: it needs a SIC Code column (and SIC Description).");
       return;
     }
     start(async () => {
-      const result = await importSicCodes(pairs);
+      const result = await reach(() => importSicCodes(pairs));
       if (!result.ok) return void toast.error(result.error);
       const { added, updated } = result.data;
       toast.success(`${added.toLocaleString()} SIC code${added === 1 ? "" : "s"} added${updated ? `, ${updated.toLocaleString()} description${updated === 1 ? "" : "s"} updated` : ""}`);

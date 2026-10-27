@@ -38,6 +38,8 @@ export async function sendHeldDeliveries(formData) {
   const sent = await releaseHolds(admin, { ids, sentBy: me.id, origin: await requestOrigin() });
   await logActivity(supabase, "delivery.release", { detail: `${sent} sent${all ? " (all)" : ""}`, userId: me.id });
   refresh();
+  // None went (already sent, or the email failed and they wait again): not "0 sent" as a success (Oct 2026).
+  if (!sent) return fail(all ? "Nothing was sent: Send all leaves the ones held back (send those one at a time), or the email could not go." : "Nothing was sent: they may have gone already, or the email could not go. Try again.");
   return ok({ sent });
 }
 

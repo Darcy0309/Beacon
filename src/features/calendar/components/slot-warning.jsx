@@ -55,6 +55,7 @@ export default function SlotWarning({ projectId, control, initial, exceptId = nu
     let live = true;
     dayOf(projectId, date)
       .then((data) => live && setClashes(data ? slotClashes({ date, time, duration, exceptId }, data) : []))
+      // A warning only: a day that can't be read warns of nothing, and the form saves as usual.
       .catch(() => live && setClashes([]));
     return () => {
       live = false;

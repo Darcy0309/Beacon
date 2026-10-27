@@ -49,6 +49,8 @@ export async function saveProject(prevState, formData) {
     ? await supabase.from("projects").update(onlySubmitted(formData, payload)).eq("id", id).select("id").maybeSingle()
     : await supabase.from("projects").insert(payload).select("id").maybeSingle();
   if (error) return fail(error, null, formValues(formData, Object.keys(schemas.project)));
+  // Row Level Security answers an update it refuses with no row, not an error (Oct 2026: said, not "Project updated").
+  if (id && !saved) return fail("Nothing was saved: that project may have been deleted, or isn't yours to change.", null, formValues(formData, Object.keys(schemas.project)));
   // Tied to an appointment project, whichever was made first: Project Info filled in here goes to the shared sheet
   // when that one has none yet (Sean, Oct 2026).
   const admin = payload.appt_project_id && saved?.id ? createAdminClient() : null;

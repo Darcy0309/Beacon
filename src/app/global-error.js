@@ -4,6 +4,9 @@
 // Kept dependency-free so it renders even when the rest of the app cannot.
 // retry() loads the page from the server again; reset() would only re-render
 // the failure the browser already has.
+// reach.js imports nothing, so it keeps this page dependency-free.
+import { REACH_ERROR, isNetworkError } from "@/lib/reach";
+
 export default function GlobalError({ error, retry, reset }) {
   return (
     <html lang="en">
@@ -34,7 +37,8 @@ export default function GlobalError({ error, retry, reset }) {
             Lighthouse could not start
           </div>
           <p style={{ marginTop: 10, fontSize: 14, color: "rgba(230,237,247,0.75)", lineHeight: 1.5 }}>
-            {error?.message || "An unexpected error occurred while loading the application."}
+            {/* Not reaching the server says so, as route-error.jsx does (Oct 2026). */}
+            {isNetworkError(error) ? REACH_ERROR : error?.message || "An unexpected error occurred while loading the application."}
           </p>
           {error?.digest ? (
             <p style={{ marginTop: 8, fontSize: 11, fontFamily: "ui-monospace, monospace", color: "rgba(230,237,247,0.45)" }}>

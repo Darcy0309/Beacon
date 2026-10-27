@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { setClientGoal } from "@/features/dashboard/actions";
+import { reach } from "@/lib/reach";
 
 const money = (n) => `$${Math.round(n).toLocaleString("en-US")}`;
 const short = (n) => (n >= 1e6 ? `$${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : money(n));
@@ -147,7 +148,7 @@ function GoalButton({ year, goal, companyId }) {
       f.set("year", String(year));
       f.set("goal", value);
       if (companyId) f.set("company_id", String(companyId));
-      const result = await setClientGoal(f);
+      const result = await reach(() => setClientGoal(f));
       if (result.ok) {
         toast.success(`Goal for ${year} set to ${money(result.data.goal)}`);
         setOpen(false);

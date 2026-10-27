@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, Users } from "lucide-react";
+import { toast } from "sonner";
 import Link from "@/components/shared/intent-link";
 import TipLayer from "@/components/shared/tip-layer";
 import { MONTH_SHORT, STALE_DAYS, pipelineCsv, stale } from "@/lib/pipeline";
@@ -29,12 +30,16 @@ const mdy = (iso) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10
 export default function PipelineReport({ rows, months, today, linkTo = "project", fileName }) {
   const projectHref = (r) => (linkTo === "work" ? `/work/${r.projectId}` : `/projects/${r.projectId}`);
   const download = () => {
-    const url = URL.createObjectURL(new Blob([`﻿${pipelineCsv(rows, months)}\r\n`], { type: "text/csv;charset=utf-8" }));
-    const a = Object.assign(document.createElement("a"), { href: url, download: fileName });
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      const url = URL.createObjectURL(new Blob([`﻿${pipelineCsv(rows, months)}\r\n`], { type: "text/csv;charset=utf-8" }));
+      const a = Object.assign(document.createElement("a"), { href: url, download: fileName });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      toast.error("Couldn't make the CSV. Try again.");
+    }
   };
   const sum = (key) => rows.reduce((n, r) => n + (r[key] ?? 0), 0);
   const total = sum("total");

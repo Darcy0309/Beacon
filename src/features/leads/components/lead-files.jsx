@@ -11,6 +11,7 @@ import { fileHref } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
 import { recordLeadFile } from "@/features/leads/actions";
 import { deleteDocument } from "@/features/documents/actions";
+import { REACH_ERROR, isNetworkError, reach } from "@/lib/reach";
 
 const BUCKET = "lead-files";
 const MAX_MB = 25;
@@ -42,11 +43,14 @@ export default function LeadFiles({ leadId, initial = null, canDelete = false, c
   const [asking, setAsking] = useState(null);
   const [removing, startRemove] = useTransition();
 
+  // A list that can't be read is said, not shown as "No files yet" (Oct 2026: every error a notice).
   const load = async () => {
     try {
       const res = await fetch(`/api/leads/${leadId}/files`, { cache: "no-store" });
-      if (res.ok) setFiles((await res.json()).files ?? []);
-    } catch {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setFiles((await res.json()).files ?? []);
+    } catch (e) {
+      toast.error(isNetworkError(e) ? REACH_ERROR : "Couldn't read the lead's files. Reload the page to try again.");
       setFiles((f) => f ?? []);
     }
   };
@@ -68,12 +72,13 @@ export default function LeadFiles({ leadId, initial = null, canDelete = false, c
       setBusy(`Adding ${file.name}${chosen.length > 1 ? ` (${i + 1} of ${chosen.length})` : ""}…`);
       // In a folder of its own, under its own name: what the browser's PDF viewer shows, and saves it as.
       const path = `lead/${leadId}/${crypto.randomUUID()}/${safe(file.name)}`;
-      const { error } = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined, upsert: false });
+      const { error } = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined, upsert: false })
+        .catch((e) => ({ error: e }));
       if (error) {
-        toast.error(`${file.name}: ${/mime|type/i.test(error.message) ? "that kind of file can't be added" : error.message}`);
+        toast.error(`${file.name}: ${/mime|type/i.test(error.message) ? "that kind of file can't be added" : isNetworkError(error) ? REACH_ERROR : error.message}`);
         continue;
       }
-      const saved = await recordLeadFile({ leadId, path, name: file.name, size: file.size });
+      const saved = await reach(() => recordLeadFile({ leadId, path, name: file.name, size: file.size }));
       if (!saved.ok) toast.error(`${file.name}: ${saved.error}`);
       else added += 1;
     }
@@ -90,7 +95,7 @@ export default function LeadFiles({ leadId, initial = null, canDelete = false, c
     startRemove(async () => {
       const form = new FormData();
       form.set("id", String(f.id));
-      const result = await deleteDocument(form);
+      const result = await reach(() => deleteDocument(form));
       if (result.ok) {
         toast.success("File taken off the lead");
         setAsking(null);

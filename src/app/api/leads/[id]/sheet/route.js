@@ -24,7 +24,12 @@ export async function GET(request, { params }) {
   if (!me) return page(401, "<p>Sign in to print a lead.</p>");
   if (!/^[1-9]\d{0,17}$/.test(id)) return page(404, "<p>No such lead.</p>");
   const supabase = await createClient();
-  const loaded = await loadLeadSheet(supabase, Number(id), null, { origin: publicOrigin(request.headers) });
+  // A read that fails says so in the tab it opened, not a bare error page (Oct 2026).
+  const loaded = await loadLeadSheet(supabase, Number(id), null, { origin: publicOrigin(request.headers) }).catch((err) => {
+    console.error("[lead sheet]", err?.message ?? err);
+    return undefined;
+  });
+  if (loaded === undefined) return page(502, "<p>The lead sheet could not be opened. Close this tab and try Print again.</p>");
   if (!loaded) return page(404, "<p>This lead is no longer available.</p>");
   const { html } = renderLeadSheet(loaded.sheet);
   const title = `Lead sheet: ${String(loaded.sheet.company ?? "").replace(/[<>&"]/g, "")}`;

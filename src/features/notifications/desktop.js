@@ -151,8 +151,8 @@ const changed = () => listeners.forEach((fn) => fn());
 // Web Push
 // ---------------------------------------------------------------------------
 
-/** active: this browser is subscribed, and the worker shows the pop-ups. */
-const push = { active: false, syncing: null };
+/** active: this browser is subscribed, and the worker shows the pop-ups. failed: the last try to subscribe went wrong. */
+const push = { active: false, failed: false, syncing: null };
 
 export const pushSupported = () =>
   typeof window !== "undefined" && window.isSecureContext && "serviceWorker" in navigator && "PushManager" in window;
@@ -180,6 +180,7 @@ const serverKey = () => (keyPromise ??= pushPublicKey().catch(() => null));
 export function syncPush({ force = false } = {}) {
   if (push.syncing && !force) return push.syncing;
   push.syncing = (async () => {
+    push.failed = false;
     if (!pushSupported() || desktopPermission() !== "granted" || store.get(OFF_KEY) === "1") return false;
     const key = await serverKey();
     if (!key) return false;
@@ -203,6 +204,7 @@ export function syncPush({ force = false } = {}) {
     } catch (err) {
       console.warn("[push] not subscribed:", err?.message ?? err);
       push.active = false;
+      push.failed = true;
     }
     changed();
     return push.active;
@@ -255,7 +257,8 @@ export function forgetPushThenSubmit(e) {
 /**
  * The person's choice, for the switch in the bell and the inbox:
  *   status    "on", "off", "ask" (not asked yet), "blocked" (the browser said no), "unsupported"
- *   turnOn()  asks the browser when it has not been asked, and clears "off"
+ *   turnOn()  asks the browser when it has not been asked, and clears "off";
+ *             resolves false when this browser could not sign up for them while closed
  *   turnOff() stops them in this browser, without changing the browser's answer
  */
 export function useDesktopNotifications() {
@@ -299,6 +302,7 @@ export function useDesktopNotifications() {
     if (desktopPermission() === "default") await window.Notification.requestPermission();
     changed();
     await syncPush({ force: true });
+    return !push.failed;
   }, []);
 
   const turnOff = useCallback(async () => {

@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { dateTime } from "@/lib/format";
 import { restoreRecord } from "@/features/trash/actions";
+import { reach } from "@/lib/reach";
 
 /**
  * Deleted records: what people have deleted, which Lighthouse keeps (a
@@ -27,7 +28,7 @@ export default function DeletedRecordsCard({ records }) {
       f.set("kind", r.kind);
       f.set("id", String(r.id));
       f.set("name", r.name);
-      const result = await restoreRecord(f);
+      const result = await reach(() => restoreRecord(f));
       if (result.ok) {
         toast.success(`${r.name} is back`);
         setAsking(null);
