@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { zipsAround } from "@/lib/server/zip-radius";
+import { countyZipLists, suggestPlaces, zipsOfCounties } from "@/lib/server/territory";
 import { STATUSES, cleanCriteria, sicSheetRows } from "@/lib/list-builder";
 import { parseCsv } from "@/lib/csv";
 
@@ -18,10 +19,24 @@ export async function radiusPreview(zip, miles) {
   return ok({ count: found.length, zips: found.slice(0, 400) });
 }
 
-/** The radius's ZIPs for criteria being kept (none when it has no radius). */
-function radiusZips(criteria) {
+/** The ZIPs criteria bring in (the radius's and the counties') and those they take out (the counties left out). */
+function territoryZips(criteria) {
   const r = criteria?.include?.radius;
-  return r ? (zipsAround(r.zip, r.miles) ?? []).map((z) => z.zip) : [];
+  const radius = r ? (zipsAround(r.zip, r.miles) ?? []).map((z) => z.zip) : [];
+  const states = criteria?.include?.states;
+  return [[...radius, ...zipsOfCounties(criteria?.include?.counties, states)], zipsOfCounties(criteria?.exclude?.counties, states)];
+}
+
+/** Counties or cities to suggest as one is typed: from the states picked (or every state). */
+export async function territorySuggest(kind, states, q) {
+  if (!["counties", "cities"].includes(kind)) return [];
+  return suggestPlaces(kind, (Array.isArray(states) ? states : []).filter((s) => /^[A-Z]{2}$/.test(s)), String(q ?? "").slice(0, 60));
+}
+
+/** The ZIP codes in each county chosen, to leave some out. */
+export async function countyZips(counties, states = []) {
+  const picked = (Array.isArray(states) ? states : []).filter((s) => /^[A-Z]{2}$/.test(s));
+  return countyZipLists((Array.isArray(counties) ? counties : []).slice(0, 50).map(String), picked);
 }
 
 /**
@@ -32,7 +47,7 @@ export async function saveListRequest(payload) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (!me) return fail("Sign in again to do that.");
-  const criteria = cleanCriteria(payload?.criteria, radiusZips(payload?.criteria));
+  const criteria = cleanCriteria(payload?.criteria, ...territoryZips(payload?.criteria));
   if (!criteria.sic.length) return fail("Pick at least one industry");
   const title = String(payload?.title ?? "").trim().slice(0, 160) || null;
   const notes = String(payload?.notes ?? "").trim().slice(0, 4000) || null;
@@ -140,7 +155,7 @@ export async function loadSicSheet(formData) {
 
 /** A prospect sends their request through a link (no sign-in). */
 export async function submitProspectRequest({ token, prospect, criteria, notes }) {
-  const clean = cleanCriteria(criteria, radiusZips(criteria));
+  const clean = cleanCriteria(criteria, ...territoryZips(criteria));
   if (!clean.sic.length) return fail("Pick at least one industry");
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submit_list_request", {

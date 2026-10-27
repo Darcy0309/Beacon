@@ -2,7 +2,8 @@
  * List Builder (Sean, Oct 2026): staff build a request for a client from the
  * SIC tree (a sector opened with +, a group ticked whole, a code found by
  * name), the employee size for each group, the territory (a state, a radius
- * around a ZIP) and what to leave out; it is kept with the client, its Sales
+ * around a ZIP, a county picked from the Census's names, a ZIP in it left
+ * out) and what to leave out; it is kept with the client, its Sales
  * Rep is told, and it exports its codes one to a line. A prospect fills one
  * in from a link without signing in; a link turned off is closed. A client
  * makes their own, and sees what they asked for before.
@@ -77,10 +78,23 @@ try {
   await admin.ev("document.querySelector('[data-radius-find]').click()");
   const found = Number(await when(admin, "document.querySelector('[data-radius-found]')?.dataset.radiusFound ?? null"));
   check("a radius: the ZIPs within 5 miles of 85201, from the Census points", found > 3, String(found));
-  // Counties and ZIPs as tags: a comma makes one.
-  await setValue(admin, '[data-tag-input="include-counties"] [data-tag-text]', "Maricopa,");
+  // A county picked from the Census's names as it is typed (Arizona's, the state picked).
+  await admin.ev(`document.querySelector('[data-tag-input="include-counties"] [data-tag-text]').focus()`);
+  await setValue(admin, '[data-tag-input="include-counties"] [data-tag-text]', "Mari");
+  const offers = await when(admin, `[...document.querySelectorAll('[data-tag-input="include-counties"] [data-tag-offer]')].map((b) => b.dataset.tagOffer).join('|') || null`);
+  check("counties suggested from the state picked", offers.split("|").includes("Maricopa County, AZ") && offers.split("|").every((o) => o.endsWith(", AZ")), offers);
+  await admin.ev(`document.querySelector('[data-tag-offer="Maricopa County, AZ"]').click()`);
+  check("…picked whole", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-counties"] [data-tag="Maricopa County, AZ"]')`))
+    && (await admin.ev(`document.querySelector('[data-tag-input="include-counties"] [data-tag-text]').value`)) === "");
+  const listed = Number(await when(admin, `document.querySelectorAll('[data-county-zip-list="Maricopa County, AZ"] [data-county-zip]').length || null`));
+  check("its ZIP codes listed", listed === 138, String(listed));
+  await admin.ev(`document.querySelector('[data-county-zip="85004"]').click()`);
+  check("…one clicked is left out", Boolean(await when(admin, `document.querySelector('[data-county-zip="85004"]').getAttribute('aria-pressed') === 'true'
+    && !!document.querySelector('[data-tag-input="exclude-zips"] [data-tag="85004"]')`)));
+  // Cities and ZIPs as tags: a comma makes one.
+  await setValue(admin, '[data-tag-input="include-cities"] [data-tag-text]', "Mesa,");
   await setValue(admin, '[data-tag-input="exclude-zips"] [data-tag-text]', "85203, 852");
-  check("a comma makes a tag: a county, a ZIP", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-counties"] [data-tag="Maricopa"]')
+  check("a comma makes a tag: a city, a ZIP", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-cities"] [data-tag="Mesa"]')
     && !!document.querySelector('[data-tag-input="exclude-zips"] [data-tag="85203"]')`))
     && (await admin.ev(`document.querySelector('[data-tag-input="exclude-zips"] [data-tag-text]').value`)) === "852");
   await setValue(admin, '[data-tag-input="exclude-zips"] [data-tag-text]', "");
@@ -90,8 +104,10 @@ try {
   const r = one(`select company_id, sales_rep_id, source, title, criteria from public.list_requests where id = ${id}`);
   check("…kept with the client and its Sales Rep", r.company_id === company && r.sales_rep_id === MIKE && r.source === "staff" && r.title === `${TAG} Contractors`, JSON.stringify(r));
   check("…the group's codes and the one found", ["1521", "1522", "1531", "1541", "1542", "1761"].every((c) => r.criteria.sic.includes(c)) && r.criteria.sic.length === 6, JSON.stringify(r.criteria.sic));
-  check("…the size for 17, the state, the radius's ZIPs less the one left out", r.criteria.employees["17"]?.min === 10 && r.criteria.employees["17"]?.max === 100
-    && r.criteria.include.states.join() === "AZ" && r.criteria.include.counties.join() === "Maricopa" && r.criteria.zips.includes("85201") && !r.criteria.zips.includes("85203") && r.criteria.exclude.zips.join() === "85203", JSON.stringify(r.criteria));
+  check("…the size for 17, the state, the county, the city", r.criteria.employees["17"]?.min === 10 && r.criteria.employees["17"]?.max === 100
+    && r.criteria.include.states.join() === "AZ" && r.criteria.include.counties.join() === "Maricopa County, AZ" && r.criteria.include.cities.join() === "Mesa", JSON.stringify(r.criteria.include));
+  check("…the radius's ZIPs and the county's, less those left out", r.criteria.zips.includes("85201") && r.criteria.zips.includes("85383")
+    && !r.criteria.zips.includes("85203") && !r.criteria.zips.includes("85004") && r.criteria.exclude.zips.join() === "85004,85203", JSON.stringify(r.criteria.exclude));
   check("the Sales Rep is told", sql(`select count(*) from public.notifications where user_id = ${MIKE} and link = '/list-builder/${id}'`) === "1");
 
   section("Its page and its exports");

@@ -181,9 +181,10 @@ const uniq = (a) => [...new Set(a)];
  * each once; employee sizes only for the groups picked, whole numbers, from
  * no more than to; states as two letters; the territory's lists trimmed and
  * capped; the radius within reason; and the ZIPs it all comes to: those
- * listed and those in the radius, less those left out.
+ * listed, `addZips` (the radius's and the counties' ZIPs), less those left
+ * out and `dropZips` (the ZIPs of the counties left out).
  */
-export function cleanCriteria(raw, radiusZips = []) {
+export function cleanCriteria(raw, addZips = [], dropZips = []) {
   const c = raw && typeof raw === "object" ? raw : {};
   const sic = uniq(list(c.sic).map(sicCode).filter((x) => x && !x.includes("-"))).slice(0, 5000);
   const groups = new Set(sic.map(groupOf));
@@ -204,8 +205,8 @@ export function cleanCriteria(raw, radiusZips = []) {
     : null;
   const include = { states: states(c.include?.states), counties: places(c.include?.counties), cities: places(c.include?.cities), zips: zips(c.include?.zips), radius };
   const exclude = { states: states(c.exclude?.states), counties: places(c.exclude?.counties), cities: places(c.exclude?.cities), zips: zips(c.exclude?.zips) };
-  const out = new Set([...include.zips, ...(radius ? radiusZips : [])]);
-  for (const z of exclude.zips) out.delete(z);
+  const out = new Set([...include.zips, ...addZips]);
+  for (const z of [...exclude.zips, ...dropZips]) out.delete(z);
   return { sic, employees, include, exclude, zips: [...out].slice(0, MAX_ZIPS) };
 }
 

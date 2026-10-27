@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Ban, Building2, Factory, MapPin, Send, Users } from "lucide-react";
@@ -12,7 +12,7 @@ import { Field, Select } from "@/components/ui/field";
 import SectionHeader from "@/components/shared/section-header";
 import SicTree from "@/features/list-builder/components/sic-tree";
 import TagInput from "@/features/list-builder/components/tag-input";
-import { radiusPreview, saveListRequest, submitProspectRequest } from "@/features/list-builder/actions";
+import { countyZips, radiusPreview, saveListRequest, submitProspectRequest, territorySuggest } from "@/features/list-builder/actions";
 import { MAX_RADIUS_MILES, buildTree, criteriaSummary, groupOf } from "@/lib/list-builder";
 import { US_STATES } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
@@ -66,6 +66,17 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [who, setWho] = useState({ name: "", company: "", email: "", phone: "" });
   const [sent, setSent] = useState(false);
+  // The ZIP codes in each county chosen (the Census's), to leave some out.
+  const [countyLists, setCountyLists] = useState([]);
+  useEffect(() => {
+    let live = true;
+    if (!inc.counties.length) { setCountyLists([]); return undefined; }
+    countyZips(inc.counties, inc.states).then((lists) => { if (live) setCountyLists(lists); }).catch(() => {});
+    return () => { live = false; };
+  }, [inc.counties, inc.states]);
+  const toggleZip = (z) => setExc((e) => ({ ...e, zips: e.zips.includes(z) ? e.zips.filter((x) => x !== z) : [...e.zips, z] }));
+  // Counties and cities suggested from the states picked (every state when none are).
+  const suggestFrom = (kind) => (q) => territorySuggest(kind, inc.states, q);
   const [pending, start] = useTransition();
   const [finding, startFinding] = useTransition();
 
@@ -116,7 +127,8 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
     );
   }
 
-  const summary = criteriaSummary({ ...criteria(), zips: [...new Set([...inc.zips, ...(found?.zips ?? []).map((z) => z.zip)])] });
+  const out = new Set(exc.zips);
+  const summary = criteriaSummary({ ...criteria(), zips: [...new Set([...inc.zips, ...(found?.zips ?? []).map((z) => z.zip), ...countyLists.flatMap((c) => c.zips)])].filter((z) => !out.has(z)) });
 
   return (
     <div className="space-y-4" data-list-builder={mode}>
@@ -177,9 +189,38 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
           <div className="space-y-4 p-5">
             <Field label="States"><StatePicker label="States" value={inc.states} onChange={(v) => setInc({ ...inc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Counties" hint="Type one, then a comma"><TagInput label="Counties" value={inc.counties} onChange={(v) => setInc({ ...inc, counties: v })} placeholder="e.g. Maricopa, Pinal" data-tag-input="include-counties" /></Field>
-              <Field label="Cities" hint="Type one, then a comma"><TagInput label="Cities" value={inc.cities} onChange={(v) => setInc({ ...inc, cities: v })} placeholder="e.g. Mesa, Tempe" data-tag-input="include-cities" /></Field>
+              <Field label="Counties" hint="Type to find one, or type it and a comma"><TagInput label="Counties" suggest={suggestFrom("counties")} value={inc.counties} onChange={(v) => setInc({ ...inc, counties: v })} placeholder="e.g. Maricopa, Pinal" data-tag-input="include-counties" /></Field>
+              <Field label="Cities" hint="Type to find one, or type it and a comma"><TagInput label="Cities" suggest={suggestFrom("cities")} value={inc.cities} onChange={(v) => setInc({ ...inc, cities: v })} placeholder="e.g. Mesa, Tempe" data-tag-input="include-cities" /></Field>
             </div>
+            {countyLists.length ? (
+              <div className="space-y-2" data-county-zips>
+                {countyLists.map((c) => {
+                  const left = c.zips.filter((z) => out.has(z)).length;
+                  return (
+                    <details key={c.county} className="rounded-lg border border-[var(--panel-border)] p-3" data-county-zip-list={c.county}>
+                      <summary className="cursor-pointer text-sm">
+                        <strong>{c.county}</strong>
+                        <span className="text-muted-foreground"> · {c.zips.length ? `${c.zips.length} ZIP codes${left ? `, ${left} left out` : ""}` : "not found: pick it from the suggestions to see its ZIP codes"}</span>
+                      </summary>
+                      {c.zips.length ? (
+                        <>
+                          <p className="mt-2 text-xs text-muted-foreground">Click a ZIP to leave it out (click again to keep it).</p>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {c.zips.map((z) => (
+                              <button key={z} type="button" aria-pressed={out.has(z)} onClick={() => toggleZip(z)} data-county-zip={z}
+                                className={cn("rounded-full border px-2.5 py-0.5 text-xs font-semibold tabular-nums transition-colors",
+                                  out.has(z) ? "border-destructive/40 bg-destructive/10 text-destructive line-through" : "border-[var(--panel-border)] text-foreground/80 hover:border-primary/40")}>
+                                {z}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      ) : null}
+                    </details>
+                  );
+                })}
+              </div>
+            ) : null}
             <Field label="ZIP codes" hint="Type or paste them, a comma between">
               <TagInput label="ZIP codes" value={inc.zips} onChange={(v) => setInc({ ...inc, zips: v })} normalize={zipTag} placeholder="e.g. 85201, 85202" data-tag-input="include-zips" />
             </Field>
@@ -208,8 +249,8 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
           <div className="space-y-4 p-5">
             <Field label="States"><StatePicker label="Leave out states" value={exc.states} onChange={(v) => setExc({ ...exc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Counties"><TagInput label="Leave out counties" value={exc.counties} onChange={(v) => setExc({ ...exc, counties: v })} placeholder="e.g. Pinal" data-tag-input="exclude-counties" /></Field>
-              <Field label="Cities"><TagInput label="Leave out cities" value={exc.cities} onChange={(v) => setExc({ ...exc, cities: v })} placeholder="e.g. Apache Junction" data-tag-input="exclude-cities" /></Field>
+              <Field label="Counties"><TagInput label="Leave out counties" suggest={suggestFrom("counties")} value={exc.counties} onChange={(v) => setExc({ ...exc, counties: v })} placeholder="e.g. Pinal" data-tag-input="exclude-counties" /></Field>
+              <Field label="Cities"><TagInput label="Leave out cities" suggest={suggestFrom("cities")} value={exc.cities} onChange={(v) => setExc({ ...exc, cities: v })} placeholder="e.g. Apache Junction" data-tag-input="exclude-cities" /></Field>
             </div>
             <Field label="ZIP codes" hint="Taken out of the radius and the ZIPs above">
               <TagInput label="Leave out ZIP codes" value={exc.zips} onChange={(v) => setExc({ ...exc, zips: v })} normalize={zipTag} placeholder="e.g. 85203" data-tag-input="exclude-zips" />
