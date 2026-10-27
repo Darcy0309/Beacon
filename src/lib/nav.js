@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
-  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter,
 } from "lucide-react";
 
 export const ROLES = {
@@ -87,6 +87,8 @@ export const navGroups = [
     items: [
       // Query the whole book at once: industry, ZIPs, renewal month, client…
       { href: "/explore", label: "Lead Explorer", icon: Database, roles: ["admin", "manager"] },
+      // The businesses a client (or prospect) wants to target: industries, size, territory (Sean, Oct 2026).
+      { href: "/list-builder", label: "List Builder", icon: ListFilter, roles: ["admin", "manager", "client"] },
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
       // Agents get the same page scoped to their own productivity.
       { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "agent", "client"] },
