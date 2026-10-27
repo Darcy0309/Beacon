@@ -30,6 +30,23 @@ assert.equal(by["17"].parent, "15-17");
 assert.equal(by["1793"].name, "Glass And Glazing Work", "the first of a repeat");
 assert.equal(rows.length, 10);
 
+// Sean's complete sheet: "01 to 09" sectors, groups with no code ("01 AGRICULTURAL…"), an industry class column.
+const sheet = sicSheetRows([
+  ["SIC Code", "SIC Description", "Industry Class"],
+  ["01 to 09", "AGRICULTURE, FORESTRY, & FISHING", ""], ["", "01 AGRICULTURAL PRODUCTION-CROPS", ""], ["0111", "Wheat", "Agricultural Production - Crops"],
+  ["", "07 AGRICULTURAL SERVICES", ""], ["0781", "Landscape Counseling And Planning", "Artisan-Special Trade Contractors"],
+  ["64 to 65", "FINANCE, INSURANCE, & REAL ESTATE", ""], ["", "64 INSURANCE AGENTS BROKERS & SERVICE", ""], ["6411", "Insurance Agents Brokers & Service", "Insurance Agents"],
+]);
+const s2 = Object.fromEntries(sheet.map((r) => [r.code, r]));
+assert.equal(s2["01-09"].kind, "sector");
+assert.equal(s2["01"].name, "Agricultural Production-Crops", "capitals in ordinary case");
+assert.equal(s2["01"].parent, "01-09");
+assert.equal(s2["0781"].parent, "07");
+assert.equal(s2["0781"].class, "Artisan-Special Trade Contractors");
+assert.equal(s2["64"].parent, "64-65");
+assert.equal(s2["6411"].class, "Insurance Agents");
+assert.deepEqual(sheet.map((r) => r.sort), [1, 2, 3, 4, 5, 6, 7, 8], "in the sheet's order");
+
 // The tree, and ticking a branch.
 const tree = buildTree(rows);
 assert.deepEqual(tree.roots.map((n) => n.code), ["01-09", "15-17"]);

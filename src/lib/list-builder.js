@@ -33,31 +33,57 @@ export function sicKind(code) {
   return "detail";
 }
 
+/** A name the sheet has in capitals ("AGRICULTURAL PRODUCTION-CROPS"), in ordinary case; others as they are. */
+export function sheetName(raw) {
+  const t = String(raw ?? "").replace(/\s+/g, " ").trim();
+  if (!t || t !== t.toUpperCase() || !/[A-Z]/.test(t)) return t;
+  return t.toLowerCase().replace(/(^|[\s\-/&(])([a-z])/g, (m, a, b) => a + b.toUpperCase()).replace(/\bNec\b/g, "NEC");
+}
+
 /**
- * A sheet of codes (Sean's: "SIC Code,SIC Description" rows, sectors and
- * groups among them) as tree rows { code, name, kind, parent, sort }: a group
- * goes under the sector whose range holds it, a code under its group (or the
- * 4-digit code it starts with). Rows that are not codes, and repeats, are left out.
+ * Sean's SIC sheet (Oct 2026: "SIC Code, SIC Description, Industry Class")
+ * as tree rows { code, name, kind, parent, sort, class }, in the sheet's own
+ * order: a sector row ("01 to 09" or "01-09", its name), then its groups (no
+ * code, the description starting with it: "01 AGRICULTURAL PRODUCTION-CROPS",
+ * or a 2-digit code), each followed by its codes (4 digits, a 6-digit one
+ * under its 4) with their industry class. A group goes under the sector
+ * before it (or the one whose range holds it), a code under its group.
+ * The heading row, rows that are not codes, and repeats are left out.
  */
 export function sicSheetRows(rows) {
   const out = new Map();
   const sectors = [];
-  for (const r of rows) {
-    const code = sicCode(r[0]);
-    const name = String(r[1] ?? "").trim();
-    if (!code || !name || out.has(code)) continue;
-    const kind = sicKind(code);
-    if (kind === "sector") sectors.push(code);
-    out.set(code, { code, name, kind, parent: null, sort: Number(code.replace(/-.*/, "")) || 0 });
-  }
+  let sector = null;
   const sectorOf = (group) => sectors.find((s) => {
     const [a, b = a] = s.split("-").map(Number);
     return Number(group) >= a && Number(group) <= b;
-  }) ?? null;
-  for (const row of out.values()) {
-    if (row.kind === "group") row.parent = sectorOf(row.code);
-    else if (row.kind === "industry") row.parent = out.has(row.code.slice(0, 2)) ? row.code.slice(0, 2) : sectorOf(row.code.slice(0, 2));
-    else if (row.kind === "detail") row.parent = out.has(row.code.slice(0, 4)) ? row.code.slice(0, 4) : row.code.slice(0, 2);
+  }) ?? sector;
+  let n = 0;
+  for (const r of rows) {
+    const rawCode = String(r[0] ?? "").trim();
+    const desc = String(r[1] ?? "").trim();
+    const cls = String(r[2] ?? "").replace(/\s+/g, " ").trim() || null;
+    let code = sicCode(rawCode.replace(/\s+to\s+/i, "-"));
+    let name = desc;
+    // A group on its own row: no code, the description opening with it.
+    if (!rawCode) {
+      const m = /^(\d{2})\s+(.+)$/.exec(desc);
+      if (!m) continue;
+      code = m[1];
+      name = m[2];
+    }
+    name = sheetName(name);
+    if (!code || !name || out.has(code)) continue;
+    n += 1;
+    const kind = sicKind(code);
+    const row = { code, name, kind, parent: null, sort: n, class: kind === "industry" || kind === "detail" ? cls : null };
+    if (kind === "sector") {
+      sectors.push(code);
+      sector = code;
+    } else if (kind === "group") row.parent = sectorOf(code);
+    else if (kind === "industry") row.parent = out.has(code.slice(0, 2)) ? code.slice(0, 2) : sectorOf(code.slice(0, 2));
+    else row.parent = out.has(code.slice(0, 4)) ? code.slice(0, 4) : out.has(code.slice(0, 2)) ? code.slice(0, 2) : null;
+    out.set(code, row);
   }
   return [...out.values()];
 }

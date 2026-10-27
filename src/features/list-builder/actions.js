@@ -103,9 +103,10 @@ export async function setListLinkActive(id, active) {
 }
 
 /**
- * An administrator loads the SIC sheet (Sean's, as CSV: "SIC Code, SIC
- * Description", sectors and groups among the codes): each code's name is
- * set, new ones added under their group. Codes not on the sheet stay.
+ * An administrator loads the SIC sheet (Sean's, saved from Excel as CSV:
+ * "SIC Code, SIC Description, Industry Class", sectors and groups among the
+ * codes): the tree becomes the sheet, its names, order and classes; codes
+ * not on it leave the tree.
  */
 export async function loadSicSheet(formData) {
   const supabase = await createClient();
@@ -121,6 +122,15 @@ export async function loadSicSheet(formData) {
   rows.sort((a, b) => rank[a.kind] - rank[b.kind]);
   for (let i = 0; i < rows.length; i += 500) {
     const { error } = await supabase.from("list_sic").upsert(rows.slice(i, i + 500), { onConflict: "code" });
+    if (error) return fail(error);
+  }
+  // What is not on the sheet leaves the tree (its children with it).
+  const keep = new Set(rows.map((r) => r.code));
+  const { data: had, error: readError } = await supabase.from("list_sic").select("code").range(0, 9999);
+  if (readError) return fail(readError);
+  const gone = (had ?? []).map((r) => r.code).filter((c) => !keep.has(c));
+  for (let i = 0; i < gone.length; i += 200) {
+    const { error } = await supabase.from("list_sic").delete().in("code", gone.slice(i, i + 200));
     if (error) return fail(error);
   }
   await logActivity(supabase, "list_sic.load", { detail: `${rows.length} codes`, userId: me.id });

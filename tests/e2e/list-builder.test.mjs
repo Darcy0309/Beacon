@@ -31,15 +31,33 @@ const setValue = (page, sel, value) => page.ev(`(() => { const el = document.que
 try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
 
+  section("Sean's SIC sheet, loaded by an administrator");
+  {
+    const SHEET = "/home/momo/Downloads/SIC_ListBuildingSheet-COMPLETE_2026-10-27.csv";
+    await admin.go("/list-builder", 8000);
+    await when(admin, "!!document.querySelector('[data-sic-upload]')");
+    const doc = await admin.send("DOM.getDocument");
+    const input = await admin.send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "[data-sic-upload]" });
+    await admin.send("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [SHEET] });
+    check("the tree becomes the sheet: its 10 sectors, 73 groups and 950 codes, each code's class",
+      Boolean(await until(() => sql("select string_agg(kind || ':' || n, ',' order by kind) from (select kind, count(*) n from public.list_sic group by kind) k") === "group:73,industry:950,sector:10" || null, { timeout: 30000 }))
+      && sql("select class from public.list_sic where code = '0781'") === "Artisan-Special Trade Contractors");
+  }
+
   section("Staff build a request for a client");
   await admin.go("/list-builder", 8000);
   check("List Builder, with New request and the prospects' links", Boolean(await when(admin, "!!document.querySelector('[data-new-request]') && !!document.querySelector('[data-prospect-links]')")));
   await admin.go(`/list-builder/new?client=${company}`, 8000);
   await when(admin, "!!document.querySelector('[data-sic-tree]')");
   check("the client chosen to begin with", (await admin.ev("document.querySelector('[data-request-client]').value")) === String(company));
-  check("the SIC tree: its sectors, closed", (await admin.ev("[...document.querySelectorAll('[data-sic-tree] > div:last-child > [data-sic-node]')].map((n) => n.dataset.sicNode).join()")) === "01-09,10-14,15-17,20-39,40-49,50-51,52-59,60-67,70-89,91-98,99");
+  check("the SIC tree: Sean's sheet's sectors, closed", (await admin.ev("[...document.querySelectorAll('[data-sic-tree] > div:last-child > [data-sic-node]')].map((n) => n.dataset.sicNode).join()")) === "01-09,10-14,15-17,20-39,40-49,50-51,52-59,64-65,70-89,91-95");
   await admin.ev("document.querySelector('[data-sic-open=\"15-17\"]').click()");
   check("+ opens a sector into its groups", Boolean(await when(admin, "!!document.querySelector('[data-sic-tick=\"15\"]') && !!document.querySelector('[data-sic-tick=\"17\"]')")));
+  // A whole industry class: across groups (0781 Landscape Counseling is an artisan trade too).
+  await admin.fill("[data-sic-class]", "Artisan-Special Trade Contractors");
+  check("an industry class ticked whole, across the tree", (await until(() => admin.ev("document.querySelector('[data-sic-picked]')?.textContent ?? ''").then((t) => (/^2\d picked/.test(t) ? t : null)))) !== null);
+  await admin.ev("[...document.querySelectorAll('[data-sic-tree] button')].find((b) => b.textContent.trim() === 'Clear')?.click()");
+  await when(admin, "/^0 picked/.test(document.querySelector('[data-sic-picked]')?.textContent ?? '')");
   await tick(admin, "15");
   check("a group ticked whole: all its codes", (await admin.ev("document.querySelector('[data-sic-tick=\"15\"]').getAttribute('aria-checked')")) === "true"
     && (await admin.ev("document.querySelector('[data-sic-tick=\"15-17\"]').getAttribute('aria-checked')")) === "mixed");
@@ -59,7 +77,13 @@ try {
   await admin.ev("document.querySelector('[data-radius-find]').click()");
   const found = Number(await when(admin, "document.querySelector('[data-radius-found]')?.dataset.radiusFound ?? null"));
   check("a radius: the ZIPs within 5 miles of 85201, from the Census points", found > 3, String(found));
-  await setValue(admin, "[data-exclude=\"zips\"]", "85203");
+  // Counties and ZIPs as tags: a comma makes one.
+  await setValue(admin, '[data-tag-input="include-counties"] [data-tag-text]', "Maricopa,");
+  await setValue(admin, '[data-tag-input="exclude-zips"] [data-tag-text]', "85203, 852");
+  check("a comma makes a tag: a county, a ZIP", Boolean(await when(admin, `!!document.querySelector('[data-tag-input="include-counties"] [data-tag="Maricopa"]')
+    && !!document.querySelector('[data-tag-input="exclude-zips"] [data-tag="85203"]')`))
+    && (await admin.ev(`document.querySelector('[data-tag-input="exclude-zips"] [data-tag-text]').value`)) === "852");
+  await setValue(admin, '[data-tag-input="exclude-zips"] [data-tag-text]', "");
   await admin.ev("document.querySelector('[data-request-save]').click()");
   const id = Number(await when(admin, "location.pathname.match(/^\\/list-builder\\/(\\d+)$/)?.[1] ?? null"));
   check("saved: its page", id > 0, await admin.url());
@@ -67,7 +91,7 @@ try {
   check("…kept with the client and its Sales Rep", r.company_id === company && r.sales_rep_id === MIKE && r.source === "staff" && r.title === `${TAG} Contractors`, JSON.stringify(r));
   check("…the group's codes and the one found", ["1521", "1522", "1531", "1541", "1542", "1761"].every((c) => r.criteria.sic.includes(c)) && r.criteria.sic.length === 6, JSON.stringify(r.criteria.sic));
   check("…the size for 17, the state, the radius's ZIPs less the one left out", r.criteria.employees["17"]?.min === 10 && r.criteria.employees["17"]?.max === 100
-    && r.criteria.include.states.join() === "AZ" && r.criteria.zips.includes("85201") && !r.criteria.zips.includes("85203") && r.criteria.exclude.zips.join() === "85203", JSON.stringify(r.criteria));
+    && r.criteria.include.states.join() === "AZ" && r.criteria.include.counties.join() === "Maricopa" && r.criteria.zips.includes("85201") && !r.criteria.zips.includes("85203") && r.criteria.exclude.zips.join() === "85203", JSON.stringify(r.criteria));
   check("the Sales Rep is told", sql(`select count(*) from public.notifications where user_id = ${MIKE} and link = '/list-builder/${id}'`) === "1");
 
   section("Its page and its exports");

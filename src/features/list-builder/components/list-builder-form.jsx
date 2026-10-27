@@ -11,12 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, Select } from "@/components/ui/field";
 import SectionHeader from "@/components/shared/section-header";
 import SicTree from "@/features/list-builder/components/sic-tree";
+import TagInput from "@/features/list-builder/components/tag-input";
 import { radiusPreview, saveListRequest, submitProspectRequest } from "@/features/list-builder/actions";
-import { MAX_RADIUS_MILES, buildTree, criteriaSummary, groupOf, parsePlaces, parseZips } from "@/lib/list-builder";
+import { MAX_RADIUS_MILES, buildTree, criteriaSummary, groupOf } from "@/lib/list-builder";
 import { US_STATES } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
 
-const lines = (a) => (a ?? []).join("\n");
+// A ZIP tag: its five digits (a ZIP+4 loses the four), or not taken.
+const zipTag = (t) => (/^\d{5}(-\d{4})?$/.test(t.trim()) ? t.trim().slice(0, 5) : null);
 
 /** The states as boxes to tick, two letters each. */
 function StatePicker({ value, onChange, label }) {
@@ -57,8 +59,8 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [picked, setPicked] = useState(() => new Set(c0.sic ?? []));
   const [employees, setEmployees] = useState(c0.employees ?? {});
-  const [inc, setInc] = useState({ states: c0.include?.states ?? [], counties: lines(c0.include?.counties), cities: lines(c0.include?.cities), zips: lines(c0.include?.zips) });
-  const [exc, setExc] = useState({ states: c0.exclude?.states ?? [], counties: lines(c0.exclude?.counties), cities: lines(c0.exclude?.cities), zips: lines(c0.exclude?.zips) });
+  const [inc, setInc] = useState({ states: c0.include?.states ?? [], counties: c0.include?.counties ?? [], cities: c0.include?.cities ?? [], zips: c0.include?.zips ?? [] });
+  const [exc, setExc] = useState({ states: c0.exclude?.states ?? [], counties: c0.exclude?.counties ?? [], cities: c0.exclude?.cities ?? [], zips: c0.exclude?.zips ?? [] });
   const [radius, setRadius] = useState({ zip: c0.include?.radius?.zip ?? "", miles: c0.include?.radius?.miles ? String(c0.include.radius.miles) : "" });
   const [found, setFound] = useState(null); // { count, zips } for the radius
   const [notes, setNotes] = useState(initial?.notes ?? "");
@@ -78,10 +80,10 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
     sic: [...picked].sort(),
     employees: Object.fromEntries(groups.map((g) => [g.code, employees[g.code] ?? {}])),
     include: {
-      states: inc.states, counties: parsePlaces(inc.counties), cities: parsePlaces(inc.cities), zips: parseZips(inc.zips),
+      states: inc.states, counties: inc.counties, cities: inc.cities, zips: inc.zips,
       radius: radius.zip && Number(radius.miles) > 0 ? { zip: radius.zip.trim(), miles: Number(radius.miles) } : null,
     },
-    exclude: { states: exc.states, counties: parsePlaces(exc.counties), cities: parsePlaces(exc.cities), zips: parseZips(exc.zips) },
+    exclude: { states: exc.states, counties: exc.counties, cities: exc.cities, zips: exc.zips },
   });
 
   const findRadius = () => startFinding(async () => {
@@ -114,7 +116,7 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
     );
   }
 
-  const summary = criteriaSummary({ ...criteria(), zips: [...new Set([...parseZips(inc.zips), ...(found?.zips ?? []).map((z) => z.zip)])] });
+  const summary = criteriaSummary({ ...criteria(), zips: [...new Set([...inc.zips, ...(found?.zips ?? []).map((z) => z.zip)])] });
 
   return (
     <div className="space-y-4" data-list-builder={mode}>
@@ -175,11 +177,11 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
           <div className="space-y-4 p-5">
             <Field label="States"><StatePicker label="States" value={inc.states} onChange={(v) => setInc({ ...inc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Counties" hint="One a line, e.g. Maricopa, AZ"><Textarea rows={3} value={inc.counties} onChange={(e) => setInc({ ...inc, counties: e.target.value })} data-include="counties" /></Field>
-              <Field label="Cities" hint="One a line, e.g. Mesa, AZ"><Textarea rows={3} value={inc.cities} onChange={(e) => setInc({ ...inc, cities: e.target.value })} data-include="cities" /></Field>
+              <Field label="Counties" hint="Type one, then a comma"><TagInput label="Counties" value={inc.counties} onChange={(v) => setInc({ ...inc, counties: v })} placeholder="e.g. Maricopa, Pinal" data-tag-input="include-counties" /></Field>
+              <Field label="Cities" hint="Type one, then a comma"><TagInput label="Cities" value={inc.cities} onChange={(v) => setInc({ ...inc, cities: v })} placeholder="e.g. Mesa, Tempe" data-tag-input="include-cities" /></Field>
             </div>
-            <Field label="ZIP codes" hint="Paste or type them, any way apart">
-              <Textarea rows={2} value={inc.zips} onChange={(e) => setInc({ ...inc, zips: e.target.value })} data-include="zips" />
+            <Field label="ZIP codes" hint="Type or paste them, a comma between">
+              <TagInput label="ZIP codes" value={inc.zips} onChange={(v) => setInc({ ...inc, zips: v })} normalize={zipTag} placeholder="e.g. 85201, 85202" data-tag-input="include-zips" />
             </Field>
             <div className="rounded-lg border border-[var(--panel-border)] p-3" data-radius>
               <div className="text-sm font-medium">A radius around a ZIP</div>
@@ -206,11 +208,11 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
           <div className="space-y-4 p-5">
             <Field label="States"><StatePicker label="Leave out states" value={exc.states} onChange={(v) => setExc({ ...exc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field label="Counties"><Textarea rows={3} value={exc.counties} onChange={(e) => setExc({ ...exc, counties: e.target.value })} data-exclude="counties" /></Field>
-              <Field label="Cities"><Textarea rows={3} value={exc.cities} onChange={(e) => setExc({ ...exc, cities: e.target.value })} data-exclude="cities" /></Field>
+              <Field label="Counties"><TagInput label="Leave out counties" value={exc.counties} onChange={(v) => setExc({ ...exc, counties: v })} placeholder="e.g. Pinal" data-tag-input="exclude-counties" /></Field>
+              <Field label="Cities"><TagInput label="Leave out cities" value={exc.cities} onChange={(v) => setExc({ ...exc, cities: v })} placeholder="e.g. Apache Junction" data-tag-input="exclude-cities" /></Field>
             </div>
             <Field label="ZIP codes" hint="Taken out of the radius and the ZIPs above">
-              <Textarea rows={2} value={exc.zips} onChange={(e) => setExc({ ...exc, zips: e.target.value })} data-exclude="zips" />
+              <TagInput label="Leave out ZIP codes" value={exc.zips} onChange={(v) => setExc({ ...exc, zips: v })} normalize={zipTag} placeholder="e.g. 85203" data-tag-input="exclude-zips" />
             </Field>
           </div>
         </Card>

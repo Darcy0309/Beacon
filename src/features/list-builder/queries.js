@@ -8,7 +8,7 @@ export async function getSicRows(supabase = null) {
   const db = supabase ?? (await createClient());
   const out = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error } = await db.from("list_sic").select("code, name, kind, parent, sort").order("sort").order("code").range(from, from + 999);
+    const { data, error } = await db.from("list_sic").select("code, name, kind, parent, sort, class").order("sort").order("code").range(from, from + 999);
     if (error) throw error;
     out.push(...(data ?? []));
     if (!data || data.length < 1000) break;

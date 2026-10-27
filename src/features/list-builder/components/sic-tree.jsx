@@ -2,6 +2,7 @@
 
 import { memo, useMemo, useState } from "react";
 import { Check, Minus, Plus, Search } from "lucide-react";
+import { Select } from "@/components/ui/field";
 import { branchState, leavesOf, toggleBranch } from "@/lib/list-builder";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +12,8 @@ import { cn } from "@/lib/utils";
  * their codes, each with a box to tick. Ticking a sector or group ticks every
  * code under it; one partly ticked shows a dash. Finding by a code or words
  * shows the matches with what they sit under, opened. Codes the client has
- * asked for before say so.
+ * asked for before say so. Each code's industry class (Sean's sheet: a
+ * grouping across the tree) can be picked whole, and finding matches it too.
  *
  *   tree     buildTree()
  *   picked   a Set of the codes ticked (the codes at the foot of the tree)
@@ -27,7 +29,7 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
   const shown = useMemo(() => {
     if (!words.length) return null;
     const keep = new Set();
-    const hit = (n) => words.every((w) => `${n.code} ${n.name}`.toLowerCase().includes(w));
+    const hit = (n) => words.every((w) => `${n.code} ${n.name} ${n.class ?? ""}`.toLowerCase().includes(w));
     const walk = (n, ancestors) => {
       if (hit(n)) {
         for (const a of ancestors) keep.add(a.code);
@@ -39,6 +41,20 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
     tree.roots.forEach((r) => walk(r, []));
     return keep;
   }, [tree, find]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The industry classes, each with its codes, for picking a class whole.
+  const classes = useMemo(() => {
+    const out = new Map();
+    for (const n of tree.byCode.values()) if (n.class && !n.children.length) (out.get(n.class) ?? out.set(n.class, []).get(n.class)).push(n.code);
+    return [...out.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [tree]);
+  // Each pick starts the class list over at "Choose a class…".
+  const [classKey, setClassKey] = useState(0);
+  const pickClass = (name) => {
+    const codes = classes.find(([c]) => c === name)?.[1] ?? [];
+    if (codes.length) onChange((now) => new Set([...now, ...codes]));
+    setClassKey((k) => k + 1);
+  };
 
   const toggleOpen = (code) => setOpen((o) => {
     const next = new Set(o);
@@ -58,6 +74,15 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
           <button type="button" onClick={() => onChange(new Set())} className="shrink-0 text-xs font-semibold text-primary hover:underline">Clear</button>
         ) : null}
       </div>
+      {classes.length ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-[var(--panel-border)] px-3 py-2 text-xs text-muted-foreground" data-sic-classes>
+          <span>Pick a whole industry class:</span>
+          <Select key={classKey} defaultValue="" onChange={(e) => pickClass(e.target.value)} aria-label="Industry class" className="h-8 w-auto min-w-64 text-xs" data-sic-class>
+            <option value="">Choose a class…</option>
+            {classes.map(([name, codes]) => <option key={name} value={name}>{name} ({codes.length})</option>)}
+          </Select>
+        </div>
+      ) : null}
       <div className="max-h-[32rem] overflow-y-auto overscroll-contain p-2">
         {tree.roots.map((n) => (
           <Branch key={n.code} node={n} depth={0} picked={picked} onChange={onChange} open={open} toggleOpen={toggleOpen} shown={shown} before={before} />
