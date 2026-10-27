@@ -15,6 +15,15 @@ is("…in any order, with other columns about", sicPairsFromRows([["Notes", "SIC
 is("…blank and repeated codes dropped", sicPairsFromRows([["SIC Code", "SIC Description"], ["", "Nothing"], ["1711", "Plumbing"], ["1711", "Again"], ["n/a", "No"]]).map((p) => p.code), ["1711"]);
 is("…no headings: code, then description", sicPairsFromRows([["1711", "Plumbing"]]), [{ code: "1711", description: "Plumbing" }]);
 is("a code kept without spaces", sicCode(" 1521 - 99 "), "1521-99");
+// The leading zero a spreadsheet takes off the agricultural codes, put back (Sean, Oct 2026).
+is("111 is 0111", sicCode("111"), "0111");
+is("11101 is 011101", sicCode("11101"), "011101");
+is("111-01 is 0111-01", sicCode("111-01"), "0111-01");
+is("1 is 01", sicCode("1"), "01");
+is("a whole code is left alone", sicCode("0111"), "0111");
+is("…and a 6-digit one", sicCode("152101"), "152101");
+is("…and one with its detail", sicCode("7342-00"), "7342-00");
+is("a sheet's codes get their zero back", sicPairsFromRows([["SIC Code", "SIC Description"], ["111", "Wheat"], ["0112", "Rice"]]).map((p) => p.code).join(), "0111,0112");
 is("descriptions compared without case or punctuation", sicKey("Plumbing, Heating & Air-Conditioning") === sicKey("PLUMBING HEATING AIR CONDITIONING"), true);
 
 if (failures) {

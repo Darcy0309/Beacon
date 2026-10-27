@@ -7,8 +7,18 @@ const norm = (h) => String(h ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const CODE_HEADS = ["siccode", "sic", "code", "siccodes", "sicnumber"];
 const DESC_HEADS = ["sicdesc", "sicdescription", "description", "desc", "industry", "siccodedescription", "title"];
 
-/** A code as kept: trimmed, no inner spaces ("1521-99", "1711"). */
-export const sicCode = (v) => String(v ?? "").replace(/\s+/g, "").slice(0, 20) || null;
+/**
+ * A code as kept: trimmed, no inner spaces ("1521-99", "1711"), and the
+ * leading zero a spreadsheet takes off the agricultural codes put back
+ * (Sean, Oct 2026): a code of an odd number of digits has lost it, so "111"
+ * is 0111, "11101" is 011101 and "111-01" is 0111-01. The database does the
+ * same (sic_pad), whatever writes the code.
+ */
+export const sicCode = (v) => {
+  const t = String(v ?? "").replace(/\s+/g, "").slice(0, 20);
+  if (/^(\d|\d{3}|\d{5}|\d{7})$/.test(t) || /^\d{3}-\d{2}$/.test(t)) return `0${t}`;
+  return t || null;
+};
 /** A description as compared: lower case, letters and digits only. */
 export const sicKey = (v) => norm(v);
 

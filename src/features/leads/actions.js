@@ -10,6 +10,7 @@ import { normalizeEin, normalizeState } from "@/lib/csv";
 import { schemas } from "@/lib/validate";
 import { POLICY_LINES } from "@/lib/coverage";
 import { AUTO_TYPES } from "@/lib/business";
+import { sicCode } from "@/lib/sic";
 
 const AUTO_TYPE_KEYS = new Set(AUTO_TYPES.map(([k]) => k));
 
@@ -45,7 +46,8 @@ function leadPayload(formData) {
     state: normalizeState(s(formData, "state")) ?? s(formData, "state"),
     zip: s(formData, "zip"),
     county: s(formData, "county"),
-    sic_code: s(formData, "sic_code"),
+    // Its leading zero back: "111" is 0111 (Sean, Oct 2026).
+    sic_code: sicCode(s(formData, "sic_code")),
     description: s(formData, "description"),
     list_source: s(formData, "list_source"),
     location: s(formData, "location"),

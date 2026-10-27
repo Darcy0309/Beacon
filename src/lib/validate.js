@@ -223,7 +223,7 @@ export const schemas = {
     zip: [zip],
     county: [max(60)],
     // 4 digits, or with the 2-digit extension the SIC list carries ("7342-00").
-    sic_code: [rules.pattern(/^\d{4}(-?\d{2})?$/, "SIC codes are 4 digits, e.g. 6411 or 7342-00")],
+    sic_code: [rules.pattern(/^\d{3,4}(-?\d{2})?$/, "SIC codes are 4 digits, e.g. 6411, 0111 or 7342-00")],
     description: [max(255)],
     list_source: [max(80)],
     location: [max(60)],

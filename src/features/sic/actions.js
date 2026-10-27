@@ -10,9 +10,11 @@ import { sicCode } from "@/lib/sic";
 /**
  * Load a master list of SIC codes and descriptions ([{ code, description }]):
  * new codes are added, and a code on file takes the list's description.
+ * With `replace` (Sean, Oct 2026), the list becomes the file: codes not in it
+ * are taken off, except those a client is filed under (they stay, counted).
  * Administrators only.
  */
-export async function importSicCodes(pairs) {
+export async function importSicCodes(pairs, { replace = false } = {}) {
   const list = (Array.isArray(pairs) ? pairs : [])
     .map((p) => ({ code: sicCode(p?.code), description: String(p?.description ?? "").trim().slice(0, 200) || null }))
     .filter((p) => p.code)
@@ -37,7 +39,27 @@ export async function importSicCodes(pairs) {
     if (error) return fail(error);
   }
   const added = changes.filter((p) => !existing.has(p.code)).length;
-  await logActivity(supabase, "sic.import", { detail: `${added} added, ${changes.length - added} updated`, userId: me.id });
+  let removed = 0;
+  let kept = 0;
+  if (replace) {
+    const inFile = new Set(list.map((p) => p.code));
+    const gone = [...existing.keys()].filter((c) => !inFile.has(c));
+    // A client's code stays: the client is filed under it.
+    const used = new Set();
+    for (let i = 0; i < gone.length; i += 200) {
+      const { data, error } = await supabase.from("companies").select("sic_code").in("sic_code", gone.slice(i, i + 200));
+      if (error) return fail(error);
+      for (const r of data ?? []) used.add(r.sic_code);
+    }
+    const drop = gone.filter((c) => !used.has(c));
+    for (let i = 0; i < drop.length; i += 200) {
+      const { error } = await supabase.from("sic_codes").delete().in("code", drop.slice(i, i + 200));
+      if (error) return fail(error);
+    }
+    removed = drop.length;
+    kept = used.size;
+  }
+  await logActivity(supabase, "sic.import", { detail: `${added} added, ${changes.length - added} updated${replace ? `, ${removed} removed` : ""}`, userId: me.id });
   revalidatePath("/settings");
-  return ok({ added, updated: changes.length - added, total: existing.size + added });
+  return ok({ added, updated: changes.length - added, removed, kept, total: existing.size + added - removed });
 }
