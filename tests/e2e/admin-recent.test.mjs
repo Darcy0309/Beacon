@@ -62,9 +62,9 @@ try {
   const pickMulti = (key, value) => admin.ev(`(() => {
     const box = document.querySelector('[data-recent-developed] [data-multi-facet="${key}"]');
     if (!box) return false;
-    if (!box.querySelector('[role=listbox]')) box.querySelector('button').click();
+    if (!document.querySelector('[data-multi-facet-list="${key}"]')) box.querySelector('button').click();
     return true; })()`).then(() => until(() => admin.ev(`(() => {
-    const o = [...document.querySelectorAll('[data-recent-developed] [data-multi-facet="${key}"] [data-option]')].find((b) => b.dataset.option === ${JSON.stringify(value)});
+    const o = [...document.querySelectorAll('[data-multi-facet-list="${key}"] [data-option]')].find((b) => b.dataset.option === ${JSON.stringify(value)});
     if (!o) return false; o.click(); return true; })()`)));
   const byProject = await pickMulti("project", `${TAG} Other DBDev`);
   const one = await until(async () => { const r = await rows(); return r.length === 1 ? r : null; });

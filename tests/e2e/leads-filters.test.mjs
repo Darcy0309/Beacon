@@ -68,12 +68,12 @@ try {
   // Call results, several at once (Sean, Oct 2026), in his sheet's order, ticked in a drop-down.
   await list("", (r) => r.length === 3);
   await admin.click('[data-multi-facet="result"] button');
-  const order = await until(() => admin.ev(`[...document.querySelectorAll('[data-multi-facet="result"] [role=option]')].map((o) => o.textContent.trim())`).then((o) => (o?.length ? o : null)));
+  const order = await until(() => admin.ev(`[...document.querySelectorAll('[data-multi-facet-list="result"] [role=option]')].map((o) => o.textContent.trim())`).then((o) => (o?.length ? o : null)));
   check("the call results in the sheet's order: appointments first, then Lead-No Contact on, then DB dev",
     order?.[0] === "Appointment (Appt)" && order?.indexOf("Lead-No Contact (Appt)") === 4 && order?.indexOf("Lead-Disco# (Appt)") < order?.findIndex((o) => /\(DB dev\)$/.test(o)), JSON.stringify(order?.slice(0, 6)));
-  await admin.click(`[data-multi-facet="result"] [data-option="${EMAIL}"]`);
+  await admin.click(`[data-multi-facet-list="result"] [data-option="${EMAIL}"]`);
   await until(async () => (await admin.url()).includes(`result=${EMAIL}`));
-  await admin.click(`[data-multi-facet="result"] [data-option="${BRANCH}"]`);
+  await admin.click(`[data-multi-facet-list="result"] [data-option="${BRANCH}"]`);
   const two = await until(async () => { const r = await shown(); return (await admin.url()).includes("result=") && r.length === 2 ? r : null; }, { timeout: 8000 });
   check("two picked: leads on either", has(two ?? [], "Alpha Roofing") && has(two ?? [], "Bravo Glass") && !has(two ?? [], "Charlie Plumbing"), `${await admin.url()} ${JSON.stringify(two ?? await shown())}`);
   check("…the list saying how many", /2 selected/.test((await admin.ev(`document.querySelector('[data-multi-facet="result"] button').innerText`)) ?? ""));

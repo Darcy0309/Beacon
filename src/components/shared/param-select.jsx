@@ -1,8 +1,8 @@
 "use client";
 
-import { useId, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -11,6 +11,8 @@ import { useReportPending } from "@/components/layout/navigation-progress";
 
 // The "all" choice; a menu choice cannot be the empty string.
 const ALL = "__all";
+// A list this long opens with a box to find a name by typing (Oct 2026).
+const FIND_FROM = 13;
 
 /**
  * A filter whose value lives in the URL (?name=), so a filtered report is
@@ -21,7 +23,8 @@ const ALL = "__all";
  * choice on one line, cut short with "…" when it is long (a project such as
  * "HeartlandIns-MidwestPros_Appointments_2026"), while the list shows every
  * name in full. Arrow keys, Enter and typing a name's first letters work as
- * in any menu.
+ * in any menu. A long list opens with a find box on top: typing narrows it
+ * (every word typed), and the down arrow goes on into what is left.
  */
 export default function ParamSelect({ name, label, value = "", options, placeholder = "All", clears = ["page"], className }) {
   const router = useRouter();
@@ -30,6 +33,19 @@ export default function ParamSelect({ name, label, value = "", options, placehol
   const [pending, startTransition] = useTransition();
   useReportPending(pending); // the bar along the top runs while the list is on its way
   const labelId = useId();
+  const [open, setOpen] = useState(false);
+  const [find, setFind] = useState("");
+  const findRef = useRef(null);
+  const contentRef = useRef(null);
+  const long = options.length >= FIND_FROM;
+  const words = find.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = words.length ? options.filter((o) => words.every((w) => String(o.label).toLowerCase().includes(w))) : options;
+  // The find box takes the keys as the list opens.
+  useEffect(() => {
+    if (!open || !long) return undefined;
+    const t = setTimeout(() => findRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [open, long]);
 
   const current = options.find((o) => String(o.value) === String(value))?.label ?? placeholder;
 
@@ -47,7 +63,7 @@ export default function ParamSelect({ name, label, value = "", options, placehol
   return (
     <div className={cn("flex min-w-0 items-center gap-2", className)}>
       <span id={labelId} className="eyebrow shrink-0">{label}</span>
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={(o) => { setOpen(o); if (!o) setFind(""); }}>
         <DropdownMenuTrigger asChild disabled={pending}>
           <button
             type="button"
@@ -64,13 +80,36 @@ export default function ParamSelect({ name, label, value = "", options, placehol
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
+          ref={contentRef}
           align="start"
           className="max-h-[min(20rem,60svh)] min-w-[var(--radix-dropdown-menu-trigger-width)] max-w-[min(28rem,92vw)] overflow-y-auto"
+          onWheel={(e) => e.stopPropagation()}
         >
+          {long ? (
+            // The find box: its keys stay with it (not the menu's own type-to-jump); the down arrow
+            // goes on into the list, Enter picks the first match.
+            <div className="sticky -top-1 z-10 -mx-1 -mt-1 mb-1 flex items-center gap-2 border-b border-[var(--panel-border)] bg-popover px-2.5" data-param-find={name}>
+              <Search className="size-3.5 shrink-0 text-muted-foreground" />
+              <input ref={findRef} value={find} onChange={(e) => setFind(e.target.value)} placeholder={`Find ${String(label).toLowerCase()}…`}
+                aria-label={`Find ${String(label).toLowerCase()}`} className="h-9 min-w-0 flex-1 bg-transparent text-sm outline-none"
+                onKeyDown={(e) => {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    contentRef.current?.querySelector('[role="menuitemradio"]')?.focus();
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (shown[0]) { choose(String(shown[0].value)); setOpen(false); }
+                  } else if (e.key !== "Escape" && e.key !== "Tab") {
+                    e.stopPropagation();
+                  }
+                }} />
+            </div>
+          ) : null}
           <DropdownMenuRadioGroup value={value ? String(value) : ALL} onValueChange={choose}>
             {/* placeholder={null}: no blank choice (the page gives its own, e.g. a value meaning all). */}
-            {placeholder === null ? null : <DropdownMenuRadioItem value={ALL}>{placeholder}</DropdownMenuRadioItem>}
-            {options.map((o) => (
+            {placeholder === null || words.length ? null : <DropdownMenuRadioItem value={ALL}>{placeholder}</DropdownMenuRadioItem>}
+            {shown.length === 0 ? <p className="px-2 py-3 text-center text-xs text-muted-foreground">No matches.</p> : null}
+            {shown.map((o) => (
               <DropdownMenuRadioItem key={o.value} value={String(o.value)} className="break-words">
                 {o.label}
               </DropdownMenuRadioItem>

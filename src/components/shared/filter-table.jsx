@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { matchesAll, searchWords } from "@/lib/search-words";
 import { csvLine } from "@/lib/lead-export";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -315,24 +316,16 @@ function FacetGroup({ group, value, onChange }) {
  * shows): a button saying what is picked, opening a list of checkboxes, each
  * group under its heading. Picked values go out as "a,b,c" (in the URL, server
  * mode), or joined by MULTI_SEP in a list filtered here, whose values are names
- * that may hold a comma. Closes on a click outside or Escape.
+ * that may hold a comma. The list floats over the page (a card never cuts it
+ * off); a long one has a box on top to find an option by typing. Closes on a
+ * click outside or Escape.
  */
+const FIND_FROM = 13;
 function MultiFacet({ group, value, onChange }) {
   const [open, setOpen] = useState(false);
-  const box = useRef(null);
+  const [find, setFind] = useState("");
   const sep = group.sep ?? ",";
   const picked = useMemo(() => new Set(String(value || "").split(sep).filter(Boolean)), [value, sep]);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e) => !box.current?.contains(e.target) && setOpen(false);
-    const esc = (e) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc);
-    };
-  }, [open]);
   // In the list's own order, so the address reads the same however they were ticked.
   const set = (next) => onChange(group.options.filter((o) => next.has(String(o.value))).map((o) => o.value).join(sep));
   const toggle = (v) => {
@@ -344,23 +337,34 @@ function MultiFacet({ group, value, onChange }) {
   const summary = picked.size === 0 ? "All"
     : picked.size === 1 ? group.options.find((o) => picked.has(String(o.value)))?.label ?? "1 selected"
     : `${picked.size} selected`;
+  const long = group.options.length >= FIND_FROM;
+  const words = find.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = words.length ? group.options.filter((o) => words.every((w) => `${o.label} ${o.group ?? ""}`.toLowerCase().includes(w))) : group.options;
 
   return (
-    <div className="relative flex items-center gap-2" ref={box} data-multi-facet={group.key}>
+    <div className="flex items-center gap-2" data-multi-facet={group.key}>
       <span className="eyebrow">{group.label}</span>
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="listbox" aria-label={`Filter by ${group.label}: ${summary}`}
-        className={cn("flex h-8 min-w-36 max-w-64 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors",
-          picked.size ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
-        <span className="flex-1 truncate text-left">{summary}</span>
-        <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
-      </button>
-      {open ? (
-        <div role="listbox" aria-multiselectable aria-label={group.label}
-          className="absolute left-0 top-full z-30 mt-1 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border bg-card shadow-xl">
-          <div className="max-h-80 overflow-y-auto p-1">
-            {group.options.map((o, i) => {
+      <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) setFind(""); }}>
+        <PopoverTrigger asChild>
+          <button type="button" aria-haspopup="listbox" aria-label={`Filter by ${group.label}: ${summary}`}
+            className={cn("flex h-8 min-w-36 max-w-64 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors",
+              picked.size ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
+            <span className="flex-1 truncate text-left">{summary}</span>
+            <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="flex w-72 max-w-[calc(100vw-2rem)] flex-col overflow-hidden bg-card p-0" data-multi-facet-list={group.key}>
+          {long ? (
+            <div className="flex shrink-0 items-center gap-2 border-b border-[var(--panel-border)] px-2.5">
+              <Search className="size-3.5 shrink-0 text-muted-foreground" />
+              <input autoFocus value={find} onChange={(e) => setFind(e.target.value)} placeholder={`Find a ${group.label.toLowerCase()}…`}
+                aria-label={`Find a ${group.label.toLowerCase()}`} className="h-9 min-w-0 flex-1 bg-transparent text-xs outline-none" data-multi-facet-find />
+            </div>
+          ) : null}
+          <div role="listbox" aria-multiselectable aria-label={group.label} className="max-h-80 min-h-0 overflow-y-auto overscroll-contain p-1" onWheel={(e) => e.stopPropagation()}>
+            {shown.map((o, i) => {
               const on = picked.has(String(o.value));
-              const heading = o.group && o.group !== group.options[i - 1]?.group ? o.group : null;
+              const heading = o.group && o.group !== shown[i - 1]?.group ? o.group : null;
               return (
                 <Fragment key={o.value}>
                   {heading ? <div className="eyebrow px-2 pb-1 pt-2">{heading}</div> : null}
@@ -374,15 +378,16 @@ function MultiFacet({ group, value, onChange }) {
                 </Fragment>
               );
             })}
+            {shown.length === 0 ? <p className="px-2 py-3 text-center text-xs text-muted-foreground">No matches.</p> : null}
           </div>
           {picked.size ? (
             <button type="button" onClick={() => set(new Set())}
-              className="w-full border-t border-[var(--panel-border)] px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary">
+              className="w-full shrink-0 border-t border-[var(--panel-border)] px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:text-primary">
               Clear {group.label.toLowerCase()}
             </button>
           ) : null}
-        </div>
-      ) : null}
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }
