@@ -72,6 +72,8 @@ try {
     Boolean(await until(() => sql(`select string_agg(name, '|' order by name) from public.cargo_types where name like ${lit(`${TAG}%`)}`) === `${TAG} Lumber|${TAG} Steel, coiled`)),
     sql(`select string_agg(name, '|' order by name) from public.cargo_types where name like ${lit(`${TAG}%`)}`));
   await adminPage.fill('[data-cargo-add] input', `${TAG} Livestock`);
+  // Once the loaded list has settled (the button is free again).
+  await until(() => adminPage.ev("document.querySelector('[data-cargo-add] button[type=submit]')?.disabled === false || null"), { timeout: 15000 });
   await adminPage.click("[data-cargo-add] button[type=submit]");
   check("…or adds one by name", Boolean(await until(() => adminPage.ev(`!!document.querySelector('[data-cargo-type=${JSON.stringify(`${TAG} Livestock`)}]')`))));
   await adminPage.click(`[data-cargo-type=${JSON.stringify(`${TAG} Livestock`)}] button`);

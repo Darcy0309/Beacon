@@ -51,13 +51,16 @@ try {
     return !!r && !!b && (r.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) > 0; })()`));
   await sean.mouseClick("[data-set-reminder]");
   await until(() => sean.ev(`!!document.querySelector('[role=dialog] select[name="remind_time"]')`));
-  // The time list, open in the dialog: the mouse wheel must reach it, not be stopped by the dialog.
-  await sean.mouseClick('[role=dialog] select[name="remind_time"]');
-  await sleep(300);
-  const wheel = await sean.ev(`(() => { const s = document.querySelector('[role=dialog] select[name="remind_time"]'); const open = s.matches(':open');
-    const e = new WheelEvent('wheel', { deltaY: 120, bubbles: true, cancelable: true }); s.querySelectorAll('option')[10].dispatchEvent(e);
-    return { open, blocked: e.defaultPrevented }; })()`);
-  check("the mouse wheel scrolls the open time list", wheel.open && !wheel.blocked, JSON.stringify(wheel));
+  // The time list (long, so it opens with a search box), open in the dialog: the mouse wheel must
+  // scroll it, not be stopped by the dialog.
+  await sean.mouseClick('[role=dialog] select[name="remind_time"] ~ button');
+  await until(() => sean.ev("!!document.querySelector('[data-search-select-list] [role=listbox]')"));
+  const at = await sean.ev("(() => { const r = document.querySelector('[data-search-select-list] [role=listbox]').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()");
+  await sean.send("Input.dispatchMouseEvent", { type: "mouseWheel", x: at.x, y: at.y, deltaX: 0, deltaY: 240 });
+  await sleep(400);
+  const wheel = await sean.ev("({ open: !!document.querySelector('[data-search-select-list]'), scrolled: document.querySelector('[data-search-select-list] [role=listbox]')?.scrollTop ?? 0 })");
+  check("the mouse wheel scrolls the open time list", wheel.open && wheel.scrolled > 0, JSON.stringify(wheel));
+  await sean.key("Escape");
   await sean.key("Escape");
   await sleep(200);
   if (!(await sean.ev(`!!document.querySelector('[role=dialog]')`))) {
