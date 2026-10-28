@@ -72,10 +72,10 @@ export default async function NotificationsPage({ searchParams }) {
   const me = await getCurrentUser();
   const canSend = me?.role === "admin" || me?.role === "manager";
 
-  const [inbox, sent, people] = await Promise.all([
+  const [inbox, sent, reach] = await Promise.all([
     getInbox({ page, perPage: PER_PAGE, unreadOnly }),
     canSend ? getSentNotifications(15) : [],
-    canSend ? getMessageRecipients() : [],
+    canSend ? getMessageRecipients(me) : { people: [], projects: [] },
   ]);
   const info = pageInfo(inbox.total, page, PER_PAGE);
   const href = (params) => {
@@ -129,7 +129,7 @@ export default async function NotificationsPage({ searchParams }) {
             <div className="space-y-4 xl:col-span-2">
               <Card className="overflow-visible">
                 <SectionHeader label="Send a notification" icon={Send} />
-                <NotificationComposer people={people.filter((p) => p.id !== me.id)} />
+                <NotificationComposer people={reach.people.filter((p) => p.id !== me.id)} projects={reach.projects} everyone={me.role === "admin"} />
               </Card>
               <Card>
                 <SectionHeader label="Sent" icon={MailCheck} />

@@ -7,12 +7,15 @@
 import { check, finish, sleep, until } from "../support/assert.mjs";
 import { signIn } from "../support/auth.mjs";
 import { sql, lit } from "../support/db.mjs";
+import { onSameProject } from "../support/fixtures.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
 const SHOTS = process.env.SHOTS;
 const id = (email) => sql(`select id from public.users where email=${lit(email)}`);
 const AGENT = id("agent@beacon.test");
 const MANAGER = id("sean@beacon.test");
+// A manager messages the agents on their own projects (Oct 2026): both on one, for the test.
+const restore = onSameProject(Number(MANAGER), Number(AGENT));
 const clear = () => sql("delete from public.notifications where title like '%Chat test%' or body like 'chat-test%'");
 clear();
 
@@ -103,6 +106,7 @@ try {
   check("no sideways scrolling on a phone", overflow <= 0, `overflow ${overflow}px`);
   await shot(phone, "phone-thread");
 } finally {
+  restore("Chat test");
   clear();
   browser.close();
 }

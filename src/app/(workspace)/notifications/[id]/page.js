@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { getNotificationThread } from "@/features/notifications/queries";
 import { KIND_ICONS, KIND_LABELS, ROLE_LABELS, linkLabel } from "@/features/notifications/kinds";
 import { colorFor } from "@/lib/format";
+import LinkedText from "@/components/shared/linked-text";
 
 export const dynamic = "force-dynamic";
 
@@ -72,7 +73,7 @@ export default async function NotificationPage({ params }) {
 
               {n.body ? (
                 <p className="whitespace-pre-line break-words rounded-lg border border-[var(--panel-border)] bg-muted/30 px-4 py-3 text-sm leading-relaxed">
-                  {n.body}
+                  <LinkedText text={n.body} />
                 </p>
               ) : null}
 

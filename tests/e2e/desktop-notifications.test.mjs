@@ -14,12 +14,15 @@
 import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { signIn } from "../support/auth.mjs";
 import { sql, lit } from "../support/db.mjs";
+import { onSameProject } from "../support/fixtures.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 import { APP_URL } from "../support/env.mjs";
 
 const AGENT = Number(sql("select id from public.users where email='agent@beacon.test'"));
 const TAG = `Desktop test ${Date.now()}`;
 const clear = () => sql(`delete from public.notifications where title like ${lit(`${TAG}%`)}`);
+// A manager messages the agents on their own projects (Oct 2026): both on one, for the test.
+const restore = onSameProject(Number(sql("select id from public.users where email='sean@beacon.test'")), AGENT);
 sql(`update public.notifications set read_at = coalesce(read_at, now()) where user_id=${AGENT}`);
 
 const manager = await signIn("sean@beacon.test");
@@ -161,6 +164,7 @@ try {
   check("the switch says the browser is blocking them, and how to allow them", (await openBell(a)) === "blocked"
     && /blocking desktop notifications[\s\S]*Allow/.test(await a.ev(`document.querySelector('[data-desktop-switch]').innerText`)));
 } finally {
+  restore(TAG);
   browser.close();
   clear();
 }

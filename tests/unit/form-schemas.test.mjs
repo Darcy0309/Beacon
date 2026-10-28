@@ -17,7 +17,7 @@ const FORMS = {
   "src/features/bulletin/components/bulletin-composer.jsx":{ schema: "bulletin",    extra: [] },
   "src/features/auth/components/password-form.jsx":    { schema: "password",    extra: [] },
   // Recipients are multi-value, checked in sendNotification rather than the schema.
-  "src/features/notifications/components/notification-composer.jsx": { schema: "notification", extra: ["roles", "user_ids"] },
+  "src/features/notifications/components/notification-composer.jsx": { schema: "notification", extra: ["roles", "user_ids", "project_ids"] },
   "src/features/notifications/components/notification-thread.jsx": { schema: "reply",   extra: ["id"] },
   "src/features/work/components/call-result-panel.jsx": { schema: "callResult", extra: [] },
   "src/features/email/components/email-lead.jsx":       { schema: "leadEmail",  extra: [] },

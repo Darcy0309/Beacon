@@ -16,8 +16,11 @@ export async function sendNotification(prevState, formData) {
 
   const roles = formData.getAll("roles").map(String).filter((r) => MESSAGE_ROLES.includes(r));
   const userIds = formData.getAll("user_ids").map(String).filter((v) => /^[1-9]\d*$/.test(v)).map(Number);
-  if (!roles.length && !userIds.length) {
-    return fail("Choose who should receive it", { recipients: "Pick at least one role or person" }, values);
+  // Whole projects (Sean, Oct 2026): the client's people and the project's reps. Who may send to which, and to
+  // everyone in a role (administrators only), send_notification() decides.
+  const projectIds = formData.getAll("project_ids").map(String).filter((v) => /^[1-9]\d*$/.test(v)).map(Number);
+  if (!roles.length && !userIds.length && !projectIds.length) {
+    return fail("Choose who should receive it", { recipients: "Pick a project or a person" }, values);
   }
 
   const supabase = await createClient();
@@ -27,6 +30,7 @@ export async function sendNotification(prevState, formData) {
     p_title: values.title,
     p_body: values.body || null,
     p_link: values.link || null,
+    p_projects: projectIds,
   });
   if (error) return fail(error);
   if (!data?.sent) return fail("Nobody received it — the people you chose may be inactive, or it was only you.");

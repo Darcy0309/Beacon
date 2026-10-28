@@ -3,11 +3,12 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Send, X } from "lucide-react";
+import { FolderKanban, Send, Users, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field, formHelpers } from "@/components/ui/field";
+import { Field, Select, formHelpers } from "@/components/ui/field";
+import ConfirmDialog from "@/components/shared/confirm-dialog";
 import { sendNotification } from "@/features/notifications/actions";
 import { cn } from "@/lib/utils";
 
@@ -21,13 +22,24 @@ const ROLES = [
 const MAX_BODY = 1000;
 
 /**
- * Send a notification to whole roles and/or particular people. It lands in
- * their bell straight away, and the Sent list shows who has read it.
+ * Send a notification to whole projects, particular people and (an
+ * administrator only) everyone in a role. It lands in their bell straight
+ * away, and the Sent list shows who has read it. Sean, Oct 2026: sending to
+ * everyone in a role asks "are you sure?" first; an account manager sends to
+ * their own projects and the people on them (administrators get a copy of
+ * what goes to clients or agents); no Link box: a web address or a page
+ * (/leads/123) in the message is a link itself.
+ *
+ *   people     who can be picked; projects: [{ id, label, people }] to send to whole
+ *   everyone   whether "All clients" and the like are offered (administrators)
  */
-export default function NotificationComposer({ people }) {
+export default function NotificationComposer({ people, projects = [], everyone = false }) {
   const [state, formAction, pending] = useActionState(sendNotification, EMPTY);
   const [roles, setRoles] = useState([]);
   const [picked, setPicked] = useState([]);
+  const [groups, setGroups] = useState([]); // projects picked
+  const [asking, setAsking] = useState(false);
+  const sure = useRef(false);
   const [filter, setFilter] = useState("");
   const [length, setLength] = useState(0);
   const formRef = useRef(null);
@@ -40,10 +52,11 @@ export default function NotificationComposer({ people }) {
       formRef.current?.reset();
       setRoles([]);
       setPicked([]);
+      setGroups([]);
       setFilter("");
       setLength(0);
       router.refresh();
-    } else if (state?.error && !state?.fieldErrors?.title && !state?.fieldErrors?.link) {
+    } else if (state?.error && !state?.fieldErrors?.title) {
       toast.error(state.error);
     }
   }, [state, router]);
@@ -53,19 +66,31 @@ export default function NotificationComposer({ people }) {
     ? people.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()) && !picked.includes(p.id)).slice(0, 8)
     : [];
 
-  // Everyone who will receive it: the chosen roles plus the chosen people.
+  // Everyone who will receive it: the chosen roles, projects and people.
+  const projectById = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
   const audience = new Set([
     ...people.filter((p) => roles.includes(p.role)).map((p) => p.id),
+    ...groups.flatMap((id) => projectById.get(id)?.people ?? []),
     ...picked,
   ]).size;
+  const roleCount = (r) => people.filter((p) => p.role === r).length;
+  // Everyone in a role is asked about first: one slip would reach every client or agent.
+  const onSubmit = (e) => {
+    if (roles.length && !sure.current) {
+      e.preventDefault();
+      setAsking(true);
+      return;
+    }
+    sure.current = false;
+  };
 
   const toggleRole = (r) => setRoles((rs) => (rs.includes(r) ? rs.filter((x) => x !== r) : [...rs, r]));
 
   return (
-    <form ref={formRef} action={formAction} noValidate className="space-y-4 p-5">
+    <form ref={formRef} action={formAction} onSubmit={onSubmit} noValidate className="space-y-4 p-5" data-composer>
       <div>
         <span className="eyebrow mb-2 block">Send to</span>
-        <div className="flex flex-wrap gap-2">
+        {everyone ? <div className="flex flex-wrap gap-2" data-role-groups>
           {ROLES.map((r) => {
             const on = roles.includes(r.value);
             const n = people.filter((p) => p.role === r.value).length;
@@ -83,13 +108,36 @@ export default function NotificationComposer({ people }) {
               </label>
             );
           })}
-        </div>
+        </div> : null}
+
+        {projects.length ? (
+          <div className={cn(everyone && "mt-3")}>
+            <Select value="" onChange={(e) => { const id = Number(e.target.value); if (id && !groups.includes(id)) setGroups((g) => [...g, id]); }}
+              aria-label="Send to everyone on a project" className="h-8 text-xs" data-project-pick>
+              <option value="">{everyone ? "…or everyone on a project" : "Everyone on one of your projects…"}</option>
+              {projects.filter((p) => !groups.includes(p.id)).map((p) => <option key={p.id} value={p.id}>{p.label} ({p.people.length})</option>)}
+            </Select>
+            {groups.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {groups.map((id) => (
+                  <span key={id} className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 py-1 pl-2.5 pr-1 text-xs text-primary" data-project-chip={id}>
+                    <FolderKanban className="size-3" /> {projectById.get(id)?.label} <span className="tabular-nums opacity-70">{projectById.get(id)?.people.length}</span>
+                    <input type="hidden" name="project_ids" value={id} />
+                    <button type="button" onClick={() => setGroups((g) => g.filter((x) => x !== id))} aria-label={`Remove ${projectById.get(id)?.label}`} className="flex size-4 cursor-pointer items-center justify-center rounded-full hover:bg-primary/20">
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="relative mt-3">
           <Input
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
-            placeholder="…or add particular people by name"
+            placeholder={everyone || projects.length ? "…or add particular people by name" : "Add people by name"}
             aria-label="Add a person"
             className="h-8 text-xs"
           />
@@ -137,25 +185,37 @@ export default function NotificationComposer({ people }) {
           name="body"
           rows={3}
           maxLength={MAX_BODY}
-          placeholder="Anything they need to know"
+          placeholder="Anything they need to know. A web address or a Lighthouse page (/leads/123) becomes a link."
           defaultValue={dv("body")}
           onChange={(e) => setLength(e.target.value.length)}
           aria-invalid={invalid("body")}
         />
       </Field>
 
-      <Field label="Link (optional)" error={fe("link")} hint="A page inside Lighthouse they should open, e.g. /clients/garry-insurance">
-        <Input name="link" maxLength={300} placeholder="/leads/123" defaultValue={dv("link")} aria-invalid={invalid("link")} />
-      </Field>
+
+      {!everyone ? (
+        <p className="text-[0.7rem] text-muted-foreground" data-copy-note>Administrators get a copy of what you send to clients or agents.</p>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-muted-foreground" data-audience={audience}>
           {audience ? `Goes to ${audience} ${audience === 1 ? "person" : "people"} (not including you)` : "Nobody chosen yet"}
         </span>
-        <Button type="submit" size="sm" disabled={pending || audience === 0}>
+        <Button type="submit" size="sm" disabled={pending || audience === 0} data-composer-send>
           <Send /> {pending ? "Sending…" : "Send"}
         </Button>
       </div>
+
+      <ConfirmDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title="Send this to everyone?"
+        description={`It goes to ${roles.map((r) => `all ${roleCount(r)} ${ROLES.find((x) => x.value === r)?.label.toLowerCase()}`).join(" and ")}: ${audience} ${audience === 1 ? "person" : "people"} in all. Make sure it's meant for every one of them.`}
+        confirm="Yes, send to everyone"
+        icon={<Users />}
+        destructive={false}
+        onConfirm={() => { sure.current = true; setAsking(false); formRef.current?.requestSubmit(); }}
+      />
     </form>
   );
 }

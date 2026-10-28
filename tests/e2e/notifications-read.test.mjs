@@ -7,10 +7,13 @@
 import { check, finish, sleep, until } from "../support/assert.mjs";
 import { signIn } from "../support/auth.mjs";
 import { sql, lit } from "../support/db.mjs";
+import { onSameProject } from "../support/fixtures.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
 const AGENT = sql("select id from public.users where email='agent@beacon.test'");
 const clear = () => sql("delete from public.notifications where title like 'Read test%'");
+// A manager messages the agents on their own projects (Oct 2026): both on one, for the test.
+const restore = onSameProject(Number(sql("select id from public.users where email='sean@beacon.test'")), Number(AGENT));
 clear();
 sql(`update public.notifications set read_at = coalesce(read_at, now()) where user_id=${AGENT}`); // start at zero unread
 
@@ -123,6 +126,7 @@ try {
   await a.key("Escape");
   check("Escape closes it", await until(async () => !(await panelOpen(a)), { timeout: 1500 }));
 } finally {
+  restore("Read test");
   clear();
   browser.close();
 }

@@ -75,13 +75,23 @@ export async function getSentNotifications(limit = 20) {
 }
 
 /** Everyone who can be messaged: active accounts, grouped by role in the composer. */
-export async function getMessageRecipients() {
+/**
+ * Who the signed-in person can message, and the projects they can send to
+ * whole (Sean, Oct 2026): an administrator anyone and every active project;
+ * an account manager the administrators and managers, and the clients and
+ * agents on their own projects, which are the projects they get.
+ */
+export async function getMessageRecipients(me) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("users")
-    .select("id, first_name, last_name, email, role")
-    .eq("status", "active")
-    .order("first_name");
+  const [{ data, error }, { data: projects, error: pErr }] = await Promise.all([
+    supabase.from("users").select("id, first_name, last_name, email, role").eq("status", "active").order("first_name"),
+    supabase.rpc("message_projects"),
+  ]);
   if (error) throw error;
-  return (data ?? []).map((u) => ({ id: u.id, name: fullName(u), role: u.role }));
+  if (pErr) throw pErr;
+  const mine = new Set((projects ?? []).flatMap((p) => p.people ?? []));
+  const people = (data ?? [])
+    .filter((u) => me?.role === "admin" || ["admin", "manager"].includes(u.role) || mine.has(u.id))
+    .map((u) => ({ id: u.id, name: fullName(u), role: u.role }));
+  return { people, projects: (projects ?? []).map((p) => ({ id: p.id, label: p.label, people: p.people ?? [] })) };
 }

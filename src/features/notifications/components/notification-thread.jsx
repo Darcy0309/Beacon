@@ -15,6 +15,7 @@ import EmojiPicker from "@/features/notifications/components/emoji-picker";
 import GifPicker from "@/features/notifications/components/gif-picker";
 import { VoicePlayer, VoiceRecorder } from "@/features/notifications/components/voice-message";
 import { QUICK_REACTIONS, onlyEmoji } from "@/lib/emoji";
+import LinkedText from "@/components/shared/linked-text";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
@@ -315,7 +316,7 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
                         <img src={att.url} alt={att.title || "GIF"} width={att.width} height={att.height} loading="lazy" data-gif-message
                           className="block h-auto max-h-80 w-auto max-w-full rounded-xl" />
                       ) : null}
-                      {text ? <div className={cn(att && "mt-1")}>{text}</div> : null}
+                      {text ? <div className={cn(att && "mt-1")}><LinkedText text={text} /></div> : null}
                     </div>
                     {groups.length ? (
                       <div className={cn("mt-1 flex flex-wrap gap-1", m.mine && "justify-end")} data-reactions>

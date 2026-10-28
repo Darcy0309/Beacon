@@ -419,7 +419,8 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
       title: n.title,
       detail: [n.sender_name ? `From ${n.sender_name}` : "From an administrator", n.body].filter(Boolean).join(" · "),
       badge: n.read_at ? null : "New", tone: "info",
-      href: n.link || "/notifications",
+      // The message itself, which may carry a link (Sean, Oct 2026: its link, a page some people can't open, kept it from them).
+      href: `/notifications/${n.id}`,
       movable: false,
     });
   }
