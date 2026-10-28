@@ -329,8 +329,10 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
             ))}
             {events.length === 0 ? <li className="py-4 text-center text-xs text-muted-foreground">Nothing on this day.</li> : null}
           </ul>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => setBlocking(true)} disabled={selected < today} data-block-out>
+          {/* Side by side when they fit, else one above the other (in a narrow panel the words ran into each other). */}
+          <div className="mt-2 flex flex-wrap gap-2 [&>button]:min-w-[8.5rem] [&>button]:flex-1 [&>button]:whitespace-nowrap">
+            {/* Always there (Darcy, Oct 2026: greyed out on a past day, it read as broken): on a past day, the dialog starts today. */}
+            <Button type="button" size="sm" variant="outline" onClick={() => setBlocking(true)} data-block-out>
               <Ban /> Block out
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={() => setNoting(true)} data-add-note>
