@@ -8,7 +8,8 @@ import { reach } from "@/lib/reach";
 
 /**
  * A GIF to send (Oct 2026), from GIPHY: what is trending, or what a word
- * finds, a moment after typing stops. GIPHY asks to be credited.
+ * finds, a moment after typing stops. The search box names GIPHY (the
+ * "Powered by GIPHY" line under the GIFs was taken off at Darcy's request).
  * `children` is the button that opens it.
  */
 export default function GifPicker({ onPick, children }) {
@@ -57,7 +58,6 @@ export default function GifPicker({ onPick, children }) {
             </div>
           ) : <p className="py-8 text-center text-xs text-muted-foreground">No GIFs for “{q.trim()}”.</p>}
         </div>
-        <p className="border-t border-[var(--panel-border)] px-3 py-1.5 text-right text-[0.6rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">Powered by GIPHY</p>
       </PopoverContent>
     </Popover>
   );

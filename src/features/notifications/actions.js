@@ -118,7 +118,8 @@ export async function searchGifs(q = "") {
       return show?.url ? {
         id: g.id, title: String(g.title ?? "").slice(0, 140),
         url: bare(show.url), still: bare(im.fixed_width_still?.url),
-        preview: bare(im.fixed_width_small?.url ?? show.url),
+        // Sharp at the picker's column width (the small one, 100 px, read blurry), still light to load.
+        preview: bare(im.fixed_width_downsampled?.url ?? show.url),
         width: Number(show.width) || 200, height: Number(show.height) || 200,
       } : null;
     }).filter(Boolean);
