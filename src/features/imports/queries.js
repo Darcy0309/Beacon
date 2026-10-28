@@ -60,3 +60,32 @@ export async function listImports(params) {
     projects: [...new Set(stats.map((i) => i.project).filter((v) => v !== "—"))].sort(),
   };
 }
+
+/**
+ * Every client's projects, for an import to check a new list against other
+ * clients' (Oct 2026: clients of one Agency Group, such as Rural Insurance
+ * or Erie, in one territory): each with its client, the client's Agency
+ * Group, its state (the project's office, else the client's), kind and status.
+ */
+export async function getCheckProjects() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("projects")
+    .select("id, name, state, company_id, company:companies(name, state, group:agencies(id, name)), type:project_types(code), status:project_statuses(name)")
+    .is("deleted_at", null).order("name");
+  if (error) throw error;
+  return (data ?? []).map((p) => {
+    const company = one(p.company);
+    const group = one(company?.group);
+    return {
+      id: p.id,
+      name: p.name,
+      clientId: p.company_id,
+      client: company?.name ?? "—",
+      groupId: group?.id ?? null,
+      group: group?.name ?? null,
+      state: (p.state || company?.state || "").toUpperCase() || null,
+      type: one(p.type)?.code ?? null,
+      status: one(p.status)?.name ?? null,
+    };
+  });
+}

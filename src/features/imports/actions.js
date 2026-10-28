@@ -50,17 +50,41 @@ async function familyNames(supabase, project) {
     if (error) throw error;
     ids = [...new Set([project.id, parent, ...(data ?? []).map((p) => p.id)])];
   }
+  return namesOn(supabase, ids, (p) => p.name);
+}
+
+// The most other clients' projects one import checks against.
+const MAX_CHECK_PROJECTS = 300;
+
+/**
+ * The names on other clients' projects an import is checked against (Oct
+ * 2026: the clients of one Agency Group in one territory, chosen on the
+ * import): each with its client and project, to say where it already is.
+ * The importing project's own client's projects are its family's business.
+ */
+async function otherNames(supabase, ids, companyId) {
+  const list = [...new Set((ids ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_CHECK_PROJECTS);
+  if (!list.length) return [];
+  const { data, error } = await supabase.from("projects").select("id, company_id").in("id", list).is("deleted_at", null);
+  if (error) throw error;
+  const others = (data ?? []).filter((p) => p.company_id !== companyId).map((p) => p.id);
+  return others.length ? namesOn(supabase, others, (p) => `${p.client} · ${p.name}`) : [];
+}
+
+/** The names on some projects, each with where it is (`label` of { name, client }) and its call result; names Moved on left out. */
+async function namesOn(supabase, ids, label) {
   const [{ data: projects }, { data: results }] = await Promise.all([
-    supabase.from("projects").select("id, name").in("id", ids),
+    supabase.from("projects").select("id, name, company:companies(name)").in("id", ids),
     supabase.from("call_results").select("id, name"),
   ]);
-  const projectName = new Map((projects ?? []).map((p) => [p.id, p.name]));
+  const one = (v) => (Array.isArray(v) ? v[0] : v);
+  const where = new Map((projects ?? []).map((p) => [p.id, label({ name: p.name, client: one(p.company)?.name ?? "—" })]));
   const resultName = new Map((results ?? []).map((r) => [r.id, r.name]));
   const rows = await allRows((from, opts) => supabase.from("leads").select("company_name, phone, ein, address, city, zip, project_id, result_id", opts)
     .in("project_id", ids).is("deleted_at", null).order("id").range(from, from + 999));
   return rows
     .filter((r) => !/^(Lead-)?Moved$/.test(resultName.get(r.result_id) ?? ""))
-    .map(({ project_id: pid, result_id: rid, ...r }) => ({ ...r, source: "lead", project: projectName.get(pid) ?? null, result: resultName.get(rid) ?? null }));
+    .map(({ project_id: pid, result_id: rid, ...r }) => ({ ...r, source: "lead", project: where.get(pid) ?? null, result: resultName.get(rid) ?? null }));
 }
 
 /** A project as the import needs it: its client, kind and appointment project. */
@@ -74,18 +98,21 @@ async function importProject(supabase, projectId) {
 
 /**
  * Before an import (Oct 2026): the names the project's client has taken off
- * before, and the names already on the project's family, for the preview to
- * leave out and list. The import checks them again.
+ * before, the names already on the project's family, and those on the other
+ * clients' projects chosen (`checkIds`), for the preview to leave out and
+ * list. The import checks them again.
  */
-export async function importChecks(projectId) {
+export async function importChecks(projectId, checkIds = []) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (me?.role !== "admin") return fail("Only administrators import lists.");
   const project = await importProject(supabase, projectId);
   if (!project) return fail("That project no longer exists.");
   try {
-    const [removals, existing] = await Promise.all([removalsOf(supabase, project.company_id), familyNames(supabase, project)]);
-    return ok({ client: project.client, removals, existing });
+    const [removals, existing, others] = await Promise.all([
+      removalsOf(supabase, project.company_id), familyNames(supabase, project), otherNames(supabase, checkIds, project.company_id),
+    ]);
+    return ok({ client: project.client, removals, existing, others });
   } catch (e) {
     return fail(e);
   }
@@ -158,17 +185,22 @@ export async function importLeadsCsv(prevState, formData) {
   // project's family aren't loaded twice (the preview left them out; this makes sure).
   let removedBefore = 0;
   let existing = 0;
+  let onOthers = 0;
   try {
-    const [removals, family] = await Promise.all([
+    const [removals, family, others] = await Promise.all([
       removalsOf(supabase, project.company_id),
       familyNames(supabase, { id: project.id, appt_project_id: project.appt_project_id, type: projectType }),
+      // The other clients' projects chosen to check against (an Agency Group's, in a territory).
+      otherNames(supabase, String(formData.get("check_projects") ?? "").split(","), project.company_id),
     ]);
     const removed = removalMatcher(removals);
     const there = removalMatcher(family);
+    const elsewhere = removalMatcher(others);
     const kept = [];
     for (const row of parsed) {
       if (removed(row.lead)) removedBefore++;
       else if (there(row.lead)) existing++;
+      else if (elsewhere(row.lead)) onOthers++;
       else kept.push(row);
     }
     parsed.splice(0, parsed.length, ...kept);
@@ -369,6 +401,7 @@ export async function importLeadsCsv(prevState, formData) {
       duplicate_count: duplicates,
       removed_count: removedBefore,
       existing_count: existing,
+      other_count: onOthers,
       status: imported > 0 ? "completed" : "failed",
       imported_by: me?.id ?? null,
     }),
@@ -378,12 +411,12 @@ export async function importLeadsCsv(prevState, formData) {
 
   await logActivity(supabase, "leads.import", {
     entity: "import",
-    detail: `${imported} of ${rows.length - 1 + duplicates} rows from ${file.name}${duplicates ? `, ${duplicates} duplicates left off` : ""}${removedBefore ? `, ${removedBefore} taken off before` : ""}${existing ? `, ${existing} already on the project` : ""}`,
+    detail: `${imported} of ${rows.length - 1 + duplicates} rows from ${file.name}${duplicates ? `, ${duplicates} duplicates left off` : ""}${removedBefore ? `, ${removedBefore} taken off before` : ""}${existing ? `, ${existing} already on the project` : ""}${onOthers ? `, ${onOthers} on other clients' lists` : ""}`,
   });
   revalidatePath("/imports");
   revalidatePath("/leads");
   revalidatePath("/work", "layout");
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing });
+  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers });
 }

@@ -36,7 +36,7 @@ import { getCallResults, getNextOnList, getOpenAppointment, getWorkProject } fro
 import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { addMonths, daysBetween, monthGrid, monthStart, todayIn } from "@/lib/dates";
-import { apptWhen, fullName, mediumDate, shortDate, sicLabel, telHref } from "@/lib/format";
+import { apptWhen, fullName, mediumDate, shortDate, telHref } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { autosLine, employeesLine, locationsLine, subcontractorsLine, xmodText, yesNo } from "@/lib/business";
 import { getCargoTypes } from "@/features/cargo/queries";
@@ -469,6 +469,10 @@ export default async function LeadSheet({ params, searchParams }) {
                       ) : null}
                       <Rows
                         rows={[
+                          // What kind of business it is, first (Oct 2026: the caller sees it without opening Edit).
+                          ["SIC code", r.sic_code ? <span className="tabular-nums" data-sic-code>{r.sic_code}</span> : null],
+                          ["SIC description", r.sic_description ? <span className="font-medium" data-sic-description>{r.sic_description}</span>
+                            : r.sic_code ? <span className="text-muted-foreground">Not on the SIC list</span> : null],
                           ["Company", lead.co],
                           ["Phone", r.phone],
                           ["Locations", locationsLine(r)],
@@ -486,7 +490,6 @@ export default async function LeadSheet({ params, searchParams }) {
                           ["Claims last 3 yrs", yesNo(r.claims_3yrs)],
                           ["Professionals", r.professionals],
                           ["Covered employees", r.covered_employees],
-                          ["SIC code", sicLabel(r.sic_code, r.sic_description)],
                         ]}
                       />
                     </div>

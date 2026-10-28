@@ -8,17 +8,30 @@ const CODE_HEADS = ["siccode", "sic", "code", "siccodes", "sicnumber"];
 const DESC_HEADS = ["sicdesc", "sicdescription", "description", "desc", "industry", "siccodedescription", "title"];
 
 /**
- * A code as kept: trimmed, no inner spaces ("1521-99", "1711"), and the
- * leading zero a spreadsheet takes off the agricultural codes put back
- * (Sean, Oct 2026): a code of an odd number of digits has lost it, so "111"
- * is 0111, "11101" is 011101 and "111-01" is 0111-01. The database does the
- * same (sic_pad), whatever writes the code.
+ * A code as kept: trimmed, no inner spaces, and one form for each code.
+ * The leading zero a spreadsheet takes off the agricultural codes is put
+ * back (Sean, Oct 2026): a code of an odd number of digits has lost it, so
+ * "111" is 0111 and "11101" is 011101. A 6-digit code is kept without its
+ * dash (Oct 2026: the client's SIC sheets write 422505, SalesGenie writes
+ * 4225-05; one code), so "4225-05" is 422505 and "111-01" is 011101. The
+ * database does the same (sic_pad), whatever writes the code.
  */
 export const sicCode = (v) => {
-  const t = String(v ?? "").replace(/\s+/g, "").slice(0, 20);
-  if (/^(\d|\d{3}|\d{5}|\d{7})$/.test(t) || /^\d{3}-\d{2}$/.test(t)) return `0${t}`;
+  let t = String(v ?? "").replace(/\s+/g, "").slice(0, 20);
+  if (/^\d{3,4}-\d{2}$/.test(t)) t = t.replace("-", "");
+  if (/^(\d|\d{3}|\d{5}|\d{7})$/.test(t)) return `0${t}`;
   return t || null;
 };
+/**
+ * The codes to find a description under, most exact first: the code itself,
+ * then its industry (4 digits) and its group (2): a 6-digit code not in the
+ * list still reads as its industry.
+ */
+export const sicLookup = (v) => {
+  const c = sicCode(v);
+  return c ? [...new Set([c, c.slice(0, 4), c.slice(0, 2)].filter((x) => /^\d{2}/.test(x)))] : [];
+};
+
 /** A description as compared: lower case, letters and digits only. */
 export const sicKey = (v) => norm(v);
 

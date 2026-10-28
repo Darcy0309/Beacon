@@ -10,6 +10,7 @@ import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { updateLead } from "@/features/leads/actions";
 import { AUTO_TYPES, TRAVEL_RADII, xmodText } from "@/lib/business";
+import { sicLookup } from "@/lib/sic";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -57,7 +58,9 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
     } else if (state?.error && !state?.fieldErrors) toast.error(state.error);
   }, [state, router]);
   const errors = state?.fieldErrors ? Object.keys(state.fieldErrors).length : 0;
-  const meaning = sic.find((s) => s.code === code.trim())?.description ?? (code.trim() && sic.length ? "Not on the SIC list" : null);
+  // What the code means: its own description, else its industry's (4 digits) or group's (2); 4225-05 and 422505 are one code.
+  const meaning = sicLookup(code).map((c) => sic.find((s) => s.code === c)?.description).find(Boolean)
+    ?? (code.trim() && sic.length ? "Not on the SIC list" : "");
   const types = new Set(state?.values ? [] : lead.auto_types ?? []);
   // The cargo list, and the lead's own cargo should it have come off the list since.
   const cargo = dv("cargo", "") ?? "";
@@ -86,6 +89,16 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
             </p>
           ) : null}
           <div className="-mr-1 grid min-h-0 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+            {/* What kind of business it is, first (Oct 2026); the description comes from the SIC list. */}
+            <Field label="SIC code" error={fe("sic_code")} hint="Type a code or what the business does, and pick from the list">
+              <Input name="sic_code" list="sic-codes" value={code} onChange={(e) => setCode(e.target.value)} maxLength={12} placeholder="422505" aria-invalid={invalid("sic_code")} autoComplete="off" />
+            </Field>
+            <Field label="SIC description">
+              <Input value={meaning} readOnly tabIndex={-1} placeholder={sic.length ? "" : "Loading the SIC list…"} className="bg-muted/40" data-sic-meaning />
+            </Field>
+            <datalist id="sic-codes">
+              {sic.map((s) => <option key={s.code} value={s.code}>{s.description}</option>)}
+            </datalist>
             <Field label="Company name" required error={fe("company_name")}>
               <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} />
             </Field>
@@ -178,12 +191,6 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
             {num("professionals", "Professionals")}
             {num("covered_employees", "Covered employees")}
 
-            <Field label="SIC code" error={fe("sic_code")} className="sm:col-span-2" hint={meaning ? <span data-sic-meaning>{meaning}</span> : "Type a code or what the business does, and pick from the list"}>
-              <Input name="sic_code" list="sic-codes" value={code} onChange={(e) => setCode(e.target.value)} maxLength={12} placeholder="7342-00" aria-invalid={invalid("sic_code")} autoComplete="off" />
-            </Field>
-            <datalist id="sic-codes">
-              {sic.map((s) => <option key={s.code} value={s.code}>{s.description}</option>)}
-            </datalist>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

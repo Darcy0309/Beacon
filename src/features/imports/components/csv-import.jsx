@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Copy, Download, Layers, Loader2, UploadCloud, UserX } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, Layers, Loader2, UploadCloud, Users, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,22 +48,27 @@ async function runImport(prevState, formData) {
  * its rows, the groups of records of one business (the one to keep marked),
  * and the names the client has taken off before.
  */
-async function checkFile(file, projectId) {
+async function checkFile(file, projectId, checkIds = []) {
   const csvRows = parseCsv(await file.text());
   const { rows } = rowsToImport(csvRows);
-  const checks = projectId ? await reach(() => importChecks(projectId)) : { ok: true, data: { removals: [], existing: [] } };
+  const checks = projectId ? await reach(() => importChecks(projectId, checkIds)) : { ok: true, data: { removals: [], existing: [], others: [] } };
   if (!checks.ok) throw new Error(checks.error);
   const removed = removalMatcher(checks.data.removals);
   // Already on the project, its appointment project or their other lead projects: the record there is kept.
   const there = removalMatcher(checks.data.existing);
+  // On the other clients' projects chosen (an Agency Group's, in a territory).
+  const elsewhere = removalMatcher(checks.data.others);
   const removedRows = [];
   const existingRows = [];
+  const otherRows = [];
   const open = [];
   rows.forEach((r, i) => {
     const entry = removed(r.lead);
     const have = entry ? null : there(r.lead);
+    const other = entry || have ? null : elsewhere(r.lead);
     if (entry) removedRows.push({ i, entry });
     else if (have) existingRows.push({ i, entry: have });
+    else if (other) otherRows.push({ i, entry: other });
     else open.push(i);
   });
   // Duplicates among the rest: a name left out above is not the one a group keeps.
@@ -72,7 +77,7 @@ async function checkFile(file, projectId) {
     keep: open[g.keep],
     why: g.why,
   }));
-  return { csvRows, rows, groups, removedRows, existingRows, client: checks.data.client ?? null };
+  return { csvRows, rows, groups, removedRows, existingRows, otherRows, client: checks.data.client ?? null };
 }
 
 /** The rows of a group not kept: left off the list. */
@@ -89,7 +94,7 @@ const droppedOf = (plan, keep) => plan.groups.flatMap((g) => g.rows.filter((i) =
  * are left out. Import goes ahead on that, or Review duplicates shows each
  * group to choose what to keep.
  */
-export default function CsvImport({ projects = [] }) {
+export default function CsvImport({ projects = [], checkProjects = [] }) {
   const [state, formAction, pending] = useActionState(runImport, EMPTY);
   const [fileName, setFileName] = useState("");
   const [projectId, setProjectId] = useState(state?.values?.project_id ?? "");
@@ -100,13 +105,16 @@ export default function CsvImport({ projects = [] }) {
   const [reviewing, setReviewing] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const [showExisting, setShowExisting] = useState(false);
+  const [showOthers, setShowOthers] = useState(false);
+  // Other clients' projects to check the list against (Oct 2026): chosen by Agency Group and territory, then ticked.
+  const [checkIds, setCheckIds] = useState(() => new Set());
   const checking = useRef(null);
   const inputRef = useRef(null);
   const formRef = useRef(null);
   const router = useRouter();
 
   // The file checked again whenever it or the project changes; a submit waits for it.
-  const recheck = (file, project) => {
+  const recheck = (file, project, ids = checkIds) => {
     setPlan(null);
     setCheckError(null);
     setReviewing(false);
@@ -114,7 +122,7 @@ export default function CsvImport({ projects = [] }) {
       checking.current = null;
       return;
     }
-    const run = checkFile(file, project).then(
+    const run = checkFile(file, project, [...ids]).then(
       (p) => {
         if (checking.current !== run) return null;
         setPlan(p);
@@ -131,9 +139,9 @@ export default function CsvImport({ projects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0, existing = 0 } = state.data ?? {};
+      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0, existing = 0, others = 0 } = state.data ?? {};
       const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
-        existing ? `${existing} already on the project` : ""].filter(Boolean).join(" · ");
+        existing ? `${existing} already on the project` : "", others ? `${others} on other clients' lists` : ""].filter(Boolean).join(" · ");
       toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}${left ? ` · ${left}` : ""}${assigned ? ` · shared across ${assigned} account managers` : ""}`);
       // Old call results not recognised: those names start at the project's first result.
       if (unknown.length) {
@@ -202,6 +210,7 @@ export default function CsvImport({ projects = [] }) {
     }
     form.set("file", upload);
     form.set("duplicates", String(dropped.length));
+    form.set("check_projects", [...checkIds].join(","));
     form.set("dropped", JSON.stringify(dropped.map((i) => {
       const l = p.rows[i].lead;
       return { company_name: l.company_name, contact_name: l.contact_name, phone: l.phone, ein: l.ein, address: l.address, city: l.city, state: l.state, zip: l.zip };
@@ -241,7 +250,12 @@ export default function CsvImport({ projects = [] }) {
   });
 
   const dropped = plan ? droppedOf(plan, keep) : [];
-  const toImport = plan ? plan.rows.length - dropped.length - plan.removedRows.length - plan.existingRows.length : 0;
+  const toImport = plan ? plan.rows.length - dropped.length - plan.removedRows.length - plan.existingRows.length - plan.otherRows.length : 0;
+  const changeChecks = (ids) => {
+    setCheckIds(ids);
+    recheck(inputRef.current?.files?.[0] ?? null, projectId, ids);
+  };
+  const ownClient = checkProjects.find((p) => String(p.id) === String(projectId))?.clientId ?? null;
 
   return (
     <Card>
@@ -277,6 +291,7 @@ export default function CsvImport({ projects = [] }) {
               <Input name="list_source" maxLength={80} defaultValue={state?.values?.list_source ?? ""} />
             </Field>
           </div>
+          <OtherClients projects={checkProjects} ownClient={ownClient} picked={checkIds} onChange={changeChecks} />
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -445,6 +460,33 @@ export default function CsvImport({ projects = [] }) {
                       ) : null}
                     </div>
                   ) : null}
+                  {plan.otherRows.length ? (
+                    <div className="rounded-lg border border-[var(--panel-border)]">
+                      <button type="button" onClick={() => setShowOthers((v) => !v)} data-show-others
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/40">
+                        {showOthers ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                        <Users className="size-4 text-violet-500" />
+                        <span>
+                          <span className="font-semibold tabular-nums" data-others-count>{plan.otherRows.length.toLocaleString()}</span> on the other clients&apos; lists checked, left out
+                        </span>
+                        <span className="ml-auto shrink-0 font-semibold text-primary">{showOthers ? "Hide" : "Show"}</span>
+                      </button>
+                      {showOthers ? (
+                        <ul className="max-h-72 divide-y divide-[var(--panel-border)] overflow-y-auto border-t border-[var(--panel-border)] text-xs">
+                          {plan.otherRows.map(({ i, entry }) => (
+                            <li key={i} className="flex items-center gap-3 px-3 py-1.5">
+                              <span className="min-w-0 flex-1 truncate">
+                                <span className="font-medium">{plan.rows[i].lead.company_name}</span>
+                                <span className="text-muted-foreground"> · {[plan.rows[i].lead.city, plan.rows[i].lead.phone].filter(Boolean).join(" · ")}</span>
+                              </span>
+                              <span className="shrink-0 truncate text-muted-foreground">{entry.project}</span>
+                              {entry.result ? <ToneBadge tone="violet">{entry.result}</ToneBadge> : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </div>
@@ -452,5 +494,87 @@ export default function CsvImport({ projects = [] }) {
         </form>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The other clients' projects to check a list against (Oct 2026): the
+ * Agency Group (Rural Insurance, Erie…) and territory narrow the projects
+ * shown; those ticked are the ones checked. The importing client's own
+ * projects are its family, checked already.
+ */
+function OtherClients({ projects, ownClient, picked, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [group, setGroup] = useState("");
+  const [state, setState] = useState("");
+  const [activeOnly, setActiveOnly] = useState(true);
+  const others = projects.filter((p) => p.clientId !== ownClient);
+  const groups = [...new Map(others.filter((p) => p.groupId).map((p) => [p.groupId, p.group])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  const states = [...new Set(others.map((p) => p.state).filter(Boolean))].sort();
+  const shown = others.filter((p) => (!group || String(p.groupId) === group) && (!state || p.state === state) && (!activeOnly || p.status === "Active"));
+  const allShown = shown.length > 0 && shown.every((p) => picked.has(p.id));
+  const set = (ids, on) => {
+    const n = new Set(picked);
+    for (const id of ids) {
+      if (on) n.add(id);
+      else n.delete(id);
+    }
+    onChange(n);
+  };
+
+  return (
+    <div className="rounded-lg border border-[var(--panel-border)]" data-other-clients>
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40" data-other-clients-open>
+        {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+        <Users className="size-4 text-violet-500" />
+        <span>Check other clients&apos; lists for duplicates</span>
+        <span className="ml-auto shrink-0 text-xs text-muted-foreground" data-other-picked>
+          {picked.size ? `${picked.size.toLocaleString()} project${picked.size === 1 ? "" : "s"} checked` : "None checked"}
+        </span>
+      </button>
+      {open ? (
+        <div className="space-y-3 border-t border-[var(--panel-border)] p-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Field label="Agency Group">
+              <Select value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Agency Group" data-other-group>
+                <option value="">Any group</option>
+                {groups.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+              </Select>
+            </Field>
+            <Field label="Territory">
+              <Select value={state} onChange={(e) => setState(e.target.value)} aria-label="Territory" data-other-state>
+                <option value="">Any state</option>
+                {states.map((st) => <option key={st} value={st}>{st}</option>)}
+              </Select>
+            </Field>
+            <label className="flex cursor-pointer items-center gap-2 self-end pb-2 text-sm">
+              <input type="checkbox" checked={activeOnly} onChange={(e) => setActiveOnly(e.target.checked)} className="size-4 accent-[var(--primary)]" />
+              Active projects only
+            </label>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="text-muted-foreground">{shown.length.toLocaleString()} project{shown.length === 1 ? "" : "s"} shown</span>
+            {shown.length ? (
+              <button type="button" onClick={() => set(shown.map((p) => p.id), !allShown)} className="font-semibold text-primary hover:underline" data-other-all>
+                {allShown ? "Untick all shown" : "Tick all shown"}
+              </button>
+            ) : null}
+            {picked.size ? <button type="button" onClick={() => onChange(new Set())} className="text-muted-foreground hover:text-foreground">Clear</button> : null}
+          </div>
+          <ul className="max-h-56 divide-y divide-[var(--panel-border)] overflow-y-auto rounded-md border border-[var(--panel-border)] text-sm">
+            {shown.length === 0 ? <li className="px-3 py-2 text-muted-foreground">No other clients&apos; projects match.</li> : null}
+            {shown.map((p) => (
+              <li key={p.id}>
+                <label className="flex cursor-pointer items-center gap-2 px-3 py-1.5">
+                  <input type="checkbox" checked={picked.has(p.id)} onChange={() => set([p.id], !picked.has(p.id))} className="size-4 accent-[var(--primary)]" data-other-project={p.id} />
+                  <span className="min-w-0 flex-1 truncate"><span className="font-medium">{p.client}</span> · {p.name}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{[p.group, p.state, p.type === "APPT" ? "Appt" : p.type === "DBDV" ? "DBDev" : null].filter(Boolean).join(" · ")}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }

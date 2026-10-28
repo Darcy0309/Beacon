@@ -4,6 +4,7 @@ import "server-only";
 import { apptWhen, cityState, colorFor, fullName, initialsOf, shortDate, shortName, timeAgo } from "@/lib/format";
 import { inner, one, paged, runPaged } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
+import { sicLookup } from "@/lib/sic";
 
 const leadSelect = ({ status = false } = {}) => `
   id, company_name, contact_name, contact_title, phone, email, website,
@@ -154,7 +155,8 @@ export function applyNameFilters(query, names = {}) {
   const num = (v) => (/^\d{1,7}$/.test(String(v ?? "")) ? Number(v) : null);
   if (num(names.empMin) != null) query = query.gte("employee_n", num(names.empMin));
   if (num(names.empMax) != null) query = query.lte("employee_n", num(names.empMax));
-  if (/^\d{1,8}(-\d{1,2})?$/.test(String(names.sic ?? ""))) query = query.like("sic_code", `${names.sic}%`);
+  // "4225-05" and "422505" are one code (sicCode).
+  if (/^\d{1,8}(-\d{1,2})?$/.test(String(names.sic ?? ""))) query = query.like("sic_code", `${String(names.sic).replace("-", "")}%`);
   if (/^[A-Za-z]{2}$/.test(String(names.state ?? ""))) query = query.eq("state", String(names.state).toUpperCase());
   return query;
 }
@@ -215,8 +217,8 @@ export async function getLead(id) {
     supabase.from("lead_notes").select("notes").eq("lead_id", data.id).maybeSingle(),
     // The code's own description, or its four-digit code's (1521-99 -> 1521).
     data.sic_code
-      ? supabase.from("sic_codes").select("code, description").in("code", [data.sic_code, String(data.sic_code).slice(0, 4)])
-          .then(({ data: rows }) => ({ data: rows?.find((r) => r.code === data.sic_code) ?? rows?.[0] ?? null }))
+      ? supabase.from("sic_codes").select("code, description").in("code", sicLookup(data.sic_code))
+          .then(({ data: rows }) => ({ data: sicLookup(data.sic_code).map((c) => rows?.find((r) => r.code === c)).find(Boolean) ?? null }))
       : Promise.resolve({ data: null }),
   ]);
   return toLeadView({ ...data, internal_notes: internal?.notes ?? null, sic_description: sic?.description ?? null });

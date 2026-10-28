@@ -17,6 +17,7 @@ import { infoProjectOf, producerAddresses } from "@/lib/project-info";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { LINK_DAYS, sheetToken } from "@/lib/server/sheet-link";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sicLookup } from "@/lib/sic";
 
 const one = (v) => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
@@ -80,8 +81,8 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
     apptQuery,
     admin.rpc("business_tz"),
     lead.sic_code
-      ? admin.from("sic_codes").select("code, description").in("code", [lead.sic_code, String(lead.sic_code).slice(0, 4)])
-          .then(({ data: rows }) => ({ data: rows?.find((r) => r.code === lead.sic_code) ?? rows?.[0] ?? null }))
+      ? admin.from("sic_codes").select("code, description").in("code", sicLookup(lead.sic_code))
+          .then(({ data: rows }) => ({ data: sicLookup(lead.sic_code).map((c) => rows?.find((r) => r.code === c)).find(Boolean) ?? null }))
       : Promise.resolve({ data: null }),
     // The policy files kept with the lead: they go with it, each behind the sheet's own signed link.
     admin.from("documents").select("id, name, file_type, size_bytes").eq("lead_id", leadId).is("deleted_at", null).order("created_at"),

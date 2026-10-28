@@ -104,7 +104,8 @@ try {
   await sean.fill('[data-business-form] input[name="dot_number"]', "DOT 1234567");
   await sean.fill('[data-business-form] input[name="annual_payroll"]', "$1.2M");
   await sean.fill('[data-business-form] select[name="claims_3yrs"]', "yes");
-  check("the SIC code says what it means, from the SIC list", Boolean(await until(() => sean.ev(`(document.querySelector('[data-sic-meaning]')?.textContent ?? '').length > 3`))));
+  check("the SIC code says what it means, from the SIC list", Boolean(await until(() => sean.ev(`(document.querySelector('[data-sic-meaning]')?.value ?? '').length > 3`))));
+  check("…at the top of the form, before the company", await sean.ev(`[...document.querySelectorAll('[data-business-form] [name]')].map((e) => e.name).filter((n) => n !== "id")[0] === "sic_code"`));
   await sean.click("[data-business-form] button[type=submit]");
   check("its details are saved", Boolean(await until(() => sql(`select location_ownership || '|' || building_acres || '|' || employees_full_time || '|' || array_to_string(auto_types, ',') || '|' || travel_radius from public.leads where id = ${lead}`)
     === "lease|1.50|15|vans,delivery_trucks|100")));
@@ -118,6 +119,9 @@ try {
   check("…and read as one line each", rows?.Locations === "2 · Lease · 15 years old, 2 stories, 1.5 acres" && rows.Employees === "20 (15 full-time, 5 part-time)"
     && rows["Sub-contractors"] === "10%" && rows.Autos === "11 · Vans, Delivery trucks · 8 drivers · within 100 miles", JSON.stringify(rows));
   check("…with no county (it is on Prospect Info)", rows && !("County" in rows));
+  // Oct 2026: what kind of business it is, first, for the caller.
+  check("…the SIC code and its description first, above the company", Object.keys(rows ?? {}).slice(0, 3).join(",") === "SIC code,SIC description,Company"
+    && rows["SIC description"]?.length > 3 && rows["SIC description"] !== "Not on the SIC list", JSON.stringify(Object.entries(rows ?? {}).slice(0, 3)));
   check("…and the new ones in their places", rows?.["DOT#"] === "1234567" && rows.Cargo === `${TAG} Steel, coiled` && rows["Annual payroll"] === "$1.2M" && rows["Claims last 3 yrs"] === "Yes"
     && rows.XMOD === "0.85" && Object.keys(rows).join(",").includes("Autos,DOT#,Cargo,XMOD,Sales volume,Annual payroll") && Object.keys(rows).join(",").includes("Est. annual premium,Claims last 3 yrs"), JSON.stringify(Object.keys(rows ?? {})));
   await shot("lead-page");

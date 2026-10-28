@@ -26,6 +26,8 @@ const project = Number(sql(`insert into public.projects (name, company_id, proje
   (select id from public.project_types where code = 'DBDV'), 1) returning id`));
 const file = path.join(mkdtempSync(path.join(tmpdir(), "import-")), "list.csv");
 const NEW_SIC = `9${String(Date.now()).slice(-3)}-77`;
+// Kept without its dash (Oct 2026: 9xxx-77 and 9xxx77 are one code).
+const NEW_SIC_KEPT = NEW_SIC.replace("-", "");
 writeFileSync(file, [
   "Company,Phone,Website,Email,Call Result DBDV,SICCode,SICDesc",
   `"${TAG} Alpha",602-555-0101,n/a,no email,Left Message,1711,`,
@@ -97,7 +99,7 @@ try {
   check("a code alone is kept", sic("Alpha") === "1711|", sic("Alpha"));
   check("a description alone finds its code in the SIC list", sic("Beta") === "1711|", sic("Beta"));
   check("a code and description the list does not have are added to it",
-    sic("Gamma").startsWith(`${NEW_SIC}|`) && sql(`select description from public.sic_codes where code = ${lit(NEW_SIC)}`) === `${TAG} widgets`, sic("Gamma"));
+    sic("Gamma").startsWith(`${NEW_SIC_KEPT}|`) && sql(`select description from public.sic_codes where code = ${lit(NEW_SIC_KEPT)}`) === `${TAG} widgets`, sic("Gamma"));
   check("a description with no code to match is kept on the lead", sic("Delta") === "|Nothing like any SIC", sic("Delta"));
 
   section("A list over 1 MB");
@@ -158,11 +160,45 @@ try {
   check("…its third person in the internal notes", sql(`select n.notes from public.lead_notes n join public.leads l on l.id = n.lead_id where l.company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "Other contact: Travis Haen, Other");
   check("both offices kept", sg("Acculevel").split("\n").length === 2, sg("Acculevel"));
   check("the FEIN kept", sg("Accurate Svc").endsWith("|39-1178301"), sg("Accurate Svc"));
+  check("SalesGenie's 6-digit SIC (1771-05) kept as the SIC sheets write it", sql(`select sic_code from public.leads where company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "177105");
   check("names taken off before are not imported", sg("Called Before Co") === "" && sg("Old Branch") === "", `${sg("Called Before Co")} / ${sg("Old Branch")}`);
   check("the duplicate left off is a Deletion on the client's list, for later lists",
     sql(`select reason || '|' || source || '|' || address from public.client_removals where company_id = ${company} and company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "deletion|import|W4437 Schmidt Rd");
   check("the import's history says so", sql(`select row_count || '|' || imported_count || '|' || duplicate_count || '|' || removed_count from public.import_batches
     where project_id = ${project} and file_name = 'salesgenie.csv'`) === "7|4|1|2");
+
+  section("Checked against other clients' lists");
+  // Sean's client (Oct 2026): a new list for a Wisconsin client checked against the other Rural Insurance clients there.
+  const group = Number(sql(`insert into public.agencies (name) values (${lit(`${TAG} Rural`)}) returning id`));
+  const rural = Number(sql(`insert into public.companies (name, agency_group_id, state) values (${lit(`${TAG} Rural Agency`)}, ${group}, 'WI') returning id`));
+  const ruralProject = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Rural DBDev`)}, ${rural},
+    (select id from public.project_types where code = 'DBDV'), 1) returning id`));
+  sql(`insert into public.leads (project_id, company_name, phone, zip, result_id) values (${ruralProject}, ${lit(`${TAG} Theirs Already`)}, '715-555-3001', '54481',
+    public.call_result_from_text('DBDV', 'Viable-Left Message'))`);
+  const otherFile = path.join(path.dirname(file), "other-clients.csv");
+  writeFileSync(otherFile, ["Company,Phone,ZIP", `"${TAG} Theirs Already Inc",(715) 555-3001,54481`, `"${TAG} Nobody's Yet",715-555-3002,54481`].join("\n"));
+  try {
+    await chooseFile(admin, otherFile);
+    check("with nothing checked, both would come in", Boolean(await until(async () => /2 of 2 rows/.test(await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`)), { timeout: 15000 })));
+    await admin.click("[data-other-clients-open]");
+    await admin.fill("[data-other-group]", String(group));
+    await admin.fill("[data-other-state]", "WI");
+    const shown = await until(() => admin.ev(`[...document.querySelectorAll('[data-other-project]')].map((b) => b.dataset.otherProject).join(',')`));
+    check("the Agency Group and territory narrow the projects to theirs", shown === String(ruralProject), shown);
+    await admin.click("[data-other-all]");
+    const after = await until(async () => { const t = await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`); return /1 of 2 rows/.test(t) && t; }, { timeout: 15000 });
+    check("…and ticked, the business on their list is left out", Boolean(after) && (await admin.ev(`document.querySelector('[data-others-count]')?.textContent`)) === "1", after);
+    await admin.click("button[type=submit]", "Import leads");
+    const said = await admin.waitToast(/Imported 1 of 2/, 20000);
+    check("it imports the rest, saying so", /1 on other clients' lists/.test(said ?? ""), said);
+    check("…and the import's history counts it", sql(`select other_count from public.import_batches where project_id = ${project} and file_name = 'other-clients.csv'`) === "1");
+    check("the one on their list is not loaded here", sql(`select count(*) from public.leads where project_id = ${project} and company_name like ${lit(`${TAG} Theirs%`)}`) === "0");
+  } finally {
+    sql(`delete from public.leads where project_id = ${ruralProject}`);
+    sql(`delete from public.projects where id = ${ruralProject}`);
+    sql(`delete from public.companies where id = ${rural}`);
+    sql(`delete from public.agencies where id = ${group}`);
+  }
 
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);
