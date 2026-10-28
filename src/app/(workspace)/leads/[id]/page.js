@@ -49,6 +49,7 @@ import { getProjectInfo } from "@/features/project-info/queries";
 import { leadPlace } from "@/lib/project-info";
 import HoldNotice from "@/features/delivery/components/hold-notice";
 import TransferDialog from "@/features/leads/components/transfer-dialog";
+import { MarkLeadButton } from "@/features/removals/components/mark-names";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
 export const dynamic = "force-dynamic";
@@ -325,6 +326,8 @@ export default async function LeadSheet({ params, searchParams }) {
             </Link>
             {/* A lead the client can't use, given to another client (Sean, Oct 2026): administrators and account managers. */}
             {seesInternal ? <TransferDialog lead={{ id: lead.id, co: lead.co }} /> : null}
+            {/* A name the client doesn't want, off their list and remembered for later lists (Oct 2026): not one with an appointment. */}
+            {client && !latestAppt ? <MarkLeadButton leadId={lead.id} /> : null}
           </div>
           {list ? (
             <div className="flex flex-wrap items-center gap-2 text-xs">

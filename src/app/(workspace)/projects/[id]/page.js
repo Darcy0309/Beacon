@@ -9,6 +9,7 @@ import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import { MoveBar, MovePicker, PickAll, PickBox } from "@/features/leads/components/move-names";
+import { MarkBar } from "@/features/removals/components/mark-names";
 import NameFilters from "@/features/leads/components/name-filters";
 import ProjectForm from "@/features/projects/components/project-form";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
@@ -284,8 +285,10 @@ export default async function ProjectDetail({ params, searchParams }) {
           {/* Narrowed by the names' data, and sorted, in place. */}
           {canManage ? <NameFilters names={names} sort={sort} sorts={NAME_SORTS} /> : null}
           {canManage ? <MoveBar projectId={p.id} type={dbdev ? "DBDV" : "APPT"} total={leads.total} filters={{ q: list.q, ...list.filters, ...names }} results={callResults} /> : null}
+          {/* A client's people take names they don't want off their list (Oct 2026), remembered for later lists. */}
+          {client ? <MarkBar /> : null}
           <FilterTable
-            columns={[...(canManage ? [{ label: <PickAll ids={leads.rows.map((l) => l.id)} />, className: "w-8" }] : []), "Company", "Contact",
+            columns={[...(canManage || client ? [{ label: <PickAll ids={leads.rows.map((l) => l.id)} />, className: "w-8" }] : []), "Company", "Contact",
               ...(canManage ? ["Location", "SIC", { label: "Employees", className: "text-right" }] : []), "Call result", "X-Date", "Assigned"]}
             filters={[
               // A project's names stand on its own kind of project's results.
@@ -301,7 +304,7 @@ export default async function ProjectDetail({ params, searchParams }) {
               id: l.id,
               node: (
                 <TableRow>
-                  {canManage ? <TableCell className="w-8"><PickBox id={l.id} name={l.co} /></TableCell> : null}
+                  {canManage || client ? <TableCell className="w-8"><PickBox id={l.id} name={l.co} /></TableCell> : null}
                   <TableCell className="font-medium"><Link href={`/leads/${l.id}`} className="transition-colors hover:text-primary">{l.co}</Link></TableCell>
                   <TableCell>{l.contact}</TableCell>
                   {canManage ? (

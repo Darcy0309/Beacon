@@ -28,6 +28,8 @@ const ACTION_LABEL = {
   "lead.transfer": "Transferred a lead to another client",
   "lead.move": "Moved names to another project",
   "lead.results": "Changed call results in bulk",
+  "lead.removed": "Took names off a client's lists",
+  "client.removal_forgotten": "Took a name off a client's removal list",
   "lead.call": "Recorded a call",
   "lead.email": "Emailed a lead",
   "lead.coverage": "Updated a lead's coverage",

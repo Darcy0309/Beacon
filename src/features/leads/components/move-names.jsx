@@ -39,6 +39,9 @@ export function MovePicker({ children }) {
   return <Picked.Provider value={value}>{children}</Picked.Provider>;
 }
 
+/** The names picked, for another bar to act on (a client's Take off; Oct 2026). */
+export const usePicked = () => useContext(Picked);
+
 const box = "size-4 cursor-pointer accent-[var(--primary)]";
 
 export function PickBox({ id, name }) {

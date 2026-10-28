@@ -55,7 +55,7 @@ is("…its coverage", Object.fromEntries(Object.keys(insurance).filter((k) => in
 check("…and no policy it did not have", Object.keys(got.insurance).every((k) => insurance[k] != null));
 is("…its appointment", got.appointment, { appt_date: "2026-10-20", appt_time: "10:00 AM" });
 is("…its internal notes, the leading dash and all", got.notes, { internal_notes: row.note });
-is("…and a bare lead as a bare lead", back.rows[1], { lead: { company_name: "Bare Co" }, insurance: null, notes: null, appointment: null, status: back.rows[1].status });
+is("…and a bare lead as a bare lead", back.rows[1], { lead: { company_name: "Bare Co" }, insurance: null, notes: null, appointment: null, status: back.rows[1].status, contacts: 0, row: 2 });
 
 const appts = [{ id: 1, appt_create_date: "2026-10-01T10:00:00Z", invalid_at: null }, { id: 2, appt_create_date: "2026-10-05T10:00:00Z", invalid_at: "2026-10-06T10:00:00Z" },
   { id: 3, appt_create_date: "2026-10-03T10:00:00Z", invalid_at: null }, { id: 4, appt_create_date: "2026-10-03T10:00:00Z", invalid_at: null }];

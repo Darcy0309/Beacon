@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FolderKanban, Target, CalendarCheck, Percent, Palette } from "lucide-react";
+import { ArrowLeft, FolderKanban, Target, CalendarCheck, Percent, Palette, UserX } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import StatTile from "@/components/shared/stat-tile";
@@ -26,6 +26,8 @@ import WebsiteForm from "@/features/clients/components/website-form";
 import { setClientLogo } from "@/features/clients/actions";
 import { imageUrl } from "@/lib/images";
 import { subscriptionNotice } from "@/lib/subscription";
+import { listClientRemovals } from "@/features/removals/queries";
+import RemovalList from "@/features/removals/components/removal-list";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +53,7 @@ export default async function ClientProfile({ params, searchParams }) {
   const delivery = `leads-${slug}@signaturemktg.net`;
   // The client calendar: every project's appointments together, last month to three months on.
   const calendar = { first: addMonths(monthStart(today), -1), last: monthEnd(addMonths(monthStart(today), 3)) };
-  const [stats, days, blocked, results, pipeline, sales] = await Promise.all([
+  const [stats, days, blocked, results, pipeline, sales, removals] = await Promise.all([
     getLeadStats({ companyId: c.id }),
     getAppointmentDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
     getBlockedDays({ projectIds: clientProjects.map((p) => p.id), from: calendar.first, to: calendar.last }),
@@ -59,6 +61,8 @@ export default async function ClientProfile({ params, searchParams }) {
     getClientDashboard({ companyId: c.id }).then((d) => d.results),
     getClientPipeline({ months: up, companyId: c.id }),
     getClientSales({ companyId: c.id, projectId: /^[1-9]\d{0,17}$/.test(sp?.sp ?? "") ? sp.sp : null }),
+    // Names left off this client's lists (Oct 2026), kept out of the lists pulled for them later.
+    listClientRemovals(c.id),
   ]);
   const s = stats.total;
   const notice = subscriptionNotice(c.endsOn, today);
@@ -150,6 +154,11 @@ export default async function ClientProfile({ params, searchParams }) {
               label="Shown in the client's workspace. They can change it themselves from Branding." />
             <WebsiteForm website={c.website} companyId={c.id} />
           </div>
+        </Card>
+
+        <Card data-client-removals>
+          <SectionHeader label={`Removal List · ${removals.totals.all.toLocaleString()}`} icon={UserX} />
+          <RemovalList rows={removals.rows} totals={removals.totals} />
         </Card>
 
         <Card>

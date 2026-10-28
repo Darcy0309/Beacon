@@ -44,6 +44,27 @@ export function parseCsv(input) {
   return rows;
 }
 
+/** Rows back to CSV text, each value quoted when it holds a comma, a quote or a new line. */
+export function csvText(rows) {
+  const cell = (v) => {
+    const s = String(v ?? "");
+    return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return rows.map((r) => r.map(cell).join(",")).join("\r\n");
+}
+
+/**
+ * The columns of a file the importer reads, and its rows without the rest:
+ * a raw SalesGenie export carries some 200 columns and goes to the server
+ * as the twenty-odd it uses. `skip` is the rows (indexes into csvRows) to
+ * leave out. The heading row stays first.
+ */
+export function keepColumns(csvRows, skip = new Set()) {
+  if (!csvRows.length) return [];
+  const used = mapAllHeaders(csvRows[0]).flatMap((m, i) => (m ? [i] : []));
+  return csvRows.filter((_, r) => !skip.has(r)).map((row) => used.map((i) => row[i] ?? ""));
+}
+
 const norm = (h) => h.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 // Maps spreadsheet headings onto columns. Three destinations: the lead row
@@ -117,6 +138,33 @@ export const COLUMN_ALIASES = {
   notes: "client_note", note: "client_note", comments: "client_note",
   notesdcm: "client_note", notesdmc: "client_note", clientnotes: "client_note",
   notesclient: "internal_notes", notestoclient: "internal_notes", internalnotes: "internal_notes",
+
+  // --- SalesGenie (Infogroup) exports, raw or trimmed (Oct 2026) ------
+  // The business's own place (Location …), not its mailing address, which
+  // can be a PO box in another town; the sales volume as a range, as the
+  // client keeps it. EIN 1 is the business's first.
+  phonenumbercombined: "phone", faxnumbercombined: "fax",
+  locationaddress: "address", locationcity: "city", locationstate: "state",
+  locationzipcode: "zip", locationzip: "zip",
+  countydescription: "county", companywebsite: "website",
+  locationemployeesizeactual: "employees", locationsalesvolumerange: "sales_volume",
+  primarysiccode: "sic_code", primarysiccodedescription: "sic_description",
+  ein1: "ein",
+  executivetitle: "contact_title", executivetitle1: "contact2_title",
+};
+
+/**
+ * A person written as a first and a last name in two columns: put together
+ * into one name on import. SalesGenie's executive is the contact, its
+ * First/Last Name 1 the second contact, and Name 2 another, kept in the
+ * internal notes (a lead has room for two).
+ */
+export const NAME_PART_ALIASES = {
+  firstname: "contact.first", lastname: "contact.last",
+  contactfirstname: "contact.first", contactlastname: "contact.last",
+  executivefirstname: "contact.first", executivelastname: "contact.last",
+  firstname1: "contact2.first", lastname1: "contact2.last",
+  firstname2: "other.first", lastname2: "other.last", executivetitle2: "other.title",
 };
 
 /**
@@ -146,6 +194,12 @@ export const TEMPLATE_HEADERS = [
  * default) to match. This leaves room under both for the form's own bytes.
  */
 export const MAX_IMPORT_MB = 4;
+/**
+ * The largest file chosen to import, in MB: read in the browser, which sends
+ * only the columns and rows imported (a raw SalesGenie export is mostly
+ * columns the import doesn't use), so that part stays under MAX_IMPORT_MB.
+ */
+export const MAX_SOURCE_MB = 60;
 
 /** Columns that belong on the lead's insurance_details row. */
 export const INSURANCE_ALIASES = {
@@ -295,6 +349,7 @@ export function mapAllHeaders(headerRow) {
     if (COLUMN_ALIASES[key]) return { table: "lead", column: COLUMN_ALIASES[key] };
     if (INSURANCE_ALIASES[key]) return { table: "insurance", column: INSURANCE_ALIASES[key] };
     if (APPOINTMENT_ALIASES[key]) return { table: "appointment", column: APPOINTMENT_ALIASES[key] };
+    if (NAME_PART_ALIASES[key]) return { table: "name", column: NAME_PART_ALIASES[key] };
     return null;
   });
 }
@@ -368,7 +423,8 @@ export function parseXmod(value) {
  * are counted as errors rather than imported.
  *
  * Returns { rows, errors, headers } where headers lists the lead columns
- * recognised, and each row is { lead, insurance, appointment, notes, status }.
+ * recognised, and each row is { lead, insurance, appointment, notes, status,
+ * contacts, row }: how many people it names, and its index in csvRows.
  */
 export function rowsToImport(csvRows) {
   if (csvRows.length < 2) return { rows: [], errors: 0, headers: [] };
@@ -377,17 +433,24 @@ export function rowsToImport(csvRows) {
   const rows = [];
   let errors = 0;
 
-  for (const raw of csvRows.slice(1)) {
+  for (let r = 1; r < csvRows.length; r++) {
+    const raw = csvRows[r];
     const lead = {};
     const insurance = {};
     const appointment = {};
     const notes = {};
+    const parts = {};
 
     resolved.forEach((target, i) => {
       if (!target) return;
       // An exported value that would open as a formula carries an apostrophe before it (lead-export.js): taken off here.
       const value = (raw[i] ?? "").trim().replace(/^'(?=[=+\-@])/, "");
       if (!value) return;
+      if (target.table === "name") {
+        const v = cleanValue(target.column, value);
+        if (v !== null) parts[target.column] = v;
+        return;
+      }
 
       const parsed = DATE_COLUMNS.has(target.column)
         ? parseDate(value)
@@ -403,6 +466,16 @@ export function rowsToImport(csvRows) {
       else if (target.table === "insurance") insurance[target.column] = parsed;
       else appointment[target.column] = parsed;
     });
+
+    // First and last names in their own columns: one name (a Contact column, when there is one, wins).
+    const person = (who) => [parts[`${who}.first`], parts[`${who}.last`]].filter(Boolean).join(" ") || null;
+    if (!lead.contact_name && person("contact")) lead.contact_name = person("contact");
+    if (!lead.contact2_name && person("contact2")) lead.contact2_name = person("contact2");
+    const other = person("other");
+    if (other) {
+      const line = `Other contact: ${[other, parts["other.title"]].filter(Boolean).join(", ")}`;
+      notes.internal_notes = notes.internal_notes ? `${notes.internal_notes}\n${line}` : line;
+    }
 
     if (!lead.company_name) {
       errors++;
@@ -436,13 +509,17 @@ export function rowsToImport(csvRows) {
       // A time with no date is not a booking.
       appointment: appointment.appt_date ? appointment : null,
       status: statusFromCallResults(lead.call_result_dbdv, lead.call_result_appt),
+      // The people the row names: which of several records of one business to keep (dedupe.js).
+      contacts: new Set([lead.contact_name, lead.contact2_name, lead.decision_maker, other].filter(Boolean).map((v) => v.toLowerCase())).size,
+      // Its row in the parsed file, to rebuild the file with only the rows kept.
+      row: r,
     });
   }
 
   return {
     rows,
     errors,
-    headers: resolved.filter((t) => t?.table === "lead").map((t) => t.column),
+    headers: [...new Set(resolved.flatMap((t) => (t?.table === "lead" ? [t.column] : t?.table === "name" && !t.column.startsWith("other.") ? [`${t.column.split(".")[0]}_name`] : [])))],
   };
 }
 

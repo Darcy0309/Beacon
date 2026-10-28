@@ -43,7 +43,26 @@ const BIG_ROWS = 600;
 const bigFile = path.join(path.dirname(file), "book.csv");
 const note = "Spoke with the owner, call back after the renewal; wants a quote on the package. ".repeat(30);
 writeFileSync(bigFile, ["Company,Phone,Call Result DBDV,Internal Notes",
-  ...Array.from({ length: BIG_ROWS }, (_, i) => `"${TAG} Book ${i}",602-555-${String(i).padStart(4, "0")},Viable-No Contact,"${note}"`)].join("\n"));
+  // Another area code from the small list's: its DNC name (602-555-0102) is on the client's removal list, and would take one off.
+  ...Array.from({ length: BIG_ROWS }, (_, i) => `"${TAG} Book ${i}",603-555-${String(i).padStart(4, "0")},Viable-No Contact,"${note}"`)].join("\n"));
+
+// A SalesGenie export as it comes (Oct 2026): one business twice at the same phone, one with two offices, one the
+// client said not to call before, and one left off an earlier list as a duplicate.
+const sgFile = path.join(path.dirname(file), "salesgenie.csv");
+const SG_HEAD = "Date List Produced,Company Name,Phone Number Combined,Executive First Name,Executive Last Name,Executive Title,Mailing Address,Mailing City,Location Address,Location City,Location State,Location ZIP Code,Fax Number Combined,County Description,Company Website,Location Employee Size Actual,Location Sales Volume Actual,Location Sales Volume Range,Primary SIC Code,Primary SIC Code Description,EIN 1,First Name 1,Last Name 1,Executive Title 1,Executive Gender 1,First Name 2,Last Name 2,Executive Title 2,Latitude";
+writeFileSync(sgFile, [SG_HEAD,
+  `10/28/2026,${TAG} Dix Concrete Inc,(920) 766-4344,Allan,Dix,Owner,PO Box 1,Kaukauna,401 Gertrude St,Kaukauna,WI,54130,(920) 766-4866,Outagamie,http://Aldixconcrete.Com,13,"$464,000 ","Less Than $500,000",1771-05,Concrete Contractors,,Dylan,Marx,Manager,Male,Travis,Haen,Other,44.28`,
+  `10/28/2026,${TAG} Dix Concrete Inc,(920) 766-4344,Michael,Dix,Manager,,,W4437 Schmidt Rd,Kaukauna,WI,54130,Not Available,Calumet,http://Aldixconcrete.Com,6,"$673,000 ","$500,000-1 Million",1771-05,Concrete Contractors,,,,,,,,,44.22`,
+  `10/28/2026,${TAG} Acculevel,(920) 710-6078,,,,,,444 Reid St # 301,De Pere,WI,54115,Not Available,Brown,http://Acculevel.Com,7,"$931,000 ","$500,000-1 Million",1741-01,Masonry Contractors,,,,,,,,,44.44`,
+  `10/28/2026,${TAG} Acculevel,(920) 310-3150,,,,,,2149 Velp Ave # 102,Green Bay,WI,54303,Not Available,Brown,http://Acculevel.Com,7,"$931,000 ","$500,000-1 Million",1741-01,Masonry Contractors,,,,,,,,,44.55`,
+  `10/28/2026,${TAG} Called Before Co,(920) 555-7777,Pat,Lee,Owner,,,1 Elm St,Appleton,WI,54911,Not Available,Outagamie,,5,,,7538-01,Automobile Repairing & Service,,,,,,,,,44.26`,
+  `10/28/2026,${TAG} Old Branch,(920) 555-8888,,,,,,9 Oak St,Neenah,WI,54956,Not Available,Winnebago,,5,,,7538-01,Automobile Repairing & Service,,,,,,,,,44.18`,
+  `10/28/2026,${TAG} Accurate Svc,(920) 731-5442,Mark,Broehm,Owner,,,3020 W Franklin St,Appleton,WI,54914,Not Available,Outagamie,,38,,$5-10 Million,5013-14,Automobile Repair/Svc-Equip/Supl (Whls),391178301,Dennis,Broehm,Manager,Male,,,,44.26`,
+].join("\n"));
+sql(`insert into public.client_removals (company_id, reason, source, company_name, phone) values (${company}, 'dont_call', 'lead', 'Someone', '920.555.7777')`);
+sql(`insert into public.client_removals (company_id, reason, source, company_name, address, zip) values (${company}, 'deletion', 'import', ${lit(`${TAG} Old Branch`)}, '9 Oak St', '54956')`);
+const sg = (name) => sql(`select coalesce(contact_name, '') || '|' || coalesce(contact2_name, '') || '|' || coalesce(address, '') || '|' || coalesce(city, '') || '|' || coalesce(phone, '')
+  || '|' || coalesce(fax, '') || '|' || coalesce(sales_volume, '') || '|' || coalesce(ein, '') from public.leads where company_name = ${lit(`${TAG} ${name}`)} order by id`);
 
 /** Open the import form on the test project with `csv` chosen. */
 async function chooseFile(page, csv) {
@@ -116,6 +135,34 @@ try {
   check("…and the form stays, with the file and project still chosen to try again",
     form.button && form.files === 1 && form.project === String(project), JSON.stringify(form));
   check("nothing was added", leadCount() === leadsBefore, leadCount());
+
+  section("A SalesGenie export, with duplicates and names taken off before");
+  await chooseFile(admin, sgFile);
+  const summary = await until(async () => admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`), { timeout: 15000 });
+  check("the list is checked before it goes", /3 of 7 rows will be imported/.test(summary ?? ""), summary);
+  const counts = await admin.ev(`({ dup: document.querySelector('[data-duplicate-count]')?.textContent, removed: document.querySelector('[data-removed-count]')?.textContent })`);
+  check("…two duplicates found (one business at one phone; one with two offices)", counts.dup === "2", JSON.stringify(counts));
+  check("…and the name the client said not to call, and the branch left off before, left out", counts.removed === "2", JSON.stringify(counts));
+  await admin.click("[data-review-duplicates]");
+  const groups = await until(async () => Number(await admin.ev(`document.querySelectorAll('[data-duplicate-group]').length`)) || 0);
+  check("Review duplicates shows each group", groups === 2, groups);
+  // The two offices are two places the client wants called: both kept.
+  await admin.ev(`[...document.querySelectorAll('[data-duplicate-group]')].find((g) => g.textContent.includes('Acculevel')).querySelector('[data-keep-all]').click()`);
+  const after = await until(async () => (await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`)).includes("4 of 7") && admin.ev(`document.querySelector('[data-import-summary]').textContent`));
+  check("…and keeping both offices puts one back", /4 of 7/.test(after || ""), after);
+  await admin.click("button[type=submit]", "Import leads");
+  const sgSaid = await admin.waitToast(/Imported 4 of 7/, 20000);
+  check("it imports, saying what it left off", /Imported 4 of 7.*1 duplicate left off.*2 taken off before/.test(sgSaid ?? ""), sgSaid);
+  check("one business at one phone: the record naming more people is kept, its columns read",
+    sg("Dix Concrete Inc") === "Allan Dix|Dylan Marx|401 Gertrude St|Kaukauna|(920) 766-4344|(920) 766-4866|Less Than $500,000|", sg("Dix Concrete Inc"));
+  check("…its third person in the internal notes", sql(`select n.notes from public.lead_notes n join public.leads l on l.id = n.lead_id where l.company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "Other contact: Travis Haen, Other");
+  check("both offices kept", sg("Acculevel").split("\n").length === 2, sg("Acculevel"));
+  check("the FEIN kept", sg("Accurate Svc").endsWith("|39-1178301"), sg("Accurate Svc"));
+  check("names taken off before are not imported", sg("Called Before Co") === "" && sg("Old Branch") === "", `${sg("Called Before Co")} / ${sg("Old Branch")}`);
+  check("the duplicate left off is a Deletion on the client's list, for later lists",
+    sql(`select reason || '|' || source || '|' || address from public.client_removals where company_id = ${company} and company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "deletion|import|W4437 Schmidt Rd");
+  check("the import's history says so", sql(`select row_count || '|' || imported_count || '|' || duplicate_count || '|' || removed_count from public.import_batches
+    where project_id = ${project} and file_name = 'salesgenie.csv'`) === "7|4|1|2");
 
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);

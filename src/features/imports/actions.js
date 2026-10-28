@@ -4,6 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 import { MAX_IMPORT_MB, parseCsv, rowsToImport } from "@/lib/csv";
+import { removalMatcher } from "@/lib/dedupe";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
@@ -13,6 +14,52 @@ const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
 // Leads per insert: each one is a round trip, and each is one statement the
 // database must finish inside its time limit.
 const IMPORT_CHUNK = 500;
+// The most duplicates one import records as Deletions.
+const MAX_DROPPED = 20000;
+
+/** A client's removal list, as the import compares a new list with it. */
+async function removalsOf(supabase, companyId) {
+  if (!companyId) return [];
+  const cols = "source, reason, company_name, phone, ein, address, city, zip";
+  const page = (from, opts) => supabase.from("client_removals").select(cols, opts).eq("company_id", companyId).order("id").range(from, from + 999);
+  const first = await page(0, { count: "exact" });
+  if (first.error) throw first.error;
+  const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil((first.count ?? 0) / 1000) - 1) }, (_, k) => page((k + 1) * 1000)));
+  return [first, ...rest].flatMap((r) => r.data ?? []);
+}
+
+/**
+ * Before an import (Oct 2026): the names the project's client has taken off
+ * before, for the preview to leave out and list. The import checks them again.
+ */
+export async function importChecks(projectId) {
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only administrators import lists.");
+  const { data: project } = await supabase.from("projects").select("id, company:companies(id, name)").eq("id", Number(projectId) || 0).maybeSingle();
+  if (!project) return fail("That project no longer exists.");
+  const company = Array.isArray(project.company) ? project.company[0] : project.company;
+  try {
+    return ok({ client: company?.name ?? null, removals: await removalsOf(supabase, company?.id) });
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** The duplicates the preview left off, as Deletions on the client's list: the business's details only. */
+function droppedRows(formData) {
+  let list;
+  try {
+    list = JSON.parse(String(formData.get("dropped") || "[]"));
+  } catch {
+    return [];
+  }
+  const text = (v, max) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  return (Array.isArray(list) ? list : []).slice(0, MAX_DROPPED).map((d) => ({
+    company_name: text(d?.company_name, 200), contact_name: text(d?.contact_name, 200), phone: text(d?.phone, 40),
+    ein: text(d?.ein, 20), address: text(d?.address, 200), city: text(d?.city, 100), state: text(d?.state, 2), zip: text(d?.zip, 10),
+  })).filter((d) => d.company_name);
+}
 
 export async function importLeadsCsv(prevState, formData) {
   const { failed } = check(formData, schemas.csvImport);
@@ -54,13 +101,26 @@ export async function importLeadsCsv(prevState, formData) {
   // and new result names both work (call_results.aliases holds the old ones).
   const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }] = await Promise.all([
     currentAppUser(supabase),
-    supabase.from("projects").select("id, appt_project_id, type:project_types(code)").eq("id", projectId).maybeSingle(),
+    supabase.from("projects").select("id, company_id, appt_project_id, type:project_types(code)").eq("id", projectId).maybeSingle(),
     supabase.from("lead_statuses").select("id, code"),
     supabase.from("call_results").select("id, project_type, name, aliases, viable, effect, status_code"),
     supabase.from("appointment_statuses").select("id").eq("name", "Scheduled").maybeSingle(),
   ]);
   if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
   const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
+
+  // Names the client has taken off before don't come back on a new list (the preview left them out; this makes sure).
+  let removedBefore = 0;
+  try {
+    const removed = removalMatcher(await removalsOf(supabase, project.company_id));
+    const before = parsed.length;
+    parsed.splice(0, parsed.length, ...parsed.filter(({ lead }) => !removed(lead)));
+    removedBefore = before - parsed.length;
+  } catch (e) {
+    return fail(e);
+  }
+  const dropped = droppedRows(formData);
+  const duplicates = Math.max(dropped.length, Math.min(Number(formData.get("duplicates")) || 0, 1_000_000));
 
   const statusId = Object.fromEntries((statusRows ?? []).map((r) => [r.code, r.id]));
   // Every name and old name of every result, indexed once, so each row's
@@ -221,7 +281,19 @@ export async function importLeadsCsv(prevState, formData) {
     appointments += appts;
   }
 
-  if (imported === 0) return fail("No rows could be imported from that file.");
+  if (imported === 0 && parsed.length) return fail("No rows could be imported from that file.");
+
+  // The duplicates left off, remembered as Deletions: a later list of this client's leaves those locations out.
+  let deletions = 0;
+  if (project.company_id && dropped.length) {
+    for (let i = 0; i < dropped.length; i += IMPORT_CHUNK) {
+      const { error: dropError } = await supabase.from("client_removals").insert(dropped.slice(i, i + IMPORT_CHUNK).map((d) => ({
+        ...d, company_id: project.company_id, reason: "deletion", source: "import", note: `Duplicate left off ${file.name}`, removed_by: me?.id ?? null,
+      })));
+      if (dropError) console.error("[import] deletions failed:", dropError.message);
+      else deletions += Math.min(IMPORT_CHUNK, dropped.length - i);
+    }
+  }
 
   // Share the new names out across each project's account managers (each
   // project on its own, so both at once), and record the batch meanwhile.
@@ -235,9 +307,11 @@ export async function importLeadsCsv(prevState, formData) {
       file_name: file.name,
       source: listSource,
       project_id: projectId,
-      row_count: rows.length - 1,
+      row_count: rows.length - 1 + duplicates,
       imported_count: imported,
       error_count: errors,
+      duplicate_count: duplicates,
+      removed_count: removedBefore,
       status: imported > 0 ? "completed" : "failed",
       imported_by: me?.id ?? null,
     }),
@@ -247,12 +321,12 @@ export async function importLeadsCsv(prevState, formData) {
 
   await logActivity(supabase, "leads.import", {
     entity: "import",
-    detail: `${imported} of ${rows.length - 1} rows from ${file.name}`,
+    detail: `${imported} of ${rows.length - 1 + duplicates} rows from ${file.name}${duplicates ? `, ${duplicates} duplicates left off` : ""}${removedBefore ? `, ${removedBefore} taken off before` : ""}`,
   });
   revalidatePath("/imports");
   revalidatePath("/leads");
   revalidatePath("/work", "layout");
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1, unknown });
+  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore });
 }
