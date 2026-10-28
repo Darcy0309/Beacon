@@ -54,19 +54,78 @@ export async function markNotificationRead(formData) {
 /**
  * Reply to a notification in your inbox. It goes to the person who sent it
  * and lands in their bell; reply_to_notification() checks it is yours and
- * that they can still receive it.
+ * that they can still receive it. With `quote`, the message it answers; with
+ * `attachment` (JSON: a voice message or a GIF; Oct 2026), the text may be
+ * left out.
  */
 export async function replyToNotification(formData) {
   const id = idFrom(formData);
   if (!id) return fail("Missing notification.");
-  const { values, failed } = check(formData, schemas.reply);
-  if (failed) return failed;
+  let attachment = null;
+  try {
+    attachment = formData.get("attachment") ? JSON.parse(String(formData.get("attachment"))) : null;
+  } catch {
+    return fail("That can't be sent.");
+  }
+  const body = String(formData.get("body") ?? "").trim();
+  if (!attachment) {
+    const { failed } = check(formData, schemas.reply);
+    if (failed) return failed;
+  } else if (body.length > 1000) return fail("Keep a reply under 1,000 characters");
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("reply_to_notification", { p_id: id, p_body: values.body });
+  const { data, error } = await supabase.rpc("reply_to_notification", {
+    p_id: id, p_body: body, p_quote: idFrom(formData, "quote"), p_attachment: attachment,
+  });
   if (error) return fail(error);
   revalidatePath("/notifications");
   return ok({ message: data });
+}
+
+/** Put an emoji on a message in your conversations, or take it off. The message's reactions after. */
+export async function toggleReaction(messageId, emoji) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("toggle_reaction", { p_message: Number(messageId), p_emoji: String(emoji ?? "") });
+  if (error) return fail(error);
+  return ok({ reactions: data ?? [] });
+}
+
+/**
+ * GIFs from GIPHY (Oct 2026): those matching `q`, or what is trending. The
+ * key stays on the server (GIPHY_API_KEY); without it, a plain word why.
+ */
+export async function searchGifs(q = "") {
+  const key = process.env.GIPHY_API_KEY;
+  if (!key) return fail("GIFs aren't set up yet: an administrator adds the GIPHY key.");
+  const supabase = await createClient();
+  if (!(await currentAppUser(supabase))) return fail("You are signed out.");
+  const term = String(q ?? "").trim().slice(0, 50);
+  const url = new URL(`https://api.giphy.com/v1/gifs/${term ? "search" : "trending"}`);
+  url.searchParams.set("api_key", key);
+  if (term) url.searchParams.set("q", term);
+  url.searchParams.set("limit", "24");
+  url.searchParams.set("rating", "pg-13");
+  url.searchParams.set("bundle", "messaging_non_clips");
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return fail(res.status === 429 ? "GIPHY is busy just now. Try again in a minute." : "GIFs couldn't be loaded. Try again.");
+    const json = await res.json();
+    // Their addresses without the tracking query, as reply_to_notification() takes them.
+    const bare = (u) => (u ? String(u).split("?")[0] : null);
+    const gifs = (json.data ?? []).map((g) => {
+      const im = g.images ?? {};
+      const show = im.fixed_width ?? im.downsized ?? im.original;
+      return show?.url ? {
+        id: g.id, title: String(g.title ?? "").slice(0, 140),
+        url: bare(show.url), still: bare(im.fixed_width_still?.url),
+        preview: bare(im.fixed_width_small?.url ?? show.url),
+        width: Number(show.width) || 200, height: Number(show.height) || 200,
+      } : null;
+    }).filter(Boolean);
+    return ok({ gifs });
+  } catch {
+    return fail("GIFs couldn't be loaded. Try again.");
+  }
 }
 
 /**

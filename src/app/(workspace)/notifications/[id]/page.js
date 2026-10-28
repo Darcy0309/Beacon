@@ -39,8 +39,9 @@ export default async function NotificationPage({ params }) {
           <ChevronLeft className="size-3.5" /> All notifications
         </Link>
 
-        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-5">
-          <Card className={person ? "xl:col-span-2" : "xl:col-span-5 xl:max-w-3xl"}>
+        {/* The conversation takes most of the page, as a chat app does (Oct 2026). */}
+        <div className={person ? "grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]" : "grid grid-cols-1 gap-4"}>
+          <Card className={person ? "" : "xl:max-w-3xl"}>
             <SectionHeader label={KIND_LABELS[n.kind] ?? "Notification"} icon={Icon} />
             <div className="space-y-5 p-5">
               <h2 className="text-lg font-semibold leading-snug">{n.title}</h2>
@@ -86,7 +87,7 @@ export default async function NotificationPage({ params }) {
           </Card>
 
           {person ? (
-            <Card className="xl:col-span-3">
+            <Card className="min-w-0">
               <SectionHeader label={`Conversation with ${person.name}`} icon={MessageSquare} />
               <NotificationThread
                 anchorId={n.id}

@@ -136,7 +136,7 @@ async function openPage(browser, port, browserContextId, { width = 1440, height 
  * styles (Tailwind's `hover:` waits for `(hover: hover)`) never apply
  * without one.
  */
-export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 600), mouse = false } = {}) {
+export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 600), mouse = false, args: extra = [] } = {}) {
   // A profile of its own, removed afterwards. Left to itself, headless Chrome
   // makes one under ~/.config/google-chrome-headless per launch and, killed
   // rather than quit, never removes it: about 100 MB a run, until the disk fills.
@@ -149,6 +149,8 @@ export async function launchBrowser({ port = 9300 + Math.floor(Math.random() * 6
   };
   const args = ["--headless=new", "--disable-gpu", "--no-sandbox", "--hide-scrollbars", `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`];
   if (mouse) args.push("--blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4");
+  // Anything else a test needs (a fake microphone, for voice messages).
+  args.push(...extra);
   // In a process group of its own, so Chrome and all its helpers stop at
   // once, before the profile goes, and none outlives a test that crashed.
   const chrome = spawn(process.env.CHROME ?? "google-chrome", [...args, "about:blank"], { stdio: "ignore", detached: true });
