@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Topbar from "@/components/layout/topbar";
 import ListBuilderForm from "@/features/list-builder/components/list-builder-form";
 import { getRequest, getSicRows, targetedBefore } from "@/features/list-builder/queries";
-import { getClients } from "@/features/clients/queries";
+import { getClientNames } from "@/features/clients/queries";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export default async function EditListRequest({ params }) {
   if (!request) notFound();
   const client = me?.role === "client";
   if (client && request.status !== "new") redirect(`/list-builder/${request.id}`);
-  const [rows, clients, before] = await Promise.all([getSicRows(), client ? [] : getClients(), targetedBefore(request.companyId, request.id)]);
+  const [rows, clients, before] = await Promise.all([getSicRows(), client ? [] : getClientNames(), targetedBefore(request.companyId, request.id)]);
   return (
     <>
       <Topbar title="Change the request" sub={request.title || request.client || "List request"} />

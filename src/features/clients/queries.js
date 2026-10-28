@@ -24,6 +24,18 @@ async function companyRollups(supabase) {
 /** A client's status as it reads: Active, Paused or Completed (the old "inactive" is Paused). */
 export const CLIENT_STATUS = { active: "Active", paused: "Paused", completed: "Completed", inactive: "Paused" };
 
+/**
+ * Every client's id, name and Sales Rep, A to Z: for a drop-down. Not getClients(),
+ * which counts every client's leads and appointments (company_rollups) for
+ * the Clients page and made the List Builder slow to open (Oct 2026).
+ */
+export async function getClientNames() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("companies").select("id, name, sales_rep_id").order("name").limit(5000);
+  if (error) throw error;
+  return (data ?? []).map((c) => ({ id: c.id, name: c.name, salesRepId: c.sales_rep_id }));
+}
+
 export async function getClients() {
   const supabase = await createClient();
   const [{ data, error }, roll] = await Promise.all([

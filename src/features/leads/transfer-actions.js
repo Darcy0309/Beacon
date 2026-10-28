@@ -29,16 +29,16 @@ async function manager(supabase) {
  * Where a place is: a 5-digit ZIP, or a city ("Mesa, AZ", or "Mesa" in the
  * lead's state). { point, label } or { error }.
  */
-function placeOf(text, state) {
+async function placeOf(text, state) {
   const t = String(text ?? "").trim();
   if (/^\d{5}$/.test(t)) {
-    const point = zipPoint(t);
+    const point = await zipPoint(t);
     return point ? { point, label: t } : { error: `${t} is not a real ZIP code` };
   }
   const m = /^(.+?)(?:,\s*([A-Za-z]{2}))?$/.exec(t);
   const st = (m?.[2] ?? state ?? "").toUpperCase();
   if (!m || !st) return { error: "Type a ZIP code, or a city and its state (Mesa, AZ)" };
-  const point = cityPoint(m[1], st);
+  const point = await cityPoint(m[1], st);
   return point ? { point, label: `${m[1].trim()}, ${st}` } : { error: `${m[1].trim()}, ${st} is not on the Census list of places` };
 }
 
@@ -63,12 +63,12 @@ export async function transferChoices(leadId, { from = "", miles = 50 } = {}) {
 
   const radius = Math.min(MAX_MILES, Math.max(1, Number(miles) || 50));
   const typed = String(from ?? "").trim();
-  const origin = typed ? placeOf(typed, lead.state) : lead.zip ? placeOf(String(lead.zip).slice(0, 5), lead.state) : lead.city ? placeOf(lead.city, lead.state) : null;
+  const origin = typed ? await placeOf(typed, lead.state) : lead.zip ? await placeOf(String(lead.zip).slice(0, 5), lead.state) : lead.city ? await placeOf(lead.city, lead.state) : null;
   const others = (projects ?? []).filter((p) => p.id !== lead.project_id);
-  const withMiles = others.map((p) => {
-    const office = (p.zip && zipPoint(p.zip)) || (p.city && p.state ? cityPoint(p.city, p.state) : null);
+  const withMiles = await Promise.all(others.map(async (p) => {
+    const office = (p.zip && (await zipPoint(p.zip))) || (p.city && p.state ? await cityPoint(p.city, p.state) : null);
     return { ...p, miles: origin?.point && office ? Math.round(milesBetween(origin.point, office)) : null, hasOffice: Boolean(office) };
-  });
+  }));
   return ok({
     matches: matches ?? [],
     from: origin?.label ?? null,

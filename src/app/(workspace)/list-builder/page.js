@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ProspectLinks, SicSheetUpload } from "@/features/list-builder/components/request-tools";
 import { listLinks, listRequests } from "@/features/list-builder/queries";
-import { getClients } from "@/features/clients/queries";
+import { getClientNames } from "@/features/clients/queries";
 import { getSalesReps } from "@/features/users/queries";
 import { requestOrigin } from "@/lib/server/action-helpers";
 import { getCurrentUser } from "@/lib/server/session";
@@ -34,7 +34,7 @@ export default async function ListBuilderPage({ searchParams }) {
   const status = STATUSES.some(([k]) => k === sp?.status) ? sp.status : null;
   const [requests, clients, reps, links, origin] = await Promise.all([
     listRequests({ companyId: staff ? idParam(sp?.client) : null, salesRepId: staff ? idParam(sp?.rep) : null, status }),
-    staff ? getClients() : [],
+    staff ? getClientNames() : [],
     staff ? getSalesReps() : [],
     staff ? listLinks() : [],
     staff ? requestOrigin() : "",

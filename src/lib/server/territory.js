@@ -1,7 +1,4 @@
 import "server-only";
-import places from "@/data/us-territory.json";
-import countyZipTable from "@/data/county-zips.json";
-import cityPoints from "@/data/city-points.json";
 
 /**
  * Counties and cities by state, and the ZIP codes in each county (List
@@ -10,14 +7,25 @@ import cityPoints from "@/data/city-points.json";
  * src/data/county-zips.json (2020 ZIP-to-county file: a ZIP is in a county
  * holding a quarter or more of its land, and always in the one holding most).
  * A county or city is named as the List Builder keeps it: "Maricopa County, AZ".
+ *
+ * Each file is read the first time it is needed, not when a page starts
+ * (about 2 MB between them): the List Builder, lead and project pages can
+ * call these, and loading them all on a cold start made those pages slow to
+ * first open (Oct 2026).
  */
+
+const lazy = (load) => { let p = null; return () => (p ??= load().then((m) => m.default ?? m)); };
+const placesData = lazy(() => import("@/data/us-territory.json"));
+const countyZipData = lazy(() => import("@/data/county-zips.json"));
+const cityData = lazy(() => import("@/data/city-points.json"));
 
 const label = (name, st) => `${name}, ${st}`;
 
 /** Up to `limit` counties or cities matching `q`, from `states` (or every state): those starting with it first. */
-export function suggestPlaces(kind, states, q, limit = 12) {
+export async function suggestPlaces(kind, states, q, limit = 12) {
   const t = String(q ?? "").trim().toLowerCase();
   if (!t) return [];
+  const places = await placesData();
   const pool = (states?.length ? states : Object.keys(places.states)).filter((st) => places.states[st]);
   const starts = [];
   const contains = [];
@@ -38,7 +46,7 @@ export function suggestPlaces(kind, states, q, limit = 12) {
  * or null. One typed without its state ("Maricopa") is looked for in the
  * states picked, and taken when just one of them has it.
  */
-export function countyId(text, states = []) {
+function countyIdIn(places, text, states = []) {
   const t = String(text ?? "").trim();
   const m = /^(.+?),\s*([A-Za-z]{2})$/.exec(t);
   const want = (m ? m[1] : t).trim().toLowerCase();
@@ -53,20 +61,23 @@ export function countyId(text, states = []) {
 }
 
 /** Each county's ZIP codes: [{ county, zips }] (none for one not found). */
-export function countyZipLists(counties, states = []) {
-  return (counties ?? []).map((c) => {
-    const id = countyId(c, states);
+export async function countyZipLists(counties, states = []) {
+  if (!counties?.length) return [];
+  const [places, countyZipTable] = await Promise.all([placesData(), countyZipData()]);
+  return counties.map((c) => {
+    const id = countyIdIn(places, c, states);
     return { county: c, zips: id ? countyZipTable.counties[id] ?? [] : [] };
   });
 }
 
 /** Every ZIP in these counties, each once. */
-export function zipsOfCounties(counties, states = []) {
-  return [...new Set(countyZipLists(counties, states).flatMap((c) => c.zips))];
+export async function zipsOfCounties(counties, states = []) {
+  return [...new Set((await countyZipLists(counties, states)).flatMap((c) => c.zips))];
 }
 
 /** Every county or city in these states, a list for each: [{ state, names }], names as kept ("Maricopa County, AZ"). */
-export function placesOf(kind, states) {
+export async function placesOf(kind, states) {
+  const places = await placesData();
   return (states ?? []).filter((st) => places.states[st]).map((st) => ({
     state: st,
     names: (kind === "counties" ? places.states[st].counties.map(([, n]) => n) : places.states[st].cities).map((n) => label(n, st)),
@@ -78,7 +89,8 @@ export function placesOf(kind, states) {
  * kept ("Maricopa County, AZ", "Mesa, AZ"), or { why } it can't be taken.
  * One typed without its state is looked for in the states picked.
  */
-export function checkPlace(kind, text, states = []) {
+export async function checkPlace(kind, text, states = []) {
+  const places = await placesData();
   const t = String(text ?? "").trim();
   const m = /^(.+?),\s*([A-Za-z]{2})$/.exec(t);
   const want = (m ? m[1] : t).trim().toLowerCase();
@@ -107,7 +119,8 @@ export function checkPlace(kind, text, states = []) {
 }
 
 /** A city's Census point, [lat, lon] (src/data/city-points.json: the 2023 Gazetteer's places), or null. */
-export function cityPoint(city, st) {
+export async function cityPoint(city, st) {
+  const cityPoints = await cityData();
   const name = String(city ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/\s+(city|town|village|cdp)$/, "");
   return cityPoints.cities[`${String(st ?? "").trim().toUpperCase()}|${name}`] ?? null;
 }

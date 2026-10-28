@@ -14,23 +14,24 @@ const idOf = (v) => (/^[1-9]\d{0,17}$/.test(String(v ?? "")) ? Number(v) : null)
 
 /** The ZIPs within a radius, to show as it is chosen: their count, nearest first. */
 export async function radiusPreview(zip, miles) {
-  const found = zipsAround(zip, miles);
+  const found = await zipsAround(zip, miles);
   if (!found) return fail(/^\d{5}$/.test(String(zip ?? "")) ? "This is not a real ZIP code" : "Enter a 5-digit ZIP code");
   return ok({ count: found.length, zips: found.slice(0, 400) });
 }
 
 /** A radius around a ZIP the Census doesn't have: what to say (it would bring in nothing). */
-function radiusProblem(criteria) {
+async function radiusProblem(criteria) {
   const r = criteria?.include?.radius;
-  return r && !zipsAround(r.zip, r.miles) ? `${r.zip} is not a real ZIP code` : null;
+  return r && !(await zipsAround(r.zip, r.miles)) ? `${r.zip} is not a real ZIP code` : null;
 }
 
 /** The ZIPs criteria bring in (the radius's and the counties') and those they take out (the counties left out). */
-function territoryZips(criteria) {
+async function territoryZips(criteria) {
   const r = criteria?.include?.radius;
-  const radius = r ? (zipsAround(r.zip, r.miles) ?? []).map((z) => z.zip) : [];
+  const radius = r ? ((await zipsAround(r.zip, r.miles)) ?? []).map((z) => z.zip) : [];
   const states = criteria?.include?.states;
-  return [[...radius, ...zipsOfCounties(criteria?.include?.counties, states)], zipsOfCounties(criteria?.exclude?.counties, states)];
+  const [inCounties, outCounties] = await Promise.all([zipsOfCounties(criteria?.include?.counties, states), zipsOfCounties(criteria?.exclude?.counties, states)]);
+  return [[...radius, ...inCounties], outCounties];
 }
 
 /** Counties or cities to suggest as one is typed: from the states picked (or every state). */
@@ -52,10 +53,10 @@ export async function territoryList(kind, states) {
  */
 export async function checkTerritory(kind, items, states = []) {
   const list = (Array.isArray(items) ? items : []).slice(0, 200).map(String);
-  if (kind === "zips") return { unmapped: unmappedZips(list) };
+  if (kind === "zips") return { unmapped: await unmappedZips(list) };
   if (!["counties", "cities"].includes(kind)) return { places: [] };
   const picked = (Array.isArray(states) ? states : []).filter((s) => /^[A-Z]{2}$/.test(s));
-  return { places: list.map((text) => ({ text, ...checkPlace(kind, text, picked) })) };
+  return { places: await Promise.all(list.map(async (text) => ({ text, ...(await checkPlace(kind, text, picked)) }))) };
 }
 
 /** The ZIP codes in each county chosen, to leave some out. */
@@ -72,9 +73,10 @@ export async function saveListRequest(payload) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (!me) return fail("Sign in again to do that.");
-  const criteria = cleanCriteria(payload?.criteria, ...territoryZips(payload?.criteria));
+  const criteria = cleanCriteria(payload?.criteria, ...(await territoryZips(payload?.criteria)));
   if (!criteria.sic.length) return fail("Pick at least one industry");
-  if (radiusProblem(criteria)) return fail(radiusProblem(criteria));
+  const badRadius = await radiusProblem(criteria);
+  if (badRadius) return fail(badRadius);
   const title = String(payload?.title ?? "").trim().slice(0, 160) || null;
   const notes = String(payload?.notes ?? "").trim().slice(0, 4000) || null;
   const client = me.role === "client";
@@ -181,9 +183,10 @@ export async function loadSicSheet(formData) {
 
 /** A prospect sends their request through a link (no sign-in). */
 export async function submitProspectRequest({ token, prospect, criteria, notes }) {
-  const clean = cleanCriteria(criteria, ...territoryZips(criteria));
+  const clean = cleanCriteria(criteria, ...(await territoryZips(criteria)));
   if (!clean.sic.length) return fail("Pick at least one industry");
-  if (radiusProblem(clean)) return fail(radiusProblem(clean));
+  const badRadius = await radiusProblem(clean);
+  if (badRadius) return fail(badRadius);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("submit_list_request", {
     p_token: String(token ?? ""), p_prospect: prospect ?? {}, p_criteria: clean, p_notes: String(notes ?? "").slice(0, 4000),

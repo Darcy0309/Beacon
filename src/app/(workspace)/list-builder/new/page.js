@@ -1,7 +1,7 @@
 import Topbar from "@/components/layout/topbar";
 import ListBuilderForm from "@/features/list-builder/components/list-builder-form";
 import { getSicRows, targetedBefore } from "@/features/list-builder/queries";
-import { getClients } from "@/features/clients/queries";
+import { getClientNames } from "@/features/clients/queries";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export default async function NewListRequest({ searchParams }) {
   const me = await getCurrentUser();
   const client = me?.role === "client";
   const companyId = client ? me?.company_id ?? null : /^[1-9]\d{0,17}$/.test(sp?.client ?? "") ? Number(sp.client) : null;
-  const [rows, clients, before] = await Promise.all([getSicRows(), client ? [] : getClients(), targetedBefore(companyId)]);
+  const [rows, clients, before] = await Promise.all([getSicRows(), client ? [] : getClientNames(), targetedBefore(companyId)]);
   return (
     <>
       <Topbar title="New list request" sub="Industries, employee size and territory to target" />

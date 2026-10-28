@@ -7,7 +7,7 @@ import DateRangePicker from "@/components/shared/date-range-picker";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getAppointmentUpdatesFeed } from "@/features/appointments/queries";
-import { getClients } from "@/features/clients/queries";
+import { getClientNames } from "@/features/clients/queries";
 import UpdateMessage from "@/features/appointments/components/update-message";
 import { getAssignableStaff, getSalesReps } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  */
 export default async function AppointmentUpdates({ searchParams }) {
   const sp = await searchParams;
-  const [today, tz, allClients, me, reps, staff] = await Promise.all([getBusinessToday(), getBusinessTimeZone(), getClients(), getCurrentUser(), getSalesReps(), getAssignableStaff()]);
+  const [today, tz, allClients, me, reps, staff] = await Promise.all([getBusinessToday(), getBusinessTimeZone(), getClientNames(), getCurrentUser(), getSalesReps(), getAssignableStaff()]);
   // The Sales Rep: as chosen ("all" for everyone's), else the one signed in if they have clients.
   const repParam = sp?.rep === "all" ? "all" : reps.some((r) => String(r.id) === sp?.rep) ? sp.rep : null;
   const rep = repParam ?? (allClients.some((c) => c.salesRepId === me?.id) ? String(me.id) : "all");
