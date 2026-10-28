@@ -12,6 +12,7 @@
 import { revalidatePath } from "next/cache";
 import { currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
 import { paged } from "@/lib/server/query-helpers";
+import { applyNameFilters } from "@/features/leads/queries";
 import { createClient } from "@/lib/supabase/server";
 import { zipPoint } from "@/lib/server/zip-radius";
 import { cityPoint } from "@/lib/server/territory";
@@ -103,15 +104,15 @@ export async function moveTargets(type) {
 
 /**
  * The ids of every name on a project matching its list's search and
- * filters (call result, assigned rep), up to 5,000: "all that match", for a
- * move.
+ * filters (call result, assigned rep, employees, SIC, state), up to 5,000:
+ * "all that match", for a move or a change of call result.
  */
-export async function matchingNames(projectId, { q = "", result = "", rep = "" } = {}) {
+export async function matchingNames(projectId, { q = "", result = "", rep = "", ...names } = {}) {
   const supabase = await createClient();
   if (!(await manager(supabase))) return fail("Only administrators and account managers move names.");
   const ids = [];
   for (let page = 1; page <= 5; page += 1) {
-    const query = supabase.from("leads").select("id").eq("project_id", idOf(projectId)).is("deleted_at", null).order("id");
+    const query = applyNameFilters(supabase.from("leads").select("id").eq("project_id", idOf(projectId)).is("deleted_at", null).order("id"), names);
     const { data, error } = await paged(query, { page, perPage: 1000, q: String(q ?? ""), filters: { result: idOf(result), rep: idOf(rep) } },
       { search: ["search_text"], columns: { result: "result_id", rep: "assigned_user_id" } });
     if (error) return fail(error);
@@ -131,6 +132,24 @@ export async function moveNames(ids, projectId, resultId) {
   const { data, error } = await supabase.rpc("move_names", { p_ids: list, p_project: idOf(projectId), p_result: idOf(resultId) });
   if (error) return fail(error.message);
   await logActivity(supabase, "lead.move", { entity: "project", entityId: data.project_id, detail: `${data.moved} moved, ${data.skipped} already there`, userId: me.id });
+  revalidatePath("/projects");
+  return ok(data);
+}
+
+/**
+ * Change many names' call results at once (Sean, Oct 2026: the old Result
+ * Change): Removed back to Viable, or Removed for those a client no longer
+ * wants. No call is recorded and no pay.
+ */
+export async function changeResults(ids, resultId) {
+  const supabase = await createClient();
+  const me = await manager(supabase);
+  if (!me) return fail("Only administrators and account managers change call results.");
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map(idOf).filter(Boolean))];
+  if (!list.length) return fail("Choose the names to change.");
+  const { data, error } = await supabase.rpc("change_results", { p_ids: list, p_result: idOf(resultId) });
+  if (error) return fail(error.message);
+  await logActivity(supabase, "lead.results", { detail: `${data.changed} changed to ${data.result}`, userId: me.id });
   revalidatePath("/projects");
   return ok(data);
 }

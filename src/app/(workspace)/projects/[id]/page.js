@@ -26,7 +26,7 @@ import { getCarrierNames } from "@/features/insurance/queries";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { clientSlug } from "@/lib/format";
 import { pageInfo, readListParams } from "@/lib/paging";
-import { listLeads } from "@/features/leads/queries";
+import { NAME_SORTS, listLeads } from "@/features/leads/queries";
 import { getProject, getProjectMonthCounts, getProjectOverview, getProjectTeam, getOfficeOptions } from "@/features/projects/queries";
 import { getXdatesByMonth } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
@@ -59,6 +59,10 @@ export default async function ProjectDetail({ params, searchParams }) {
   const sp = await searchParams;
   const list = readListParams(sp, ["result", "rep"]);
   if (list.filters.result && !/^[1-9]\d{0,17}$/.test(list.filters.result)) delete list.filters.result;
+  // The names' own data to narrow and sort by (Sean, Oct 2026: to change their call results in bulk).
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
+  const names = { empMin: str(sp?.emp_min), empMax: str(sp?.emp_max), sic: str(sp?.sic), state: str(sp?.state).toUpperCase() };
+  const sort = NAME_SORTS.some(([k]) => k && k === sp?.sort) ? sp.sort : "";
   // Everything at once: what needs only the project's id, and (as soon as the person and the day
   // are known) what depends on them, rather than one round of queries after another.
   const pid = Number(id);
@@ -80,7 +84,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getProject(id),
     getProjectOverview(id),
     getProjectTeam(id),
-    listLeads(list, { projectId: id }),
+    listLeads(list, { projectId: id, names, sort }),
     getLookups().then(async (l) => ({ ...l, ...(await getOfficeOptions()) })),
     meP.then((me) => (role(me).canManage ? getAssignableStaff() : [])),
     getXdatesByMonth({ projectId: pid }),
@@ -276,9 +280,32 @@ export default async function ProjectDetail({ params, searchParams }) {
           />
           {/* Moving names to another project (Sean, Oct 2026): administrators and account managers tick them here. */}
           <MovePicker>
-          {canManage ? <MoveBar projectId={p.id} type={dbdev ? "DBDV" : "APPT"} total={leads.total} filters={{ q: list.q, ...list.filters }} results={callResults} /> : null}
+          {canManage ? (
+            // Narrowed by the names' data, and sorted: a plain form, the list's other choices kept.
+            <form action={`/projects/${p.id}`} className="flex flex-wrap items-end gap-x-3 gap-y-2 border-b border-[var(--panel-border)] px-5 py-3 text-xs" data-name-filters>
+              {Object.entries(sp ?? {}).filter(([k, v]) => typeof v === "string" && ["q", "result", "rep", "per"].includes(k)).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+              <label className="flex flex-col gap-1"><span className="eyebrow">Employees from</span>
+                <input name="emp_min" inputMode="numeric" defaultValue={names.empMin} placeholder="Any" className="h-8 w-20 rounded-md border border-input bg-background/60 px-2" data-filter-emp-min /></label>
+              <label className="flex flex-col gap-1"><span className="eyebrow">to</span>
+                <input name="emp_max" inputMode="numeric" defaultValue={names.empMax} placeholder="Any" className="h-8 w-20 rounded-md border border-input bg-background/60 px-2" data-filter-emp-max /></label>
+              <label className="flex flex-col gap-1"><span className="eyebrow">SIC code</span>
+                <input name="sic" inputMode="numeric" defaultValue={names.sic} placeholder="e.g. 1521 or 15" className="h-8 w-32 rounded-md border border-input bg-background/60 px-2" data-filter-sic /></label>
+              <label className="flex flex-col gap-1"><span className="eyebrow">State</span>
+                <input name="state" maxLength={2} defaultValue={names.state} placeholder="AZ" className="h-8 w-14 rounded-md border border-input bg-background/60 px-2 uppercase" data-filter-state /></label>
+              <label className="flex flex-col gap-1"><span className="eyebrow">Sort</span>
+                <select name="sort" defaultValue={sort} className="h-8 rounded-md border border-input bg-background/60 px-2" data-filter-sort>
+                  {NAME_SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select></label>
+              <Button type="submit" size="sm" variant="outline" data-filter-apply>Apply</Button>
+              {names.empMin || names.empMax || names.sic || names.state || sort ? (
+                <Link href={`/projects/${p.id}#leads`} className="pb-2 font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Clear</Link>
+              ) : null}
+            </form>
+          ) : null}
+          {canManage ? <MoveBar projectId={p.id} type={dbdev ? "DBDV" : "APPT"} total={leads.total} filters={{ q: list.q, ...list.filters, ...names }} results={callResults} /> : null}
           <FilterTable
-            columns={[...(canManage ? [{ label: <PickAll ids={leads.rows.map((l) => l.id)} />, className: "w-8" }] : []), "Company", "Contact", "Call result", "X-Date", "Assigned"]}
+            columns={[...(canManage ? [{ label: <PickAll ids={leads.rows.map((l) => l.id)} />, className: "w-8" }] : []), "Company", "Contact",
+              ...(canManage ? ["Location", "SIC", { label: "Employees", className: "text-right" }] : []), "Call result", "X-Date", "Assigned"]}
             filters={[
               // A project's names stand on its own kind of project's results.
               { key: "result", label: "Call result", kind: "select", options: callResults.filter((c) => c.project_type === (dbdev ? "DBDV" : "APPT")).map((c) => ({ value: String(c.id), label: c.name })) },
@@ -296,6 +323,13 @@ export default async function ProjectDetail({ params, searchParams }) {
                   {canManage ? <TableCell className="w-8"><PickBox id={l.id} name={l.co} /></TableCell> : null}
                   <TableCell className="font-medium"><Link href={`/leads/${l.id}`} className="transition-colors hover:text-primary">{l.co}</Link></TableCell>
                   <TableCell>{l.contact}</TableCell>
+                  {canManage ? (
+                    <>
+                      <TableCell className="text-muted-foreground">{l.city}</TableCell>
+                      <TableCell className="tabular-nums text-muted-foreground">{l.sic ?? "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums" data-employees>{l.employees ?? "—"}</TableCell>
+                    </>
+                  ) : null}
                   <TableCell><ResultBadge result={l.result} /></TableCell>
                   <TableCell className="tabular-nums text-muted-foreground">{l.xdate}</TableCell>
                   <TableCell className={l.rep === "Unassigned" ? "text-muted-foreground" : ""}>{l.rep}</TableCell>

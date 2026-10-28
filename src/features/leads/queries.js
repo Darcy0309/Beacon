@@ -34,7 +34,7 @@ const LEAD_SELECT = leadSelect();
  * from a row's menu, edited (loadLeadForEdit): a fraction of the size, on every page of them.
  */
 const leadListSelect = ({ status = false } = {}) => `
-  id, company_name, contact_name, phone, city, state, lead_date, date_last_worked, updated_at, assigned_user_id,
+  id, company_name, contact_name, phone, city, state, sic_code, employees, lead_date, date_last_worked, updated_at, assigned_user_id,
   status:lead_statuses${inner(status)}(id, code, name),
   result:call_results(id, name, viable),
   assigned:users!leads_assigned_user_id_fkey(id, first_name, last_name, email),
@@ -73,6 +73,8 @@ function toLeadView(row) {
     color: colorFor(row.company_name || ""),
     contact: row.contact_name ?? "—",
     phone: row.phone ?? "—",
+    sic: row.sic_code ?? null,
+    employees: row.employees ?? null,
     status: status?.code ?? "new",
     // Where it stands: its call result (what the lists and the sheet show; the old status is not).
     result: one(row.result) ? { id: one(row.result).id, name: one(row.result).name, viable: one(row.result).viable } : null,
@@ -138,7 +140,36 @@ export async function getLeadOption(id) {
  * lead last called or changed between them, and `resultIds`, a lead on any
  * of those call results.
  */
-export async function listLeads(params, { projectId, clientId = null, worked = null, resultIds = [] } = {}) {
+/**
+ * What a project's list can be narrowed and sorted by besides its call result
+ * and rep (Sean, Oct 2026: the old Result Change, by the names' data):
+ * employees from and to (employee_n(), the count as a number), an SIC code
+ * or its start ("15" for construction), a state; and the order.
+ */
+export const NAME_SORTS = [
+  ["", "Newest first"], ["company", "Company A–Z"], ["employees", "Employees, fewest first"],
+  ["employees_desc", "Employees, most first"], ["city", "City"], ["sic", "SIC code"],
+];
+export function applyNameFilters(query, names = {}) {
+  const num = (v) => (/^\d{1,7}$/.test(String(v ?? "")) ? Number(v) : null);
+  if (num(names.empMin) != null) query = query.gte("employee_n", num(names.empMin));
+  if (num(names.empMax) != null) query = query.lte("employee_n", num(names.empMax));
+  if (/^\d{1,8}(-\d{1,2})?$/.test(String(names.sic ?? ""))) query = query.like("sic_code", `${names.sic}%`);
+  if (/^[A-Za-z]{2}$/.test(String(names.state ?? ""))) query = query.eq("state", String(names.state).toUpperCase());
+  return query;
+}
+function sortNames(query, sort) {
+  switch (sort) {
+    case "company": return query.order("company_name", { ascending: true, nullsFirst: false }).order("id");
+    case "employees": return query.order("employee_n", { ascending: true, nullsFirst: false }).order("id");
+    case "employees_desc": return query.order("employee_n", { ascending: false, nullsFirst: false }).order("id");
+    case "city": return query.order("city", { ascending: true, nullsFirst: false }).order("company_name").order("id");
+    case "sic": return query.order("sic_code", { ascending: true, nullsFirst: false }).order("company_name").order("id");
+    default: return query.order("lead_date", { ascending: false, nullsFirst: false }).order("id", { ascending: false });
+  }
+}
+
+export async function listLeads(params, { projectId, clientId = null, worked = null, resultIds = [], names = null, sort = "" } = {}) {
   const supabase = await createClient();
   let clientProjects = null;
   if (clientId) {
@@ -149,14 +180,13 @@ export async function listLeads(params, { projectId, clientId = null, worked = n
   }
   const { rows, total } = await runPaged(
     (p) => {
-      let query = supabase
+      let query = sortNames(supabase
         .from("leads")
-        .select(leadListSelect({ status: Boolean(p.filters?.status) }), { count: "exact" })
-        .order("lead_date", { ascending: false, nullsFirst: false })
-        .order("id", { ascending: false });
+        .select(leadListSelect({ status: Boolean(p.filters?.status) }), { count: "exact" }), sort);
       if (projectId) query = query.eq("project_id", Number(projectId));
       if (clientProjects) query = query.in("project_id", clientProjects);
       if (resultIds.length) query = query.in("result_id", resultIds.map(Number));
+      if (names) query = applyNameFilters(query, names);
       if (worked) {
         const [from, to] = [worked.from.toISOString(), worked.to.toISOString()];
         query = query.or(`and(date_last_worked.gte.${from},date_last_worked.lt.${to}),and(updated_at.gte.${from},updated_at.lt.${to})`);

@@ -3,11 +3,11 @@
 import { createContext, useContext, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowRightLeft, Loader2 } from "lucide-react";
+import { ArrowRightLeft, ListChecks, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Select } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { matchingNames, moveNames, moveTargets } from "@/features/leads/transfer-actions";
+import { changeResults, matchingNames, moveNames, moveTargets } from "@/features/leads/transfer-actions";
 import { reach } from "@/lib/reach";
 
 /**
@@ -16,7 +16,10 @@ import { reach } from "@/lib/reach";
  * that match its search and filters), choose a project of the same kind
  * and the call result they take there. They are copied there and shared out
  * evenly among its reps; the originals are marked Removed (Lead-Removed for
- * leads), so this project's reports stay as they were.
+ * leads), so this project's reports stay as they were. Or (the old Result
+ * Change) give them all another call result here: Removed back to Viable, or
+ * Removed for those a client no longer wants (filtered by employees, SIC,
+ * place). No call is recorded and no pay.
  *
  *   <MovePicker> around the list; <PickBox id> in each row, <PickAll ids> in
  *   the heading; <MoveBar> above it.
@@ -60,6 +63,11 @@ export function MoveBar({ projectId, type, total, filters, results }) {
   const [result, setResult] = useState(start ? String(start.id) : "");
   const [finding, startFinding] = useTransition();
   const [moving, startMoving] = useTransition();
+  // Changing their call result here: only a name's standing (no promotion, appointment or chargeback).
+  const changeable = own.filter((r) => r.effect === "none" || r.effect === "pending");
+  const [changing, setChanging] = useState(false);
+  const [to, setTo] = useState("");
+  const [saving, startSaving] = useTransition();
   const n = p.ids.size;
   const kind = type === "APPT" ? "lead" : "name";
 
@@ -91,6 +99,19 @@ export function MoveBar({ projectId, type, total, filters, results }) {
     router.refresh();
   });
 
+  const change = () => startSaving(async () => {
+    const r = await reach(() => changeResults([...p.ids], to));
+    if (!r.ok) { toast.error(r.error); return; }
+    const { changed, same, result: name } = r.data;
+    if (changed) toast.success(`${changed.toLocaleString()} ${kind}${changed === 1 ? "" : "s"} changed to ${name}`,
+      same ? { description: `${same.toLocaleString()} already were.` } : undefined);
+    else toast.warning("Nothing changed", { description: `They were all ${name} already.` });
+    setChanging(false);
+    setTo("");
+    p.clear();
+    router.refresh();
+  });
+
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-[var(--panel-border)] px-5 py-2 text-xs" data-move-bar>
       <span className="text-muted-foreground"><strong className="tabular-nums text-foreground" data-picked-count>{n.toLocaleString()}</strong> picked</span>
@@ -100,7 +121,31 @@ export function MoveBar({ projectId, type, total, filters, results }) {
         </button>
       ) : null}
       {n ? <button type="button" onClick={p.clear} className="text-muted-foreground hover:text-foreground" data-pick-clear>Clear</button> : null}
-      <Button size="sm" variant="outline" className="ml-auto" disabled={!n} onClick={openMove} data-move-open><ArrowRightLeft /> Move to project</Button>
+      <Button size="sm" variant="outline" className="ml-auto" disabled={!n} onClick={() => setChanging(true)} data-change-open><ListChecks /> Change call result</Button>
+      <Button size="sm" variant="outline" disabled={!n} onClick={openMove} data-move-open><ArrowRightLeft /> Move to project</Button>
+
+      <Dialog open={changing} onOpenChange={setChanging}>
+        <DialogContent className="max-w-lg" data-change-dialog>
+          <DialogHeader>
+            <DialogTitle>Change the call result of {n.toLocaleString()} {kind}{n === 1 ? "" : "s"}</DialogTitle>
+            <DialogDescription>
+              They all take the result you choose. No call is recorded and no pay; each one&apos;s notes say what it was. Names that can be called again are shared out to the project&apos;s reps.
+            </DialogDescription>
+          </DialogHeader>
+          <Field label="New call result">
+            <Select value={to} onChange={(e) => setTo(e.target.value)} aria-label="New call result" data-change-result>
+              <option value="">Choose a result…</option>
+              {changeable.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </Select>
+          </Field>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChanging(false)}>Cancel</Button>
+            <Button disabled={!to || saving} onClick={change} data-change-go>
+              {saving ? <Loader2 className="animate-spin" /> : <ListChecks />} Change {n.toLocaleString()}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg" data-move-dialog>
