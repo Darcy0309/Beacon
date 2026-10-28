@@ -42,10 +42,17 @@ try {
   await admin.go(`/projects/${P}`, 8000);
   await when(admin, "!!document.querySelector('[data-name-filters]')", 30000);
   check("the list shows each name's place, SIC and employees", await admin.ev(`[...document.querySelectorAll('[data-employees]')].map((c) => c.textContent).includes('25')`));
-  await admin.ev(`(() => { const f = document.querySelector('[data-name-filters]'); f.querySelector('[name=emp_max]').value = '4'; f.querySelector('[name=sort]').value = 'employees'; f.requestSubmit(); })()`);
-  await when(admin, "location.search.includes('emp_max=4')");
+  // Applied in place: the list comes again, not the whole page (the mark set here would go with a reload).
+  await admin.ev("window.__stayed = true");
+  await admin.ev(`(() => { const el = document.querySelector('[data-filter-emp-max]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, '4'); el.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  await admin.ev("document.querySelector('[data-filter-apply]').click()");
+  await when(admin, "location.search.includes('emp_max=4') && document.querySelectorAll('[data-pick]').length === 3");
+  await setSelect(admin, "[data-filter-sort]", "employees");
+  await when(admin, "location.search.includes('sort=employees')");
   const small = await when(admin, `(() => { const r = ${"[...document.querySelectorAll('[data-pick]')]"}; return r.length === 3 ? r.map((b) => b.closest('tr').querySelector('a').textContent).join(',') : null; })()`);
   check("employees up to 4, fewest first", small === `${TAG} Two Movers,${TAG} Tiny Tile,${TAG} Four Roofs`, small);
+  check("…applied without reloading the page", (await admin.ev("window.__stayed === true")) === true);
   await admin.go(`/projects/${P}?sic=15`, 8000);
   await when(admin, "!!document.querySelector('[data-name-filters]')");
   check("an SIC code's start: 15 is construction", (await rowsShown(admin)).split(",").sort().join() === "Big Builders,Unknown Size", await rowsShown(admin));

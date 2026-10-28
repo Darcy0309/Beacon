@@ -9,6 +9,7 @@ import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import { MoveBar, MovePicker, PickAll, PickBox } from "@/features/leads/components/move-names";
+import NameFilters from "@/features/leads/components/name-filters";
 import ProjectForm from "@/features/projects/components/project-form";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import ProjectTeam from "@/features/projects/components/project-team";
@@ -280,28 +281,8 @@ export default async function ProjectDetail({ params, searchParams }) {
           />
           {/* Moving names to another project (Sean, Oct 2026): administrators and account managers tick them here. */}
           <MovePicker>
-          {canManage ? (
-            // Narrowed by the names' data, and sorted: a plain form, the list's other choices kept.
-            <form action={`/projects/${p.id}`} className="flex flex-wrap items-end gap-x-3 gap-y-2 border-b border-[var(--panel-border)] px-5 py-3 text-xs" data-name-filters>
-              {Object.entries(sp ?? {}).filter(([k, v]) => typeof v === "string" && ["q", "result", "rep", "per"].includes(k)).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-              <label className="flex flex-col gap-1"><span className="eyebrow">Employees from</span>
-                <input name="emp_min" inputMode="numeric" defaultValue={names.empMin} placeholder="Any" className="h-8 w-20 rounded-md border border-input bg-background/60 px-2" data-filter-emp-min /></label>
-              <label className="flex flex-col gap-1"><span className="eyebrow">to</span>
-                <input name="emp_max" inputMode="numeric" defaultValue={names.empMax} placeholder="Any" className="h-8 w-20 rounded-md border border-input bg-background/60 px-2" data-filter-emp-max /></label>
-              <label className="flex flex-col gap-1"><span className="eyebrow">SIC code</span>
-                <input name="sic" inputMode="numeric" defaultValue={names.sic} placeholder="e.g. 1521 or 15" className="h-8 w-32 rounded-md border border-input bg-background/60 px-2" data-filter-sic /></label>
-              <label className="flex flex-col gap-1"><span className="eyebrow">State</span>
-                <input name="state" maxLength={2} defaultValue={names.state} placeholder="AZ" className="h-8 w-14 rounded-md border border-input bg-background/60 px-2 uppercase" data-filter-state /></label>
-              <label className="flex flex-col gap-1"><span className="eyebrow">Sort</span>
-                <select name="sort" defaultValue={sort} className="h-8 rounded-md border border-input bg-background/60 px-2" data-filter-sort>
-                  {NAME_SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                </select></label>
-              <Button type="submit" size="sm" variant="outline" data-filter-apply>Apply</Button>
-              {names.empMin || names.empMax || names.sic || names.state || sort ? (
-                <Link href={`/projects/${p.id}#leads`} className="pb-2 font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Clear</Link>
-              ) : null}
-            </form>
-          ) : null}
+          {/* Narrowed by the names' data, and sorted, in place. */}
+          {canManage ? <NameFilters names={names} sort={sort} sorts={NAME_SORTS} /> : null}
           {canManage ? <MoveBar projectId={p.id} type={dbdev ? "DBDV" : "APPT"} total={leads.total} filters={{ q: list.q, ...list.filters, ...names }} results={callResults} /> : null}
           <FilterTable
             columns={[...(canManage ? [{ label: <PickAll ids={leads.rows.map((l) => l.id)} />, className: "w-8" }] : []), "Company", "Contact",
