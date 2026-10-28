@@ -36,8 +36,8 @@ function MarkDialog({ open, onOpenChange, ids, onDone }) {
     if (!r.ok) { toast.error(r.error); return; }
     const { marked, kept } = r.data;
     if (marked) toast.success(`${marked.toLocaleString()} name${marked === 1 ? "" : "s"} taken off · ${r.data.reason}`,
-      { description: `${kept ? `${kept.toLocaleString()} with an appointment or made a lead stayed as they are. ` : ""}They won't come back on a new list.` });
-    else toast.warning("Nothing taken off", { description: "Those names have an appointment or were made a lead: ask your account manager." });
+      { description: `${kept ? `${kept.toLocaleString()} with an appointment stayed as ${kept === 1 ? "it is" : "they are"}. ` : ""}They won't come back on a new list.` });
+    else toast.warning("Nothing taken off", { description: "Those names have an appointment: ask your account manager." });
     onOpenChange(false);
     setNote("");
     setReason("deletion");

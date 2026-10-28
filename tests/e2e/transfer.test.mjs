@@ -7,7 +7,7 @@
  * pay), marks the original Lead-Removed and opens the copy. "Use this
  * record" puts the one already on the other list back on it. Names ticked on
  * a project move to another of its kind, shared out among its reps; one
- * whose phone is there already stays; the originals are marked Removed.
+ * whose phone is there already stays; the originals are marked Moved.
  *
  *   npm run test:e2e
  */
@@ -100,8 +100,11 @@ try {
   check("moved: said, with the one already there", Boolean(await when(admin, `[...document.querySelectorAll('[data-sonner-toast]')].some((t) => /2 names moved/.test(t.textContent) && /1 already on that project/.test(t.textContent))`)));
   const there = JSON.parse(sql(`select coalesce(json_agg(json_build_object('rep', assigned_user_id, 'result', result_id)), '[]') from public.leads where project_id = ${PD2} and company_name in (${lit(`${TAG} Viable 1`)}, ${lit(`${TAG} Viable 2`)})`));
   check("…copied there as Viable-CallBack, one to each rep", there.length === 2 && there.every((t) => t.result === CALLBACK) && new Set(there.map((t) => t.rep)).size === 2, JSON.stringify(there));
-  check("…the originals Removed, the one already there left as it was",
-    sql(`select string_agg(r.name, ',' order by l.id) from public.leads l join public.call_results r on r.id = l.result_id where l.id in (${V.join(",")})`) === "Removed,Removed,Viable-CallBack");
+  // Moved within the client (Oct 2026): still being called there, so not a removal.
+  check("…the originals Moved, the one already there left as it was",
+    sql(`select string_agg(r.name, ',' order by l.id) from public.leads l join public.call_results r on r.id = l.result_id where l.id in (${V.join(",")})`) === "Moved,Moved,Viable-CallBack");
+  check("…and the copies count for the project they went to", sql(`select count(*) from public.leads where project_id = ${PD2} and source_project_id = ${PD2}
+    and company_name in (${lit(`${TAG} Viable 1`)}, ${lit(`${TAG} Viable 2`)})`) === "2");
 } finally {
   browser.close();
   const projects = [PA, PB, PC, PD1, PD2].join(",");

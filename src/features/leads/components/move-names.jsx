@@ -15,7 +15,7 @@ import { reach } from "@/lib/reach";
  * them and importing them again: tick names on a project's list (or all
  * that match its search and filters), choose a project of the same kind
  * and the call result they take there. They are copied there and shared out
- * evenly among its reps; the originals are marked Removed (Lead-Removed for
+ * evenly among its reps; the originals are marked Moved (Lead-Moved for
  * leads), so this project's reports stay as they were. Or (the old Result
  * Change) give them all another call result here: Removed back to Viable, or
  * Removed for those a client no longer wants (filtered by employees, SIC,
@@ -155,7 +155,7 @@ export function MoveBar({ projectId, type, total, filters, results }) {
           <DialogHeader>
             <DialogTitle>Move {n.toLocaleString()} {kind}{n === 1 ? "" : "s"} to another project</DialogTitle>
             <DialogDescription>
-              They&apos;re copied there with the call result you choose and shared out evenly among its reps. Here they&apos;re marked {type === "APPT" ? "Lead-Removed" : "Removed"}. A {kind} already on that project (same phone) stays here.
+              They&apos;re copied there with the call result you choose and shared out evenly among its reps. Here they&apos;re marked {type === "APPT" ? "Lead-Moved" : "Moved"} (another client&apos;s project: {type === "APPT" ? "Lead-Removed" : "Removed"}). A {kind} already on that project (same phone) stays here.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

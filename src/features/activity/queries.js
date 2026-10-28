@@ -29,6 +29,7 @@ const ACTION_LABEL = {
   "lead.move": "Moved names to another project",
   "lead.results": "Changed call results in bulk",
   "lead.removed": "Took names off a client's lists",
+  "project.renew": "Renewed a project",
   "client.removal_forgotten": "Took a name off a client's removal list",
   "lead.call": "Recorded a call",
   "lead.email": "Emailed a lead",

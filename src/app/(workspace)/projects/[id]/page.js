@@ -10,6 +10,7 @@ import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import { MoveBar, MovePicker, PickAll, PickBox } from "@/features/leads/components/move-names";
 import { MarkBar } from "@/features/removals/components/mark-names";
+import RenewProject from "@/features/projects/components/renew-project";
 import NameFilters from "@/features/leads/components/name-filters";
 import ProjectForm from "@/features/projects/components/project-form";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
@@ -29,7 +30,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { clientSlug } from "@/lib/format";
 import { pageInfo, readListParams } from "@/lib/paging";
 import { NAME_SORTS, listLeads } from "@/features/leads/queries";
-import { getProject, getProjectMonthCounts, getProjectOverview, getProjectTeam, getOfficeOptions } from "@/features/projects/queries";
+import { getProject, getProjectMonthCounts, getProjectOverview, getProjectTeam, getOfficeOptions, getRenewalLinks } from "@/features/projects/queries";
 import { getXdatesByMonth } from "@/features/reports/queries";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
@@ -110,6 +111,12 @@ export default async function ProjectDetail({ params, searchParams }) {
   const dbdev = p.type === "DBDV";
 
   const raw = p.raw ?? {};
+  // Renewals (Oct 2026): the project this one carries on from, and those carrying on from it.
+  const renewals = await getRenewalLinks(pid, raw.renewed_from_id ?? null);
+  // The list's filters, said: what "the names matching the list's filters" are when renewing.
+  const resultName = list.filters.result ? callResults.find((c) => String(c.id) === String(list.filters.result))?.name : null;
+  const filterLabel = [resultName, names.sic ? `SIC ${names.sic}` : null, names.state || null,
+    names.empMin || names.empMax ? `${names.empMin || "0"}–${names.empMax || "any"} employees` : null, list.q ? `“${list.q}”` : null].filter(Boolean).join(" · ");
   const apptProject = raw.appt_project_id ? options.projects.find((x) => x.id === raw.appt_project_id) : null;
   const canOpenLists = admin || team.some((r) => r.id === me?.id);
   const byMonth = (key) => xdates.months.map((m) => m[key]);
@@ -176,10 +183,19 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <ToneBadge tone={typeTone[p.type] ?? "slate"}>{p.type}</ToneBadge>
                 <ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge>
                 {admin ? <ProjectRatesForm project={rates} ranges={payRules?.rates} /> : null}
+                {/* The program's next term (Oct 2026): a new lead project carrying the viable names on. */}
+                {admin && dbdev ? <RenewProject project={{ id: p.id, name: p.name }} team={team} staff={staff}
+                  filters={{ q: list.q, ...list.filters, ...names }} filterLabel={filterLabel} /> : null}
                 {client ? null : <ProjectForm project={p.raw ? { ...p.raw, company: p.raw.company?.[0] ?? p.raw.company, type: p.raw.type?.[0] ?? p.raw.type, status: p.raw.status?.[0] ?? p.raw.status } : p} options={options} />}
               </div>
             </div>
             {p.description && !client ? <p className="mt-4 text-sm text-muted-foreground">{p.description}</p> : null}
+            {renewals.from || renewals.to.length ? (
+              <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm" data-renewal-links>
+                {renewals.from ? <span>Renewal of <Link href={`/projects/${renewals.from.id}`} className="font-medium text-primary hover:underline">{renewals.from.name}</Link></span> : null}
+                {renewals.to.map((r) => <span key={r.id}>Renewed as <Link href={`/projects/${r.id}`} className="font-medium text-primary hover:underline">{r.name}</Link></span>)}
+              </p>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {p.startDate !== "—" || p.endDate !== "—" ? <span>{p.startDate} — {p.endDate}</span> : null}
               {raw.contact_name || raw.city || raw.phone ? (

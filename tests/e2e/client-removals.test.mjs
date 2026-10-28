@@ -86,6 +86,34 @@ try {
   check("a client can't take another client's names off", /not on your lists/.test(refused), refused.trim().slice(0, 160));
   check("…which stay as they are", result(theirs) === "Viable-CallBack", result(theirs));
 
+  section("Leads in their appointment pipeline");
+  // Sean's client (Oct 2026): leads they no longer want called for appointments come off as Lead-Removed, still in the reports.
+  const appt = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Appts`)}, ${company},
+    (select id from public.project_types where code = 'APPT'), 1) returning id`));
+  const apptLead = (name, phone, res) => Number(sql(`insert into public.leads (project_id, company_name, phone, city, zip, result_id)
+    values (${appt}, ${lit(`${TAG} ${name}`)}, ${lit(phone)}, 'Appleton', '54911', public.call_result_from_text('APPT', ${lit(res)})) returning id`));
+  const pipeline = apptLead("Pipeline", "920-555-1011", "Lead-Left Message");
+  const corrected = apptLead("Corrected", "920-555-1012", "Lead-Corrected");
+  const booked = apptLead("Booked", "920-555-1013", "Appointment");
+  const leadsBefore = sql(`select leads_active + leads_resolved from public.lead_stats(null, ${appt})`);
+  let apptOut = "";
+  try {
+    apptOut = sql(`begin; set local role authenticated;
+      select set_config('request.jwt.claims', ${lit(JSON.stringify({ sub: auth, role: "authenticated", aal: "aal2" }))}, true);
+      select public.mark_names(array[${pipeline}, ${corrected}, ${booked}]::bigint[], 'deletion'); commit;`);
+  } catch (e) {
+    apptOut = String(e.stderr ?? e.message);
+  }
+  check("leads in the pipeline come off, the appointment stays", /"kept": 1/.test(apptOut) && /"marked": 2/.test(apptOut), apptOut.trim().slice(0, 160));
+  check("…as Lead-Removed, an X-date corrected or not", result(pipeline) === "Lead-Removed" && result(corrected) === "Lead-Removed", `${result(pipeline)} / ${result(corrected)}`);
+  check("…the appointment as it was", result(booked) === "Appointment", result(booked));
+  check("…still counted as leads in the reports", sql(`select leads_active + leads_resolved from public.lead_stats(null, ${appt})`) === leadsBefore);
+  check("…and on the client's list for later lists", sql(`select count(*) from public.client_removals where lead_id in (${pipeline}, ${corrected})`) === "2");
+  sql(`delete from public.client_removals where lead_id in (select id from public.leads where project_id = ${appt})`);
+  sql(`delete from public.lead_notes where lead_id in (select id from public.leads where project_id = ${appt})`);
+  sql(`delete from public.leads where project_id = ${appt}`);
+  sql(`delete from public.projects where id = ${appt}`);
+
   section("The client's page");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1400, height: 1000 });
   await admin.go(`/clients/${clientSlug(companyName)}`, 6000);

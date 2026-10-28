@@ -17,30 +17,75 @@ const IMPORT_CHUNK = 500;
 // The most duplicates one import records as Deletions.
 const MAX_DROPPED = 20000;
 
+/** Every row a query returns, a thousand at a time (a request returns at most 1000). */
+async function allRows(query) {
+  const first = await query(0, { count: "exact" });
+  if (first.error) throw first.error;
+  const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil((first.count ?? 0) / 1000) - 1) }, (_, k) => query((k + 1) * 1000)));
+  for (const r of rest) if (r.error) throw r.error;
+  return [first, ...rest].flatMap((r) => r.data ?? []);
+}
+
 /** A client's removal list, as the import compares a new list with it. */
 async function removalsOf(supabase, companyId) {
   if (!companyId) return [];
-  const cols = "source, reason, company_name, phone, ein, address, city, zip";
-  const page = (from, opts) => supabase.from("client_removals").select(cols, opts).eq("company_id", companyId).order("id").range(from, from + 999);
-  const first = await page(0, { count: "exact" });
-  if (first.error) throw first.error;
-  const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil((first.count ?? 0) / 1000) - 1) }, (_, k) => page((k + 1) * 1000)));
-  return [first, ...rest].flatMap((r) => r.data ?? []);
+  return allRows((from, opts) => supabase.from("client_removals").select("source, reason, company_name, phone, ein, address, city, zip", opts)
+    .eq("company_id", companyId).order("id").range(from, from + 999));
+}
+
+/**
+ * The names already on a project's family (Oct 2026): the project, the
+ * appointment project it promotes to (the client's "parent project") and
+ * the parent's other lead projects. A new list for a renewal is checked
+ * against them, so a business carried over, already a lead or an
+ * appointment, or already called and ruled out there is not loaded twice:
+ * the record there, with what was learned about it, is kept. Names Moved
+ * on are left out (they are on the list they went to).
+ */
+async function familyNames(supabase, project) {
+  const parent = project.type === "APPT" ? project.id : project.appt_project_id;
+  let ids = [project.id];
+  if (parent) {
+    const { data, error } = await supabase.from("projects").select("id").eq("appt_project_id", parent).is("deleted_at", null);
+    if (error) throw error;
+    ids = [...new Set([project.id, parent, ...(data ?? []).map((p) => p.id)])];
+  }
+  const [{ data: projects }, { data: results }] = await Promise.all([
+    supabase.from("projects").select("id, name").in("id", ids),
+    supabase.from("call_results").select("id, name"),
+  ]);
+  const projectName = new Map((projects ?? []).map((p) => [p.id, p.name]));
+  const resultName = new Map((results ?? []).map((r) => [r.id, r.name]));
+  const rows = await allRows((from, opts) => supabase.from("leads").select("company_name, phone, ein, address, city, zip, project_id, result_id", opts)
+    .in("project_id", ids).is("deleted_at", null).order("id").range(from, from + 999));
+  return rows
+    .filter((r) => !/^(Lead-)?Moved$/.test(resultName.get(r.result_id) ?? ""))
+    .map(({ project_id: pid, result_id: rid, ...r }) => ({ ...r, source: "lead", project: projectName.get(pid) ?? null, result: resultName.get(rid) ?? null }));
+}
+
+/** A project as the import needs it: its client, kind and appointment project. */
+async function importProject(supabase, projectId) {
+  const { data } = await supabase.from("projects").select("id, company_id, appt_project_id, company:companies(name), type:project_types(code)")
+    .eq("id", Number(projectId) || 0).maybeSingle();
+  if (!data) return null;
+  const one = (v) => (Array.isArray(v) ? v[0] : v);
+  return { ...data, client: one(data.company)?.name ?? null, type: one(data.type)?.code === "APPT" ? "APPT" : "DBDV" };
 }
 
 /**
  * Before an import (Oct 2026): the names the project's client has taken off
- * before, for the preview to leave out and list. The import checks them again.
+ * before, and the names already on the project's family, for the preview to
+ * leave out and list. The import checks them again.
  */
 export async function importChecks(projectId) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (me?.role !== "admin") return fail("Only administrators import lists.");
-  const { data: project } = await supabase.from("projects").select("id, company:companies(id, name)").eq("id", Number(projectId) || 0).maybeSingle();
+  const project = await importProject(supabase, projectId);
   if (!project) return fail("That project no longer exists.");
-  const company = Array.isArray(project.company) ? project.company[0] : project.company;
   try {
-    return ok({ client: company?.name ?? null, removals: await removalsOf(supabase, company?.id) });
+    const [removals, existing] = await Promise.all([removalsOf(supabase, project.company_id), familyNames(supabase, project)]);
+    return ok({ client: project.client, removals, existing });
   } catch (e) {
     return fail(e);
   }
@@ -109,13 +154,24 @@ export async function importLeadsCsv(prevState, formData) {
   if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
   const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
 
-  // Names the client has taken off before don't come back on a new list (the preview left them out; this makes sure).
+  // Names the client has taken off before don't come back on a new list, and names already on the
+  // project's family aren't loaded twice (the preview left them out; this makes sure).
   let removedBefore = 0;
+  let existing = 0;
   try {
-    const removed = removalMatcher(await removalsOf(supabase, project.company_id));
-    const before = parsed.length;
-    parsed.splice(0, parsed.length, ...parsed.filter(({ lead }) => !removed(lead)));
-    removedBefore = before - parsed.length;
+    const [removals, family] = await Promise.all([
+      removalsOf(supabase, project.company_id),
+      familyNames(supabase, { id: project.id, appt_project_id: project.appt_project_id, type: projectType }),
+    ]);
+    const removed = removalMatcher(removals);
+    const there = removalMatcher(family);
+    const kept = [];
+    for (const row of parsed) {
+      if (removed(row.lead)) removedBefore++;
+      else if (there(row.lead)) existing++;
+      else kept.push(row);
+    }
+    parsed.splice(0, parsed.length, ...kept);
   } catch (e) {
     return fail(e);
   }
@@ -312,6 +368,7 @@ export async function importLeadsCsv(prevState, formData) {
       error_count: errors,
       duplicate_count: duplicates,
       removed_count: removedBefore,
+      existing_count: existing,
       status: imported > 0 ? "completed" : "failed",
       imported_by: me?.id ?? null,
     }),
@@ -321,12 +378,12 @@ export async function importLeadsCsv(prevState, formData) {
 
   await logActivity(supabase, "leads.import", {
     entity: "import",
-    detail: `${imported} of ${rows.length - 1 + duplicates} rows from ${file.name}${duplicates ? `, ${duplicates} duplicates left off` : ""}${removedBefore ? `, ${removedBefore} taken off before` : ""}`,
+    detail: `${imported} of ${rows.length - 1 + duplicates} rows from ${file.name}${duplicates ? `, ${duplicates} duplicates left off` : ""}${removedBefore ? `, ${removedBefore} taken off before` : ""}${existing ? `, ${existing} already on the project` : ""}`,
   });
   revalidatePath("/imports");
   revalidatePath("/leads");
   revalidatePath("/work", "layout");
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore });
+  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing });
 }

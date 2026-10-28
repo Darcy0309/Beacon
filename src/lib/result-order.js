@@ -10,13 +10,13 @@ const SHEET = {
   APPT: [
     "Appointment", "Appointment-Phone", "Appointment-Confirmed", "Appointment-Invalid",
     "Lead-No Contact", "Lead-Left Message", "Lead-Email", "Lead-ClientList", "Lead-Not Shopping", "Lead-Corrected",
-    "Lead-Never Shops", "Lead-Removed", "Lead-DoNotCall", "Lead-Out of Business", "Lead-Branch", "Lead-Not Qualified",
+    "Lead-Never Shops", "Lead-Removed", "Lead-Moved", "Lead-DoNotCall", "Lead-Out of Business", "Lead-Branch", "Lead-Not Qualified",
     "Lead-CurrentClient", "Lead-Invalid", "Lead-Disco#",
   ],
   DBDV: [
     // The sheet's Viable-No Contact: the result is also known as Viable-CallBack.
     ["Viable-No Contact", "Viable-CallBack"], "Viable-Staged", "Viable-Left Message", "Viable-Email", "Lead", "Lead-Hot Lead",
-    "Not Interested", "Disco#", "Out of Business", "Branch", "Removed", "Not Qualified", "DoNotCall", "Client", "Pending",
+    "Not Interested", "Disco#", "Out of Business", "Branch", "Removed", "Moved", "Not Qualified", "DoNotCall", "Client", "Pending",
   ],
 };
 const STAGES = ["APPT", "DBDV"];

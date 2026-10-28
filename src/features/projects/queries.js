@@ -209,3 +209,13 @@ export async function getProjectMonthCounts(projectIds) {
   if (error) throw error;
   return Object.fromEntries((data ?? []).map((r) => [r.project_id, { leads: Number(r.leads) || 0, appointments: Number(r.appointments) || 0 }]));
 }
+
+/** A project's place in its renewals (Oct 2026): the project it carries on from, and those carrying on from it. */
+export async function getRenewalLinks(id, fromId = null) {
+  const supabase = await createClient();
+  const [{ data: from }, { data: to }] = await Promise.all([
+    fromId ? supabase.from("projects").select("id, name").eq("id", fromId).is("deleted_at", null).maybeSingle() : { data: null },
+    supabase.from("projects").select("id, name").eq("renewed_from_id", id).is("deleted_at", null).order("id"),
+  ]);
+  return { from: from ?? null, to: to ?? [] };
+}

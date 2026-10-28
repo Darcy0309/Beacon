@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight, Copy, Download, Loader2, UploadCloud, UserX } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Download, Layers, Loader2, UploadCloud, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -51,23 +51,28 @@ async function runImport(prevState, formData) {
 async function checkFile(file, projectId) {
   const csvRows = parseCsv(await file.text());
   const { rows } = rowsToImport(csvRows);
-  const checks = projectId ? await reach(() => importChecks(projectId)) : { ok: true, data: { removals: [] } };
+  const checks = projectId ? await reach(() => importChecks(projectId)) : { ok: true, data: { removals: [], existing: [] } };
   if (!checks.ok) throw new Error(checks.error);
   const removed = removalMatcher(checks.data.removals);
+  // Already on the project, its appointment project or their other lead projects: the record there is kept.
+  const there = removalMatcher(checks.data.existing);
   const removedRows = [];
+  const existingRows = [];
   const open = [];
   rows.forEach((r, i) => {
     const entry = removed(r.lead);
+    const have = entry ? null : there(r.lead);
     if (entry) removedRows.push({ i, entry });
+    else if (have) existingRows.push({ i, entry: have });
     else open.push(i);
   });
-  // Duplicates among the rest: a name taken off before is not the one a group keeps.
+  // Duplicates among the rest: a name left out above is not the one a group keeps.
   const groups = findDuplicates(open.map((i) => rows[i])).map((g) => ({
     rows: g.rows.map((k) => open[k]),
     keep: open[g.keep],
     why: g.why,
   }));
-  return { csvRows, rows, groups, removedRows, client: checks.data.client ?? null };
+  return { csvRows, rows, groups, removedRows, existingRows, client: checks.data.client ?? null };
 }
 
 /** The rows of a group not kept: left off the list. */
@@ -94,6 +99,7 @@ export default function CsvImport({ projects = [] }) {
   const [keep, setKeep] = useState(() => new Set());
   const [reviewing, setReviewing] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
+  const [showExisting, setShowExisting] = useState(false);
   const checking = useRef(null);
   const inputRef = useRef(null);
   const formRef = useRef(null);
@@ -125,8 +131,9 @@ export default function CsvImport({ projects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0 } = state.data ?? {};
-      const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : ""].filter(Boolean).join(" · ");
+      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0, existing = 0 } = state.data ?? {};
+      const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
+        existing ? `${existing} already on the project` : ""].filter(Boolean).join(" · ");
       toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}${left ? ` · ${left}` : ""}${assigned ? ` · shared across ${assigned} account managers` : ""}`);
       // Old call results not recognised: those names start at the project's first result.
       if (unknown.length) {
@@ -234,7 +241,7 @@ export default function CsvImport({ projects = [] }) {
   });
 
   const dropped = plan ? droppedOf(plan, keep) : [];
-  const toImport = plan ? plan.rows.length - dropped.length - plan.removedRows.length : 0;
+  const toImport = plan ? plan.rows.length - dropped.length - plan.removedRows.length - plan.existingRows.length : 0;
 
   return (
     <Card>
@@ -404,6 +411,34 @@ export default function CsvImport({ projects = [] }) {
                                 <span className="text-muted-foreground"> · {[plan.rows[i].lead.city, plan.rows[i].lead.phone].filter(Boolean).join(" · ")}</span>
                               </span>
                               <ToneBadge tone="rose">{reasonLabel(entry.reason)}</ToneBadge>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {plan.existingRows.length ? (
+                    <div className="rounded-lg border border-[var(--panel-border)]">
+                      <button type="button" onClick={() => setShowExisting((v) => !v)} data-show-existing
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/40">
+                        {showExisting ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                        <Layers className="size-4 text-sky-500" />
+                        <span>
+                          <span className="font-semibold tabular-nums" data-existing-count>{plan.existingRows.length.toLocaleString()}</span> already on this project or its appointment project, left out
+                          <span className="text-muted-foreground"> · the record there, with its call history, is kept</span>
+                        </span>
+                        <span className="ml-auto shrink-0 font-semibold text-primary">{showExisting ? "Hide" : "Show"}</span>
+                      </button>
+                      {showExisting ? (
+                        <ul className="max-h-72 divide-y divide-[var(--panel-border)] overflow-y-auto border-t border-[var(--panel-border)] text-xs">
+                          {plan.existingRows.map(({ i, entry }) => (
+                            <li key={i} className="flex items-center gap-3 px-3 py-1.5">
+                              <span className="min-w-0 flex-1 truncate">
+                                <span className="font-medium">{plan.rows[i].lead.company_name}</span>
+                                <span className="text-muted-foreground"> · {[plan.rows[i].lead.city, plan.rows[i].lead.phone].filter(Boolean).join(" · ")}</span>
+                              </span>
+                              <span className="shrink-0 text-muted-foreground">{entry.project}</span>
+                              {entry.result ? <ToneBadge tone="sky">{entry.result}</ToneBadge> : null}
                             </li>
                           ))}
                         </ul>
