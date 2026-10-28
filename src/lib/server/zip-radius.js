@@ -17,3 +17,8 @@ export function zipsAround(zip, miles) {
 export function unmappedZips(zips) {
   return (zips ?? []).filter((z) => !table.zips[z]);
 }
+
+/** A ZIP's Census point, [lat, lon], or null. */
+export function zipPoint(zip) {
+  return table.zips[String(zip ?? "").trim().slice(0, 5)] ?? null;
+}

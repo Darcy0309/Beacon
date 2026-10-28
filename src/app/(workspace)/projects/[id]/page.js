@@ -8,6 +8,7 @@ import { getCallResults } from "@/features/work/queries";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
+import { MoveBar, MovePicker, PickAll, PickBox } from "@/features/leads/components/move-names";
 import ProjectForm from "@/features/projects/components/project-form";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import ProjectTeam from "@/features/projects/components/project-team";
@@ -273,8 +274,11 @@ export default async function ProjectDetail({ params, searchParams }) {
               </a>
             ) : null}
           />
+          {/* Moving names to another project (Sean, Oct 2026): administrators and account managers tick them here. */}
+          <MovePicker>
+          {canManage ? <MoveBar projectId={p.id} type={dbdev ? "DBDV" : "APPT"} total={leads.total} filters={{ q: list.q, ...list.filters }} results={callResults} /> : null}
           <FilterTable
-            columns={["Company", "Contact", "Call result", "X-Date", "Assigned"]}
+            columns={[...(canManage ? [{ label: <PickAll ids={leads.rows.map((l) => l.id)} />, className: "w-8" }] : []), "Company", "Contact", "Call result", "X-Date", "Assigned"]}
             filters={[
               // A project's names stand on its own kind of project's results.
               { key: "result", label: "Call result", kind: "select", options: callResults.filter((c) => c.project_type === (dbdev ? "DBDV" : "APPT")).map((c) => ({ value: String(c.id), label: c.name })) },
@@ -289,6 +293,7 @@ export default async function ProjectDetail({ params, searchParams }) {
               id: l.id,
               node: (
                 <TableRow>
+                  {canManage ? <TableCell className="w-8"><PickBox id={l.id} name={l.co} /></TableCell> : null}
                   <TableCell className="font-medium"><Link href={`/leads/${l.id}`} className="transition-colors hover:text-primary">{l.co}</Link></TableCell>
                   <TableCell>{l.contact}</TableCell>
                   <TableCell><ResultBadge result={l.result} /></TableCell>
@@ -298,6 +303,7 @@ export default async function ProjectDetail({ params, searchParams }) {
               ),
             }))}
           />
+          </MovePicker>
         </Card>
       </div>
     </>

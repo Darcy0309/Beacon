@@ -1,6 +1,7 @@
 import "server-only";
 import places from "@/data/us-territory.json";
 import countyZipTable from "@/data/county-zips.json";
+import cityPoints from "@/data/city-points.json";
 
 /**
  * Counties and cities by state, and the ZIP codes in each county (List
@@ -103,4 +104,10 @@ export function checkPlace(kind, text, states = []) {
   if (hits.length === 1) return { name: hits[0] };
   if (hits.length > 1) return { why: `${t} is in more than one state picked: choose it from the suggestions` };
   return { why: `${t}: no ${noun} by that name in ${states.join(", ")}` };
+}
+
+/** A city's Census point, [lat, lon] (src/data/city-points.json: the 2023 Gazetteer's places), or null. */
+export function cityPoint(city, st) {
+  const name = String(city ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/\s+(city|town|village|cdp)$/, "");
+  return cityPoints.cities[`${String(st ?? "").trim().toUpperCase()}|${name}`] ?? null;
 }

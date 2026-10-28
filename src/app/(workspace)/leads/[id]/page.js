@@ -48,6 +48,7 @@ import { ProjectInfoDialog } from "@/features/project-info/components/project-in
 import { getProjectInfo } from "@/features/project-info/queries";
 import { leadPlace } from "@/lib/project-info";
 import HoldNotice from "@/features/delivery/components/hold-notice";
+import TransferDialog from "@/features/leads/components/transfer-dialog";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
 export const dynamic = "force-dynamic";
@@ -322,6 +323,8 @@ export default async function LeadSheet({ params, searchParams }) {
             <Link href={back.href} className="back-link inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary">
               <ArrowLeft className="size-3.5" /> {back.label}
             </Link>
+            {/* A lead the client can't use, given to another client (Sean, Oct 2026): administrators and account managers. */}
+            {seesInternal ? <TransferDialog lead={{ id: lead.id, co: lead.co }} /> : null}
           </div>
           {list ? (
             <div className="flex flex-wrap items-center gap-2 text-xs">
