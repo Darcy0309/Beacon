@@ -99,6 +99,22 @@ try {
   await client.go("/notifications/abc");
   check("a malformed id is a 404 too", /not found|does not exist/i.test(await client.text()));
 
+  // Oct 2026: always at the newest message, even opened from an old one, and once a picture in it has loaded.
+  const many = Array.from({ length: 24 }, (_, i) => `(${AGENT}, ${MANAGER}, 'message', 'Chat test: long ${i}', 'chat-test line ${i}', now() - interval '${60 - i} minutes', null)`);
+  // A GIF in the middle, a large one, that loads after the page has drawn.
+  many.splice(20, 0, `(${AGENT}, ${MANAGER}, 'message', 'Chat test: gif', 'GIF', now() - interval '39 minutes', '{"kind":"gif","url":"/wallpapers/alpine.webp","width":800,"height":600,"title":"Alpine"}'::jsonb)`);
+  sql(`insert into public.notifications (user_id, sender_id, kind, title, body, created_at, attachment) values ${many.join(", ")}`);
+  const oldest = sql("select id from public.notifications where title = 'Chat test: long 0'");
+  await agent.go(`/notifications/${oldest}`, 5000);
+  const atEnd = () => agent.ev(`(() => { const l = document.querySelector('[role=log]'); const last = [...document.querySelectorAll('[data-message-id]')].pop();
+    const imgs = [...l.querySelectorAll('img')]; return { gap: Math.round(l.scrollHeight - l.scrollTop - l.clientHeight), loaded: imgs.length > 0 && imgs.every((i) => i.complete),
+      lastSeen: last ? last.getBoundingClientRect().bottom <= l.getBoundingClientRect().bottom + 2 : false }; })()`);
+  const end = await until(async () => { const r = await atEnd(); return r.loaded && r.gap <= 4 && r.lastSeen ? r : null; }, { timeout: 8000 });
+  check("opened from an old message, the conversation shows its newest, the GIF loaded", Boolean(end), JSON.stringify(await atEnd()));
+  await agent.ev("(() => { const l = document.querySelector('[role=log]'); l.scrollTop = 0; l.dispatchEvent(new Event('scroll')); return true; })()");
+  await sleep(400);
+  check("…and stays where they scrolled up to read back", (await agent.ev("document.querySelector('[role=log]').scrollTop")) === 0);
+
   // Phone width.
   const phone = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go(`/notifications/${msgId}`, 4000);

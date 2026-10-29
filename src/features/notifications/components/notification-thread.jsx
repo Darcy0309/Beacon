@@ -119,10 +119,40 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
     reach(() => markThreadRead(f)).then(announceNotificationsChanged);
   }, [messages, anchorId, anchorUnread]);
 
-  // Keep the newest message in view.
+  // Always at the newest message (Oct 2026): on opening, as messages come, and as what is in them loads (a picture
+  // or a GIF arriving after the page pushed the newest out of view). Unless they've scrolled up to read back:
+  // then it stays where they are, until they come back to the bottom.
+  const contentRef = useRef(null);
+  const atEnd = useRef(true);
+  const toEndRef = useRef(null);
   useEffect(() => {
     const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    const inner = contentRef.current;
+    if (!el || !inner) return undefined;
+    // Where it was last put at the end. A scroll event comes a frame later, by when a picture may have made the list
+    // taller: so only scrolling up from there is reading back, and coming back to the bottom follows the end again.
+    let placed = 0;
+    const toEnd = () => { el.scrollTop = el.scrollHeight; placed = el.scrollTop; };
+    const onScroll = () => {
+      if (el.scrollTop < placed - 4) atEnd.current = false;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 48) { atEnd.current = true; placed = el.scrollTop; }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    // The messages growing (a picture loading), or the list itself changing size as the page settles.
+    const grown = new ResizeObserver(() => { if (atEnd.current) toEnd(); });
+    grown.observe(inner);
+    grown.observe(el);
+    toEndRef.current = toEnd;
+    toEnd();
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      grown.disconnect();
+    };
+  }, []);
+  // A new message (theirs or one sent here) brings the view back to the end.
+  useEffect(() => {
+    atEnd.current = true;
+    toEndRef.current?.();
   }, [messages.length]);
 
   // Live: their new messages, receipts for yours, and reactions either way.
@@ -266,8 +296,10 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
         role="log"
         aria-label={`Conversation with ${person.name}`}
         aria-live="polite"
-        className="h-[min(68svh,46rem)] min-h-[22rem] space-y-3.5 overflow-y-auto px-4 py-5 sm:px-6 lg:h-[calc(100svh-23.5rem)]"
+        className="h-[min(68svh,46rem)] min-h-[22rem] overflow-y-auto px-4 py-5 sm:px-6 lg:h-[calc(100svh-23.5rem)]"
       >
+        {/* The messages, in one box whose height the list watches (below): it grows as pictures and GIFs load. */}
+        <div ref={contentRef} className="space-y-3.5">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
             <MessageSquare className="size-5" />
@@ -379,6 +411,7 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
             );
           })
         )}
+        </div>
       </div>
 
       {person.active ? (
