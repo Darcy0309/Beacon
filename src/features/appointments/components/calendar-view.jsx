@@ -24,6 +24,7 @@ import LeadFiles from "@/features/leads/components/lead-files";
 import { useRole } from "@/components/layout/role-provider";
 import { blockDays, blockHours, blockOn, clockOf, noteTime } from "@/lib/project-calendar";
 import { NoteDialog } from "@/features/calendar/components/project-calendar";
+import RemoveBlock from "@/features/calendar/components/remove-block";
 import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
@@ -407,7 +408,8 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
                     {dayLong.filter((b) => blocksDay(b, d.date)).map((b) => (
                       <div key={b.id} data-blocked-time-block={b.id} title={blockTitle(b)} className="flex items-center gap-1 truncate rounded px-1.5 py-1 text-[0.68rem] font-semibold" style={BLOCKED_FILL}>
                         <Ban className="size-3 shrink-0" style={{ color: "var(--neon-amber)" }} />
-                        <span className="truncate">{b.synced ? "Busy" : "Blocked"}{blockNote(b) ? ` · ${blockNote(b)}` : ""}</span>
+                        <span className="min-w-0 flex-1 truncate">{b.synced ? "Busy" : "Blocked"}{blockNote(b) ? ` · ${blockNote(b)}` : ""}</span>
+                        <RemoveBlock block={b} size="size-3" />
                       </div>
                     ))}
                   </div>
@@ -488,7 +490,8 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
                       style={{ top: top(b.start), height: ((b.end - b.start) / 60) * HOUR_PX, ...BLOCKED_FILL }}>
                       <span className="flex items-center gap-1">
                         <Ban className="size-3 shrink-0" style={{ color: "var(--neon-amber)" }} />
-                        <span className="truncate">{b.synced ? "Busy" : "Blocked"} · {blockHours(b)}</span>
+                        <span className="min-w-0 flex-1 truncate">{b.synced ? "Busy" : "Blocked"} · {blockHours(b)}</span>
+                        <RemoveBlock block={b} size="size-3" />
                       </span>
                       {blockNote(b) ? <span className="block truncate font-normal text-muted-foreground">{blockNote(b)}</span> : null}
                     </div>
@@ -786,7 +789,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
   );
 }
 
-/** Time blocked out on the day picked: when, why, by whom, and on which project's calendar when several are shown. */
+/** Time blocked out on the day picked: when, why, by whom, and on which project's calendar when several are shown; and to take it off. */
 function BlockedRow({ b }) {
   return (
     <div data-blocked-row={b.id} className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-lg px-2 py-2" style={BLOCKED_FILL}>
@@ -798,6 +801,7 @@ function BlockedRow({ b }) {
           {[b.startsOn !== b.endsOn ? blockDays(b) : null, blockNote(b), b.project].filter(Boolean).join(" · ") || "No appointments in this time"}
         </div>
       </div>
+      <RemoveBlock block={b} size="size-4" />
     </div>
   );
 }

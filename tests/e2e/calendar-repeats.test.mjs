@@ -3,7 +3,8 @@
  * straight to another month or year from the month's name (the Calendar
  * page, a project's calendar), and time blocked out on the same days every
  * week until a day (every Tuesday and Thursday for two months), shaded on
- * those days only, and taken off in one go.
+ * those days only, and taken off in one go; and blocked time taken off
+ * wherever it shows (a day blocked out by mistake).
  *
  * Removes everything it made.
  *
@@ -78,6 +79,39 @@ try {
   await until(() => client.ev("!!document.querySelector('[data-confirm-dialog]')"));
   await client.click("[data-confirm-dialog] [data-confirm]");
   check("every week of it", Boolean(await until(() => sql(`select count(*) from public.calendar_blocks where project_id = ${APPT}`) === "0")));
+
+  section("Undoing a day blocked out by mistake, wherever it shows");
+  const block = (start = null, end = null) => Number(sql(`insert into public.calendar_blocks (project_id, starts_on, ends_on, start_time, end_time, note)
+    values (${APPT}, ${lit(TODAY)}, ${lit(TODAY)}, ${start ? lit(start) : "null"}, ${end ? lit(end) : "null"}, 'By mistake') returning id`));
+  const gone = (bid) => until(() => sql(`select count(*) from public.calendar_blocks where id = ${bid}`) === "0");
+  const takeOff = async (page, sel) => {
+    await until(() => page.ev(`!!document.querySelector(${JSON.stringify(sel)})`));
+    await sleep(200);
+    await page.click(sel);
+    await until(() => page.ev("!!document.querySelector('[data-confirm-dialog]')"));
+    await page.click("[data-confirm-dialog] [data-confirm]");
+  };
+  let bid = block();
+  await client.go(`/calendar?project=${APPT}&view=month&d=${TODAY}`, 5000);
+  await takeOff(client, `[data-blocked-row="${bid}"] [data-remove-block]`);
+  check("the month: the day picked lists it, with a way to take it off", Boolean(await gone(bid)));
+  bid = block("13:00", "15:00");
+  await client.go(`/calendar?project=${APPT}&view=day&d=${TODAY}`, 5000);
+  await takeOff(client, `[data-blocked-time-block="${bid}"] [data-remove-block]`);
+  check("the day: hours blocked out, taken off from the band itself", Boolean(await gone(bid)));
+  bid = block();
+  await client.go(`/calendar?project=${APPT}&view=week&d=${TODAY}`, 5000);
+  await takeOff(client, `[data-blocked-all-day] [data-blocked-time-block="${bid}"] [data-remove-block]`);
+  check("the week: a whole day, from its All day row", Boolean(await gone(bid)));
+  const many = Array.from({ length: 5 }, () => block());
+  await client.go(`/calendar?client=${company}&view=month&d=${TODAY}`, 5000);
+  await until(() => client.ev("!!document.querySelector('[data-blocks-more]')"));
+  check("several calendars together: each listed can be taken off", (await client.ev("document.querySelectorAll('[data-blocked-time] [data-remove-block]').length")) === 4);
+  await client.click("[data-blocks-more]");
+  check("…and + more shows the rest, to take off too", Boolean(await until(async () => (await client.ev(`!!document.querySelector('[data-blocked-time] [data-block="${many[4]}"] [data-remove-block]')`)))));
+  await takeOff(client, `[data-blocked-time] [data-block="${many[4]}"] [data-remove-block]`);
+  check("…taken off", Boolean(await gone(many[4])));
+  sql(`delete from public.calendar_blocks where project_id = ${APPT}`);
 
   section("A project's calendar, on a lead sheet");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1400, height: 1000 });

@@ -80,8 +80,9 @@ try {
     Boolean(await until(async () => (await admin.url()).includes(`client=${company}`) && JSON.stringify(await blockedCells()) === JSON.stringify([`day:${Number(today.slice(8))}`]))), JSON.stringify(await blockedCells()));
   const bar = (await admin.ev(`document.querySelector('[data-blocked-time]')?.innerText.replace(/\\s+/g, ' ') ?? ''`)) ?? "";
   check("…the block listed with its project, the one whose calendar it is on", bar.includes("All day · Office closed") && bar.includes(`${TAG} Appts`) && !bar.includes("Not theirs"), bar);
-  check("…to look at: a project is chosen to add or take one off", /Choose a project to block out time/.test(bar)
-    && (await admin.ev(`document.querySelectorAll('[data-blocked-time] [data-remove-block], [data-blocked-time] [data-block-out]').length`)) === 0);
+  check("…a project is chosen to add one; one there can be taken off (Oct 2026: undoing a day blocked by mistake)", /Choose a project to block out time/.test(bar)
+    && (await admin.ev(`document.querySelectorAll('[data-blocked-time] [data-block-out]').length`)) === 0
+    && (await admin.ev(`document.querySelectorAll('[data-blocked-time] [data-remove-block]').length`)) >= 1);
   await admin.go(`/calendar?view=month&d=${today}`, 4000);
   check("every client's calendars together show no blocked time: a project or client is chosen for that", (await blockedCells()).length === 0 && !(await admin.ev(`!!document.querySelector('[data-blocked-time]')`)));
 
