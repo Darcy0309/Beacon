@@ -58,6 +58,12 @@ function snippet(m) {
  * reaction on any message, replying to one message (quoted above the reply),
  * emoji, GIFs (GIPHY) and voice messages.
  */
+/**
+ * A message's link worth a button in the chat: a page inside Lighthouse for
+ * one record (/leads/123, /calendar?a=45), not a page in general (/team).
+ */
+const recordLink = (link) => typeof link === "string" && /^\/(?![/\\])/.test(link) && /\/\d+(?=$|[/?#])|[?&][a-z_]+=\d+(?=$|&|#)/i.test(link);
+
 export default function NotificationThread({ anchorId, anchorUnread, person, messages: initial }) {
   const router = useRouter();
   const mounted = useMounted();
@@ -319,11 +325,11 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
                           className="block h-auto max-h-80 w-auto max-w-full rounded-xl" />
                       ) : null}
                       {text ? <div className={cn(att && "mt-1")}><LinkedText text={text} /></div> : null}
-                      {/* What it was sent about (Oct 2026: a question about an appointment links to its lead). */}
-                      {m.link && /^\/(?![/\\])/.test(m.link) ? (
+                      {/* What it was sent about (Oct 2026: a question about an appointment links to its lead): on the other
+                          person's messages only, and only a link to one record, not a page in general (a thank-you's Team page). */}
+                      {!m.mine && recordLink(m.link) ? (
                         <Link href={m.link} data-message-link
-                          className={cn("mt-1.5 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors",
-                            m.mine ? "border-primary-foreground/40 hover:bg-primary-foreground/15" : "border-primary/40 text-primary hover:bg-primary/10")}>
+                          className="mt-1.5 inline-flex items-center gap-1 rounded-md border border-primary/40 px-2 py-0.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10">
                           {linkLabel(m.link)} <ArrowUpRight className="size-3" />
                         </Link>
                       ) : null}

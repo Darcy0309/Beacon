@@ -117,6 +117,17 @@ try {
   await sean.go(`/notifications/${nid}`, 6000);
   const link = await until(() => sean.ev(`(() => { const a = document.querySelector('[data-message-link]'); return a ? a.getAttribute('href') + ' | ' + a.innerText.trim() : null; })()`), { timeout: 10000 });
   check("the message in the chat links to its lead", (link ?? "").startsWith(`/leads/${A.lead} | Open lead`), link);
+  // Only a link to one record gets a button (not a thank-you's Team page), and only on the other person's messages.
+  const ADMIN = userId("admin@beacon.test");
+  sql(`insert into public.notifications (user_id, sender_id, kind, title, body, link) values (${SEAN}, ${ADMIN}, 'message', ${lit(`🙌 ${TAG} says thank you`)}, 'Thank you for your work.', '/team')`);
+  await sean.go(`/notifications/${nid}`, 6000);
+  await until(() => sean.ev(`[...document.querySelectorAll('[data-message]')].some((m) => m.innerText.includes(${JSON.stringify(`${TAG} says thank you`)}))`), { timeout: 10000 });
+  check("…a message linking to a page in general gets no button", (await sean.ev(`document.querySelectorAll('[data-message-link]').length`)) === 1
+    && !(await sean.ev(`[...document.querySelectorAll('[data-message]')].find((m) => m.innerText.includes(${JSON.stringify(`${TAG} says thank you`)}))?.querySelector('[data-message-link]') ? true : false`)));
+  const reply = sql(`insert into public.notifications (user_id, sender_id, kind, title, body) values (${ADMIN}, ${SEAN}, 'message', ${lit(`Re: ${TAG}`)}, 'Will do') returning id`);
+  await admin.go(`/notifications/${reply}`, 6000);
+  await until(() => admin.ev(`[...document.querySelectorAll('[data-message="mine"]')].some((m) => m.innerText.includes('Can you check the time'))`), { timeout: 10000 });
+  check("…and none on your own message", !(await admin.ev(`[...document.querySelectorAll('[data-message="mine"]')].find((m) => m.innerText.includes('Can you check the time'))?.querySelector('[data-message-link]') ? true : false`)));
 
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1600, height: 1100 });
@@ -128,7 +139,7 @@ try {
   check("…with no client or manager filter", await client.ev(`!/All clients|Everyone/.test(document.querySelector('[data-appointment-filters]').innerText)`));
 } finally {
   browser.close();
-  sql(`delete from public.notifications where title like ${lit(`%${TAG}%`)}`);
+  sql(`delete from public.notifications where title like ${lit(`%${TAG}%`)} or title = ${lit(`Re: ${TAG}`)}`);
   sql(`delete from public.appointments where lead_id in (select id from public.leads where company_name like ${lit(`${TAG}%`)})`);
   sql(`delete from public.leads where company_name like ${lit(`${TAG}%`)}`);
   sql(`delete from public.projects where name like ${lit(`${TAG}%`)}`);
