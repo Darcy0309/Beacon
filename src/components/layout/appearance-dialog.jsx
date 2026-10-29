@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Image as ImageIcon, ImageUp, Monitor, Moon, Palette, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
+import { Check, Image as ImageIcon, ImageUp, Monitor, Moon, MousePointer2, Palette, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CURSORS, DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
+import { CURSOR_SIZES, CURSOR_STYLES, cursorSrc } from "@/lib/cursor-styles";
+import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
@@ -233,19 +234,39 @@ export default function AppearanceDialog({ open, onOpenChange }) {
           <p className="text-xs text-muted-foreground">JPG, PNG or WebP. It stays on this computer and is softened a little so text reads on it.</p>
         </section>
 
-        {/* The cursor (Oct 2026): the gem arrow, or the computer's own. */}
+        {/* The cursor (Oct 2026: the client's twenty to pick from; the computer's own unless one is chosen), and its size. */}
         <section className="space-y-2" data-cursor-choice>
-          <h3 className="eyebrow text-muted-foreground">Cursor</h3>
-          <div role="radiogroup" aria-label="Cursor" className="grid grid-cols-2 gap-2">
-            {CURSORS.map(([k, label]) => (
-              <button key={k} type="button" role="radio" aria-checked={(a.cursor ?? "gem") === k} onClick={() => change({ cursor: k })} data-cursor-pick={k}
-                className={cn("rounded-lg border px-3 py-2 text-left transition-colors",
-                  (a.cursor ?? "gem") === k ? "border-primary bg-primary/10" : "border-[var(--panel-border)] hover:border-primary/40")}>
-                <span className={cn("block text-sm font-medium", (a.cursor ?? "gem") === k ? "text-primary" : "")}>{label}</span>
-                <span className="block text-xs text-muted-foreground">{k === "gem" ? "An arrow with a gem that crackles over what you can click" : "Your computer's own pointer"}</span>
-              </button>
-            ))}
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="eyebrow text-muted-foreground">Cursor</h3>
+            <div role="radiogroup" aria-label="Cursor size" className="flex gap-1">
+              {CURSOR_SIZES.map(([k, label]) => (
+                <button key={k} type="button" role="radio" aria-checked={(a.cursorSize ?? "normal") === k} onClick={() => change({ cursorSize: k })}
+                  disabled={(a.cursor ?? "standard") === "standard"} data-cursor-size-pick={k}
+                  className={cn("rounded-md border px-2 py-0.5 text-xs font-medium transition-colors disabled:opacity-40",
+                    (a.cursorSize ?? "normal") === k ? "border-primary bg-primary/10 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40")}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
+          <div role="radiogroup" aria-label="Cursor" className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+            {CURSOR_STYLES.map(([k, label]) => {
+              const on = (a.cursor ?? "standard") === k;
+              const src = cursorSrc(k);
+              return (
+                <button key={k} type="button" role="radio" aria-checked={on} onClick={() => change({ cursor: k })} data-cursor-pick={k} title={label}
+                  className={cn("flex flex-col items-center gap-1 rounded-lg border px-1 py-2 text-center transition-colors",
+                    on ? "border-primary bg-primary/10" : "border-[var(--panel-border)] hover:border-primary/40")}>
+                  {/* Its look at rest; pointing at the tile shows its look over something to click. */}
+                  <span className="flex h-10 w-10 items-center justify-center rounded-md bg-[#0d1520]">
+                    {src ? <img src={src} alt="" className="max-h-9 max-w-9" /> : <MousePointer2 className="size-6 fill-white text-black" strokeWidth={1.5} />}
+                  </span>
+                  <span className={cn("text-[0.68rem] leading-tight", on ? "font-semibold text-primary" : "text-muted-foreground")}>{label}</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">Point at a tile to see how the cursor looks over something you can click. It moves as fast as your computer's own, and stays on this computer.</p>
         </section>
 
         <section className="space-y-2" data-wallpaper-blur>
@@ -279,7 +300,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </section>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur && (a.cursor ?? "gem") === "gem"}
+          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur && (a.cursor ?? "standard") === "standard" && (a.cursorSize ?? "normal") === "normal"}
             data-appearance-reset>
             <RotateCcw /> Back to the original
           </Button>
