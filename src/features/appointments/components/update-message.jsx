@@ -20,8 +20,11 @@ const NOTE_MAX = 600;
  *
  *   update    { id, leadId, co, client, summary, statusText, managerId, manager }
  *   staff     [{ id, name, role }]
+ *   about     "appointment": a question about an appointment, from the
+ *             Appointments list (Oct 2026), rather than its update
  */
-export default function UpdateMessage({ update, staff }) {
+export default function UpdateMessage({ update, staff, about = "update" }) {
+  const question = about === "appointment";
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState(update.managerId ? String(update.managerId) : "");
   const [note, setNote] = useState("");
@@ -39,26 +42,27 @@ export default function UpdateMessage({ update, staff }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
-  const title = `Appointment update: ${update.co} · ${update.statusText}`.slice(0, 120);
-  const body = [update.summary, note.trim() ? `Note: ${note.trim()}` : null].filter(Boolean).join("\n\n").slice(0, 1000);
+  const title = `${question ? "About an appointment" : "Appointment update"}: ${update.co} · ${update.statusText}`.slice(0, 120);
+  const body = [update.summary, note.trim() ? `${question ? "Question" : "Note"}: ${note.trim()}` : null].filter(Boolean).join("\n\n").slice(0, 1000);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button type="button" aria-label={`Send this update to a manager: ${update.co}`} title="Send this update to a manager"
+        <button type="button" aria-label={question ? `Message ${update.manager} about ${update.co}` : `Send this update to a manager: ${update.co}`}
+          title={question ? `Message ${update.manager} about this appointment` : "Send this update to a manager"}
           className="ml-1.5 inline-flex size-6 items-center justify-center rounded-md align-middle text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
-          data-update-message={update.id}>
+          data-update-message={question ? undefined : update.id} data-appt-message={question ? update.id : undefined}>
           <MessageSquareShare className="size-3.5" />
         </button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Send this update</DialogTitle>
+          <DialogTitle>{question ? "Message about this appointment" : "Send this update"}</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="flex flex-col gap-4" data-update-message-form>
           <input type="hidden" name="title" value={title} />
           <input type="hidden" name="body" value={body} />
-          <input type="hidden" name="link" value={update.leadId ? `/leads/${update.leadId}?tab=updates` : ""} />
+          <input type="hidden" name="link" value={update.leadId ? `/leads/${update.leadId}${question ? "" : "?tab=updates"}` : ""} />
           <Field label="To" hint={update.managerId ? `${update.manager} set this appointment` : null}>
             <Select name="user_ids" value={to} onChange={(e) => setTo(e.target.value)} required>
               <option value="" disabled>Choose someone</option>
@@ -70,9 +74,10 @@ export default function UpdateMessage({ update, staff }) {
             <p className="mt-0.5 whitespace-pre-line text-muted-foreground">{update.summary}</p>
             {update.leadId ? <p className="mt-1 text-xs text-primary">With a link to the lead</p> : null}
           </div>
-          <Field label="Note" hint={`${note.length}/${NOTE_MAX}`}>
+          <Field label={question ? "Your question" : "Note"} hint={`${note.length}/${NOTE_MAX}`}>
             <Textarea name="note" value={note} maxLength={NOTE_MAX} rows={4} onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Invalid: please call them back and reschedule, or hand it to someone who can." />
+              placeholder={question ? "e.g. Can you check the time with them? The client asked to move it to the afternoon."
+                : "e.g. Invalid: please call them back and reschedule, or hand it to someone who can."} />
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

@@ -51,7 +51,7 @@ try {
   check("the next 7 days, not later and not invalid", has(week, "Arizona Cleanpros") && has(week, "Bell Stone Granite") && has(week, "Cactus Roofing") && !has(week, "Desert Glass") && !has(week, "Echo Plumbing"), JSON.stringify(week));
   const cols = await admin.ev(`(() => { const r = document.querySelector('[data-appt-row="${A.id}"]'); return Object.fromEntries([...r.querySelectorAll('[data-col]')].map((c) => [c.dataset.col, c.innerText.trim()])); })()`);
   check("one row: client, project, agent, status, and the manager who set it at the far right",
-    cols.client === clientName && cols.project === `${TAG} Maricopa Appts` && cols.agent === "Bret Godsey" && /scheduled/i.test(cols.status) && cols.manager === "Sean Fitzgerald", JSON.stringify(cols));
+    cols.client === clientName && cols.project === `${TAG} Maricopa Appts` && cols.agent === "Bret Godsey" && /awaiting confirmation/i.test(cols.status) && cols.manager === "Sean Fitzgerald", JSON.stringify(cols));
   check("…the manager last in the row", await admin.ev(`(() => { const r = document.querySelector('[data-appt-row="${A.id}"]'); const cells = [...r.querySelectorAll('[data-col]')]; return cells[cells.length - 1].dataset.col === 'manager'; })()`));
   await admin.click(`[data-appt-row="${A.id}"]`);
   check("an appointment opens its lead", Boolean(await until(async () => (await admin.path()) === `/leads/${A.lead}`, { timeout: 6000 })), await admin.path());
@@ -73,6 +73,44 @@ try {
   const projects = await admin.ev(`document.querySelector('[data-appointment-filters]').innerText`);
   check("a client chosen, its projects alone to pick from", Boolean(projects));
 
+  section("Awaiting confirmation, a Sales Rep, and the tiles");
+  // Oct 2026: an upcoming one not confirmed reads Awaiting confirmation (B is Confirmed); the Sales Rep's clients' alone, tiles too.
+  const bStatus = await admin.ev(`document.querySelector('[data-appt-row="${B.id}"] [data-col="status"]')?.innerText.trim() ?? ''`);
+  check("a confirmed one still reads Confirmed", /confirmed/i.test(bStatus) && !/awaiting/i.test(bStatus), bStatus);
+  const awaitingList = await open(`?status=${encodeURIComponent("Awaiting confirmation")}`, (r) => has(r, "Arizona Cleanpros"));
+  check("the Status filter offers Awaiting confirmation", has(awaitingList, "Arizona Cleanpros") && has(awaitingList, "Cactus Roofing") && !has(awaitingList, "Bell Stone Granite"), JSON.stringify(awaitingList));
+  sql(`update public.companies set sales_rep_id = ${MIKE} where id = ${other}`);
+  const mikes = `(select p.id from public.projects p join public.companies c on c.id = p.company_id where c.sales_rep_id = ${MIKE})`;
+  const repWeek = Number(sql(`select count(*) from public.appointments where invalid_at is null and project_id in ${mikes}
+    and appt_date between (now() at time zone public.business_tz())::date and (now() at time zone public.business_tz())::date + 6`));
+  const byRep = await open(`?rep=${MIKE}`, (r) => has(r, "Cactus Roofing"));
+  check("by Sales Rep: their clients' appointments alone", has(byRep, "Cactus Roofing") && !has(byRep, "Arizona Cleanpros") && !has(byRep, "Bell Stone Granite"), JSON.stringify(byRep));
+  const firstTile = await until(async () => { const t = await admin.ev(`[...document.querySelectorAll('.stat-label')].find((e) => e.textContent.trim() === 'Next 7 Days')?.closest('[data-panel], .group')?.innerText.replace(/\\s+/g, ' ') ?? ''`);
+    return t.startsWith(`Next 7 Days ${repWeek} `) && t; }, { timeout: 8000 });
+  check("…and the tiles follow it", Boolean(firstTile) && /Mike Preston's clients/.test(firstTile), `${firstTile} (${repWeek})`);
+
+  section("A message about one, to the manager who set it");
+  await open("", (r) => has(r, "Arizona Cleanpros"));
+  await admin.click(`[data-appt-message="${A.id}"]`);
+  await until(() => admin.ev(`!!document.querySelector('[data-update-message-form]')`));
+  check("to the manager who set it, to begin with", (await admin.ev(`document.querySelector('[data-update-message-form] select[name="user_ids"]')?.value`)) === String(SEAN));
+  await admin.fill('[data-update-message-form] textarea[name="note"]', "Can you check the time with them?");
+  await admin.click("[data-update-message-form] button[type=submit]");
+  const sent = await until(() => sql(`select title || ' | ' || coalesce(link, '') || ' | ' || coalesce(body, '') from public.notifications where user_id = ${SEAN} and title like ${lit(`%${TAG} Arizona Cleanpros%`)} order by id desc limit 1`) || null, { timeout: 8000 });
+  check("…sent, about that appointment, linking to its lead, with the question", /^About an appointment: .*Arizona Cleanpros · Awaiting confirmation/.test(sent ?? "")
+    && (sent ?? "").includes(`| /leads/${A.lead} |`) && /Question: Can you check the time with them\?/.test(sent ?? ""), sent);
+
+  section("A manager's own, to begin with");
+  const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1600, height: 1100 });
+  const seanShown = () => sean.ev(`[...document.querySelectorAll('[data-appointment-list] [data-appt-row]')].map((r) => r.innerText.replace(/\\s+/g, ' ')).filter((t) => t.includes(${JSON.stringify(TAG)}))`);
+  await sean.go("/appointments", 5000);
+  const own = await until(async () => { const r = await seanShown(); return has(r, "Arizona Cleanpros") ? r : null; }, { timeout: 8000 });
+  check("a manager's list starts as the ones they set", has(own ?? [], "Arizona Cleanpros") && !has(own ?? [], "Bell Stone Granite") && !has(own ?? [], "Cactus Roofing"), JSON.stringify(own));
+  check("…the Manager filter says so", /Manager\s*Sean Fitzgerald/.test(await sean.ev(`document.querySelector('[data-appointment-filters]').innerText`)));
+  await sean.go("/appointments?manager=all", 5000);
+  const everyone = await until(async () => { const r = await seanShown(); return has(r, "Cactus Roofing") ? r : null; }, { timeout: 8000 });
+  check("…and Everyone shows the rest", has(everyone ?? [], "Bell Stone Granite") && has(everyone ?? [], "Cactus Roofing"), JSON.stringify(everyone));
+
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1600, height: 1100 });
   await client.go("/appointments", 4000);
@@ -83,6 +121,7 @@ try {
   check("…with no client or manager filter", await client.ev(`!/All clients|Everyone/.test(document.querySelector('[data-appointment-filters]').innerText)`));
 } finally {
   browser.close();
+  sql(`delete from public.notifications where title like ${lit(`%${TAG}%`)}`);
   sql(`delete from public.appointments where lead_id in (select id from public.leads where company_name like ${lit(`${TAG}%`)})`);
   sql(`delete from public.leads where company_name like ${lit(`${TAG}%`)}`);
   sql(`delete from public.projects where name like ${lit(`${TAG}%`)}`);

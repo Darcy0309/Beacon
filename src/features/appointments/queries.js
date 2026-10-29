@@ -23,6 +23,13 @@ const APPT_SELECT = `
 
 // Not confirmed yet and still to come (today or later), as the dashboard's calendar has it.
 export const AWAITING = "Awaiting confirmation";
+// Statuses an appointment still waiting for its confirmation call can have (not Confirmed, Held, Cancelled, No Show).
+const OPEN_STATUSES = ["Scheduled", "Rescheduled"];
+/** An appointment ({ appt_date, confirmed_at, status, invalid_at }) still waiting for its confirmation call on `today`. */
+function isAwaiting(a, today) {
+  const status = one(a.status)?.name;
+  return Boolean(today) && !a.confirmed_at && !a.invalid_at && a.appt_date >= today && (!status || OPEN_STATUSES.includes(status));
+}
 
 function toApptView(a, today = null) {
   const lead = one(a.lead);
@@ -30,7 +37,7 @@ function toApptView(a, today = null) {
   const kind = appointmentKind(one(lead?.result)?.name, Boolean(a.confirmed_at));
   // Every calendar (Oct 2026: the client's admins and managers): one still to be confirmed reads Awaiting confirmation,
   // in the dashboard's yellow, rather than Scheduled, so it stands out on a day or week.
-  const waiting = Boolean(today) && !a.confirmed_at && a.appt_date >= today;
+  const waiting = isAwaiting(a, today);
   const user = one(a.user);
   const rep = a.rep_name || shortName(user);
   const { time, ampm } = splitTime(a.appt_time);
@@ -73,7 +80,7 @@ function toApptView(a, today = null) {
 }
 
 /** Every appointment between two ISO days, inclusive, in date and time order. */
-async function fetchAppointments({ from, to, projectIds = null } = {}) {
+async function fetchAppointments({ from, to, projectIds = null, userId = null } = {}) {
   // A calendar of no projects (a client with none yet) is empty, not everyone's.
   if (projectIds && !projectIds.length) return [];
   const [supabase, today] = await Promise.all([createClient(), getBusinessToday()]);
@@ -85,6 +92,8 @@ async function fetchAppointments({ from, to, projectIds = null } = {}) {
     if (to) q = q.lte("appt_date", to);
     // One client's or one project's calendar: the projects its appointments are kept on.
     if (projectIds) q = q.in("project_id", projectIds);
+    // Those one manager set (the Appointments page's Manager filter).
+    if (userId) q = q.eq("user_id", Number(userId));
     return q;
   });
   return rows
@@ -105,9 +114,10 @@ export async function getAppointments() {
 }
 
 /** The seven days from the business's today, grouped by day, for the appointments page. */
-export async function getWeekAppointments() {
+export async function getWeekAppointments({ projectIds = null, userId = null } = {}) {
   const today = await getBusinessToday();
-  const rows = await fetchAppointments({ from: today, to: addDays(today, 6) });
+  // Narrowed as the page's list is (Oct 2026: its client, project, manager and Sales Rep), so its tiles follow them.
+  const rows = await fetchAppointments({ from: today, to: addDays(today, 6), projectIds, userId });
   const groups = new Map();
   for (const a of rows) {
     if (!groups.has(a.date)) groups.set(a.date, []);
@@ -142,6 +152,21 @@ export async function getCalendarMonth(year, month /* 0-indexed */, projectIds =
 }
 
 /**
+ * The projects of a client, or of the clients one Sales Rep owns (Oct 2026),
+ * or both: an appointment list narrowed to them. Null when neither is asked.
+ */
+export async function clientProjectIds({ clientId = null, repId = null } = {}) {
+  if (!clientId && !repId) return null;
+  const supabase = await createClient();
+  let q = supabase.from("projects").select("id, company:companies!inner(id, sales_rep_id)");
+  if (clientId) q = q.eq("company_id", Number(clientId));
+  if (repId) q = q.eq("company.sales_rep_id", Number(repId));
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map((p) => p.id);
+}
+
+/**
  * The Appointments page's list (Sean, Oct 2026): appointments from `from` to
  * `to` (their day), filtered by client (`clientId`: its projects'), project
  * (one kept on it, or set from it), the manager who set it (`userId`) and
@@ -149,17 +174,17 @@ export async function getCalendarMonth(year, month /* 0-indexed */, projectIds =
  * are otherwise left out). In date and time order, at most 2,000. Each:
  * when, the company and contact, client, project, agent, status, who set it.
  */
-export async function listAppointments({ from, to, clientId = null, projectId = null, userId = null, status = null }) {
-  const supabase = await createClient();
-  let projectIds = null;
-  if (clientId) {
-    const { data, error } = await supabase.from("projects").select("id").eq("company_id", clientId);
-    if (error) throw error;
-    projectIds = (data ?? []).map((p) => p.id);
-    if (!projectIds.length) return { rows: [], capped: false };
-  }
+export async function listAppointments({ from, to, clientId = null, projectId = null, userId = null, status = null, repId = null }) {
+  const [supabase, today] = await Promise.all([createClient(), getBusinessToday()]);
+  const projectIds = await clientProjectIds({ clientId, repId });
+  if (projectIds && !projectIds.length) return { rows: [], capped: false };
   let statusId = null;
-  if (status && status !== "Invalid") {
+  // Awaiting confirmation (Oct 2026): still open, not confirmed, today or later.
+  const awaiting = status === AWAITING;
+  const openIds = awaiting
+    ? ((await supabase.from("appointment_statuses").select("id").in("name", OPEN_STATUSES)).data ?? []).map((r) => r.id)
+    : null;
+  if (status && status !== "Invalid" && !awaiting) {
     const { data } = await supabase.from("appointment_statuses").select("id").eq("name", status).maybeSingle();
     if (!data) return { rows: [], capped: false };
     statusId = data.id;
@@ -167,9 +192,9 @@ export async function listAppointments({ from, to, clientId = null, projectId = 
   const MAX = 2000;
   const rows = await readAll((first, last) => {
     let q = supabase.from("appointments")
-      .select(`id, appt_date, appt_time, duration_min, rep_name, invalid_at,
+      .select(`id, appt_date, appt_time, duration_min, rep_name, invalid_at, confirmed_at,
         status:appointment_statuses(name),
-        setter:users!appointments_user_id_fkey(first_name, last_name),
+        setter:users!appointments_user_id_fkey(id, first_name, last_name),
         project:projects!appointments_project_id_fkey(id, name, company:companies(id, name)),
         lead:leads!inner(id, company_name, contact_name, city, state)`)
       // Only with a lead still there to open (one deleted leaves nothing to show).
@@ -179,6 +204,7 @@ export async function listAppointments({ from, to, clientId = null, projectId = 
     else {
       q = q.is("invalid_at", null);
       if (statusId) q = q.eq("status_id", statusId);
+      if (awaiting) q = q.is("confirmed_at", null).gte("appt_date", today).in("status_id", openIds);
     }
     if (projectIds) q = q.in("project_id", projectIds);
     if (projectId) q = q.or(`project_id.eq.${Number(projectId)},set_project_id.eq.${Number(projectId)}`);
@@ -194,8 +220,9 @@ export async function listAppointments({ from, to, clientId = null, projectId = 
       id: a.id, date: a.appt_date, time, ampm, appt_time: a.appt_time, duration: a.duration_min ?? 30,
       co: lead?.company_name ?? "—", contact: lead?.contact_name ?? null, location: cityState(lead), leadId: lead?.id ?? null,
       client: one(project?.company)?.name ?? "—", project: project?.name ?? "—", agent: a.rep_name || "—",
-      status: a.invalid_at ? "Invalid" : one(a.status)?.name ?? "—",
+      status: a.invalid_at ? "Invalid" : isAwaiting(a, today) ? AWAITING : one(a.status)?.name ?? "—",
       manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—",
+      managerId: setter?.id ?? null,
     };
   }).sort((a, b) => a.date.localeCompare(b.date) || timeRank(a.appt_time) - timeRank(b.appt_time));
   return { rows: shaped, capped: rows.length >= MAX };
@@ -211,14 +238,15 @@ export async function getAppointmentFilters() {
   const [companies, projects, staff, statuses] = await Promise.all([
     supabase.from("companies").select("id, name").order("name").limit(2000),
     supabase.from("projects").select("id, name, company_id").order("name").limit(5000),
-    supabase.from("users").select("id, first_name, last_name").in("role", ["admin", "manager", "agent"]).order("first_name").order("last_name").limit(1000),
+    supabase.from("users").select("id, first_name, last_name, role").in("role", ["admin", "manager", "agent"]).order("first_name").order("last_name").limit(1000),
     supabase.from("appointment_statuses").select("name").order("id"),
   ]);
   return {
     clients: (companies.data ?? []).map((c) => ({ value: String(c.id), label: c.name })),
     projects: (projects.data ?? []).map((p) => ({ value: String(p.id), label: p.name, clientId: p.company_id })),
-    managers: (staff.data ?? []).map((u) => ({ value: String(u.id), label: [u.first_name, u.last_name].filter(Boolean).join(" ") || "—" })),
-    statuses: (statuses.data ?? []).map((s) => ({ value: s.name, label: s.name })),
+    managers: (staff.data ?? []).map((u) => ({ value: String(u.id), label: [u.first_name, u.last_name].filter(Boolean).join(" ") || "—", role: u.role })),
+    // Awaiting confirmation first: what the list says of an upcoming one not confirmed yet (Oct 2026).
+    statuses: [{ value: AWAITING, label: AWAITING }, ...(statuses.data ?? []).map((s) => ({ value: s.name, label: s.name }))],
   };
 }
 
