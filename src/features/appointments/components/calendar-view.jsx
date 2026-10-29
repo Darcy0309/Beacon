@@ -15,6 +15,7 @@ import ToneBadge from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import TipLayer from "@/components/shared/tip-layer";
+import MonthJump from "@/components/shared/month-jump";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -128,8 +129,10 @@ function layoutDay(events) {
  * live in the URL (?view=&d=), so every view is linkable.
  */
 export default function CalendarView(props) {
-  const { view, title, prev, next, todayHref, viewHrefs, focusId = null } = props;
+  const { view, title, prev, next, todayHref, viewHrefs, focusId = null, monthHrefBase, today, year, month } = props;
   const [selected, setSelected] = useState(null);
+  const router = useRouter();
+  const shownMonth = `${year}-${String(month + 1).padStart(2, "0")}-01`;
 
   return (
     <OpenAppointment.Provider value={setSelected}>
@@ -153,6 +156,10 @@ export default function CalendarView(props) {
           ))}
         </div>
         <div className="flex items-center gap-1">
+          {/* Straight to another month or year (Sean, Oct 2026), not only a step at a time. */}
+          {monthHrefBase ? (
+            <MonthJump month={shownMonth} today={today} className="mr-1 text-sm" onPick={(iso) => router.push(`${monthHrefBase}${iso}`, { scroll: false })} />
+          ) : null}
           <Link href={prev} scroll={false} aria-label={`Previous ${view}`}
             className="surface-chip flex size-7 items-center justify-center rounded-md border border-[var(--panel-border)] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
             <ChevronLeft className="size-3.5" />

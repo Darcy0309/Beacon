@@ -7,6 +7,7 @@ import { AlarmClock, BellRing, CalendarCheck, CalendarClock, ChevronLeft, Chevro
 import Link from "@/components/shared/intent-link";
 import SectionHeader from "@/components/shared/section-header";
 import DatePicker from "@/components/shared/date-picker";
+import MonthJump from "@/components/shared/month-jump";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Field, Select } from "@/components/ui/field";
@@ -226,7 +227,7 @@ export default function MySchedule({ items, awaiting, month, today, params, allH
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <ChevronLeft className="size-4" />
             </Link>
-            <span className="text-sm font-semibold" data-schedule-month>{formatIso(month, "month")}</span>
+            <span data-schedule-month><MonthJump month={month} today={today} onPick={(iso) => router.push(monthHref(iso), { scroll: false })} className="text-sm" /></span>
             <Link href={monthHref(addMonths(month, 1))} scroll={false} aria-label="Next month"
               className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <ChevronRight className="size-4" />

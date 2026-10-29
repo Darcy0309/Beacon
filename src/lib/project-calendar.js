@@ -33,10 +33,14 @@ export const BLOCK_TIMES = Array.from({ length: 31 }, (_, i) => clockOf(360 + i 
 
 /** When a block applies each day: "All day" or "10:00 AM – 1:00 PM". */
 export const blockHours = (b) => (b.start == null ? "All day" : `${clockOf(b.start)} – ${clockOf(b.end)}`);
-/** Its days: "Oct 20", "Oct 20 – Oct 22", or every week, "Every Mon & Fri". */
+const dayRange = (b) => (b.startsOn === b.endsOn ? formatIso(b.startsOn, "short") : `${formatIso(b.startsOn, "short")} – ${formatIso(b.endsOn, "short")}`);
+/**
+ * Its days: "Oct 20", "Oct 20 – Oct 22", or every week, "Every Tue & Thu,
+ * Nov 3 – Dec 31" (the client's days to avoid: "Every Mon & Fri", for good).
+ */
 export const blockDays = (b) => (b.weekdays
-  ? `Every ${weekdayList(b.weekdays)}`
-  : b.startsOn === b.endsOn ? formatIso(b.startsOn, "short") : `${formatIso(b.startsOn, "short")} – ${formatIso(b.endsOn, "short")}`);
+  ? `Every ${weekdayList(b.weekdays)}${b.weekly ? "" : `, ${dayRange(b)}`}`
+  : dayRange(b));
 
 /** Whether a block covers `day`: within its days and, for one kept every week, on one of its weekdays. */
 export const blockOn = (b, day) => day >= b.startsOn && day <= b.endsOn && (!b.weekdays || b.weekdays.includes(weekdayOf(day)));

@@ -7,13 +7,15 @@ import { ArrowRight, Ban, CalendarCheck, CalendarRange, ChevronLeft, ChevronRigh
 import Link from "@/components/shared/intent-link";
 import SectionHeader from "@/components/shared/section-header";
 import DatePicker from "@/components/shared/date-picker";
+import MonthJump from "@/components/shared/month-jump";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { addMonths, formatIso, monthGrid, monthStart, sameMonth } from "@/lib/dates";
+import { addMonths, formatIso, monthGrid, monthStart, sameMonth, weekdayOf } from "@/lib/dates";
+import { WEEKDAYS } from "@/lib/project-info";
 import { BLOCK_TIMES, blockDays, blockHours, dayMarks, eventsOn, noteTime } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
 import { addCalendarBlock, addCalendarNote, removeCalendarBlock, removeCalendarNote } from "@/features/calendar/actions";
@@ -25,10 +27,13 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
 const BLOCKED = "var(--neon-amber)";
 export const NOTED = "var(--neon-violet)";
 
-/** Block out days, or a time of day on them, on this calendar. */
+/** Block out days, or a time of day on them, on this calendar; or (Oct 2026) the same days of every week, until a day. */
 export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
   const [state, action, pending] = useActionState(addCalendarBlock, EMPTY);
   const [allDay, setAllDay] = useState(true);
+  const [repeat, setRepeat] = useState(false);
+  const [days, setDays] = useState(() => new Set([weekdayOf(day)]));
+  const flip = (d) => setDays((x) => { const n = new Set(x); if (n.has(d)) n.delete(d); else n.add(d); return n; });
   const { fe, invalid } = formHelpers(state, null);
   const handled = useRef(null);
   useEffect(() => {
@@ -40,15 +45,18 @@ export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
     } else if (state?.error && !state?.fieldErrors) toast.error(state.error);
   }, [state, onDone]);
   useEffect(() => {
-    if (open) setAllDay(true);
-  }, [open]);
+    if (!open) return;
+    setAllDay(true);
+    setRepeat(false);
+    setDays(new Set([weekdayOf(day)]));
+  }, [open, day]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Block out time</DialogTitle>
-          <DialogDescription>Days, or a time of day, when no appointments should be set. It shows on this calendar, and anyone booking over it is warned.</DialogDescription>
+          <DialogDescription>Days, or a time of day, when no appointments should be set; or the same days every week. It shows on this calendar, and anyone booking over it is warned.</DialogDescription>
         </DialogHeader>
         <form action={action} noValidate className="flex flex-col gap-4" data-block-form>
           <input type="hidden" name="project_id" value={projectId} />
@@ -56,10 +64,36 @@ export function BlockDialog({ open, onOpenChange, projectId, day, onDone }) {
             <Field label="From" required error={fe("starts_on")}>
               <DatePicker name="starts_on" required defaultValue={day} key={`s${day}${open}`} invalid={invalid("starts_on")} aria-label="First day" min="today" />
             </Field>
-            <Field label="To" error={fe("ends_on")} hint="Leave empty for one day">
-              <DatePicker name="ends_on" key={`e${day}${open}`} invalid={invalid("ends_on")} aria-label="Last day" min="today" />
-            </Field>
+            {repeat ? (
+              <Field label="Until" required error={fe("ends_on")} hint="Up to a year">
+                <DatePicker name="ends_on" key={`r${day}${open}`} defaultValue={addMonths(day, 2)} invalid={invalid("ends_on")} aria-label="Repeat until" min="today"
+                  presets={["nextMonth", "nextYear"]} />
+              </Field>
+            ) : (
+              <Field label="To" error={fe("ends_on")} hint="Leave empty for one day">
+                <DatePicker name="ends_on" key={`e${day}${open}`} invalid={invalid("ends_on")} aria-label="Last day" min="today" />
+              </Field>
+            )}
           </div>
+          {/* The same days of every week, e.g. every Tuesday and Thursday for two months. */}
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="repeat" value="weekly" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} className="size-4 accent-[var(--primary)]" data-block-repeat />
+            Repeat every week
+          </label>
+          {repeat ? (
+            <Field label="On" required error={fe("weekdays")}>
+              <div className="flex flex-wrap gap-1" role="group" aria-label="Days of the week" data-block-weekdays>
+                {WEEKDAYS.map(([d, short, long]) => (
+                  <label key={d} title={long}
+                    className={cn("cursor-pointer rounded-md border px-2.5 py-1 text-xs font-semibold transition-colors",
+                      days.has(d) ? "border-primary bg-primary text-primary-foreground" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40 hover:text-foreground")}>
+                    <input type="checkbox" name="weekdays" value={d} checked={days.has(d)} onChange={() => flip(d)} className="sr-only" data-block-weekday={d} />
+                    {short}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          ) : null}
           <label className="flex items-center gap-2 text-sm">
             <input type="hidden" name="all_day" value="off" />
             <input type="checkbox" name="all_day" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} className="size-4 accent-[var(--primary)]" />
@@ -241,7 +275,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
         <div>
           <div className="mb-1 flex items-center justify-between">
             <button type="button" className={step} onClick={() => setMonth(addMonths(month, -1))} aria-label="Previous month"><ChevronLeft className="size-3.5" /></button>
-            <span className="text-xs font-semibold" data-calendar-month>{formatIso(month, "month")}</span>
+            <span data-calendar-month><MonthJump month={month} today={today} onPick={setMonth} className="text-xs" /></span>
             <button type="button" className={step} onClick={() => setMonth(addMonths(month, 1))} aria-label="Next month"><ChevronRight className="size-3.5" /></button>
           </div>
           <div className="grid grid-cols-7 gap-0.5 text-center" role="grid" aria-label={formatIso(month, "month")}>

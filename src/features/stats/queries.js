@@ -63,7 +63,7 @@ export async function getBlockedDays({ projectIds, from, to }) {
   const supabase = await createClient();
   // Read in pages: synced busy times from personal calendars can pass the API's 1,000-row cap.
   const [data, profiles] = await Promise.all([
-    readAll((first, last) => supabase.from("calendar_blocks").select("starts_on, ends_on, start_time")
+    readAll((first, last) => supabase.from("calendar_blocks").select("starts_on, ends_on, start_time, weekdays")
       .in("project_id", projectIds).lte("starts_on", to).gte("ends_on", from).order("starts_on").order("id").range(first, last)),
     supabase.from("project_profiles").select("avoid_days").in("project_id", projectIds),
   ]);
@@ -71,6 +71,8 @@ export async function getBlockedDays({ projectIds, from, to }) {
   const days = {};
   for (const b of data) {
     for (let d = b.starts_on < from ? from : b.starts_on; d <= b.ends_on && d <= to; d = addDays(d, 1)) {
+      // One kept every week: on its weekdays only.
+      if (b.weekdays?.length && !b.weekdays.map(Number).includes(weekdayOf(d))) continue;
       days[d] = b.start_time ? days[d] ?? "part" : "day";
     }
   }

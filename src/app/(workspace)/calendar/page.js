@@ -154,6 +154,7 @@ export default async function CalendarPage({ searchParams }) {
           todayHref={href(view, today)}
           viewHrefs={viewHrefs}
           dayHrefBase={`/calendar?${only}view=day&d=`}
+          monthHrefBase={`/calendar?${only}view=month&d=`}
           focusId={focusId}
           blockedDays={blockedDays}
           blocks={blocks}

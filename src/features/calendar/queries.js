@@ -7,7 +7,7 @@ import { minutesOf, weeklyBlock } from "@/lib/project-calendar";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
-const BLOCK_COLUMNS = "id, starts_on, ends_on, start_time, end_time, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)";
+const BLOCK_COLUMNS = "id, starts_on, ends_on, start_time, end_time, weekdays, note, feed_id, by:users!calendar_blocks_created_by_fkey(first_name, last_name, role)";
 
 const NOTE_COLUMNS = "id, on_date, at_time, until_time, body, by:users!calendar_notes_created_by_fkey(first_name, last_name, role)";
 
@@ -27,6 +27,8 @@ function shapeBlock(b) {
   return {
     id: b.id, startsOn: b.starts_on, endsOn: b.ends_on, start: b.start_time ? minutesOf(b.start_time) : null,
     end: b.end_time ? minutesOf(b.end_time) : null, note: b.note,
+    // Every week on these days, from its first day to its last (Oct 2026).
+    weekdays: b.weekdays?.length ? b.weekdays.map(Number) : null,
     // Busy on someone's own calendar (connected to this one): no more is known of it than when.
     synced: b.feed_id != null,
     by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || null : null, byClient: by?.role === "client",

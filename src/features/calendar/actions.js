@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { check, currentAppUser, fail, idFrom, logActivity, ok } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { busyTimes, calendarLink } from "@/lib/busy-times";
-import { todayIn } from "@/lib/dates";
+import { addDays, daysBetween, todayIn, weekdayOf } from "@/lib/dates";
 import { minutesOf } from "@/lib/project-calendar";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { fetchCalendar, syncFeed } from "@/features/calendar/sync";
@@ -16,14 +16,24 @@ const asTime = (minutes) => `${String(Math.floor(minutes / 60)).padStart(2, "0")
 
 /**
  * Block out time on a project's calendar: whole days, or between two times
- * each day from `starts_on` to `ends_on` (one day when no end is given).
- * Anyone who can see the calendar can: staff, and the client's own people.
+ * each day from `starts_on` to `ends_on` (one day when no end is given), or
+ * (Sean, Oct 2026) only on the `weekdays` ticked, every week until then, up
+ * to a year. Anyone who can see the calendar can: staff, and the client's
+ * own people.
  */
 export async function addCalendarBlock(prevState, formData) {
   const { values, failed } = check(formData, schemas.calendarBlock);
   if (failed) return failed;
+  const repeats = formData.get("repeat") === "weekly";
+  const weekdays = repeats ? [...new Set(formData.getAll("weekdays").map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort() : null;
+  if (repeats && !weekdays.length) return fail("Tick the days of the week it repeats on", { weekdays: "Tick at least one day" }, values);
+  if (repeats && !values.ends_on) return fail("Choose the day it repeats until", { ends_on: "Choose the last day" }, values);
   const endsOn = values.ends_on || values.starts_on;
   if (endsOn < values.starts_on) return fail("The last day is before the first", { ends_on: "On or after the first day" }, values);
+  if (daysBetween(values.starts_on, endsOn) > 366) return fail("Block out a year at most at a time", { ends_on: "Within a year of the first day" }, values);
+  if (repeats && !Array.from({ length: Math.min(7, daysBetween(values.starts_on, endsOn) + 1) }, (_, i) => weekdayOf(addDays(values.starts_on, i))).some((d) => weekdays.includes(d))) {
+    return fail("None of those days fall between the first day and the last", { weekdays: "Not between those days" }, values);
+  }
   const allDay = formData.getAll("all_day").includes("on");
   const start = allDay ? null : minutesOf(values.start_time);
   const end = allDay ? null : minutesOf(values.end_time);
@@ -36,9 +46,10 @@ export async function addCalendarBlock(prevState, formData) {
   const { data, error } = await supabase.from("calendar_blocks").insert({
     project_id: Number(values.project_id), starts_on: values.starts_on, ends_on: endsOn,
     start_time: allDay ? null : asTime(start), end_time: allDay ? null : asTime(end), note: values.note || null,
+    weekdays: repeats ? weekdays : null,
   }).select("id, project_id").single();
   if (error) return fail(/row-level security/i.test(error.message) ? "That calendar is not yours to change." : error, null, values);
-  await logActivity(supabase, "calendar.block", { entity: "project", entityId: data.project_id, detail: `${values.starts_on}${endsOn !== values.starts_on ? ` to ${endsOn}` : ""}`, userId: me.id });
+  await logActivity(supabase, "calendar.block", { entity: "project", entityId: data.project_id, detail: `${values.starts_on}${endsOn !== values.starts_on ? ` to ${endsOn}` : ""}${repeats ? ` every ${weekdays.join(",")}` : ""}`, userId: me.id });
   revalidatePath("/calendar");
   return ok({ id: data.id });
 }

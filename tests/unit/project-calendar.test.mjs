@@ -62,6 +62,18 @@ is("appointments still to be confirmed, from today on", JSON.stringify(dayMarks(
 is("…and booking at that time is not warned of it", slotClashes({ date: "2026-10-20", time: "10:00 AM" }, { appointments: [], blocks: [], notes: noted.notes }), []);
 is("no notes: the calendar is as it was", eventsOn("2026-10-20", cal).some((e) => e.kind === "note"), false);
 
+// Blocked out every week on some days, until a day (Sean, Oct 2026: every Tue & Thu for two months).
+const repeating = { id: 40, startsOn: "2026-11-03", endsOn: "2026-12-31", start: 780, end: 1020, weekdays: [2, 4], note: "Staff meetings" };
+is("a repeating block in words: its days of the week and when", [blockDays(repeating), blockHours(repeating)], ["Every Tue & Thu, Nov 3 – Dec 31", "1:00 PM – 5:00 PM"]);
+is("…on those days only, between its first and last", ["2026-11-03", "2026-11-04", "2026-11-05", "2026-12-31", "2027-01-05", "2026-10-29"].map((d) => blockOn(repeating, d)),
+  [true, false, true, true, false, false]);
+const marked = dayMarks({ blocks: [repeating] }, "2026-11-01", "2026-11-30");
+is("…marked on November's Tuesdays and Thursdays, part of the day", Object.keys(marked).filter((d) => marked[d].blocked).join(),
+  "2026-11-03,2026-11-05,2026-11-10,2026-11-12,2026-11-17,2026-11-19,2026-11-24,2026-11-26");
+is("…and in the way of a slot then", slotClashes({ date: "2026-11-10", time: "2:00 PM", duration: 30 }, { blocks: [repeating] }).map((c) => c.text),
+  ["Blocked out 1:00 PM – 5:00 PM (Staff meetings)"]);
+is("…not the Wednesday between", slotClashes({ date: "2026-11-11", time: "2:00 PM", duration: 30 }, { blocks: [repeating] }), []);
+
 if (failures) {
   console.error(`\n${failures} check(s) failed.`);
   process.exit(1);
