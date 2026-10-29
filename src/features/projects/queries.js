@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 
 const projectSelect = ({ company = false, type = false, status = false } = {}) => `
   *,
-  company:companies${inner(company)}(id, name, group:agencies(id, name), sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name)),
+  company:companies${inner(company)}(id, name, sales_rep_id, group:agencies(id, name), sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name)),
   type:project_types${inner(type)}(id, code, description),
   status:project_statuses${inner(status)}(id, name),
   assignments:project_assignments(ae:users!project_assignments_ae_user_id_fkey(id, first_name, last_name, email)),
@@ -27,6 +27,7 @@ function toProjectView(p) {
     group: one(company?.group)?.name ?? null,
     // Its client's Sales Rep (Sean, Oct 2026): the client's, for every project of it.
     salesRep: one(company?.sales_rep) ? shortName(one(company.sales_rep)) : null,
+    salesRepId: company?.sales_rep_id ?? null,
     type: one(p.type)?.code ?? "—",
     leads: p.leads?.[0]?.count ?? 0,
     status: one(p.status)?.name ?? "—",

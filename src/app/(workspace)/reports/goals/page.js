@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { GoalBar } from "@/features/projects/components/project-goals";
 import { getProjectMonthCounts, getProjects } from "@/features/projects/queries";
+import { getSalesReps } from "@/features/users/queries";
 import { getLeadStats } from "@/features/stats/queries";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { projectDays, projectGoals } from "@/lib/project-goals";
@@ -16,6 +17,14 @@ import { shapeStats } from "@/lib/lead-stats";
 export const dynamic = "force-dynamic";
 
 const SHOW = [["open", "Not completed"], ["all", "Every project"], ["behind", "Behind pace"], ["owed", "Still owed"]];
+const TYPES = [["DBDV", "DB Dev"], ["APPT", "Appts"]];
+// Ordered by what is owed or how complete, leads or appointments, either way (Oct 2026); behind pace first otherwise.
+const SORTS = [
+  ["leads_owed", "Leads owed: most first", (r) => r.leads?.owed, -1], ["leads_owed_low", "Leads owed: fewest first", (r) => r.leads?.owed, 1],
+  ["leads_pct", "Leads % complete: highest first", (r) => r.leads?.pct, -1], ["leads_pct_low", "Leads % complete: lowest first", (r) => r.leads?.pct, 1],
+  ["appts_owed", "Appts owed: most first", (r) => r.appts?.owed, -1], ["appts_owed_low", "Appts owed: fewest first", (r) => r.appts?.owed, 1],
+  ["appts_pct", "Appts % complete: highest first", (r) => r.appts?.pct, -1], ["appts_pct_low", "Appts % complete: lowest first", (r) => r.appts?.pct, 1],
+];
 const rank = { behind: 0, "on pace": 1, null: 2, met: 3 };
 const statusTone = { behind: "amber", "on pace": "cyan", met: "emerald" };
 
@@ -27,8 +36,13 @@ const statusTone = { behind: "amber", "on pace": "cyan", met: "emerald" };
 export default async function GoalsReport({ searchParams }) {
   const sp = await searchParams;
   const show = SHOW.some(([k]) => k === sp?.show) ? sp.show : "open";
-  const [projects, today] = await Promise.all([getProjects(), getBusinessToday()]);
-  const withGoals = projects.filter((p) => !p.raw.deleted_at && (p.raw.lead_goal || p.raw.appt_goal || p.raw.lead_goal_month || p.raw.appt_goal_month));
+  // Narrowed by the client's Sales Rep and the kind of project (Oct 2026), each with All.
+  const type = TYPES.some(([k]) => k === sp?.type) ? sp.type : "";
+  const rep = /^[1-9]\d{0,17}$/.test(sp?.rep ?? "") ? sp.rep : "";
+  const sort = SORTS.find(([k]) => k === sp?.sort) ?? null;
+  const [projects, today, reps] = await Promise.all([getProjects(), getBusinessToday(), getSalesReps()]);
+  const withGoals = projects.filter((p) => !p.raw.deleted_at && (p.raw.lead_goal || p.raw.appt_goal || p.raw.lead_goal_month || p.raw.appt_goal_month)
+    && (!type || p.type === type) && (!rep || String(p.salesRepId) === rep));
   const monthCounts = await getProjectMonthCounts(withGoals.map((p) => p.id));
   // Counted as on each project's page (lead_stats(), by client: one read for each client's projects).
   const counted = await Promise.all([
@@ -53,7 +67,17 @@ export default async function GoalsReport({ searchParams }) {
       : show === "behind" ? r.status === "behind"
       : show === "owed" ? r.owed > 0
       : r.p.status !== "Completed")
-    .sort((a, b) => rank[a.status] - rank[b.status] || (a.days.daysLeft ?? 1e9) - (b.days.daysLeft ?? 1e9) || a.p.name.localeCompare(b.p.name));
+    .sort((a, b) => {
+      // By the figure chosen, those without that goal last; then as before.
+      if (sort) {
+        const [, , of, dir] = sort;
+        const x = of(a);
+        const y = of(b);
+        if (x == null || y == null) { if (x != null || y != null) return x == null ? 1 : -1; }
+        else if (x !== y) return (x - y) * dir;
+      }
+      return rank[a.status] - rank[b.status] || (a.days.daysLeft ?? 1e9) - (b.days.daysLeft ?? 1e9) || a.p.name.localeCompare(b.p.name);
+    });
 
   const owedLeads = rows.reduce((n, r) => n + (r.leads?.owed ?? 0), 0);
   const owedAppts = rows.reduce((n, r) => n + (r.appts?.owed ?? 0), 0);
@@ -64,10 +88,17 @@ export default async function GoalsReport({ searchParams }) {
       <div className="flex-1 p-4 sm:p-6">
         <Card>
           <SectionHeader wrap label="Project Goals" icon={Goal}
-            action={<ParamSelect name="show" label="Show" value={show} options={SHOW.map(([value, label]) => ({ value, label }))} />} />
+            action={(
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-goal-filters>
+                <ParamSelect name="rep" label="Sales Rep" value={rep} options={reps.map((r) => ({ value: String(r.id), label: r.name }))} />
+                <ParamSelect name="type" label="Type" value={type} options={TYPES.map(([value, label]) => ({ value, label }))} />
+                <ParamSelect name="sort" label="Order" value={sort?.[0] ?? ""} placeholder="Behind pace first" options={SORTS.map(([value, label]) => ({ value, label }))} />
+                <ParamSelect name="show" label="Show" value={show} options={SHOW.map(([value, label]) => ({ value, label }))} />
+              </div>
+            )} />
           {rows.length === 0 ? (
             <p className="p-10 text-center text-sm text-muted-foreground">
-              {show === "open" ? "No project has a goal yet. Edit a project to give it a lead or appointment goal." : "No projects to show."}
+              {show === "open" && !rep && !type ? "No project has a goal yet. Edit a project to give it a lead or appointment goal." : "No projects to show."}
             </p>
           ) : (
             <div className="overflow-x-auto">
