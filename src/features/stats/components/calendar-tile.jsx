@@ -75,7 +75,8 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
                   day === today && "ring-1 ring-primary"
                 )}>
                 {Number(day.slice(8))}
-                {count > 1 && !dim ? <sup className="absolute right-0.5 top-0 text-[0.45rem] leading-none">{count}</sup> : null}
+                {/* The day's count, big enough to read at a glance (Oct 2026). */}
+                {count > 1 && !dim ? <sup className="absolute right-1 top-0.5 text-[0.62rem] font-extrabold leading-none" data-tile-count>{count}</sup> : null}
               </Link>
             );
           })}
