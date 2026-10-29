@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
+import { CURSORS, DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
@@ -233,6 +233,21 @@ export default function AppearanceDialog({ open, onOpenChange }) {
           <p className="text-xs text-muted-foreground">JPG, PNG or WebP. It stays on this computer and is softened a little so text reads on it.</p>
         </section>
 
+        {/* The cursor (Oct 2026): the gem arrow, or the computer's own. */}
+        <section className="space-y-2" data-cursor-choice>
+          <h3 className="eyebrow text-muted-foreground">Cursor</h3>
+          <div role="radiogroup" aria-label="Cursor" className="grid grid-cols-2 gap-2">
+            {CURSORS.map(([k, label]) => (
+              <button key={k} type="button" role="radio" aria-checked={(a.cursor ?? "gem") === k} onClick={() => change({ cursor: k })} data-cursor-pick={k}
+                className={cn("rounded-lg border px-3 py-2 text-left transition-colors",
+                  (a.cursor ?? "gem") === k ? "border-primary bg-primary/10" : "border-[var(--panel-border)] hover:border-primary/40")}>
+                <span className={cn("block text-sm font-medium", (a.cursor ?? "gem") === k ? "text-primary" : "")}>{label}</span>
+                <span className="block text-xs text-muted-foreground">{k === "gem" ? "An arrow with a gem that crackles over what you can click" : "Your computer's own pointer"}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
         <section className="space-y-2" data-wallpaper-blur>
           <div className="flex items-center justify-between">
             <h3 className="eyebrow text-muted-foreground">Wallpaper blur</h3>
@@ -264,7 +279,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </section>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur}
+          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur && (a.cursor ?? "gem") === "gem"}
             data-appearance-reset>
             <RotateCcw /> Back to the original
           </Button>

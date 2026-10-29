@@ -12,6 +12,9 @@
  *   light      how much the light theme is dimmed: 0 to 0.3 (100% to 70%)
  *   dark       how much the dark theme is lifted: 0 to 0.3 (100% to 130%)
  *   blur       how much the wallpaper itself is blurred, 0 to MAX_BLUR px
+ *   cursor     "gem" (the default, Oct 2026: an arrow with a gem set in it that
+ *              crackles over what can be clicked, CursorFollower) or "standard"
+ *              (the computer's own pointer)
  */
 export const APPEARANCE_KEY = "lighthouse.appearance";
 export const DESKTOP_WALLPAPERS = [
@@ -34,7 +37,8 @@ export const MAX_BLUR = 24;
 const clampBlur = (v) => Math.min(MAX_BLUR, Math.max(0, Math.round(Number(v) || 0)));
 export const STYLES = [["executive", "Executive"], ["modern", "Modern"], ["classic", "Classic"]];
 const STYLE_KEYS = new Set(STYLES.map(([k]) => k));
-export const DEFAULT_APPEARANCE = { style: "executive", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null };
+export const DEFAULT_APPEARANCE = { style: "executive", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null, cursor: "gem" };
+export const CURSORS = [["gem", "Gem arrow"], ["standard", "Standard"]];
 // Saved before Executive was the default (Sean, Oct 2026): a saved "modern" was then simply the default, so it moves to Executive once.
 const APPEARANCE_VERSION = 2;
 
@@ -104,6 +108,7 @@ export function readAppearance() {
       blur: clampBlur(a.blur),
       tone: TONE_KEYS.has(a.tone) && (a.tone !== "custom" || HEX6.test(a.toneColor ?? "")) ? a.tone : null,
       toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor.toLowerCase() : null,
+      cursor: a.cursor === "standard" ? "standard" : "gem",
     };
   } catch {
     return { ...DEFAULT_APPEARANCE };
@@ -271,10 +276,13 @@ export function applyAppearance(a, { keep = true } = {}) {
   d.style.setProperty("--lift-dark", String(clamp(a.dark)));
   if (clamp(a.light) || clamp(a.dark)) d.dataset.brightness = "";
   else delete d.dataset.brightness;
+  // The cursor they chose: CursorFollower watches this.
+  d.dataset.cursor = a.cursor === "standard" ? "standard" : "gem";
   if (!keep) return true;
   try {
     localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : "executive", wallpaper: a.wallpaper,
       blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark), tone: tone ? a.tone : null, toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor : null,
+      cursor: a.cursor === "standard" ? "standard" : "gem",
       // A colour of their own, worked out, for the script that puts it on before the page draws.
       toneVars: tone && a.tone === "custom" ? [tone.page, tone.menu, tone.accent, tone.accentDark, tone.contrast, tone.contrastDark] : undefined }));
     return true;
@@ -287,8 +295,9 @@ export function applyAppearance(a, { keep = true } = {}) {
 /** The same, as a script run before the page draws: no flash of the default look. */
 // Executive unless Modern (saved since it stopped being the default) or Classic was chosen; then the colours (TONES, or their own).
 const TONE_SCRIPT_TABLE = JSON.stringify(Object.fromEntries(TONES.map(([k, , ...colors]) => [k, colors])));
-export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";d.dataset.executive="";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
+export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";d.dataset.executive="";d.dataset.cursor="gem";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
   + `if(a.style==="classic"){d.dataset.style="classic";delete d.dataset.executive;}else if(a.style==="modern"&&a.v===${APPEARANCE_VERSION})delete d.dataset.executive;`
+  + `if(a.cursor==="standard")d.dataset.cursor="standard";`
   + `var T=${TONE_SCRIPT_TABLE},k=a.tone,tc=null;if(k==="custom"&&a.toneVars&&/^#[0-9a-f]{6}$/i.test(a.toneVars[0]))tc=a.toneVars;else if(typeof k==="string"&&T[k])tc=T[k];`
   + `if(tc){d.dataset.tone=k;["--tone-page","--tone-menu","--tone-accent","--tone-accent-dark","--tone-contrast","--tone-contrast-dark"].forEach(function(p,j){if(/^#[0-9a-f]{6}$/i.test(tc[j]))d.style.setProperty(p,tc[j]);});}`
   + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
