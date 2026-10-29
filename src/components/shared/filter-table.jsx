@@ -50,6 +50,8 @@ import { useReportPending } from "@/components/layout/navigation-progress";
  * `searchable={false}` drops the search box, for a list that cannot be searched.
  * `exportCsv` ({ name, header }, client mode): an Export CSV button saving
  * the rows as filtered just then, each row's `csv` cells under `header`.
+ * `urlFacets` (client mode): facets also kept in the URL, for a page whose
+ * other parts follow them; their starting values come in `selected`.
  */
 const CHIP_LIMIT = 6;
 // Between the values picked in a "multi" filter on a list filtered here (names may hold commas).
@@ -68,6 +70,7 @@ export default function FilterTable({
   paging,
   searchable = true,
   exportCsv = null,
+  urlFacets = [],
 }) {
   const server = Boolean(paging);
   const router = useRouter();
@@ -127,9 +130,22 @@ export default function FilterTable({
     clearTimeout(timer.current);
     timer.current = setTimeout(() => navigate(value.trim(), picked), SEARCH_DEBOUNCE_MS);
   };
+  // A facet filtered here that the page also reads (`urlFacets`): kept in its URL parameter too, so the
+  // server draws what depends on it (Oct 2026: the Clients tiles follow the Sales Rep picked).
+  const writeUrlFacets = (next) => {
+    if (!urlFacets.length) return;
+    const params = new URLSearchParams(searchParams.toString());
+    for (const key of urlFacets) {
+      if (next[key]) params.set(key, next[key]);
+      else params.delete(key);
+    }
+    const qs = params.toString();
+    startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
+  };
   const onPick = (key, value) => {
     const next = { ...picked, [key]: value };
     setPicked(next);
+    if (!server && urlFacets.includes(key)) writeUrlFacets(next);
     if (!server) return;
     clearTimeout(timer.current);
     navigate(q.trim(), next);
@@ -137,6 +153,7 @@ export default function FilterTable({
   const reset = () => {
     setQ("");
     setPicked({});
+    if (!server && urlFacets.some((key) => picked[key])) writeUrlFacets({});
     if (!server) return;
     clearTimeout(timer.current);
     navigate("", {});

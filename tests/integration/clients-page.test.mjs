@@ -65,6 +65,15 @@ try {
   check("a range reaches back: the lead of 40 days ago is in it, a day at a time", wide.hours === null && wide.days.length >= 2 && sum(wide, "leads") >= sum(day, "leads") + 1, JSON.stringify(wide.days.slice(0, 3)));
   check("a manager sees every client's, not only their own pay", sum((await chart(sean)).data, "leads") === sum(day, "leads"));
 
+  section("One Sales Rep's clients");
+  // Sean's client (Oct 2026): picking a Sales Rep on the Clients list counts the tiles for that rep's clients.
+  const only = await admin.sb.rpc("clients_totals", { p_companies: [A] });
+  check("the totals for the clients given, and only theirs", JSON.stringify(only.data?.[0]) === JSON.stringify({ leads_active: 1, leads_resolved: 3, appointments: 1, invalid_appointments: 1 }), JSON.stringify(only.data ?? only.error));
+  check("…none for a client not active", JSON.stringify((await admin.sb.rpc("clients_totals", { p_companies: [P] })).data?.[0]) === JSON.stringify({ leads_active: 0, leads_resolved: 0, appointments: 0, invalid_appointments: 0 }));
+  const theirs = (await admin.sb.rpc("clients_chart", { p_from: today, p_to: today, p_companies: [A] })).data;
+  check("the chart for the clients given: today's 2 leads and 1 appointment", sum(theirs, "leads") === 2 && sum(theirs, "appts") === 1, JSON.stringify(theirs?.days));
+  check("…nothing for no clients", sum((await admin.sb.rpc("clients_chart", { p_from: today, p_to: today, p_companies: [] })).data, "leads") === 0);
+
   section("Who may ask");
   check("an agent may not", Boolean((await chart(agent)).error));
   check("a client may not", Boolean((await chart(client)).error));

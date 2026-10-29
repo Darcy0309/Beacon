@@ -131,11 +131,13 @@ export async function getTimeZones() {
  * and hours for a single day, as the production chart reads them).
  * `leads` and `appts`: { from, to }.
  */
-export async function getClientsOverview({ leads, appts }) {
+export async function getClientsOverview({ leads, appts }, companies = null) {
   const supabase = await createClient();
-  const chart = (r) => supabase.rpc("clients_chart", { p_from: r.from, p_to: r.to });
+  // `companies`: only these clients' (Oct 2026: a Sales Rep's, picked on the list); every active client's when null.
+  const only = companies ? { p_companies: companies } : {};
+  const chart = (r) => supabase.rpc("clients_chart", { p_from: r.from, p_to: r.to, ...only });
   const same = leads.from === appts.from && leads.to === appts.to;
-  const [totals, a, b] = await Promise.all([supabase.rpc("clients_totals"), chart(leads), same ? null : chart(appts)]);
+  const [totals, a, b] = await Promise.all([supabase.rpc("clients_totals", only), chart(leads), same ? null : chart(appts)]);
   for (const r of [totals, a, b]) if (r?.error) throw r.error;
   const shape = (d) => ({ days: d?.days ?? [], hours: d?.hours ?? [] });
   const t = totals.data?.[0] ?? {};

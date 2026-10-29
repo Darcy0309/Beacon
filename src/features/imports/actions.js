@@ -8,7 +8,7 @@ import { removalMatcher } from "@/lib/dedupe";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
-import { sicCode, sicKey } from "@/lib/sic";
+import { sicCode, sicMatcher } from "@/lib/sic";
 
 const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
 // Leads per insert: each one is a round trip, and each is one statement the
@@ -234,18 +234,16 @@ export async function importLeadsCsv(prevState, formData) {
   // the list does not have yet is added to it.
   if (parsed.some(({ lead }) => lead.sic_description)) {
     const byCode = new Map();
-    const byDesc = new Map();
     // A request returns at most 1000 codes: the first page says how many
     // there are, and the rest are asked for together.
     const page = (from, opts) => supabase.from("sic_codes").select("code, description", opts).order("code").range(from, from + 999);
     const first = await page(0, { count: "exact" });
     const rest = await Promise.all(Array.from({ length: Math.max(0, Math.ceil((first.count ?? 0) / 1000) - 1) }, (_, k) => page((k + 1) * 1000)));
     for (const { data } of [first, ...rest]) {
-      for (const r of data ?? []) {
-        byCode.set(r.code, r.description);
-        if (r.description && !byDesc.has(sicKey(r.description))) byDesc.set(sicKey(r.description), r.code);
-      }
+      for (const r of data ?? []) byCode.set(r.code, r.description);
     }
+    // A description alone (the old system's records) finds its code: & and "and", NEC, the lists' short forms (sicMatcher).
+    const codeFor = sicMatcher([...byCode].map(([code, description]) => ({ code, description })));
     const fresh = new Map();
     for (const { lead } of parsed) {
       if (lead.sic_code) lead.sic_code = sicCode(lead.sic_code);
@@ -255,7 +253,7 @@ export async function importLeadsCsv(prevState, formData) {
       if (lead.sic_code) {
         if (!byCode.has(lead.sic_code) && !fresh.has(lead.sic_code)) fresh.set(lead.sic_code, desc);
       } else {
-        const code = byDesc.get(sicKey(desc));
+        const code = codeFor(desc);
         if (code) lead.sic_code = code;
         // No code for it: keep the description on the lead rather than lose it.
         else lead.description ??= desc;

@@ -42,12 +42,18 @@ export default async function ClientsPage({ searchParams }) {
   // ?lr= and ?ar=: the range of the Leads chart and of the Appointments chart (a month to begin with).
   const range = (v) => chartRange(typeof v === "string" && v !== "custom" ? v : "1M", today);
   const ranges = { leads: range(sp?.lr), appts: range(sp?.ar) };
-  const [clients, groups, zones, overview, reps] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getClientsOverview(ranges), getSalesReps()]);
+  // ?rep=: the Sales Rep picked on the list below (Oct 2026); the tiles count that rep's clients.
+  const rep = typeof sp?.rep === "string" && sp.rep.trim() ? sp.rep.trim() : "";
+  const [all, groups, zones, everyone, reps] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(),
+    rep ? null : getClientsOverview(ranges), getSalesReps()]);
+  const clients = rep ? all.filter((c) => (c.salesRep ?? "Not set") === rep) : all;
+  const overview = everyone ?? await getClientsOverview(ranges, clients.map((c) => c.id));
+  const whose = rep ? (rep === "Not set" ? "clients with no Sales Rep" : `${rep}'s clients`) : "active clients";
 
   const active = clients.filter((c) => c.status === "Active");
   const paused = clients.filter((c) => c.status === "Paused").length;
   const completed = clients.filter((c) => c.status === "Completed").length;
-  const params = Object.fromEntries(["lr", "ar"].filter((k) => typeof sp?.[k] === "string").map((k) => [k, sp[k]]));
+  const params = Object.fromEntries(["lr", "ar", "rep"].filter((k) => typeof sp?.[k] === "string").map((k) => [k, sp[k]]));
 
   return (
     <>
@@ -56,7 +62,7 @@ export default async function ClientsPage({ searchParams }) {
         {/* One row on a desktop, four tiles of one width; whichever is pointed at takes more of the row while it is (.expand-row). */}
         <div className="expand-row grid grid-cols-1 gap-4 md:grid-cols-2 xl:flex" data-from="xl" data-client-tiles>
           <StatTile label="Active Clients" value={String(active.length)} icon={Building2} accent="var(--neon-cyan)"
-            note={`${(clients.length - active.length).toLocaleString()} inactive · ${clients.length.toLocaleString()} in all`}
+            note={`${(clients.length - active.length).toLocaleString()} inactive · ${clients.length.toLocaleString()} in all${rep ? ` · ${whose}` : ""}`}
             className="animate-pop-in" style={{ "--min": "11rem", "--grow": 1.8 }}>
             <dl className="mt-3 space-y-1 text-sm" data-client-statuses>
               {[["Active", active.length, "var(--neon-emerald)"], ["Paused", paused, "var(--neon-amber)"], ["Completed", completed, "var(--neon-blue)"]].map(([name, n, color]) => (
@@ -69,11 +75,11 @@ export default async function ClientsPage({ searchParams }) {
           </StatTile>
           <TrendTile label="Leads" icon={<Target className="size-4" />} accent="var(--neon-emerald)" series="leads" param="lr" params={params}
             value={(overview.leadsActive + overview.leadsResolved).toLocaleString()}
-            note={`${overview.leadsActive.toLocaleString()} active · ${overview.leadsResolved.toLocaleString()} resolved · active clients`}
+            note={`${overview.leadsActive.toLocaleString()} active · ${overview.leadsResolved.toLocaleString()} resolved · ${whose}`}
             data={overview.leads} range={ranges.leads} developed="developed" className="animate-pop-in" style={{ animationDelay: "60ms", "--min": "14.5rem", "--grow": 1.8 }} />
           <TrendTile label="Appointments" icon={<CalendarCheck className="size-4" />} accent="var(--neon-amber)" series="appts" param="ar" params={params}
             value={overview.appointments.toLocaleString()}
-            note={`${overview.invalid.toLocaleString()} invalid · active clients`}
+            note={`${overview.invalid.toLocaleString()} invalid · ${whose}`}
             data={overview.appts} range={ranges.appts} developed="set" className="animate-pop-in" style={{ animationDelay: "120ms", "--min": "14.5rem", "--grow": 1.8 }} />
           <BreakdownTile label="Active Clients By" icon={<Globe2 className="size-4" />} accent="var(--neon-violet)"
             groups={[
@@ -98,7 +104,10 @@ export default async function ClientsPage({ searchParams }) {
             ]}
             placeholder="Search clients, contacts, cities…"
             empty="No client accounts yet. Add the first with New client."
-            rows={clients.map((c) => ({
+            // The Sales Rep picked is in the URL too, so the tiles above follow it.
+            selected={rep ? { rep } : undefined}
+            urlFacets={["rep"]}
+            rows={all.map((c) => ({
               id: c.id,
               search: [c.name, c.contact, c.city, c.state, c.zone, c.group, c.manager, c.salesRep, c.email, c.phone].filter((v) => v && v !== "—").join(" "),
               facets: { status: c.status, state: c.state ?? "", zone: c.zone ?? "", group: c.group ?? "", manager: c.manager, rep: c.salesRep ?? "Not set" },

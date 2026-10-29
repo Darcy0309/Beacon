@@ -154,6 +154,33 @@ try {
   if (process.env.SHOTS) await admin.screenshot(`${process.env.SHOTS}/clients-page.png`);
   sql(`update public.companies set status = 'active' where id = ${otherClient}`);
 
+  section("The Clients page: tiles for one Sales Rep");
+  // Sean's client (Oct 2026): picking a Sales Rep on the list counts the tiles for that rep's clients.
+  sql(`update public.companies set sales_rep_id = ${adminId} where id = ${companyNow}`);
+  await admin.go("/clients?lr=1D&ar=1D", 6000);
+  await until(() => admin.ev(`!!document.querySelector('select[aria-label="Filter by Sales Rep"]')`));
+  const rep = sql(`select coalesce(nullif(first_name, ''), email) || coalesce(' ' || left(nullif(last_name, ''), 1) || '.', '') from public.users where id = ${adminId}`);
+  await admin.fill('select[aria-label="Filter by Sales Rep"]', rep);
+  check("the Sales Rep picked goes in the address", Boolean(await until(async () => new URL(await admin.ev("location.href")).searchParams.get("rep") === rep)), rep);
+  const repCompanies = `(select id from public.companies where sales_rep_id = ${adminId} and deleted_at is null)`;
+  const repCount = Number(sql(`select count(*) from public.companies where id in ${repCompanies}`));
+  const repLeadsToday = Number(sql(`select count(*) from public.pay_events pe join public.projects p on p.id = pe.project_id join public.companies c on c.id = p.company_id
+    where c.id in ${repCompanies} and c.status = 'active' and p.deleted_at is null and pe.kind = 'lead' and not pe.is_chargeback
+      and (pe.created_at at time zone public.business_tz())::date = (now() at time zone public.business_tz())::date`));
+  const firstRep = await until(async () => { const t = await admin.ev(`document.querySelector('[data-client-statuses]')?.closest('[data-panel]')?.innerText.replace(/\\s+/g, ' ') ?? ''`);
+    return t.includes(`${rep}'s clients`) && t; }, { timeout: 10000 });
+  check("1st tile: that rep's clients", Boolean(firstRep) && new RegExp(`${repCount} in all`).test(firstRep), firstRep);
+  check("2nd and 3rd tiles: their leads and appointments", (await tile("leads")).includes(`${rep}'s clients`) && new RegExp(`${repLeadsToday} developed`).test(await tile("leads"))
+    && (await tile("appts")).includes(`${rep}'s clients`), `${await tile("leads")} || ${await tile("appts")}`);
+  const repActive = Number(sql(`select count(*) from public.companies where id in ${repCompanies} and status = 'active'`));
+  const repLeads = sql(`select count(*) filter (where c.stage = 'appt') from public.lead_classes c join public.projects p on p.id = c.project_id
+    join public.companies co on co.id = p.company_id where co.id in ${repCompanies} and co.status = 'active'`);
+  check("…their numbers once counted up", Boolean(await until(async () => (await admin.ev(`document.querySelector('[data-client-statuses]')?.closest('[data-panel]')?.innerText.replace(/\\s+/g, ' ') ?? ''`)).startsWith(`Active Clients ${repActive} `)
+    && (await tile("leads")).startsWith(`Leads ${repLeads} `), { timeout: 8000 })), `${repActive} active, ${repLeads} leads: ${await tile("leads")}`);
+  check("…the list still offers every rep", Number(await admin.ev(`document.querySelector('select[aria-label="Filter by Sales Rep"]').options.length`)) > 2);
+  await admin.fill('select[aria-label="Filter by Sales Rep"]', "");
+  check("All again: every active client's", Boolean(await until(async () => /active clients/.test(await tile("leads")) && !new URL(await admin.ev("location.href")).searchParams.get("rep"))), await tile("leads"));
+
   section("Agency Group in Production & Pay");
   // A call today on a project of each client.
   const companyOf = Number(sql(`select id from public.companies where name = ${lit(NAME)}`));
