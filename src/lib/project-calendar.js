@@ -80,10 +80,14 @@ export function eventsOn(day, { appointments = [], blocks = [], notes = [] }) {
 }
 
 /** Per day from `from` to `to`: how many appointments and notes, and whether any of it is blocked ("day" or "part"). */
-export function dayMarks({ appointments = [], blocks = [], notes = [] }, from, to) {
+export function dayMarks({ appointments = [], blocks = [], notes = [] }, from, to, today = null) {
   const marks = {};
   for (const a of appointments) {
-    if (a.date >= from && a.date <= to) (marks[a.date] ||= { appointments: 0, blocked: null }).appointments += 1;
+    if (a.date < from || a.date > to) continue;
+    const m = (marks[a.date] ||= { appointments: 0, blocked: null });
+    m.appointments += 1;
+    // Still to be confirmed (today or later, not confirmed), as the dashboard's calendar counts them (Oct 2026).
+    if (today && !a.confirmed && a.date >= today) m.waiting = (m.waiting ?? 0) + 1;
   }
   for (const n of notes) {
     if (n.date >= from && n.date <= to) {

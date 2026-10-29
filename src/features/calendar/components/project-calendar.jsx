@@ -195,8 +195,9 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
   }, [covered, extra, month, grid, calendarId]);
 
   const data = covered ? initial : extra[month] ?? { appointments: [], blocks: [], notes: [] };
-  const marks = useMemo(() => dayMarks(data, grid[0], grid[41]), [data, grid]);
+  const marks = useMemo(() => dayMarks(data, grid[0], grid[41], today), [data, grid, today]);
   const events = eventsOn(selected, data);
+  const waitingOn = (a) => !a.confirmed && a.date >= today;
   const reload = () => {
     setBlocking(false);
     setNoting(false);
@@ -262,7 +263,9 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
                   style={m?.blocked === "day" ? { background: `repeating-linear-gradient(135deg, color-mix(in srgb, ${BLOCKED} 28%, transparent) 0 3px, transparent 3px 6px)` } : undefined}>
                   {Number(day.slice(8))}
                   <span className="mt-px flex h-1.5 items-center gap-px">
-                    {m?.appointments ? <span className="rounded-full bg-primary px-[3px] text-[0.5rem] font-bold leading-[0.6rem] text-primary-foreground">{m.appointments}</span> : null}
+                    {/* In the dashboard's colours: yellow while any is still to be confirmed. */}
+                    {m?.appointments ? <span className="rounded-full px-[3px] text-[0.5rem] font-bold leading-[0.6rem] text-white" data-day-waiting={m.waiting || undefined}
+                      style={{ background: m.waiting ? "var(--event-waiting)" : "var(--event-appt)" }}>{m.appointments}</span> : null}
                     {m?.blocked === "part" ? <span className="h-1 w-2 rounded-full" style={{ background: BLOCKED }} /> : null}
                     {m?.notes ? <span className="size-1 rounded-full" style={{ background: NOTED }} data-day-notes={m.notes} /> : null}
                   </span>
@@ -271,7 +274,8 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
             })}
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.6rem] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full bg-primary" /> Appointments</span>
+            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: "var(--event-appt)" }} /> Appointments</span>
+            <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: "var(--event-waiting)" }} /> Awaiting confirmation</span>
             <span className="flex items-center gap-1"><span className="h-1 w-2 rounded-full" style={{ background: BLOCKED }} /> Blocked out</span>
             <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: NOTED }} /> Notes</span>
           </div>
@@ -316,11 +320,14 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
                 )}
               </li>
             ) : (
-              <li key={e.key} data-appointment={e.appointment.id} className="flex items-start gap-1.5 rounded-md bg-primary/8 px-2 py-1.5 text-xs">
-                <CalendarCheck className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              // The dashboard's colours (Oct 2026): still to be confirmed in yellow, and said so.
+              <li key={e.key} data-appointment={e.appointment.id} data-awaiting={waitingOn(e.appointment) || undefined} className="flex items-start gap-1.5 rounded-md px-2 py-1.5 text-xs"
+                style={{ background: `color-mix(in srgb, ${waitingOn(e.appointment) ? "var(--event-waiting)" : "var(--event-appt)"} 10%, transparent)` }}>
+                <CalendarCheck className="mt-0.5 size-3.5 shrink-0" style={{ color: waitingOn(e.appointment) ? "var(--event-waiting)" : "var(--event-appt)" }} />
                 <span className="min-w-0 flex-1">
                   <span className="font-semibold tabular-nums">{e.appointment.time ?? "No time"}</span>
                   <span className="text-muted-foreground"> · {e.appointment.duration} min{e.appointment.confirmed ? " · confirmed" : ""}</span>
+                  {waitingOn(e.appointment) ? <span className="block font-semibold text-[var(--event-waiting)]">Awaiting confirmation</span> : null}
                   {leadLinks && e.appointment.leadId ? (
                     <Link href={`/leads/${e.appointment.leadId}`} className="block truncate hover:text-primary">{e.appointment.company ?? "Appointment"}</Link>
                   ) : <span className="block truncate">{e.appointment.company ?? "Appointment"}</span>}

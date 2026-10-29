@@ -178,7 +178,7 @@ export default function CalendarView(props) {
 }
 
 const APPT_TONE = {
-  Scheduled: "cyan", Confirmed: "emerald", Held: "violet",
+  "Awaiting confirmation": "amber", Scheduled: "cyan", Confirmed: "emerald", Held: "violet",
   Rescheduled: "amber", Cancelled: "rose", "No Show": "slate",
 };
 
@@ -555,7 +555,10 @@ function Block({ a, dense = false, compact = false }) {
       onClick={() => open(a)}
       data-focused-appointment={focused || undefined}
       data-tip={a.id}
-      aria-label={`${a.time} ${a.ampm} ${a.co}`}
+      // Still to be confirmed (Oct 2026): tinted in the dashboard's yellow, even as a one-line block.
+      data-awaiting={a.waiting || undefined}
+      style={a.waiting ? { background: "color-mix(in srgb, var(--event-waiting) 14%, var(--card))", borderColor: "color-mix(in srgb, var(--event-waiting) 45%, transparent)" } : undefined}
+      aria-label={`${a.time} ${a.ampm} ${a.co}${a.waiting ? ", awaiting confirmation" : ""}`}
       className={cn(
         "flex h-full w-full min-w-0 gap-1.5 overflow-hidden rounded-md border border-[var(--panel-border)] bg-card/90 px-1.5 py-1 text-left transition-colors hover:border-primary/50 hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         compact && "h-auto",
@@ -576,7 +579,9 @@ function Block({ a, dense = false, compact = false }) {
           </span>
           <span className="block truncate text-xs font-medium">{a.co}</span>
           {!compact ? (
-            <span className="block truncate text-[0.66rem] text-muted-foreground">{a.detail}</span>
+            <span className="block truncate text-[0.66rem] text-muted-foreground">
+              {a.waiting ? <><span className="font-semibold text-[var(--event-waiting)]">{a.detail.split(" · ")[0]}</span>{a.detail.slice(a.detail.indexOf(" · "))}</> : a.detail}
+            </span>
           ) : null}
         </span>
       )}
@@ -838,7 +843,10 @@ function ApptRow({ a }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{a.co}</div>
-        <div className="truncate text-xs text-muted-foreground">{a.detail.split(" · ")[0]}</div>
+        {/* Still to be confirmed: said, in the dashboard's yellow (Oct 2026). */}
+        <div className={cn("truncate text-xs", a.waiting ? "font-semibold text-[var(--event-waiting)]" : "text-muted-foreground")} data-awaiting={a.waiting || undefined}>
+          {a.detail.split(" · ")[0]}
+        </div>
       </div>
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md text-[0.6rem] font-bold text-white"
         style={{ background: a.repC }} aria-label={a.rep}>

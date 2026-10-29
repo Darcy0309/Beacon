@@ -21,10 +21,16 @@ const APPT_SELECT = `
   )
 `;
 
-function toApptView(a) {
+// Not confirmed yet and still to come (today or later), as the dashboard's calendar has it.
+export const AWAITING = "Awaiting confirmation";
+
+function toApptView(a, today = null) {
   const lead = one(a.lead);
   // Its kind as its call result says (Appointment, Appointment-Phone, Appointment-Confirmed), not the old system's status.
   const kind = appointmentKind(one(lead?.result)?.name, Boolean(a.confirmed_at));
+  // Every calendar (Oct 2026: the client's admins and managers): one still to be confirmed reads Awaiting confirmation,
+  // in the dashboard's yellow, rather than Scheduled, so it stands out on a day or week.
+  const waiting = Boolean(today) && !a.confirmed_at && a.appt_date >= today;
   const user = one(a.user);
   const rep = a.rep_name || shortName(user);
   const { time, ampm } = splitTime(a.appt_time);
@@ -35,16 +41,17 @@ function toApptView(a) {
     time,
     ampm,
     co: lead?.company_name ?? "—",
-    detail: [kind, lead?.contact_name, `${a.duration_min ?? 30} min`]
+    detail: [waiting ? AWAITING : kind, lead?.contact_name, `${a.duration_min ?? 30} min`]
       .filter(Boolean)
       .join(" · "),
     rep,
     repI: initialsOf(rep),
     repC: colorFor(rep),
-    bar: BAR[kind] ?? BAR.Appointment,
+    bar: waiting ? "bg-[var(--event-waiting)]" : BAR[kind] ?? BAR.Appointment,
     leadId: lead?.id ?? null,
     appt_time: a.appt_time,
-    status: one(a.status)?.name ?? "—",
+    status: waiting ? AWAITING : one(a.status)?.name ?? "—",
+    waiting,
     // Where the block sits on a day/week time grid.
     startMin: timeRank(a.appt_time),
     duration: a.duration_min ?? 30,
@@ -69,7 +76,7 @@ function toApptView(a) {
 async function fetchAppointments({ from, to, projectIds = null } = {}) {
   // A calendar of no projects (a client with none yet) is empty, not everyone's.
   if (projectIds && !projectIds.length) return [];
-  const supabase = await createClient();
+  const [supabase, today] = await Promise.all([createClient(), getBusinessToday()]);
   // A busy month passes the API's 1,000-row cap, so it is read in pages.
   const rows = await readAll((first, last) => {
     // Ones marked invalid were charged back: they are not on the calendar or in its counts.
@@ -81,7 +88,7 @@ async function fetchAppointments({ from, to, projectIds = null } = {}) {
     return q;
   });
   return rows
-    .map(toApptView)
+    .map((a) => toApptView(a, today))
     .sort((a, b) => a.date.localeCompare(b.date) || timeRank(a.appt_time) - timeRank(b.appt_time));
 }
 

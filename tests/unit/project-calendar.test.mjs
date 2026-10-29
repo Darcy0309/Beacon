@@ -55,6 +55,10 @@ is("…several calendars together name theirs", weeklyBlock({ projectId: 3, days
 const noted = { ...cal, notes: [{ id: 7, date: "2026-10-20", start: 600, text: "Owner back from vacation" }] };
 is("a note sits at its time among the day's events", eventsOn("2026-10-20", noted).filter((e) => e.kind === "note").map((e) => [e.key, e.start, e.end]), [["n7", 600, 630]]);
 is("…counted on its day", dayMarks(noted, "2026-10-01", "2026-10-31")["2026-10-20"].notes, 1);
+// Oct 2026: still to be confirmed (today or later, not confirmed) counted apart, for the dashboard's yellow.
+const waitingCal = { appointments: [{ date: "2026-10-28", confirmed: false }, { date: "2026-10-30", confirmed: false }, { date: "2026-10-30", confirmed: true }] };
+is("appointments still to be confirmed, from today on", JSON.stringify(dayMarks(waitingCal, "2026-10-01", "2026-10-31", "2026-10-29")),
+  JSON.stringify({ "2026-10-28": { appointments: 1, blocked: null }, "2026-10-30": { appointments: 2, blocked: null, waiting: 1 } }));
 is("…and booking at that time is not warned of it", slotClashes({ date: "2026-10-20", time: "10:00 AM" }, { appointments: [], blocks: [], notes: noted.notes }), []);
 is("no notes: the calendar is as it was", eventsOn("2026-10-20", cal).some((e) => e.kind === "note"), false);
 

@@ -65,7 +65,9 @@ try {
     const r = b.getBoundingClientRect(); return { x: r.x + 24, y: r.y + r.height / 2 }; })()`));
   const tip = await until(() => admin.ev(`document.querySelector('[role=tooltip]')?.innerText ?? null`), { timeout: 4000 });
   check("a tip shows who, when and how it stands, and that a click opens it",
-    /Same Hour Co/.test(tip ?? "") && /6:00 PM · 30 min/.test(tip ?? "") && /Scheduled/.test(tip ?? "") && /Click for details/.test(tip ?? ""), JSON.stringify(tip));
+    /Same Hour Co/.test(tip ?? "") && /6:00 PM · 30 min/.test(tip ?? "")
+    // Still to be confirmed, it says so rather than Scheduled (Oct 2026).
+    && /Awaiting confirmation/.test(tip ?? "") && /Click for details/.test(tip ?? ""), JSON.stringify(tip));
   await admin.hover({ x: 5, y: 5 });
   check("…and goes when the pointer leaves", Boolean(await until(() => admin.ev(`!document.querySelector('[role=tooltip]')`))));
 

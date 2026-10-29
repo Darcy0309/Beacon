@@ -52,6 +52,15 @@ try {
     && (await sean.ev(`document.querySelector('[data-project-calendar] [data-day="${D2}"]')?.dataset.blocked`)) === "day");
   await sean.click(`[data-project-calendar] [data-day="${D1}"]`);
   check("a day clicked: what is scheduled, beside the month", Boolean(await until(async () => /10:00 AM · 30 min .*Booked Co/.test(await dayText(sean)))), await dayText(sean));
+  // Oct 2026: in the dashboard's colours, one still to be confirmed said so, in yellow.
+  check("…still to be confirmed: Awaiting confirmation, in the dashboard's yellow", /Awaiting confirmation/.test(await dayText(sean))
+    && (await sean.ev(`document.querySelector('[data-project-calendar] [data-appointment][data-awaiting]')?.getAttribute('style') ?? ''`)).includes("--event-waiting")
+    && (await sean.ev(`document.querySelector('[data-project-calendar] [data-day="${D1}"] [data-day-waiting]')?.dataset.dayWaiting`)) === "1", await dayText(sean));
+  await sean.go(`/calendar?project=${APPT}&view=day&d=${D1}`, 6000);
+  const block = await until(() => sean.ev(`(() => { const b = document.querySelector('button[data-awaiting]'); return b ? (b.getAttribute('aria-label') ?? '') + ' | ' + (b.getAttribute('style') ?? '') : null; })()`));
+  check("on the full calendar too: the day's appointment marked awaiting confirmation, tinted yellow", /awaiting confirmation/.test(block ?? "") && /--event-waiting/.test(block ?? ""), block);
+  await sean.go(`/leads/${lead}?project=${DBDV}`, 6000);
+  await until(() => sean.ev(`!!document.querySelector('[data-project-calendar] [data-day="${D2}"]')`));
   await sean.click(`[data-project-calendar] [data-day="${D2}"]`);
   check("…or that it is blocked out, and why", Boolean(await until(async () => /Blocked · All day .*Office closed/.test(await dayText(sean)))), await dayText(sean));
 
