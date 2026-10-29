@@ -49,6 +49,7 @@ import { getProjectInfo } from "@/features/project-info/queries";
 import { leadPlace } from "@/lib/project-info";
 import HoldNotice from "@/features/delivery/components/hold-notice";
 import TransferDialog from "@/features/leads/components/transfer-dialog";
+import CallBackLater from "@/features/leads/components/call-back-later";
 import { MarkLeadButton } from "@/features/removals/components/mark-names";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
@@ -252,6 +253,11 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  // An appointment found invalid, its lead not since given another (Sean, Oct 2026: "call next year"):
+  // put back on the call list on a later day. And, until that day, when it comes back.
+  const callBackLater = staff && canRecord && r.stage === "appt" && !["appointment", "confirm"].includes(r.result?.effect)
+    && activity.appointments.some((a) => a.invalid);
+  const callBackOn = r.call_back_on && String(r.call_back_on) > today ? String(r.call_back_on) : null;
   // The appointment an Appointment result would move (record_call_result's rule: still to come or
   // waiting for QA, never one that failed it): the panel starts from its day and time.
   const movable = openAppt && openAppt.qa_status !== "failed" && (openAppt.qa_status === "pending" || String(openAppt.appt_date) >= today)
@@ -422,6 +428,7 @@ export default async function LeadSheet({ params, searchParams }) {
             <div className="border-t border-[var(--panel-border)] px-4 py-3">
               <div className="flex flex-wrap items-center gap-1.5 pb-2">
                 {r.result ? <ToneBadge tone={r.result.viable ? "cyan" : "slate"}>{r.result.name}</ToneBadge> : null}
+                {staff && callBackOn ? <span data-call-back-on={callBackOn}><ToneBadge tone="amber">Call back {shortDate(callBackOn)}</ToneBadge></span> : null}
                 {admin && daysOut !== null ? (
                   <span
                     className="rounded-full border px-2.5 py-0.5 text-[0.62rem] font-bold uppercase tracking-[0.12em]"
@@ -435,6 +442,9 @@ export default async function LeadSheet({ params, searchParams }) {
                 ) : null}
               </div>
               {/* The business's calendar day: a 6 pm call in Phoenix is already tomorrow in UTC. */}
+              {callBackLater && !callBackOn ? (
+                <div className="pb-2"><CallBackLater leadId={lead.id} company={lead.co} today={today} /></div>
+              ) : null}
               <Fact label="Last worked">{r.date_last_worked ? shortDate(todayIn(tz, new Date(r.date_last_worked))) : "Not yet"}</Fact>
               <Fact label="Lead account mgr">{leadManager ? fullName(leadManager) : null}</Fact>
               <Fact label="Appt mgr">{apptManager ? fullName(apptManager) : null}</Fact>

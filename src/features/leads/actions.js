@@ -335,3 +335,21 @@ export async function recordLeadFile({ leadId, path, name, size }) {
   revalidatePath(`/leads/${id}`);
   return ok({ id: data.id });
 }
+
+/**
+ * Call an invalid appointment's name back later (Sean, Oct 2026: "no time this
+ * year, call next year"): call_back_later() puts it back on its project's list
+ * on that day, as Lead-Not Shopping, notes why, and reminds its account
+ * manager; the appointment stays invalid, and counted so.
+ */
+export async function callBackLater({ leadId, on, note }) {
+  const id = /^[1-9]\d{0,17}$/.test(String(leadId ?? "")) ? Number(leadId) : null;
+  if (!id) return fail("That lead no longer exists.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(on ?? ""))) return fail("Choose the day to call back.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("call_back_later", { p_lead: id, p_on: on, p_note: String(note ?? "").trim() || null });
+  if (error) return fail(error.message);
+  await logActivity(supabase, "lead.call_back", { entity: "lead", entityId: id, detail: `on ${on}` });
+  revalidatePath(`/leads/${id}`);
+  return ok(data);
+}
