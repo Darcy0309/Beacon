@@ -111,6 +111,13 @@ try {
   const everyone = await until(async () => { const r = await seanShown(); return has(r, "Cactus Roofing") ? r : null; }, { timeout: 8000 });
   check("…and Everyone shows the rest", has(everyone ?? [], "Bell Stone Granite") && has(everyone ?? [], "Cactus Roofing"), JSON.stringify(everyone));
 
+  section("The message in their chat, with its link");
+  // Oct 2026: the chat showed the message with nothing to open; it links to the lead, as the inbox does.
+  const nid = sql(`select id from public.notifications where user_id = ${SEAN} and title like ${lit(`%${TAG} Arizona Cleanpros%`)} order by id desc limit 1`);
+  await sean.go(`/notifications/${nid}`, 6000);
+  const link = await until(() => sean.ev(`(() => { const a = document.querySelector('[data-message-link]'); return a ? a.getAttribute('href') + ' | ' + a.innerText.trim() : null; })()`), { timeout: 10000 });
+  check("the message in the chat links to its lead", (link ?? "").startsWith(`/leads/${A.lead} | Open lead`), link);
+
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1600, height: 1100 });
   await client.go("/appointments", 4000);

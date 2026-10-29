@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Send, Loader2, MessageSquare, UserX, Reply, SmilePlus, Smile, X } from "lucide-react";
+import { Send, Loader2, MessageSquare, UserX, Reply, SmilePlus, Smile, X, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useMounted } from "@/components/shared/local-time";
@@ -16,6 +16,8 @@ import GifPicker from "@/features/notifications/components/gif-picker";
 import { VoicePlayer, VoiceRecorder } from "@/features/notifications/components/voice-message";
 import { QUICK_REACTIONS, onlyEmoji } from "@/lib/emoji";
 import LinkedText from "@/components/shared/linked-text";
+import Link from "@/components/shared/intent-link";
+import { linkLabel } from "@/features/notifications/kinds";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
@@ -145,7 +147,7 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
           ({ new: n }) => {
             if (n.kind !== "message" || n.sender_id !== person.id) return;
             setExtra((xs) => [...xs, {
-              id: n.id, mine: false, title: n.title, body: n.body,
+              id: n.id, mine: false, title: n.title, body: n.body, link: n.link,
               reply_to: n.reply_to, read_at: n.read_at, created_at: n.created_at,
               quote_id: n.quote_id, attachment: n.attachment, reactions: [],
             }]);
@@ -317,6 +319,14 @@ export default function NotificationThread({ anchorId, anchorUnread, person, mes
                           className="block h-auto max-h-80 w-auto max-w-full rounded-xl" />
                       ) : null}
                       {text ? <div className={cn(att && "mt-1")}><LinkedText text={text} /></div> : null}
+                      {/* What it was sent about (Oct 2026: a question about an appointment links to its lead). */}
+                      {m.link && /^\/(?![/\\])/.test(m.link) ? (
+                        <Link href={m.link} data-message-link
+                          className={cn("mt-1.5 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors",
+                            m.mine ? "border-primary-foreground/40 hover:bg-primary-foreground/15" : "border-primary/40 text-primary hover:bg-primary/10")}>
+                          {linkLabel(m.link)} <ArrowUpRight className="size-3" />
+                        </Link>
+                      ) : null}
                     </div>
                     {groups.length ? (
                       <div className={cn("mt-1 flex flex-wrap gap-1", m.mine && "justify-end")} data-reactions>
