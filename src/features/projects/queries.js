@@ -90,11 +90,14 @@ export async function listProjects(params) {
  * developed and sent on, and what each still has to call (names on a DB dev
  * project, leads on an appointment project). `total`: every lead once.
  */
-export async function getProjectStats() {
+export async function getProjectStats(companies = null) {
   const supabase = await createClient();
+  // `companies`: only these clients' projects (Oct 2026: the Sales Rep, client or Agency Group picked on the list).
+  let list = supabase.from("projects").select("id, amount_paid, type:project_types(code), status:project_statuses(name)");
+  if (companies) list = list.in("company_id", companies.length ? companies : [0]);
   const [{ data, error }, stats] = await Promise.all([
-    supabase.from("projects").select("id, amount_paid, type:project_types(code), status:project_statuses(name)"),
-    supabase.rpc("projects_lead_stats"),
+    list,
+    supabase.rpc("projects_lead_stats", companies ? { p_companies: companies } : {}),
   ]);
   if (error) throw error;
   if (stats.error) throw stats.error;
@@ -120,6 +123,23 @@ export async function getProject(id) {
   const { data, error } = await supabase.from("projects").select(PROJECT_SELECT).eq("id", id).maybeSingle();
   if (error) throw error;
   return data ? toProjectView(data) : null;
+}
+
+/**
+ * The clients the Projects list is narrowed to by its client filters (a
+ * Sales Rep's, a client by name, an Agency Group's), for its tiles to count
+ * them too; null when none of those is picked.
+ */
+export async function getFilteredClients({ rep, client, group } = {}) {
+  if (!rep && !client && !group) return null;
+  const supabase = await createClient();
+  let q = supabase.from("companies").select("id");
+  if (rep) q = q.eq("sales_rep_id", rep);
+  if (group) q = q.eq("agency_group_id", group);
+  if (client) q = q.eq("name", client);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map((c) => c.id);
 }
 
 /** One project's true totals (project_overview()): every lead, appointment and call on it, not a page of them. */

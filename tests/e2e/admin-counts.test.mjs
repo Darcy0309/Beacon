@@ -45,6 +45,20 @@ try {
   const pipeline = await until(() => tile("Leads Across Campaigns"));
   check("Leads Across Campaigns counts the leads, in the pipeline", (pipeline ?? "").includes(leads.toLocaleString()) && /in the pipeline/i.test(pipeline ?? "") && !/on the book/i.test(pipeline ?? ""), `${pipeline} (${leads} leads)`);
   check("…and the database development count reads as the tile's heading does", await admin.ev(`document.querySelector('[data-dbdev-count]')?.classList.contains('stat-label') ?? false`));
+
+  // Oct 2026: the tiles follow the list's Sales Rep, as on the Clients page.
+  sql(`update public.companies set sales_rep_id = ${MIKE} where id = ${company}`);
+  const mike = sql(`select concat_ws(' ', nullif(first_name, ''), nullif(last_name, '')) from public.users where id = ${MIKE}`);
+  const mikes = `(select p.id from public.projects p join public.companies c on c.id = p.company_id where c.sales_rep_id = ${MIKE})`;
+  const mikeProjects = Number(sql(`select count(*) from ${mikes} x`));
+  const mikeLeads = Number(sql(`select count(*) from public.lead_classes where stage = 'appt' and project_id in ${mikes}`));
+  await admin.go(`/projects?rep=${MIKE}`, 5000);
+  const campaigns = await until(async () => { const t = await tile("Active Campaigns"); return t?.includes(`${mike}'s clients`) && t; });
+  check("with a Sales Rep picked, the tiles count that rep's clients' projects", Boolean(campaigns) && campaigns.includes(`${mikeProjects} total`), `${campaigns} (${mikeProjects})`);
+  const repLeads = await until(async () => { const t = await tile("Leads Across Campaigns"); return t?.startsWith(`Leads Across Campaigns ${mikeLeads.toLocaleString()} `) && t; }, { timeout: 8000 });
+  check("…and their leads", Boolean(repLeads) && repLeads.includes(`${mike}'s clients`), `${repLeads ?? await tile("Leads Across Campaigns")} (${mikeLeads})`);
+  await admin.go("/projects", 5000);
+
   const heads = await admin.ev(`[...document.querySelectorAll('th')].map((t) => t.textContent.trim())`);
   check("each project's Leads, with what it still has to call beside them", heads.includes("Leads") && heads.includes("To call"), JSON.stringify(heads));
 

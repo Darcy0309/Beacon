@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
-import { listProjects, getProjectStats, getOfficeOptions } from "@/features/projects/queries";
+import { listProjects, getFilteredClients, getProjectStats, getOfficeOptions } from "@/features/projects/queries";
 import { getClientGroups } from "@/features/clients/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
@@ -39,23 +39,27 @@ export default async function ProjectsPage({ searchParams }) {
     delete params.filters.rep;
   }
   const [{ rows, total }, stats, lookups, offices, clientGroups, reps] = await Promise.all([
-    listProjects(params), getProjectStats(), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(), client ? [] : getSalesReps(),
+    // The tiles follow the list's client filters (Oct 2026: a Sales Rep's clients, as on the Clients page).
+    listProjects(params), (client ? Promise.resolve(null) : getFilteredClients(params.filters)).then(getProjectStats), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(), client ? [] : getSalesReps(),
   ]);
   const { projects } = stats;
   const statsOf = new Map(projects.map((p) => [p.id, p]));
   const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
   const options = { ...lookups, ...offices };
 
-  // Tiles describe every project; the table shows one page of them.
+  // Tiles describe every project (of the clients picked by Sales Rep, client or Agency Group); the table shows one page of them.
+  const repName = params.filters.rep ? reps.find((r) => String(r.id) === params.filters.rep)?.name : null;
+  const groupName = params.filters.group ? groupOptions.find((g) => g.value === params.filters.group)?.label : null;
+  const whose = [repName ? `${repName}'s clients` : null, params.filters.client, groupName].filter(Boolean).join(" · ");
   const active = projects.filter((p) => p.status === "Active").length;
   // Leads, not every name loaded: each once, whichever projects it passed through.
   const totalLeads = stats.total.leads;
   const contract = projects.reduce((s, p) => s + Number(p.amount ?? 0), 0);
 
   const tiles = [
-    { label: "Active Campaigns", value: String(active), note: `${projects.length} total`,
+    { label: "Active Campaigns", value: String(active), note: `${projects.length} total${whose ? ` · ${whose}` : ""}`,
       icon: FolderKanban, accent: "var(--neon-cyan)", series: projects.map((p) => p.leads), bars: true },
-    { label: "Leads Across Campaigns", value: totalLeads.toLocaleString(), note: "in the pipeline",
+    { label: "Leads Across Campaigns", value: totalLeads.toLocaleString(), note: whose ? `in the pipeline · ${whose}` : "in the pipeline",
       icon: Target, accent: "var(--neon-emerald)", series: projects.map((p) => p.leads) },
     { label: "Appointment Setting", value: String(projects.filter((p) => p.type === "APPT").length),
       // As the tile's own heading reads.
