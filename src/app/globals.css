@@ -1697,22 +1697,35 @@ html[data-style][data-executive].dark [data-nav-active] { background-color: var(
 }
 
 /* ---------------------------------------------------------------------------
-   The gem cursor (Oct 2026, CursorFollower). The computer's own
-   pointer is hidden only while the follower runs (html[data-cursor-live]),
-   and comes back where it says more: in a text box, on a drag handle, over
-   something switched off. */
+   The gem cursor (Oct 2026, CursorFollower, lib/gem-cursor.js). The arrow and
+   its emerald are the computer's own cursor, as an image, so it moves exactly
+   as fast as the system's pointer: at rest, larger and glowing over what can
+   be clicked, the gem pushed in while pressed. Only while CursorFollower runs
+   (html[data-cursor-live], which also sets the images); the usual cursor
+   stays where it says more: typing, dragging, something switched off. */
 html[data-cursor-live],
 html[data-cursor-live] * {
-  cursor: none !important;
+  cursor: var(--gem-cursor-rest), auto !important;
 }
-html[data-cursor-live] :is(input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="reset"], [type="range"], [type="file"], [type="color"], [type="image"]), textarea, [contenteditable]:not([contenteditable="false"]), .cursor-text) {
+html[data-cursor-live] :is(a[href], button, [role="button"], [role="radio"], [role="tab"], [role="menuitem"], [role="option"], summary, select, label:has(> select),
+  input[type="checkbox"], input[type="radio"], input[type="range"], input[type="file"], input[type="color"], input[type="submit"], input[type="button"], .cursor-pointer, [data-tip]),
+html[data-cursor-live] :is(a[href], button, [role="button"], [role="radio"], [role="tab"], [role="menuitem"], [role="option"], summary, label:has(> select), .cursor-pointer, [data-tip]) * {
+  cursor: var(--gem-cursor-hover), pointer !important;
+}
+html[data-cursor-live] :is(a[href], button, [role="button"], [role="radio"], [role="tab"], [role="menuitem"], [role="option"], summary, .cursor-pointer, [data-tip]):active,
+html[data-cursor-live] :is(a[href], button, [role="button"], [role="radio"], [role="tab"], [role="menuitem"], [role="option"], summary, .cursor-pointer, [data-tip]):active * {
+  cursor: var(--gem-cursor-press), pointer !important;
+}
+/* The usual cursor where it says more (the doubled attribute outranks the gem's rules above). */
+html[data-cursor-live][data-cursor-live] :is(input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="reset"], [type="range"], [type="file"], [type="color"], [type="image"]), textarea, [contenteditable]:not([contenteditable="false"]), .cursor-text) {
   cursor: text !important;
 }
-html[data-cursor-live] .cursor-cell { cursor: cell !important; }
-html[data-cursor-live] .cursor-grab { cursor: grab !important; }
-html[data-cursor-live] :is(.cursor-grabbing, .active\:cursor-grabbing:active) { cursor: grabbing !important; }
-html[data-cursor-live] :is(:disabled, [aria-disabled="true"]) { cursor: not-allowed !important; }
+html[data-cursor-live][data-cursor-live] .cursor-cell { cursor: cell !important; }
+html[data-cursor-live][data-cursor-live] .cursor-grab { cursor: grab !important; }
+html[data-cursor-live][data-cursor-live] :is(.cursor-grabbing, .active\:cursor-grabbing:active) { cursor: grabbing !important; }
+html[data-cursor-live][data-cursor-live] :is(:disabled, [aria-disabled="true"], :disabled *, [aria-disabled="true"] *) { cursor: not-allowed !important; }
 
+/* What an image can't do, drawn on the page over the cursor: the current, and a click's rings. */
 .gem-cursor {
   position: fixed;
   left: 0;
@@ -1720,54 +1733,14 @@ html[data-cursor-live] :is(:disabled, [aria-disabled="true"]) { cursor: not-allo
   z-index: 2147483647;
   pointer-events: none;
   will-change: transform;
-  transition: opacity 0.12s ease;
-  /* Clean and easy to see: a dark shadow under it, and a soft teal glow round it. */
-  filter: drop-shadow(0 1.5px 1.5px rgb(0 0 0 / 0.45)) drop-shadow(0 0 3px rgb(47 224 176 / 0.35));
 }
 .gem-cursor[data-hidden="true"] { opacity: 0; }
 .gem-cursor svg {
   display: block;
   overflow: visible;
   transform-origin: 3px 2px;
-  transition: transform 0.15s ease;
-}
-.gem-cursor-frame {
-  fill: none;
-  stroke: url(#gem-cursor-gold);
-  stroke-width: 1.7;
-  stroke-linejoin: round;
-}
-.gem-cursor-crystal-facets {
-  fill: none;
-  stroke: rgb(190 255 238 / 0.35);
-  stroke-width: 0.5;
-}
-/* The emerald in its bezel, set in like a button: a press pushes it in. */
-.gem-cursor-gem {
-  transform-box: view-box;
-  transform-origin: 16.5px 24.5px;
-  transition: transform 0.12s ease, filter 0.2s ease;
-}
-.gem-cursor-bezel {
-  fill: url(#gem-cursor-gold);
-  stroke: #5a4318;
-  stroke-width: 0.5;
-}
-.gem-cursor-facets {
-  fill: none;
-  stroke: rgb(220 255 245 / 0.45);
-  stroke-width: 0.35;
-}
-/* Over something to click: a little larger, brighter, the glow up, the current on. */
-.gem-cursor[data-hover="true"] {
-  filter: drop-shadow(0 1.5px 1.5px rgb(0 0 0 / 0.45)) drop-shadow(0 0 6px rgb(47 224 176 / 0.75));
 }
 .gem-cursor[data-hover="true"] svg { transform: scale(1.1); }
-.gem-cursor[data-hover="true"] .gem-cursor-gem { filter: brightness(1.2) saturate(1.15); }
-.gem-cursor[data-press="true"] .gem-cursor-gem {
-  transform: scale(0.88) translateY(0.5px);
-  filter: brightness(1.35);
-}
 .gem-cursor-electric {
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -1793,7 +1766,6 @@ html[data-cursor-live] :is(:disabled, [aria-disabled="true"]) { cursor: not-allo
 @keyframes gem-flow {
   to { stroke-dashoffset: -19; }
 }
-/* The rings a click sends out. */
 .gem-cursor-ripple {
   fill: none;
   stroke: #5ff2d6;
@@ -1808,12 +1780,6 @@ html[data-cursor-live] :is(:disabled, [aria-disabled="true"]) { cursor: not-allo
   0% { opacity: 0.9; transform: scale(1); }
   100% { opacity: 0; transform: scale(2.6); }
 }
-/* A page on its way: the gem glows on and off. */
-html[data-navigating] .gem-cursor-gem { animation: gem-busy 0.8s ease-in-out infinite alternate; }
-@keyframes gem-busy {
-  to { filter: brightness(1.6) drop-shadow(0 0 3px #2fe0b0); }
-}
 @media (prefers-reduced-motion: reduce) {
-  .gem-cursor svg, .gem-cursor-gem, .gem-cursor-electric { transition: opacity 0.15s ease; }
-  .gem-cursor-bolt, html[data-navigating] .gem-cursor-gem { animation: none; }
+  .gem-cursor-bolt { animation: none; }
 }

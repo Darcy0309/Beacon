@@ -1,37 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { BEZEL, GEM, TIP, at, cursorImages, pt } from "@/lib/gem-cursor";
 
-// What sets the gem crackling: anything that acts on a click (buttons, links, cards, the menu; as globals.css gives the hand).
+// What sets the gem crackling: anything that acts on a click (buttons, links, cards, the menu). globals.css gives these the hover cursor.
 const CLICKABLE = 'a[href], button, [role="button"], [role="radio"], [role="tab"], [role="menuitem"], [role="option"], summary, select, label:has(> select), '
   + 'input[type="checkbox"], input[type="radio"], input[type="range"], input[type="file"], input[type="color"], input[type="submit"], input[type="button"], .cursor-pointer, [data-tip]';
-// Where the computer's own cursor says more (globals.css keeps it there): typing, dragging, a cell, something switched off.
+// Where the computer's usual cursor says more (globals.css keeps it there): typing, dragging, a cell, something switched off.
 const OWN_CURSOR = 'input:not([type="checkbox"], [type="radio"], [type="button"], [type="submit"], [type="reset"], [type="range"], [type="file"], [type="color"], [type="image"]), '
   + 'textarea, [contenteditable]:not([contenteditable="false"]), .cursor-text, .cursor-cell, .cursor-grab, .cursor-grabbing, :disabled, [aria-disabled="true"]';
-
-// The client's design (Oct 2026): a gold-framed arrowhead of teal crystal, its tip at TIP, two feet below
-// and a wing to the right, and a large round emerald in a gold bezel set in its middle.
-const TIP = [3, 2];
-const POINTS = { wing: [38, 31], notchR: [26, 31], tail: [32, 47], notch: [21, 36], foot: [12, 45] };
-const ARROW = `M${TIP} L${POINTS.wing} L${POINTS.notchR} L${POINTS.tail} L${POINTS.notch} L${POINTS.foot} Z`;
-const GEM = [16.5, 24.5];
-const BEZEL = 8.2;
-const STONE = 6.9;
-const at = (r, a) => [GEM[0] + r * Math.cos(a), GEM[1] + r * Math.sin(a)];
-const pt = ([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`;
-// The crystal's facets: from the tip and the gem's edge out to the arrow's corners.
-const CRYSTAL = [
-  `M${TIP} L${pt(at(BEZEL, -2.2))}`, `M${POINTS.wing} L${pt(at(BEZEL, -0.25))}`, `M${POINTS.foot} L${pt(at(BEZEL, 1.95))}`,
-  `M${POINTS.tail} L${pt(at(BEZEL, 0.95))}`, `M${POINTS.notchR} L${pt(at(BEZEL, 0.35))}`, `M${POINTS.notch} L${pt(at(BEZEL, 1.35))}`,
-].join(" ");
-// The emerald, a round brilliant seen from above: an octagonal table, a star round it, and the girdle's facets.
-const TABLE = Array.from({ length: 8 }, (_, i) => at(3.1, (Math.PI / 4) * i + Math.PI / 8));
-const STAR = Array.from({ length: 8 }, (_, i) => at(5.1, (Math.PI / 4) * i));
-const GIRDLE = Array.from({ length: 16 }, (_, i) => at(STONE, (Math.PI / 8) * i));
-const FACETS = [
-  ...TABLE.map((p, i) => `M${pt(p)} L${pt(STAR[i])} L${pt(TABLE[(i + 7) % 8])}`),
-  ...STAR.map((p, i) => `M${pt(p)} L${pt(GIRDLE[(2 * i + 15) % 16])} M${pt(p)} L${pt(GIRDLE[(2 * i + 1) % 16])}`),
-].join(" ");
 const ARCS = 3;
 const SPARKS = 7;
 
@@ -58,8 +35,8 @@ function tendril() {
   let [x, y] = at(BEZEL, a);
   let d = `M${pt([x, y])}`;
   for (let i = 0; i < 6; i++) {
-    const step = 2.4 + Math.random() * 1.6;
     const turn = a + (Math.random() - 0.5) * 1.6;
+    const step = 2.4 + Math.random() * 1.6;
     x += step * Math.cos(turn);
     y += step * Math.sin(turn);
     d += ` L${pt([x, y])}`;
@@ -68,16 +45,16 @@ function tendril() {
 }
 
 /**
- * The gem cursor (Oct 2026: the whole app, to the client's design): a
- * gold-framed arrowhead of teal crystal with a large emerald set in it like
- * a button. Over anything that can be clicked (a button, a link, a card, the
- * menu) electric current crackles round the gem and leaps off it, with
- * sparks; a click presses the gem in and sends rings out from it. Only with
- * a mouse (not a touch screen), and only while this runs:
- * html[data-cursor-live] is what hides the computer's own pointer
- * (globals.css), so if it never starts, nothing is hidden. Over a text box,
- * a drag handle or something switched off, the computer's own cursor shows
- * instead. Appearance can turn it off ("standard").
+ * The gem cursor (Oct 2026: the whole app, to the client's design). The
+ * arrow and its emerald are the computer's own cursor, as an image
+ * (lib/gem-cursor.js, set on <html> as --gem-cursor-*), so it moves exactly
+ * as fast as the system's pointer; a larger, glowing one over what can be
+ * clicked, and the gem pushed in on a press. What an image can't do is drawn
+ * here, over it: over something to click, electric current crackling round
+ * the gem with tendrils and sparks; on a click, rings sent out from it.
+ * Only with a mouse (not a touch screen), and only while this runs
+ * (html[data-cursor-live]); over a text box, a drag handle or something
+ * switched off, the computer's usual cursor. Appearance can turn it off.
  */
 export default function CursorFollower() {
   const box = useRef(null);
@@ -90,9 +67,13 @@ export default function CursorFollower() {
     const html = document.documentElement;
     const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
     const still = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const images = cursorImages();
+    // The most immediate pointer event the browser has (Chrome: as the mouse reports, not once a frame).
+    const MOVE = "onpointerrawupdate" in window ? "pointerrawupdate" : "pointermove";
     let on = false;
     let crackle = 0;
     let hovering = false;
+    let lastTarget = null;
 
     const set = (key, value) => { if (box.current) box.current.dataset[key] = value ? "true" : "false"; };
     // The current, redrawn many times a second while over something to click: it crackles, and the sparks flicker.
@@ -120,15 +101,21 @@ export default function CursorFollower() {
     };
     const move = (e) => {
       if (e.pointerType && e.pointerType !== "mouse") return;
-      if (box.current) box.current.style.transform = `translate3d(${e.clientX - TIP[0]}px, ${e.clientY - TIP[1]}px, 0)`;
+      // The effects sit on the cursor: placed where the pointer is, larger with it over something to click.
+      if (box.current) {
+        box.current.style.transform = `translate3d(${e.clientX - TIP[0]}px, ${e.clientY - TIP[1]}px, 0)`;
+        box.current.style.visibility = "visible";
+      }
+      // What is under the pointer, looked at again only when it changes.
       const target = e.target instanceof Element ? e.target : null;
+      if (target === lastTarget) return;
+      lastTarget = target;
       const own = Boolean(target?.closest(OWN_CURSOR));
       set("hidden", own);
       charge(!own && Boolean(target?.closest(CLICKABLE)));
     };
-    // A click: the gem pressed in, and rings sent out from it (the animation started again each time).
+    // A click: rings sent out from the gem (the animation started again each time).
     const pressDown = () => {
-      set("press", true);
       if (still.matches) return;
       ripples.current.forEach((r) => {
         if (!r) return;
@@ -137,16 +124,17 @@ export default function CursorFollower() {
         r.classList.add("gem-cursor-ripple-go");
       });
     };
-    const pressUp = () => set("press", false);
-    const leave = () => { set("hidden", true); charge(false); };
+    const leave = () => { set("hidden", true); charge(false); lastTarget = null; };
 
     const start = () => {
       if (on) return;
       on = true;
+      html.style.setProperty("--gem-cursor-rest", images.rest);
+      html.style.setProperty("--gem-cursor-hover", images.hover);
+      html.style.setProperty("--gem-cursor-press", images.press);
       html.dataset.cursorLive = "";
-      window.addEventListener("pointermove", move, { passive: true });
+      window.addEventListener(MOVE, move, { passive: true });
       window.addEventListener("pointerdown", pressDown, { passive: true });
-      window.addEventListener("pointerup", pressUp, { passive: true });
       document.addEventListener("pointerleave", leave);
       window.addEventListener("blur", leave);
     };
@@ -155,9 +143,8 @@ export default function CursorFollower() {
       on = false;
       delete html.dataset.cursorLive;
       leave();
-      window.removeEventListener("pointermove", move);
+      window.removeEventListener(MOVE, move);
       window.removeEventListener("pointerdown", pressDown);
-      window.removeEventListener("pointerup", pressUp);
       document.removeEventListener("pointerleave", leave);
       window.removeEventListener("blur", leave);
     };
@@ -176,25 +163,9 @@ export default function CursorFollower() {
   }, []);
 
   return (
-    <div ref={box} aria-hidden className="gem-cursor" data-hidden="true" data-hover="false" data-press="false">
+    <div ref={box} aria-hidden className="gem-cursor" data-hidden="true" data-hover="false" style={{ visibility: "hidden" }}>
       <svg width="44" height="50" viewBox="0 0 44 50" overflow="visible">
         <defs>
-          <linearGradient id="gem-cursor-gold" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#fbf0c8" />
-            <stop offset="45%" stopColor="#d9b56a" />
-            <stop offset="100%" stopColor="#8f6a2e" />
-          </linearGradient>
-          <linearGradient id="gem-cursor-crystal" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#2fae98" stopOpacity="0.95" />
-            <stop offset="55%" stopColor="#0f5a52" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="#073531" stopOpacity="0.95" />
-          </linearGradient>
-          <radialGradient id="gem-cursor-emerald" cx="38%" cy="32%" r="75%">
-            <stop offset="0%" stopColor="#b6ffe9" />
-            <stop offset="35%" stopColor="#2fe0b0" />
-            <stop offset="75%" stopColor="#0f9c78" />
-            <stop offset="100%" stopColor="#065343" />
-          </radialGradient>
           <filter id="gem-cursor-glow" x="-80%" y="-80%" width="260%" height="260%">
             <feGaussianBlur stdDeviation="1.3" result="blur" />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
@@ -204,17 +175,6 @@ export default function CursorFollower() {
         {[0, 1].map((i) => (
           <circle key={i} ref={(el) => { ripples.current[i] = el; }} cx={GEM[0]} cy={GEM[1]} r={BEZEL} className="gem-cursor-ripple" />
         ))}
-        {/* The arrowhead: teal crystal in a gold frame, its facets catching the light. */}
-        <path d={ARROW} fill="url(#gem-cursor-crystal)" />
-        <path d={CRYSTAL} className="gem-cursor-crystal-facets" />
-        <path d={ARROW} className="gem-cursor-frame" />
-        {/* The emerald in its gold bezel, set in like a button. */}
-        <g className="gem-cursor-gem">
-          <circle cx={GEM[0]} cy={GEM[1]} r={BEZEL} className="gem-cursor-bezel" />
-          <circle cx={GEM[0]} cy={GEM[1]} r={STONE} fill="url(#gem-cursor-emerald)" />
-          <path d={FACETS} className="gem-cursor-facets" />
-          <ellipse cx={GEM[0] - 2.4} cy={GEM[1] - 2.8} rx="1.9" ry="1" transform={`rotate(-35 ${GEM[0] - 2.4} ${GEM[1] - 2.8})`} fill="white" opacity="0.85" />
-        </g>
         {/* The current: bolts round the gem, tendrils leaping off it, and sparks, all glowing. */}
         <g className="gem-cursor-electric" filter="url(#gem-cursor-glow)">
           {Array.from({ length: ARCS }, (_, i) => <path key={`a${i}`} ref={(el) => { arcs.current[i] = el; }} className="gem-cursor-bolt" />)}
