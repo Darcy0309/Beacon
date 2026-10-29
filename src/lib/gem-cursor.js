@@ -18,6 +18,8 @@ export const HOVER_SCALE = 1.1;
 
 const P = { wing: [38, 31], notchR: [26, 31], tail: [32, 47], notch: [21, 36], foot: [12, 45] };
 const ARROW = `M${TIP} L${P.wing} L${P.notchR} L${P.tail} L${P.notch} L${P.foot} Z`;
+/** The arrow's outline, corner by corner: the current runs along the outside of it. */
+export const OUTLINE = [TIP, P.wing, P.notchR, P.tail, P.notch, P.foot];
 export const at = (r, a) => [GEM[0] + r * Math.cos(a), GEM[1] + r * Math.sin(a)];
 export const pt = ([x, y]) => `${x.toFixed(2)} ${y.toFixed(2)}`;
 // The crystal's facets: from the tip and the gem's edge out to the arrow's corners.

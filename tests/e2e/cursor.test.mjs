@@ -43,6 +43,15 @@ try {
   check("over what can be clicked, the larger glowing gem", isGem(linkCursor) && linkCursor !== (await state()).body && /feFlood/.test(decodeURIComponent(linkCursor)), linkCursor.slice(0, 60));
   check("…and the current is on round it", Boolean(await until(async () => { const s = await state(); return s.hover === "true" && Number(s.current) > 0.5 && s.bolts.every((d) => d.startsWith("M")); })),
     JSON.stringify(await state()));
+  // The system draws its cursor over everything, this too: the current has to be outside the arrow to be seen (Oct 2026).
+  const outside = await page.ev(`(() => {
+    const poly = [[3, 2], [38, 31], [26, 31], [32, 47], [21, 36], [12, 45]];
+    const inside = ([x, y]) => poly.reduce((c, [x1, y1], i) => { const [x2, y2] = poly[(i + 1) % poly.length];
+      return ((y1 > y) !== (y2 > y)) && x < ((x2 - x1) * (y - y1)) / (y2 - y1) + x1 ? !c : c; }, false);
+    const pts = [...document.querySelectorAll('.gem-cursor-bolt, .gem-cursor-tendril, .gem-cursor-arc')]
+      .flatMap((p) => [...(p.getAttribute('d') ?? '').matchAll(/(-?[\\d.]+) (-?[\\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]));
+    return pts.length ? pts.filter((q) => !inside(q)).length / pts.length : 0; })()`);
+  check("…drawn outside the arrow, where the cursor doesn't cover it", outside > 0.9, outside);
   const first = (await state()).bolts.join("|");
   check("…and crackles: the bolts keep changing", Boolean(await until(async () => (await state()).bolts.join("|") !== first, { timeout: 2000 })));
   const there = await page.ev(`(() => { const r = document.querySelector('a[href], button:not(:disabled)').getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);

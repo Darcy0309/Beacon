@@ -1747,6 +1747,7 @@ html[data-cursor-live][data-cursor-live] :is(:disabled, [aria-disabled="true"], 
 }
 .gem-cursor[data-hover="true"] .gem-cursor-electric { opacity: 1; }
 .gem-cursor-bolt,
+.gem-cursor-arc,
 .gem-cursor-tendril {
   fill: none;
   stroke-linecap: round;
@@ -1754,14 +1755,15 @@ html[data-cursor-live][data-cursor-live] :is(:disabled, [aria-disabled="true"], 
 }
 .gem-cursor-bolt {
   stroke: #7ff8e0;
-  stroke-width: 0.9;
+  stroke-width: 1.2;
   stroke-dasharray: 7 2.5;
   animation: gem-flow 0.3s linear infinite;
 }
 /* A white-hot core in one, flowing the other way in another. */
-.gem-cursor-bolt:nth-child(2) { stroke: #eafffb; stroke-width: 0.6; animation-direction: reverse; }
-.gem-cursor-bolt:nth-child(3) { stroke-width: 0.7; animation-duration: 0.22s; }
-.gem-cursor-tendril { stroke: #5ff2d6; stroke-width: 0.55; }
+.gem-cursor-bolt:nth-child(2) { stroke: #eafffb; stroke-width: 0.8; animation-direction: reverse; }
+.gem-cursor-bolt:nth-child(3) { stroke-width: 0.9; animation-duration: 0.22s; }
+.gem-cursor-arc { stroke: #5ff2d6; stroke-width: 0.7; stroke-opacity: 0.85; }
+.gem-cursor-tendril { stroke: #9ff9e6; stroke-width: 0.8; }
 .gem-cursor-spark { fill: #e8fff9; }
 @keyframes gem-flow {
   to { stroke-dashoffset: -19; }
@@ -1777,8 +1779,8 @@ html[data-cursor-live][data-cursor-live] :is(:disabled, [aria-disabled="true"], 
 .gem-cursor-ripple.gem-cursor-ripple-go { animation: gem-ripple 0.55s ease-out; }
 .gem-cursor-ripple.gem-cursor-ripple-go + .gem-cursor-ripple.gem-cursor-ripple-go { animation-delay: 0.12s; }
 @keyframes gem-ripple {
-  0% { opacity: 0.9; transform: scale(1); }
-  100% { opacity: 0; transform: scale(2.6); }
+  0% { opacity: 0.9; transform: scale(0.85); }
+  100% { opacity: 0; transform: scale(1.7); }
 }
 @media (prefers-reduced-motion: reduce) {
   .gem-cursor-bolt { animation: none; }
