@@ -55,6 +55,21 @@ export function addMonths(iso, n) {
 }
 
 export const addYears = (iso, n) => addMonths(iso, 12 * n);
+
+/**
+ * When to call a name back, `days` (90) before its next renewal (Sean, Oct
+ * 2026): the renewal on file moved on a year at a time (an X-date is often
+ * last year's) until that day is after today. A year from today with none.
+ */
+export function beforeRenewal(renewal, today, days = 90) {
+  const on = fromIso(String(renewal ?? "").slice(0, 10)) ? String(renewal).slice(0, 10) : null;
+  if (!on) return addYears(today, 1);
+  const years = Math.max(0, Number(today.slice(0, 4)) - Number(on.slice(0, 4)) - 1);
+  for (let k = years; ; k += 1) {
+    const day = addDays(addYears(on, k), -days);
+    if (day > today) return day;
+  }
+}
 /** 0 for Sunday to 6 for Saturday. */
 export const weekdayOf = (iso) => fromIso(iso).getUTCDay();
 /** Whole days from a to b (negative when b is earlier). */

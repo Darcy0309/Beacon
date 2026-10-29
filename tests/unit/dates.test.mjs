@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Unit tests for the calendar's date helpers: arithmetic, the month grid, formatting, and reading typed dates. */
 import {
-  addDays, addMonths, clampIso, daysBetween, formatIso, formatRange, fromIso, isIsoDate, makeIso,
+  addDays, addMonths, beforeRenewal, clampIso, daysBetween, formatIso, formatRange, fromIso, isIsoDate, makeIso,
   monthEnd, monthGrid, parseTypedDate, relativeDay, todayIn, todayIso, weekdayOf,
 } from "../../src/lib/dates.js";
 
@@ -78,6 +78,15 @@ is("no year: this year by default", read("Jan 5"), "2026-01-05");
 is("no year, future: next January", read("Jan 5", { future: true }), "2027-01-05");
 is("no year, future: later this year stays", read("12/24", { future: true }), "2026-12-24");
 is("no year, future: today counts", read("10/1", { future: true }), T);
+
+// --- calling back before the renewal -----------------------------------------
+is("90 days before a renewal still to come", beforeRenewal("2027-03-01", "2026-10-29"), "2026-12-01");
+is("last year's renewal: before the next one", beforeRenewal("2025-03-01", "2026-10-29"), "2026-12-01");
+is("90 days before it already past: the year after's", beforeRenewal("2026-12-15", "2026-10-29"), "2027-09-16");
+is("a renewal long ago, moved on to the next", beforeRenewal("2019-06-30", "2026-10-29"), "2027-04-01");
+is("…a day before today is not after today", beforeRenewal("2027-01-27", "2026-10-29"), "2027-10-29");
+is("no renewal on file: a year from today", beforeRenewal(null, "2026-10-29"), "2027-10-29");
+is("a timestamp reads as its day", beforeRenewal("2027-03-01T00:00:00", "2026-10-29"), "2026-12-01");
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll date tests passed.\n");
 process.exit(failures ? 1 : 0);

@@ -443,7 +443,7 @@ export default async function LeadSheet({ params, searchParams }) {
               </div>
               {/* The business's calendar day: a 6 pm call in Phoenix is already tomorrow in UTC. */}
               {callBackLater && !callBackOn ? (
-                <div className="pb-2"><CallBackLater leadId={lead.id} company={lead.co} today={today} /></div>
+                <div className="pb-2"><CallBackLater leadId={lead.id} company={lead.co} today={today} renewal={r.renewal ? String(r.renewal).slice(0, 10) : null} /></div>
               ) : null}
               <Fact label="Last worked">{r.date_last_worked ? shortDate(todayIn(tz, new Date(r.date_last_worked))) : "Not yet"}</Fact>
               <Fact label="Lead account mgr">{leadManager ? fullName(leadManager) : null}</Fact>

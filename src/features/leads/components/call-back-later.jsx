@@ -10,20 +10,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import DatePicker from "@/components/shared/date-picker";
 import { callBackLater } from "@/features/leads/actions";
-import { addDays, addYears, formatIso } from "@/lib/dates";
+import { addDays, beforeRenewal, formatIso } from "@/lib/dates";
 import { reach } from "@/lib/reach";
 
 /**
  * Call back later, for a lead whose appointment was found invalid (Sean, Oct
- * 2026: "no time this year, call next year"): the day (a year from today to
- * begin with) and why. It comes back onto its project's call list that day
- * as Lead-Not Shopping, with a reminder; the appointment stays invalid, and
- * counted so, its pay charged back.
+ * 2026: "no time this year, call next year"): the day (90 days before its
+ * next renewal to begin with, a year from today with none on file) and why.
+ * It comes back onto its project's call list that day as Lead-Not Shopping,
+ * with a reminder; the appointment stays invalid, and counted so, its pay
+ * charged back.
  */
-export default function CallBackLater({ leadId, company, today }) {
+export default function CallBackLater({ leadId, company, today, renewal }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [on, setOn] = useState(() => addYears(today, 1));
+  const first = beforeRenewal(renewal, today);
+  const [on, setOn] = useState(first);
   const [note, setNote] = useState("");
   const [saving, start] = useTransition();
 
@@ -36,7 +38,7 @@ export default function CallBackLater({ leadId, company, today }) {
   });
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) { setOn(addYears(today, 1)); setNote(""); } }}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (o) { setOn(first); setNote(""); } }}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline" data-call-back-later><CalendarClock /> Call back later</Button>
       </DialogTrigger>
@@ -49,7 +51,7 @@ export default function CallBackLater({ leadId, company, today }) {
           </DialogDescription>
         </DialogHeader>
         <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save(); }}>
-          <Field label="Call back on">
+          <Field label="Call back on" hint={renewal ? `90 days before its renewal, ${formatIso(addDays(first, 90), "medium")}` : "No renewal date on file: a year from today"}>
             <DatePicker name="on" value={on} onChange={setOn} min={addDays(today, 1)} max={addDays(today, 731)} presets={["nextMonth", "nextYear"]} future required aria-label="Call back on" />
           </Field>
           <Field label="Why (optional)">
