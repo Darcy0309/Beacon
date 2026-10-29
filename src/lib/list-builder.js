@@ -88,12 +88,34 @@ export function sicSheetRows(rows) {
   return [...out.values()];
 }
 
-/** The tree from its rows: { byCode, roots }, each node { code, name, kind, parent, children }. */
+/**
+ * The 6-digit codes from the SIC list (Sean's 6-digit sheet, [[code, name]])
+ * added to the tree's rows (Oct 2026), each under its industry (or, without
+ * one, its 2-digit group) and of its industry's class, its name in ordinary
+ * case; those the tree has already, and those with nowhere to go, left out.
+ */
+export function withDetails(rows, details = []) {
+  if (!details?.length) return rows;
+  const by = new Map(rows.map((r) => [r.code, r]));
+  const out = [...rows];
+  for (const [code, name] of details) {
+    if (!/^\d{6}$/.test(code ?? "") || by.has(code) || !name) continue;
+    const up = by.get(code.slice(0, 4)) ?? by.get(code.slice(0, 2));
+    if (!up) continue;
+    const row = { code, name: sheetName(String(name).trim()), kind: "detail", parent: up.code, sort: 1e9, class: up.kind === "industry" ? up.class ?? null : null };
+    by.set(code, row);
+    out.push(row);
+  }
+  return out;
+}
+
+/** The tree from its rows: { byCode, roots }, each node { code, name, kind, parent, up, children }. */
 export function buildTree(rows) {
   const byCode = new Map(rows.map((r) => [r.code, { ...r, children: [] }]));
   const roots = [];
   for (const node of byCode.values()) {
     const up = node.parent ? byCode.get(node.parent) : null;
+    node.up = up ?? null;
     if (up) up.children.push(node);
     else roots.push(node);
   }
@@ -103,27 +125,76 @@ export function buildTree(rows) {
   return { byCode, roots };
 }
 
+/*
+ * What a list is pulled by: an industry (4 digits) whole, or some of its
+ * 6-digit codes (Oct 2026). Ticking an industry keeps its code, which takes
+ * in every business under it (the 6-digit list may not name them all);
+ * ticking some of its 6-digit codes keeps those; all of them is the industry.
+ */
+const isDetail = (n) => n.kind === "detail";
+const isIndustry = (n) => n.kind === "industry" && n.children.every(isDetail);
+
+/** The nodes at the foot of a branch, as a list is pulled: industries, and a 6-digit code with no industry over it. */
+function unitsOf(node) {
+  if (!node.children.length || isDetail(node) || isIndustry(node)) return [node];
+  return node.children.flatMap(unitsOf);
+}
+
 /** The codes at the foot of a branch (the ones a list is pulled by); a code with nothing under it is its own. */
-export function leavesOf(node) {
-  if (!node.children.length) return [node.code];
-  return node.children.flatMap(leavesOf);
+export const leavesOf = (node) => unitsOf(node).map((n) => n.code);
+
+/** How much of one at the foot (or a 6-digit code) is ticked: its own code or its industry's, or some of its 6-digit codes. */
+function unitState(node, picked) {
+  if (picked.has(node.code) || (isDetail(node) && node.up && isIndustry(node.up) && picked.has(node.up.code))) return "all";
+  return node.children.some((c) => picked.has(c.code)) ? "some" : "none";
 }
 
 /** How much of a branch is ticked: "all", "some" or "none". */
 export function branchState(node, picked) {
-  const leaves = leavesOf(node);
-  const n = leaves.filter((c) => picked.has(c)).length;
-  return n === 0 ? "none" : n === leaves.length ? "all" : "some";
+  const states = unitsOf(node).map((u) => unitState(u, picked));
+  if (states.every((x) => x === "all")) return "all";
+  return states.every((x) => x === "none") ? "none" : "some";
 }
 
-/** A branch ticked or unticked: every code at its foot. */
+/** How many of what is under a branch are ticked, of how many: its 6-digit codes for an industry, else its industries. */
+export function pickedOf(node, picked) {
+  if (isIndustry(node) && node.children.length) {
+    const all = node.children.length;
+    return [picked.has(node.code) ? all : node.children.filter((c) => picked.has(c.code)).length, all];
+  }
+  const units = unitsOf(node);
+  return [units.filter((u) => unitState(u, picked) !== "none").length, units.length];
+}
+
+/**
+ * A branch ticked or unticked. An industry or anything over it: every
+ * industry under it, whole (its 6-digit codes giving way to it), or none. A
+ * 6-digit code: on or off, the industry ticked whole once all of them are,
+ * and an industry ticked whole keeping the rest when one is taken off.
+ */
 export function toggleBranch(node, picked) {
   const next = new Set(picked);
-  const leaves = leavesOf(node);
+  const up = node.up;
+  if (isDetail(node) && up && isIndustry(up)) {
+    const siblings = up.children.map((c) => c.code);
+    if (next.has(up.code)) {
+      next.delete(up.code);
+      for (const c of siblings) if (c !== node.code) next.add(c);
+    } else if (next.has(node.code)) next.delete(node.code);
+    else {
+      next.add(node.code);
+      if (siblings.every((c) => next.has(c))) {
+        for (const c of siblings) next.delete(c);
+        next.add(up.code);
+      }
+    }
+    return next;
+  }
   const on = branchState(node, picked) !== "all";
-  for (const c of leaves) {
-    if (on) next.add(c);
-    else next.delete(c);
+  for (const u of unitsOf(node)) {
+    next.delete(u.code);
+    for (const c of u.children) next.delete(c.code);
+    if (on) next.add(u.code);
   }
   return next;
 }

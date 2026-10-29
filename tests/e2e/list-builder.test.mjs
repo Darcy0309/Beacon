@@ -6,7 +6,8 @@
  * list, a ZIP in it left out) and what to leave out; it is kept with the client, its Sales
  * Rep is told, and it exports its codes one to a line. A prospect fills one
  * in from a link without signing in; a link turned off is closed. A client
- * makes their own, and sees what they asked for before.
+ * makes their own, and sees what they asked for before. Each industry opens
+ * into its 6-digit codes from the SIC list, to narrow it to some of them.
  *
  *   npm run test:e2e
  */
@@ -64,7 +65,7 @@ try {
     && (await admin.ev("document.querySelector('[data-sic-tick=\"15-17\"]').getAttribute('aria-checked')")) === "mixed");
   await setValue(admin, "[data-sic-find]", "roofing");
   await when(admin, "!!document.querySelector('[data-sic-tick=\"1761\"]')");
-  check("found by a word, with what it sits under", (await admin.ev("!!document.querySelector('[data-sic-node=\"17\"]') && !document.querySelector('[data-sic-tick=\"1711\"]')")) === true);
+  check("found by a word, with what it sits under", (await admin.ev("!!document.querySelector('[data-sic-node=\"17\"]') && !document.querySelector('[data-sic-tick=\"1721\"]')")) === true);
   await tick(admin, "1761");
   await setValue(admin, "[data-sic-find]", "");
   await setValue(admin, "[data-request-title]", `${TAG} Contractors`);
@@ -188,10 +189,38 @@ try {
   await setValue(client, "[data-sic-find]", "plumbing");
   await when(client, "!!document.querySelector('[data-sic-tick=\"1711\"]')");
   await tick(client, "1711");
+
+  section("A client narrows an industry to its 6-digit codes");
+  // Sean's 6-digit sheet, as loaded into the SIC list (Settings): plumbing's codes.
+  const PLUMBING = Number(sql("select count(*) from public.sic_codes where code ~ '^1711[0-9]{2}$'"));
+  await setValue(client, "[data-sic-find]", "");
+  for (const code of ["15-17", "17", "1711"]) {
+    await when(client, `!!document.querySelector('[data-sic-open="${code}"]')`);
+    await client.ev(`document.querySelector('[data-sic-open="${code}"]').click()`);
+  }
+  const ticked = (code) => client.ev(`document.querySelector('[data-sic-tick="${code}"]')?.getAttribute('aria-checked') ?? null`);
+  check("an industry opens into its 6-digit codes", Boolean(await when(client, "!!document.querySelector('[data-sic-tick=\"171105\"]')"))
+    && /Plumbing Contractors/.test(await client.ev("document.querySelector('[data-sic-node=\"171105\"]').textContent")),
+    await client.ev("document.querySelector('[data-sic-node=\"1711\"]')?.textContent.slice(0, 160)"));
+  check("…each ticked with the industry", (await ticked("171105")) === "true");
+  await tick(client, "171105");
+  check("one taken off: the industry partly ticked, the rest kept", (await until(async () => (await ticked("1711")) === "mixed")) && (await ticked("171101")) === "true"
+    && new RegExp(`${PLUMBING - 1} of ${PLUMBING}`).test(await client.ev("document.querySelector('[data-sic-tick=\"1711\"]').textContent")));
+  await tick(client, "171105");
+  check("…back on: the industry whole again", Boolean(await until(async () => (await ticked("1711")) === "true")));
+  await tick(client, "1711");
+  await setValue(client, "[data-sic-find]", "septic");
+  check("found by a word among the 6-digit codes", Boolean(await when(client, "!!document.querySelector('[data-sic-tick=\"171107\"]') && !document.querySelector('[data-sic-tick=\"1721\"]')")));
+  await tick(client, "171107");
+  await tick(client, "171108");
+  await setValue(client, "[data-sic-find]", "");
   await client.ev("document.querySelector('[data-request-save]').click()");
   const cid = Number(await when(client, "location.pathname.match(/^\\/list-builder\\/(\\d+)$/)?.[1] ?? null"));
   const cr = one(`select company_id, source, status from public.list_requests where id = ${cid}`);
   check("…kept as theirs, from the client", cr.company_id === company && cr.source === "client" && cr.status === "new", JSON.stringify(cr));
+  check("…the two 6-digit codes, not the industry", sql(`select criteria->>'sic' from public.list_requests where id = ${cid}`) === '["171107", "171108"]',
+    sql(`select criteria->>'sic' from public.list_requests where id = ${cid}`));
+  check("…on its page with their names", Boolean(await when(client, "/171107 Septic Tanks/i.test(document.body.textContent) && /171108 Septic Tanks/i.test(document.body.textContent)")));
   await sleep(100);
 } finally {
   browser.close();

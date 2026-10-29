@@ -3,20 +3,22 @@
 import { memo, useMemo, useState } from "react";
 import { Check, Minus, Plus, Search } from "lucide-react";
 import { Select } from "@/components/ui/field";
-import { branchState, leavesOf, toggleBranch } from "@/lib/list-builder";
+import { branchState, leavesOf, pickedOf, toggleBranch } from "@/lib/list-builder";
 import { cn } from "@/lib/utils";
 
 /**
  * The SIC tree as the list vendor's software has it (Sean, Oct 2026): sectors
- * (15-17 Construction) open with + into their 2-digit groups, and those into
- * their codes, each with a box to tick. Ticking a sector or group ticks every
- * code under it; one partly ticked shows a dash. Finding by a code or words
+ * (15-17 Construction) open with + into their 2-digit groups, those into
+ * their industries (4 digits), and those into their 6-digit codes, each with
+ * a box to tick. Ticking a sector or group ticks every industry under it,
+ * whole; an industry can be narrowed to some of its 6-digit codes; one partly
+ * ticked shows a dash. Finding by a code or words
  * shows the matches with what they sit under, opened. Codes the client has
  * asked for before say so. Each code's industry class (Sean's sheet: a
  * grouping across the tree) can be picked whole, and finding matches it too.
  *
  *   tree     buildTree()
- *   picked   a Set of the codes ticked (the codes at the foot of the tree)
+ *   picked   a Set of the codes ticked: industries whole, and 6-digit codes
  *   onChange a state setter: given the new Set, or a function of the latest one (so quick ticks all count)
  *   before   { code: when } the client asked for before
  */
@@ -33,7 +35,8 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
     const walk = (n, ancestors) => {
       if (hit(n)) {
         for (const a of ancestors) keep.add(a.code);
-        const all = (x) => { keep.add(x.code); x.children.forEach(all); };
+        // All beneath a match, down to its industries: their 6-digit codes show when they match, or opened.
+        const all = (x) => { keep.add(x.code); if (x.kind !== "industry") x.children.forEach(all); };
         all(n);
       }
       for (const c of n.children) walk(c, [...ancestors, n]);
@@ -45,7 +48,9 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
   // The industry classes, each with its codes, for picking a class whole.
   const classes = useMemo(() => {
     const out = new Map();
-    for (const n of tree.byCode.values()) if (n.class && !n.children.length) (out.get(n.class) ?? out.set(n.class, []).get(n.class)).push(n.code);
+    for (const n of tree.byCode.values()) {
+      if (n.class && leavesOf(n)[0] === n.code && n.kind !== "detail") (out.get(n.class) ?? out.set(n.class, []).get(n.class)).push(n.code);
+    }
     return [...out.entries()].sort(([a], [b]) => a.localeCompare(b));
   }, [tree]);
   // Each pick starts the class list over at "Choose a class…".
@@ -55,6 +60,9 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
     if (codes.length) onChange((now) => new Set([...now, ...codes]));
     setClassKey((k) => k + 1);
   };
+
+  // The industries asked for before, whole or by some of their 6-digit codes.
+  const was = useMemo(() => new Set(Object.keys(before).map((c) => (/^\d{6}$/.test(c) ? c.slice(0, 4) : c))), [before]);
 
   const toggleOpen = (code) => setOpen((o) => {
     const next = new Set(o);
@@ -85,7 +93,7 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
       ) : null}
       <div className="max-h-[32rem] overflow-y-auto overscroll-contain p-2">
         {tree.roots.map((n) => (
-          <Branch key={n.code} node={n} depth={0} picked={picked} onChange={onChange} open={open} toggleOpen={toggleOpen} shown={shown} before={before} />
+          <Branch key={n.code} node={n} depth={0} picked={picked} onChange={onChange} open={open} toggleOpen={toggleOpen} shown={shown} before={before} was={was} />
         ))}
         {shown && shown.size === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">No industry matches “{find}”.</p> : null}
       </div>
@@ -93,14 +101,15 @@ export default function SicTree({ tree, picked, onChange, before = {} }) {
   );
 }
 
-const Branch = memo(function Branch({ node, depth, picked, onChange, open, toggleOpen, shown, before }) {
-  if (shown && !shown.has(node.code)) return null;
+const Branch = memo(function Branch({ node, depth, picked, onChange, open, toggleOpen, shown, before, was: wasSet, opened = false }) {
+  // Finding: what matches and what it sits under; an industry opened shows all its 6-digit codes.
+  if (shown && !shown.has(node.code) && !opened) return null;
   const has = node.children.length > 0;
-  const expanded = shown ? true : open.has(node.code);
+  const industry = node.kind === "industry" && has;
+  const expanded = shown && !industry ? true : open.has(node.code) || Boolean(shown && node.children.some((c) => shown.has(c.code)));
   const state = branchState(node, picked);
-  const leaves = has ? leavesOf(node) : [node.code];
-  const n = leaves.filter((c) => picked.has(c)).length;
-  const was = has ? leaves.some((c) => before[c]) : Boolean(before[node.code]);
+  const [n, of] = has ? pickedOf(node, picked) : [0, 0];
+  const was = node.kind === "detail" ? Boolean(before[node.code] || before[node.parent]) : leavesOf(node).some((c) => wasSet.has(c));
   return (
     <div data-sic-node={node.code}>
       <div className="flex items-start gap-1.5 rounded-md py-0.5 pr-2 hover:bg-muted/50" style={{ paddingLeft: depth * 20 + 4 }}>
@@ -119,13 +128,14 @@ const Branch = memo(function Branch({ node, depth, picked, onChange, open, toggl
           </span>
           <span className={cn("min-w-0 flex-1 break-words", node.kind === "sector" ? "font-semibold" : node.kind === "group" ? "font-medium" : "")}>
             <span className="tabular-nums text-muted-foreground">{node.code}</span> · {node.name}
-            {has && n ? <span className="ml-1.5 text-xs text-primary">{n} of {leaves.length}</span> : null}
+            {has && n ? <span className="ml-1.5 text-xs text-primary">{n} of {of}</span> : null}
             {was ? <span className="ml-1.5 rounded bg-amber-500/15 px-1.5 py-px text-[0.65rem] font-semibold text-amber-700 dark:text-amber-400" title="This client has asked for it before" data-sic-before>before</span> : null}
           </span>
         </button>
       </div>
       {has && expanded ? node.children.map((c) => (
-        <Branch key={c.code} node={c} depth={depth + 1} picked={picked} onChange={onChange} open={open} toggleOpen={toggleOpen} shown={shown} before={before} />
+        <Branch key={c.code} node={c} depth={depth + 1} picked={picked} onChange={onChange} open={open} toggleOpen={toggleOpen} shown={shown} before={before} was={wasSet}
+          opened={industry && open.has(node.code)} />
       )) : null}
     </div>
   );

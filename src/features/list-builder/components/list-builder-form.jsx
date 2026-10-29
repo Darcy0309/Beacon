@@ -13,11 +13,18 @@ import SectionHeader from "@/components/shared/section-header";
 import SicTree from "@/features/list-builder/components/sic-tree";
 import TagInput from "@/features/list-builder/components/tag-input";
 import PlaceBrowser from "@/features/list-builder/components/place-browser";
-import { checkTerritory, countyZips, radiusPreview, saveListRequest, submitProspectRequest, territorySuggest } from "@/features/list-builder/actions";
-import { MAX_RADIUS_MILES, buildTree, criteriaSummary, groupOf } from "@/lib/list-builder";
+import { checkTerritory, countyZips, radiusPreview, saveListRequest, sicDetails, submitProspectRequest, territorySuggest } from "@/features/list-builder/actions";
+import { MAX_RADIUS_MILES, buildTree, criteriaSummary, groupOf, withDetails } from "@/lib/list-builder";
 import { reach } from "@/lib/reach";
 import { US_STATES } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
+
+// The 6-digit codes, read once a visit: some 10,000, so after the page is up rather than with it.
+let detailsOnce = null;
+const loadDetails = () => {
+  detailsOnce ??= sicDetails().then((r) => (r?.ok ? r.data : [])).catch(() => { detailsOnce = null; return []; });
+  return detailsOnce;
+};
 
 // A ZIP tag: its five digits (a ZIP+4 loses the four), or not taken.
 const zipTag = (t) => (/^\d{5}(-\d{4})?$/.test(t.trim()) ? t.trim().slice(0, 5) : null);
@@ -55,7 +62,14 @@ function StatePicker({ value, onChange, label }) {
  */
 export default function ListBuilderForm({ mode, rows, initial = null, clients = [], before = {}, token = null }) {
   const router = useRouter();
-  const tree = useMemo(() => buildTree(rows), [rows]);
+  // Each industry opens into its 6-digit codes (Sean, Oct 2026) once they are in.
+  const [details, setDetails] = useState([]);
+  useEffect(() => {
+    let live = true;
+    loadDetails().then((d) => live && setDetails(d));
+    return () => { live = false; };
+  }, []);
+  const tree = useMemo(() => buildTree(withDetails(rows, details)), [rows, details]);
   const c0 = initial?.criteria ?? {};
   const [companyId, setCompanyId] = useState(initial?.companyId ? String(initial.companyId) : "");
   const [title, setTitle] = useState(initial?.title ?? "");

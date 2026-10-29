@@ -7,7 +7,7 @@ import ToneBadge from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { RequestExports, RequestStatus } from "@/features/list-builder/components/request-tools";
-import { getRequest, getSicRows } from "@/features/list-builder/queries";
+import { getRequest, getSicNames, getSicRows } from "@/features/list-builder/queries";
 import { getCurrentUser } from "@/lib/server/session";
 import { criteriaSummary, groupOf, statusLabel } from "@/lib/list-builder";
 
@@ -28,7 +28,8 @@ export default async function ListRequestPage({ params }) {
   const [me, request, rows] = await Promise.all([getCurrentUser(), getRequest(Number(id)), getSicRows()]);
   if (!request) notFound();
   const staff = me?.role !== "client";
-  const names = Object.fromEntries(rows.map((r) => [r.code, r.name]));
+  // The tree's names, and its 6-digit codes' from the SIC list.
+  const names = { ...Object.fromEntries(rows.map((r) => [r.code, r.name])), ...(await getSicNames(request.criteria?.sic)) };
   const c = request.criteria;
   const byGroup = {};
   for (const code of c.sic ?? []) (byGroup[groupOf(code)] ??= []).push(code);

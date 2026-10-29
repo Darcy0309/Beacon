@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
   branchState, buildTree, cleanCriteria, codesCsv, criteriaSummary, leavesOf, milesBetween, parsePlaces, parseZips,
-  sicCode, sicSheetRows, territoryCsv, toggleBranch, zipsWithin,
+  pickedOf, sicCode, sicSheetRows, territoryCsv, toggleBranch, withDetails, zipsWithin,
 } from "../../src/lib/list-builder.js";
 
 // Codes as the vendor writes them: the agricultural ones keep their leading zero.
@@ -51,13 +51,42 @@ assert.deepEqual(sheet.map((r) => r.sort), [1, 2, 3, 4, 5, 6, 7, 8], "in the she
 const tree = buildTree(rows);
 assert.deepEqual(tree.roots.map((n) => n.code), ["01-09", "15-17"]);
 const construction = tree.byCode.get("15-17");
-assert.deepEqual(leavesOf(construction), ["152101", "1793"], "a code with a 6-digit one under it gives way to it");
+assert.deepEqual(leavesOf(construction), ["1521", "1793"], "an industry is pulled whole, its 6-digit codes part of it");
 let picked = toggleBranch(construction, new Set());
 assert.equal(branchState(construction, picked), "all");
 picked = toggleBranch(tree.byCode.get("17"), picked);
 assert.equal(branchState(construction, picked), "some");
 assert.equal(branchState(tree.byCode.get("01-09"), picked), "none");
 assert.equal(branchState(toggleBranch(construction, picked) && construction, toggleBranch(construction, picked)), "all", "a partly ticked branch ticks all");
+
+// The 6-digit codes from the SIC list (Oct 2026): under their industry, of its class; one already there or with nowhere to go, left out.
+const full = buildTree(withDetails(sicSheetRows([
+  ["SIC Code", "SIC Description", "Industry Class"],
+  ["15-17", "CONSTRUCTION", ""], ["17", "SPECIAL TRADE", ""], ["1741", "Masonry, Stone Setting, And Other Stone Work", "Masonry"], ["1742", "Plastering", "Drywall"],
+]), [["174101", "Masonry Contractors"], ["174102", "Stone Setting"], ["174103", "Chimney Builders"], ["174101", "Again"], ["999901", "Nowhere"], ["1741", "Not six"]]));
+const masonry = full.byCode.get("1741");
+assert.deepEqual(masonry.children.map((n) => [n.code, n.kind, n.class]),
+  [["174101", "detail", "Masonry"], ["174102", "detail", "Masonry"], ["174103", "detail", "Masonry"]]);
+assert.equal(full.byCode.has("999901"), false);
+assert.deepEqual(leavesOf(full.byCode.get("17")), ["1741", "1742"]);
+const tick = (code, now) => toggleBranch(full.byCode.get(code), now);
+let p6 = tick("1741", new Set());
+assert.deepEqual([...p6], ["1741"], "an industry ticked keeps its own code");
+assert.equal(branchState(full.byCode.get("174102"), p6), "all", "…and so each of its 6-digit codes");
+p6 = tick("174102", p6);
+assert.deepEqual([...p6].sort(), ["174101", "174103"], "one of them taken off: the rest kept");
+assert.equal(branchState(masonry, p6), "some");
+assert.deepEqual(pickedOf(masonry, p6), [2, 3]);
+assert.deepEqual(pickedOf(full.byCode.get("17"), p6), [1, 2], "a group counts its industries with any ticked");
+assert.equal(branchState(full.byCode.get("15-17"), p6), "some");
+p6 = tick("174102", p6);
+assert.deepEqual([...p6], ["1741"], "all of them ticked again: the industry");
+p6 = tick("174103", tick("174101", new Set()));
+assert.deepEqual([...p6].sort(), ["174101", "174103"]);
+p6 = tick("17", p6);
+assert.deepEqual([...p6].sort(), ["1741", "1742"], "a group ticked: its industries whole, their 6-digit codes giving way");
+assert.deepEqual([...tick("17", p6)], [], "…and unticked");
+assert.equal(branchState(masonry, new Set(["174101"])), "some", "a saved 6-digit code shows its industry partly ticked");
 
 // The territory.
 assert.deepEqual(parseZips("85201, 85202\n85203-1234 abc 1234 85201"), ["85201", "85202", "85203"]);

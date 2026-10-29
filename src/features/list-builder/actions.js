@@ -12,6 +12,14 @@ import { parseCsv } from "@/lib/csv";
 
 const idOf = (v) => (/^[1-9]\d{0,17}$/.test(String(v ?? "")) ? Number(v) : null);
 
+/** The 6-digit codes, for the tree to open its industries into: [[code, name]]. Anyone with the form, a prospect's link too. */
+export async function sicDetails() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("sic_details");
+  if (error) return fail(error);
+  return ok(Array.isArray(data) ? data : []);
+}
+
 /** The ZIPs within a radius, to show as it is chosen: their count, nearest first. */
 export async function radiusPreview(zip, miles) {
   const found = await zipsAround(zip, miles);

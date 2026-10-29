@@ -16,6 +16,20 @@ export async function getSicRows(supabase = null) {
   return out;
 }
 
+/** The names of a request's 6-digit codes (the tree's rows stop at 4 digits): { code: name }. */
+export async function getSicNames(codes) {
+  const six = [...new Set((codes ?? []).filter((c) => /^\d{6}$/.test(c)))].slice(0, 5000);
+  if (!six.length) return {};
+  const supabase = await createClient();
+  const out = {};
+  for (let i = 0; i < six.length; i += 500) {
+    const { data, error } = await supabase.from("sic_codes").select("code, description").in("code", six.slice(i, i + 500));
+    if (error) throw error;
+    for (const r of data ?? []) out[r.code] = r.description;
+  }
+  return out;
+}
+
 const REQUEST_COLUMNS = `id, company_id, sales_rep_id, source, title, prospect, criteria, notes, status, created_at, updated_at,
   company:companies(id, name), rep:users!list_requests_sales_rep_id_fkey(id, first_name, last_name),
   by:users!list_requests_created_by_fkey(first_name, last_name)`;
