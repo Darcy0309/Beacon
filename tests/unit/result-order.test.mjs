@@ -10,7 +10,7 @@ const check = (label, cond, detail = "") => {
 
 // As the database has them: by stage, then each result's own order.
 const db = [
-  ["APPT", "Lead-No Contact"], ["APPT", "Lead-Left Message"], ["APPT", "Lead-Email"], ["APPT", "Lead-ClientList"], ["APPT", "Appointment"],
+  ["APPT", "Lead-No Contact"], ["APPT", "Lead-Viable"], ["APPT", "Lead-Left Message"], ["APPT", "Lead-Email"], ["APPT", "Lead-ClientList"], ["APPT", "Appointment"],
   ["APPT", "Appointment-Phone"], ["APPT", "Appointment-Confirmed"], ["APPT", "Lead-Not Shopping"], ["APPT", "Lead-Never Shops"],
   ["APPT", "Lead-Corrected"], ["APPT", "Lead-Removed"], ["APPT", "Lead-DoNotCall"], ["APPT", "Lead-Disco#"], ["APPT", "Lead-Out of Business"],
   ["APPT", "Lead-Branch"], ["APPT", "Lead-Not Qualified"], ["APPT", "Lead-CurrentClient"], ["APPT", "Lead-Invalid"], ["APPT", "Appointment-Invalid"],
@@ -22,7 +22,7 @@ const db = [
 const names = (stage) => orderResults(db).filter((r) => r.project_type === stage).map((r) => r.name);
 
 check("appointment setting's first, as the sheet lists them", JSON.stringify(names("APPT")) === JSON.stringify([
-  "Appointment", "Appointment-Phone", "Appointment-Confirmed", "Appointment-Invalid", "Lead-No Contact", "Lead-Left Message", "Lead-Email",
+  "Appointment", "Appointment-Phone", "Appointment-Confirmed", "Appointment-Invalid", "Lead-No Contact", "Lead-Viable", "Lead-Left Message", "Lead-Email",
   "Lead-ClientList", "Lead-Not Shopping", "Lead-Corrected", "Lead-Never Shops", "Lead-Removed", "Lead-DoNotCall", "Lead-Out of Business",
   "Lead-Branch", "Lead-Not Qualified", "Lead-CurrentClient", "Lead-Invalid", "Lead-Disco#",
 ]), JSON.stringify(names("APPT")));

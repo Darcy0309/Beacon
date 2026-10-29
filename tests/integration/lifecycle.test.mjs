@@ -245,7 +245,9 @@ try {
     const id = newName(APPT, MIKE);
     const { error } = await record(mike, id, "APPT", name);
     const s = lead(id);
-    check(`${name}: stays on Mike's list, weight 1`, !error && (await onList(mike, APPT, id)) && s.weight === 1 && s.result === name && !s.resolved, error?.message ?? JSON.stringify(s));
+    // Called and still to work: Lead-Viable, but a client's list keeps its own title (Sean, Oct 2026).
+    const shown = name === "Lead-ClientList" ? name : "Lead-Viable";
+    check(`${name}: stays on Mike's list, weight 1, as ${shown}`, !error && (await onList(mike, APPT, id)) && s.weight === 1 && s.result === shown && !s.resolved, error?.message ?? JSON.stringify(s));
   }
 
   section("Appt: results that resolve the lead");
