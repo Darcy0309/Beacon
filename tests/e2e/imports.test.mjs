@@ -200,6 +200,30 @@ try {
     sql(`delete from public.agencies where id = ${group}`);
   }
 
+  section("A place half given, filled in (Oct 2026)");
+  const placesFile = path.join(path.dirname(file), "places.csv");
+  writeFileSync(placesFile, ["Company,Phone,City,State,ZIP,County",
+    `"${TAG} Zip Only",920-555-4101,,,54911,`,
+    `"${TAG} Zip County",651-555-4102,,,55101,Ramsey`,
+    `"${TAG} City State",920-555-4103,Ft. Atkinson,WI,,`,
+    `"${TAG} Wrong State",480-555-4104,,WI,85201,`,
+    `"${TAG} County Only",602-555-4105,,AZ,,Maricopa`,
+    `"${TAG} Lost Zero",617-555-4106,,,2108,`,
+  ].join("\n"));
+  await chooseFile(admin, placesFile);
+  await until(() => admin.ev("!!document.querySelector('[data-import-places]')"));
+  check("the form says it fills a place in, crediting where the ZIP data is from", /filled in from the ZIP or city[\s\S]*GeoNames/.test(await admin.ev("document.querySelector('[data-import-places]').innerText")));
+  await admin.click("button[type=submit]", "Import leads");
+  const placed = await admin.waitToast(/Imported 6 of 6/, 20000);
+  check("imported, saying what was filled in", /Filled in from the ZIP or city given: 3 counties, 3 cities, 2 ZIP codes, 3 states/.test(placed ?? ""), placed);
+  const place = (name) => sql(`select concat_ws('|', city, state, zip, county) from public.leads where project_id = ${project} and company_name = ${lit(`${TAG} ${name}`)}`);
+  check("a ZIP alone: its city, state and county", place("Zip Only") === "Appleton|WI|54911|Outagamie", place("Zip Only"));
+  check("a ZIP with its county: the city and state", place("Zip County") === "Saint Paul|MN|55101|Ramsey", place("Zip County"));
+  check("a city and state: its one ZIP and county", place("City State") === "Ft. Atkinson|WI|53538|Jefferson", place("City State"));
+  check("a ZIP of another state than the one given: left as given", place("Wrong State") === "WI|85201", place("Wrong State"));
+  check("a county alone: nothing more", place("County Only") === "AZ|Maricopa", place("County Only"));
+  check("a ZIP that lost its leading zero: put right, and filled in", place("Lost Zero") === "Boston|MA|02108|Suffolk", place("Lost Zero"));
+
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);
   const before = Number((await admin.ev(`document.querySelector('[data-sic-count]')?.textContent ?? '0'`)).replace(/\D/g, ""));

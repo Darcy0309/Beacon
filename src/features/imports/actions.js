@@ -9,6 +9,7 @@ import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 import { sicCode, sicMatcher } from "@/lib/sic";
+import { fillPlaces } from "@/lib/server/zip-places";
 
 const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
 // Leads per insert: each one is a round trip, and each is one statement the
@@ -165,6 +166,9 @@ export async function importLeadsCsv(prevState, formData) {
   if (!headers.includes("company_name")) {
     return fail("No recognisable company column — expected a 'Company' heading.");
   }
+
+  // A place half given (a ZIP and no county, a city and no ZIP…; Sean, Oct 2026): filled in where the rest says for certain.
+  const places = await fillPlaces(parsed.map((r) => r.lead));
 
   const supabase = await createClient();
 
@@ -416,5 +420,5 @@ export async function importLeadsCsv(prevState, formData) {
   revalidatePath("/work", "layout");
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers });
+  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
 }

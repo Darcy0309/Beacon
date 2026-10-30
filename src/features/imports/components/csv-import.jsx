@@ -139,10 +139,14 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0, existing = 0, others = 0 } = state.data ?? {};
+      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
       const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
         existing ? `${existing} already on the project` : "", others ? `${others} on other clients' lists` : ""].filter(Boolean).join(" · ");
-      toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}${left ? ` · ${left}` : ""}${assigned ? ` · shared across ${assigned} account managers` : ""}`);
+      // What the list left out of a place and the rest said for certain (a ZIP's county, a city's ZIP…; Oct 2026).
+      const filled = [["county", "county", "counties"], ["city", "city", "cities"], ["zip", "ZIP code", "ZIP codes"], ["state", "state", "states"]]
+        .filter(([k]) => places[k] > 0).map(([k, one, many]) => `${places[k].toLocaleString()} ${places[k] === 1 ? one : many}`);
+      toast.success(`Imported ${imported} of ${total} rows${errors ? ` · ${errors} skipped` : ""}${left ? ` · ${left}` : ""}${assigned ? ` · shared across ${assigned} account managers` : ""}`,
+        filled.length ? { description: `Filled in from the ZIP or city given: ${filled.join(", ")}`, duration: 12000 } : undefined);
       // Old call results not recognised: those names start at the project's first result.
       if (unknown.length) {
         const n = unknown.reduce((sum, u) => sum + u.n, 0);
@@ -339,6 +343,11 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
               </Button>
             )}
           </div>
+          {/* GeoNames' ZIP data is CC BY 4.0: credited where it is used. */}
+          <p className="text-xs text-muted-foreground" data-import-places>
+            A missing city, state, county or ZIP code is filled in from the ZIP or city the row does give, where that is certain
+            (ZIP data from <a href="https://www.geonames.org" target="_blank" rel="noreferrer" className="underline hover:text-primary">GeoNames</a>, CC BY 4.0).
+          </p>
 
           {fileName ? (
             <div className="space-y-2 text-sm" data-import-check>
