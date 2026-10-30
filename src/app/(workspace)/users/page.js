@@ -1,10 +1,11 @@
-import { UserPlus, ShieldCheck, Users, KeyRound, Mail } from "lucide-react";
+import { UserPlus, ShieldCheck, Users, KeyRound, Mail, ArrowRightLeft } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import EditName from "@/components/shared/edit-name";
 import ToneBadge from "@/components/shared/tone-badge";
 import RowActions from "@/components/shared/row-actions";
 import UserForm from "@/features/users/components/user-form";
 import TempPasswordForm from "@/features/users/components/temp-password-form";
+import HandOverForm from "@/features/users/components/hand-over-form";
 import { getCurrentUser } from "@/lib/server/session";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
-import { listUsers, getUserStats, USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from "@/features/users/queries";
+import { listUsers, getAssignableStaff, getUserStats, USER_ROLE_OPTIONS, USER_STATUS_OPTIONS } from "@/features/users/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { getTimeZones } from "@/features/clients/queries";
 import { getPayProfiles, getPayRules } from "@/features/pay/queries";
@@ -30,8 +31,8 @@ const statusTone = { Active: "emerald", Invited: "amber", Disabled: "slate" };
 
 export default async function UsersPage({ searchParams }) {
   const params = readListParams(await searchParams, ["role", "status", "mfa"]);
-  const [{ rows, total }, users, lookups, payProfiles, payRules, me, timezones] = await Promise.all([
-    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(), getCurrentUser(), getTimeZones(),
+  const [{ rows, total }, users, lookups, payProfiles, payRules, me, timezones, staff] = await Promise.all([
+    listUsers(params), getUserStats(), getLookups(), getPayProfiles(), getPayRules(), getCurrentUser(), getTimeZones(), getAssignableStaff(),
   ]);
   // The time zones a person can be in, as clients have them.
   const options = { ...lookups, timezones };
@@ -115,7 +116,11 @@ export default async function UsersPage({ searchParams }) {
                       edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} pay={payProfiles.get(u.id)} hourly={hourly} />}
                       onResetTwoFactor={u.mfa ? resetUserTwoFactor : undefined}
                       onResendInvite={awaitingInvite(u.raw) ? resendInvitation : undefined}
-                      forms={u.id === me?.id || u.status === "disabled" ? [] : [{ key: "temp", label: "Set temporary password", icon: <KeyRound />, element: <TempPasswordForm user={{ id: u.id, name: u.name }} /> }]}
+                      forms={[
+                        ...(u.id === me?.id || u.raw.status === "disabled" ? [] : [{ key: "temp", label: "Set temporary password", icon: <KeyRound />, element: <TempPasswordForm user={{ id: u.id, name: u.name }} /> }]),
+                        // A member of staff's work to another, when they leave (Sean, Oct 2026): disabled already, or about to be.
+                        ...(u.id === me?.id || u.raw.role === "client" ? [] : [{ key: "handover", label: "Hand over work", icon: <ArrowRightLeft />, element: <HandOverForm user={{ id: u.id, name: u.name }} staff={staff} /> }]),
+                      ]}
                       onDelete={deleteUser}
                       warning="Their sign-in is removed, so they can no longer get in, and they come off every list. The work they did stays as it is. Nothing else is erased: an administrator can restore the account under Settings › Deleted records, then invite them again. To keep them on the list, set them to Disabled instead."
                     />

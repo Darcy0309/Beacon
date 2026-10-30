@@ -330,7 +330,9 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
   const supabase = await createClient();
   const [lo, hi] = around({ from, to });
   // `everyone`: an administrator's calendar, every manager's appointments with who set each (Sean, Oct 2026).
-  const theirs = (q) => (everyone ? q : q.eq("user_id", userId));
+  // Theirs: the ones they follow up, set by them or handed over to them (Oct 2026: a manager who left).
+  const uid = Number(userId);
+  const theirs = (q) => (everyone ? q : q.or(`follow_up_user_id.eq.${uid},and(follow_up_user_id.is.null,user_id.eq.${uid})`));
   const [appts, reminders, messages, awaiting] = await Promise.all([
     theirs(supabase
       .from("appointments")

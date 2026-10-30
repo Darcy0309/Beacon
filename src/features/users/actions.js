@@ -408,3 +408,36 @@ export async function deleteUser(formData) {
   revalidatePath("/users");
   return ok({ id });
 }
+
+/** What a member of staff still holds, before handing it over: hand_over_work() with no one to hand to. */
+export async function handOverPreview(fromId) {
+  const from = Number(fromId);
+  if (!Number.isInteger(from) || from <= 0) return fail("Missing user.");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!activeAdmin(me)) return fail("Only administrators hand over work.");
+  const { data, error } = await supabase.rpc("hand_over_work", { p_from: from, p_to: null });
+  if (error) return fail(error.message);
+  return ok(data);
+}
+
+/**
+ * Hand a member of staff's work to another (Sean, Oct 2026: a manager who
+ * leaves): their projects, open names, appointments to follow up, reminders
+ * still to go off and clients go to `to`; what they did stays theirs.
+ */
+export async function handOverWork(prevState, formData) {
+  const from = idFrom(formData, "from");
+  const to = idFrom(formData, "to");
+  if (!from) return fail("Missing user.");
+  if (!to) return fail("Choose who takes over", { to: "Choose who takes over" });
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!activeAdmin(me)) return fail("Only administrators hand over work.");
+  const { data, error } = await supabase.rpc("hand_over_work", { p_from: from, p_to: to });
+  if (error) return fail(error.message);
+  await logActivity(supabase, "user.hand_over", { entity: "user", entityId: from, detail: `to user ${to}: ${JSON.stringify(data)}`, userId: me.id });
+  revalidatePath("/users");
+  revalidatePath("/work");
+  return ok(data);
+}

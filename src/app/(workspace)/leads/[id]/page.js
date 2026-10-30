@@ -241,8 +241,8 @@ export default async function LeadSheet({ params, searchParams }) {
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
 
-  // The confirmation follow-up belongs to whoever set the appointment.
-  const followUp = openAppt && (admin || openAppt.user_id === me?.id)
+  // The confirmation follow-up belongs to whoever set the appointment, or was handed it (Oct 2026).
+  const followUp = openAppt && (admin || (openAppt.follow_up_user_id ?? openAppt.user_id) === me?.id)
     ? {
         id: openAppt.id,
         setStage: openAppt.set_stage ?? r.stage,

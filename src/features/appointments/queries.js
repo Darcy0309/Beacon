@@ -194,7 +194,7 @@ export async function listAppointments({ from, to, clientId = null, projectId = 
     let q = supabase.from("appointments")
       .select(`id, appt_date, appt_time, duration_min, rep_name, invalid_at, confirmed_at,
         status:appointment_statuses(name),
-        setter:users!appointments_user_id_fkey(id, first_name, last_name),
+        setter:users!appointments_user_id_fkey(id, first_name, last_name), follow_up_user_id,
         project:projects!appointments_project_id_fkey(id, name, company:companies(id, name)),
         lead:leads!inner(id, company_name, contact_name, city, state)`)
       // Only with a lead still there to open (one deleted leaves nothing to show).
@@ -222,7 +222,8 @@ export async function listAppointments({ from, to, clientId = null, projectId = 
       client: one(project?.company)?.name ?? "—", project: project?.name ?? "—", agent: a.rep_name || "—",
       status: a.invalid_at ? "Invalid" : isAwaiting(a, today) ? AWAITING : one(a.status)?.name ?? "—",
       manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—",
-      managerId: setter?.id ?? null,
+      // Who follows it up now (handed over from a manager who left; Oct 2026), else who set it: where a message about it goes.
+      managerId: a.follow_up_user_id ?? setter?.id ?? null,
     };
   }).sort((a, b) => a.date.localeCompare(b.date) || timeRank(a.appt_time) - timeRank(b.appt_time));
   return { rows: shaped, capped: rows.length >= MAX };
@@ -290,7 +291,7 @@ export async function getLeadAppointments(leadId) {
 
 const UPDATE_COLUMNS = `id, appointment_id, lead_id, status, previous_status, note, potential_premium, sold_lines, total_premium, created_at,
   by:users!appointment_updates_created_by_fkey(first_name, last_name, role),
-  appointment:appointments(appt_date, appt_time, setter:users!appointments_user_id_fkey(id, first_name, last_name)),
+  appointment:appointments(appt_date, appt_time, follow_up_user_id, setter:users!appointments_user_id_fkey(id, first_name, last_name)),
   lead:leads(id, company_name), project:projects(id, name), company:companies(id, name)`;
 
 function shapeUpdate(u) {
@@ -303,7 +304,7 @@ function shapeUpdate(u) {
     total: u.total_premium == null ? null : Number(u.total_premium), lines: u.sold_lines ?? null, at: u.created_at,
     by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || "—" : "—", byClient: by?.role === "client",
     apptDate: appt?.appt_date ?? null, apptTime: appt?.appt_time ?? null,
-    manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—", managerId: setter?.id ?? null,
+    manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—", managerId: appt?.follow_up_user_id ?? setter?.id ?? null,
     co: one(u.lead)?.company_name ?? "—", project: one(u.project)?.name ?? "—", client: one(u.company)?.name ?? "—",
     companyId: one(u.company)?.id ?? null,
   };
