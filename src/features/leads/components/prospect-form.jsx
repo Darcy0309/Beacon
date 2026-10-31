@@ -16,11 +16,11 @@ import { SECTION_BOX, SECTION_LEGEND as LEGEND } from "@/features/leads/form-sec
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const SECTION = `grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2 ${SECTION_BOX}`;
 
-// One person's lines: name and title, then business phone, mobile and email.
+// One person's lines: name and title, then phone, mobile and email, each named for whose it is (Sean, Oct 2026).
 const PEOPLE = [
-  ["Decision maker", { name: "decision_maker", title: "dm_title", phone: "dm_phone", mobile: "dm_mobile", email: "dm_email" }],
-  ["Contact", { name: "contact_name", title: "contact_title", phone: null, mobile: "contact_mobile", email: "email" }],
-  ["Secondary contact", { name: "contact2_name", title: "contact2_title", phone: "contact2_phone", mobile: "contact2_mobile", email: "contact2_email" }],
+  ["Decision maker", "Decision Maker", { name: "decision_maker", title: "dm_title", phone: "dm_phone", mobile: "dm_mobile", email: "dm_email" }],
+  ["Contact", "Contact", { name: "contact_name", title: "contact_title", phone: "contact_phone", mobile: "contact_mobile", email: "email" }],
+  ["Secondary contact", "2nd Contact", { name: "contact2_name", title: "contact2_title", phone: "contact2_phone", mobile: "contact2_mobile", email: "contact2_email" }],
 ];
 
 /**
@@ -89,14 +89,14 @@ export default function ProspectForm({ lead, trigger }) {
               {text("address", "Street address", { wide: true, max: 120 })}
               <PlaceFields fe={fe} invalid={invalid} dv={dv} />
             </fieldset>
-            {PEOPLE.map(([who, f]) => (
+            {PEOPLE.map(([who, called, f]) => (
               <fieldset key={who} className={SECTION} data-person={who}>
                 <legend className={LEGEND}>{who}</legend>
                 {text(f.name, "Name")}
                 {text(f.title, "Title", { max: 60 })}
-                {f.phone ? phone(f.phone, "Business phone") : null}
-                {phone(f.mobile, "Mobile")}
-                {text(f.email, "Email", { type: "email", inputMode: "email", max: 120, wide: !f.phone })}
+                {phone(f.phone, `${called} Phone`)}
+                {phone(f.mobile, `${called} Mobile`)}
+                {text(f.email, `${called} Email`, { type: "email", inputMode: "email", max: 120, wide: true })}
               </fieldset>
             ))}
           </div>

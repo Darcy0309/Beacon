@@ -33,6 +33,8 @@ function leadPayload(formData) {
     // On Prospect Info since Oct 2026, but never saved until now.
     fax: phoneOf(formData, "fax"),
     contact_mobile: phoneOf(formData, "contact_mobile"),
+    // The contact's own line (Oct 2026); the business's number is `phone`.
+    contact_phone: phoneOf(formData, "contact_phone"),
     email: s(formData, "email"),
     decision_maker: s(formData, "decision_maker"),
     dm_title: s(formData, "dm_title"),

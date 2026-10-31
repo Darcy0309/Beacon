@@ -50,6 +50,7 @@ import { leadPlace } from "@/lib/project-info";
 import HoldNotice from "@/features/delivery/components/hold-notice";
 import TransferDialog from "@/features/leads/components/transfer-dialog";
 import CallBackLater from "@/features/leads/components/call-back-later";
+import { SECTION_LINE } from "@/features/leads/form-section";
 import { MarkLeadButton } from "@/features/removals/components/mark-names";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
@@ -66,12 +67,12 @@ function CallButton({ tel, leadId, company, label }) {
   );
 }
 
-/** One way to reach someone: what it is, the number or address, and its button. */
-function Line({ kind, children, action }) {
+/** One way to reach someone: what it is (`label`, else its kind), the number or address, and its button. */
+function Line({ kind, label = kind, children, action }) {
   return (
     <div data-contact-line={kind} className="flex items-center justify-between gap-3 border-t border-[var(--panel-border)] py-2">
       <div className="min-w-0">
-        <div className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{kind}</div>
+        <div className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</div>
         <div className="break-all text-sm tabular-nums">{children}</div>
       </div>
       {action}
@@ -81,28 +82,29 @@ function Line({ kind, children, action }) {
 
 /**
  * A person to reach, as the contact card lists them: each number with a Call
- * button beside it and each address with an Email button. The contact always
- * has an Email line, so an address the contact gives on the phone can be
- * typed in and used at once.
+ * button beside it and each address with an Email button, each named for
+ * whose it is ("Decision Maker Email", "2nd Contact Mobile"; Sean, Oct 2026),
+ * `called` the name. The contact always has an Email line, so an address the
+ * contact gives on the phone can be typed in and used at once.
  */
-function Person({ who, phone, mobile, email: address, leadId, company, emailButton, alwaysEmail = false, allLines = false, children }) {
+function Person({ who, called = who, phone, mobile, email: address, leadId, company, emailButton, alwaysEmail = false, allLines = false, children }) {
   const label = who.toLowerCase();
   const none = <span className="text-muted-foreground">None on file</span>;
   return (
     <div data-person={who}>
       {children}
       {address || ((alwaysEmail || allLines) && emailButton) ? (
-        <Line kind="Email" action={emailButton?.(address)}>
+        <Line kind="Email" label={`${called} Email`} action={emailButton?.(address)}>
           {address ?? <span className="text-muted-foreground">None on file</span>}
         </Line>
       ) : null}
       {phone || allLines ? (
-        <Line kind="Business" action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} company={company} label={`Call ${label}, business: ${phone}`} /> : null}>
+        <Line kind="Business" label={`${called} Phone`} action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} company={company} label={`Call ${label}, business: ${phone}`} /> : null}>
           {phone || none}
         </Line>
       ) : null}
       {mobile || allLines ? (
-        <Line kind="Mobile" action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} company={company} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
+        <Line kind="Mobile" label={`${called} Mobile`} action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} company={company} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
           {mobile || none}
         </Line>
       ) : null}
@@ -397,23 +399,25 @@ export default async function LeadSheet({ params, searchParams }) {
               {address.map((line) => <div key={line} className="text-xs text-muted-foreground">{line}</div>)}
               {r.county ? <div className="text-xs text-muted-foreground" data-county>{/county$/i.test(r.county) ? r.county : `${r.county} County`}</div> : null}
               {website ? <div className="mt-1 text-xs">{website}</div> : null}
-              <div className="mt-3">
-                <Line kind="Business phone" action={telHref(r.phone) ? <CallButton tel={telHref(r.phone)} leadId={lead.id} company={lead.co} label={`Call the business: ${r.phone}`} /> : null}>
-                  {r.phone || <span className="text-muted-foreground">None on file</span>}
-                </Line>
-                {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
-              </div>
-
-              {/* The three people, the decision maker first: every line of theirs, "None on file" when empty,
-                  so a number or address given on the phone has its place; the secondary contact once there is one. */}
+              {/* The three people, each in a dark box (Sean, Oct 2026), the business's number with the decision maker:
+                  every line of theirs, "None on file" when empty, so a number or address given on the phone has its place;
+                  the secondary contact's once there is one. */}
               {[
-                ["Decision maker", r.decision_maker, r.dm_title, { phone: r.dm_phone, mobile: r.dm_mobile, email: r.dm_email, allLines: true }],
-                ["Contact", r.contact_name, r.contact_title, { mobile: r.contact_mobile, email: r.email, alwaysEmail: true, primary: true }],
-                ["Secondary contact", r.contact2_name, r.contact2_title, { phone: r.contact2_phone, mobile: r.contact2_mobile, email: r.contact2_email,
+                ["Decision maker", "Decision Maker", r.decision_maker, r.dm_title, { phone: r.dm_phone, mobile: r.dm_mobile, email: r.dm_email, allLines: true }],
+                ["Contact", "Contact", r.contact_name, r.contact_title, { phone: r.contact_phone, mobile: r.contact_mobile, email: r.email, allLines: true, primary: true }],
+                ["Secondary contact", "2nd Contact", r.contact2_name, r.contact2_title, { phone: r.contact2_phone, mobile: r.contact2_mobile, email: r.contact2_email,
                   allLines: Boolean(r.contact2_name || r.contact2_phone || r.contact2_mobile || r.contact2_email) }],
-              ].map(([who, name, title, ways]) => (
-                <div key={who} className="mt-3">
-                  <Person who={who} phone={ways.phone} mobile={ways.mobile} email={ways.email} leadId={lead.id} company={lead.co}
+              ].map(([who, called, name, title, ways]) => (
+                <div key={who} className={`mt-3 px-3 pb-1 pt-2.5 ${SECTION_LINE}`} data-person-box={who}>
+                  {who === "Decision maker" ? (
+                    <div className="mb-3 [&>[data-contact-line]:first-child]:border-t-0 [&>[data-contact-line]:first-child]:pt-0">
+                      <Line kind="Business phone" action={telHref(r.phone) ? <CallButton tel={telHref(r.phone)} leadId={lead.id} company={lead.co} label={`Call the business: ${r.phone}`} /> : null}>
+                        {r.phone || <span className="text-muted-foreground">None on file</span>}
+                      </Line>
+                      {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
+                    </div>
+                  ) : null}
+                  <Person who={who} called={called} phone={ways.phone} mobile={ways.mobile} email={ways.email} leadId={lead.id} company={lead.co}
                     alwaysEmail={ways.alwaysEmail} allLines={ways.allLines} emailButton={emailButton(name, ways.primary)}>
                     <div className="eyebrow">{who}</div>
                     <div className="mb-2 mt-1 text-sm">

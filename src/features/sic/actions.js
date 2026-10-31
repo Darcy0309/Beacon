@@ -5,7 +5,7 @@
 import { revalidatePath } from "next/cache";
 import { currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
-import { sicCode } from "@/lib/sic";
+import { sicCode, sicMatcher } from "@/lib/sic";
 
 /**
  * Load a master list of SIC codes and descriptions ([{ code, description }]):
@@ -62,4 +62,55 @@ export async function importSicCodes(pairs, { replace = false } = {}) {
   await logActivity(supabase, "sic.import", { detail: `${added} added, ${changes.length - added} updated${replace ? `, ${removed} removed` : ""}`, userId: me.id });
   revalidatePath("/settings");
   return ok({ added, updated: changes.length - added, removed, kept, total: existing.size + added - removed });
+}
+
+/**
+ * The leads already in Lighthouse with what the business does but no SIC
+ * code (the old system's records, and lists loaded before imports matched
+ * them; Sean, Oct 2026): each given the code its description is on the SIC
+ * list, as an import would. Only a blank code is filled, and only where the
+ * description names one industry. Administrators only. Returns how many
+ * were looked at and how many found their code.
+ */
+export async function fillLeadSicCodes() {
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only an administrator can fill in SIC codes.");
+
+  const list = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("sic_codes").select("code, description").order("code").range(from, from + 999);
+    if (error) return fail(error);
+    list.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
+  const codeFor = sicMatcher(list);
+
+  // The leads with a description and no code, a page at a time; then each code's leads together.
+  const byCode = new Map();
+  let looked = 0;
+  for (let last = 0; ; ) {
+    const { data, error } = await supabase.from("leads").select("id, description").is("sic_code", null).is("deleted_at", null)
+      .not("description", "is", null).gt("id", last).order("id").limit(1000);
+    if (error) return fail(error);
+    for (const lead of data ?? []) {
+      looked += 1;
+      const code = codeFor(lead.description);
+      if (code) (byCode.get(code) ?? byCode.set(code, []).get(code)).push(lead.id);
+    }
+    if ((data ?? []).length < 1000) break;
+    last = data.at(-1).id;
+  }
+  let filled = 0;
+  for (const [code, ids] of byCode) {
+    for (let i = 0; i < ids.length; i += 500) {
+      // Still blank: nothing written over that changed meanwhile.
+      const { data, error } = await supabase.from("leads").update({ sic_code: code }).in("id", ids.slice(i, i + 500)).is("sic_code", null).select("id");
+      if (error) return fail(error);
+      filled += data?.length ?? 0;
+    }
+  }
+  await logActivity(supabase, "sic.fill_leads", { detail: `${filled} of ${looked} leads given their SIC code from the description`, userId: me.id });
+  revalidatePath("/leads");
+  return ok({ looked, filled });
 }

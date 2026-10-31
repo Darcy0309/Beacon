@@ -6,7 +6,7 @@
  * state and county, or a city's ZIP and county, filled in where blank.
  */
 
-import { placeFrom, statePlaces } from "@/lib/server/zip-places";
+import { placeFrom, placeOfZip, statePlaces } from "@/lib/server/zip-places";
 
 const text = (v, max) => String(v ?? "").trim().slice(0, max);
 
@@ -19,4 +19,9 @@ export async function placesInState(state) {
 /** The blank ones of { city, state, zip, county } that the others say for certain. */
 export async function fillPlaceFields(fields) {
   return placeFrom({ city: text(fields?.city, 60), state: text(fields?.state, 2).toUpperCase(), zip: text(fields?.zip, 10), county: text(fields?.county, 60) });
+}
+
+/** A ZIP typed: its city, state and county ({ zip, city, state, county }), or null when it is not a ZIP on file. */
+export async function zipPlace(zip) {
+  return placeOfZip(text(zip, 10));
 }

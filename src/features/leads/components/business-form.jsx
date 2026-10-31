@@ -93,7 +93,7 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
           <div className="-mr-1 grid min-h-0 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
             {/* What kind of business it is, first (Oct 2026); the description comes from the SIC list. */}
             <Field label="SIC code" error={fe("sic_code")} hint="Type a code or what the business does, and pick from the list">
-              <Input name="sic_code" list="sic-codes" value={code} onChange={(e) => setCode(e.target.value)} maxLength={12} placeholder="422505" aria-invalid={invalid("sic_code")} autoComplete="off" />
+              <Input name="sic_code" list="sic-codes" value={code} onChange={(e) => setCode(e.target.value)} maxLength={12} aria-invalid={invalid("sic_code")} autoComplete="off" />
             </Field>
             <Field label="SIC description">
               <Input value={meaning} readOnly tabIndex={-1} placeholder={sic.length ? "" : "Loading the SIC list…"} className="bg-muted/40" data-sic-meaning />
@@ -177,7 +177,7 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
               <Input name="annual_payroll" defaultValue={dv("annual_payroll")} maxLength={30} aria-invalid={invalid("annual_payroll")} />
             </Field>
             <Field label="EIN" error={fe("ein")} hint="Federal employer ID, 9 digits">
-              <Input name="ein" inputMode="numeric" placeholder="12-3456789" defaultValue={dv("ein")} maxLength={12} aria-invalid={invalid("ein")} />
+              <Input name="ein" inputMode="numeric" defaultValue={dv("ein")} maxLength={12} aria-invalid={invalid("ein")} />
             </Field>
             {num("years_in_business", "Years in business", { max: 3 })}
             <Field label="Est. annual premium" error={fe("estimated_annual_premium")}>

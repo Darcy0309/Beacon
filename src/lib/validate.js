@@ -205,6 +205,7 @@ export const schemas = {
     phone: [phone],
     fax: [phone],
     contact_mobile: [phone],
+    contact_phone: [phone],
     email: [email, max(120)],
     decision_maker: [max(80)],
     dm_title: [max(60)],

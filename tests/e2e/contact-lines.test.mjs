@@ -60,6 +60,14 @@ try {
     print: c.querySelector('[data-print-sheet]')?.getAttribute('href') ?? null }; })()`);
   check("the card is Prospect Info, headed by the business's name, not the contact's", /prospect info/i.test(prospect.title) && prospect.heading === `${TAG} AGSI Business`, JSON.stringify(prospect));
   check("…its three people in order: decision maker, contact, secondary contact", JSON.stringify(prospect.people) === JSON.stringify(["Decision maker", "Contact", "Secondary contact"]), JSON.stringify(prospect.people));
+  // Sean's sketch (Oct 2026): each person in a dark box, the business's number with the decision maker, each line named for whose it is.
+  const boxes = await sean.ev(`[...document.querySelectorAll('[data-person-box]')].map((b) => [b.dataset.personBox, getComputedStyle(b).borderTopWidth,
+    [...b.querySelectorAll('[data-contact-line] > div > div:first-child')].map((d) => d.textContent)])`);
+  check("…each in a dark box, the business's number with the decision maker, each line named for whose it is", JSON.stringify(boxes) === JSON.stringify([
+    ["Decision maker", "2px", ["Business phone", "Decision Maker Email", "Decision Maker Phone", "Decision Maker Mobile"]],
+    ["Contact", "2px", ["Contact Email", "Contact Phone", "Contact Mobile"]],
+    ["Secondary contact", "2px", ["2nd Contact Email", "2nd Contact Phone", "2nd Contact Mobile"]],
+  ]), JSON.stringify(boxes));
   check("…with Edit and Print, and no Appointment button (appointments come from the call results)",
     prospect.buttons.some((b) => /^edit$/i.test(b)) && prospect.buttons.some((b) => /^print$/i.test(b)) && !prospect.buttons.some((b) => /appointment/i.test(b)) && prospect.print === `/api/leads/${lead}/sheet`,
     JSON.stringify(prospect.buttons));
@@ -126,15 +134,18 @@ try {
   const dashed = (n) => n.replace(/^\((\d{3})\) (\d{3})-(\d{4})/, "$1-$2-$3");
   check("the lead form has the new fields, filled in", JSON.stringify(fields) === JSON.stringify([dashed(MOBILE), "Robert Huff", "President", "214-269-7400", "214-785-2055", "robert@agsi.test"]), JSON.stringify(fields));
   await sean.fill('[role=dialog] input[name="dm_mobile"]', "602-555-0177 x9");
+  await sean.fill('[role=dialog] input[name="contact_phone"]', "(214) 269-7402");
   await sean.click("[role=dialog] button[type=submit]");
-  check("…and saves them (an extension is fine)", Boolean(await until(() => sql(`select dm_mobile from public.leads where id=${lead}`) === "602-555-0177 x9")));
+  check("…and saves them (an extension is fine), the contact's own phone too", Boolean(await until(() => sql(`select dm_mobile || '|' || contact_phone from public.leads where id=${lead}`) === "602-555-0177 x9|214-269-7402")));
+  await sean.go(`/leads/${lead}`, 4000);
+  check("…the Contact Phone on the card with its Call button", (await card(sean)).find((p) => p.who === "Contact")?.lines.find((l) => l.kind === "Business")?.call === "tel:+12142697402");
 
   section("Someone not on the name");
   const tyler = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();
   await tyler.go(`/leads/${lead}`, 4000);
   const theirs = await card(tyler);
   check("still sees the numbers with Call buttons, but no Email buttons",
-    theirs.every((p) => p.lines.filter((l) => l.kind !== "Email").every((l) => l.call)) && theirs.every((p) => p.lines.every((l) => !l.email)), JSON.stringify(theirs));
+    theirs.every((p) => p.lines.filter((l) => l.kind !== "Email" && l.value !== "None on file").every((l) => l.call)) && theirs.every((p) => p.lines.every((l) => !l.email)), JSON.stringify(theirs));
 } finally {
   browser.close();
   sql(`delete from public.work_activity where lead_id = ${lead}`);

@@ -66,6 +66,17 @@ try {
   const place = await until(async () => { const p = [await v("[data-prospect-form] [data-suggest=city] input"), await v("[data-prospect-form] select[name=state]"), await v("[data-prospect-form] [data-suggest=county] input")]; return p[0] && p; });
   check("a ZIP fills in the city, state and county", JSON.stringify(place) === JSON.stringify(["Phoenix", "AZ", "Maricopa"]), JSON.stringify(place));
 
+  // Sean (Oct 2026): a ZIP in another state typed over an Arizona record changed nothing. A new ZIP is where the business is.
+  await type("[data-prospect-form] input[name=zip]", "92101");
+  const moved = await until(async () => { const p = [await v("[data-prospect-form] [data-suggest=city] input"), await v("[data-prospect-form] select[name=state]"), await v("[data-prospect-form] [data-suggest=county] input")]; return p[1] === "CA" && p; });
+  check("a new ZIP, in another state, sets the city, state and county to its own", JSON.stringify(moved) === JSON.stringify(["San Diego", "CA", "San Diego"]), JSON.stringify(moved));
+  check("…and says so", /From ZIP 92101: San Diego, CA · San Diego County/.test(await mike.ev("document.querySelector('[data-zip-said]')?.textContent ?? ''")));
+  await type("[data-prospect-form] input[name=zip]", "00000");
+  check("a ZIP that is none is said, and changes nothing", Boolean(await until(() => mike.ev("/00000 isn't a ZIP we know/.test(document.querySelector('[data-zip-said]')?.textContent ?? '')")))
+    && (await v("[data-prospect-form] select[name=state]")) === "CA");
+  await type("[data-prospect-form] input[name=zip]", "85027");
+  await until(async () => (await v("[data-prospect-form] select[name=state]")) === "AZ");
+
   section("Prospect Info: each section boxed");
   const boxes = await mike.ev("[...document.querySelectorAll('[data-prospect-form] fieldset')].map((f) => [f.querySelector('legend')?.textContent, getComputedStyle(f).borderTopWidth])");
   check("Business, Location, Decision maker, Contact and Secondary contact, each in a box of a heavier line",

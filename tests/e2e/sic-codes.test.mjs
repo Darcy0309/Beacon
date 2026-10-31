@@ -42,6 +42,31 @@ try {
   check("loaded from a sheet: 111 is 0111, 11101 is 011101", Boolean(await until(() => sql(`select string_agg(code, ',' order by code) from public.sic_codes where description like ${lit(`${TAG}%`)}`) === "0111,011101" || null, { timeout: 20000 })));
   check("…and nothing kept without its zero", sql("select count(*) from public.sic_codes where code in ('111', '11101')") === "0");
 
+  section("The leads already in: a code from what the business does (Oct 2026)");
+  const project = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Appts`)}, ${company},
+    (select id from public.project_types where code = 'APPT'), 1) returning id`));
+  const old = (name, code, description) => Number(sql(`insert into public.leads (company_name, project_id, sic_code, description)
+    values (${lit(`${TAG} ${name}`)}, ${project}, ${code ? lit(code) : "null"}, ${lit(description)}) returning id`));
+  const electric = old("Electric", null, "ELECTRICAL WORK");
+  const story = old("Story", null, "Family-owned HVAC company since 1990");
+  const coded = old("Coded", "1521", "Electrical Work");
+  await admin.go("/settings", 5000);
+  await admin.click("[data-sic-fill-leads]");
+  check("Settings gives the leads with a description and no code theirs, and says how many", Boolean(await toastSays("/given theirs from the description/")));
+  check("…a description on the list: its code", sql(`select coalesce(sic_code, '') from public.leads where id = ${electric}`) === "1731", sql(`select sic_code from public.leads where id = ${electric}`));
+  check("…what the business does in words of its own: left for a person", sql(`select coalesce(sic_code, 'none') from public.leads where id = ${story}`) === "none");
+  check("…a lead with a code keeps it", sql(`select sic_code from public.leads where id = ${coded}`) === "1521");
+  await admin.go(`/leads/${story}`, 5000);
+  await admin.ev("[...document.querySelectorAll('[role=tab]')].find((t) => /^Business/.test(t.textContent.trim()))?.click(); true");
+  await until(() => admin.ev("!!document.querySelector('[data-edit-business]')"));
+  await admin.click("[data-edit-business]");
+  await until(() => admin.ev("!!document.querySelector('[role=dialog] input[name=sic_code]')"));
+  check("a lead with no code shows a blank code, not an example that reads as one", (await admin.ev("(() => { const i = document.querySelector('[role=dialog] input[name=sic_code]'); return i.value + '|' + i.placeholder; })()")) === "|");
+  await admin.key("Escape");
+  sql(`delete from public.leads where project_id = ${project}`);
+  sql(`delete from public.projects where id = ${project}`);
+  await admin.go("/settings", 5000);
+
   section("Replace the whole list");
   await admin.ev("document.querySelector('[data-sic-replace]').click()");
   await upload(file("replace.csv", `SIC Code,SIC Description\n111,${TAG} Wheat\n1521,${TAG} Homes\n`));

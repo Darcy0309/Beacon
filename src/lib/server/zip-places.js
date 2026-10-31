@@ -47,3 +47,12 @@ export async function placeFrom(fields) {
   const filled = fillPlace(lead, index);
   return Object.fromEntries(filled.map((k) => [k, lead[k]]));
 }
+
+/** A ZIP's place: { zip, city, state, county }, or null for one not on file. ZIP+4 and a lost leading zero read as the ZIP. */
+export async function placeOfZip(zip) {
+  const index = await placesIndex();
+  const t = String(zip ?? "").trim();
+  const z = /^\d{5}(-?\d{4})?$/.test(t) ? t.slice(0, 5) : /^\d{3,4}$/.test(t) ? t.padStart(5, "0") : null;
+  const place = z ? index.zips[z] : null;
+  return place ? { zip: z, city: place[0], state: place[1], county: place[2] } : null;
+}

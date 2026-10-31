@@ -14,7 +14,7 @@ const leadSelect = ({ status = false } = {}) => `
   subcontractors_pct, auto_types, drivers, travel_radius, xmod, annual_payroll, dot_number, cargo, claims_3yrs,
   estimated_annual_premium, client_note, lead_date, import_date,
   date_last_worked, updated_at, created_at, decision_maker, dm_title, fax,
-  contact_mobile, dm_phone, dm_mobile, dm_email,
+  contact_mobile, contact_phone, dm_phone, dm_mobile, dm_email,
   contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email, producer_name,
   stage, call_weight, original_xdate, promoted_at, call_back_on,
   status:lead_statuses${inner(status)}(id, code, name),

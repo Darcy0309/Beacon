@@ -37,7 +37,7 @@ const longDate = (d) =>
 export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin = null } = {}) {
   const { data: lead, error } = await admin
     .from("leads")
-    .select(`id, company_name, contact_name, contact_title, phone, contact_mobile, email,
+    .select(`id, company_name, contact_name, contact_title, phone, contact_mobile, contact_phone, email,
       decision_maker, dm_title, dm_phone, dm_mobile, dm_email,
       contact2_name, contact2_title, contact2_phone, contact2_mobile, contact2_email,
       address, city, state, zip, website, fax, producer_name, list_source,
@@ -106,7 +106,8 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
     rep: fullName(rep) || null,
     appointment: appt ? { date: longDate(appt.appt_date), time: appt.appt_time, with: appt.rep_name, links: [] } : null,
     people: [
-      { who: "Contact", name: lead.contact_name, title: lead.contact_title, phone: lead.phone, mobile: lead.contact_mobile, email: lead.email },
+      // The contact's own line when there is one (Oct 2026), else the business's number as before.
+      { who: "Contact", name: lead.contact_name, title: lead.contact_title, phone: lead.contact_phone || lead.phone, mobile: lead.contact_mobile, email: lead.email },
       { who: "Decision maker", name: lead.decision_maker, title: lead.dm_title, phone: lead.dm_phone, mobile: lead.dm_mobile, email: lead.dm_email },
       { who: "Secondary contact", name: lead.contact2_name, title: lead.contact2_title, phone: lead.contact2_phone, mobile: lead.contact2_mobile, email: lead.contact2_email },
     ],
