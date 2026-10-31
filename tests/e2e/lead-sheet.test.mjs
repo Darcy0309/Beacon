@@ -216,7 +216,7 @@ try {
   const value = (label) => business.find((r) => r[0] === label)?.[1];
   check("Locations above Employees", labels.indexOf("Locations") === labels.indexOf("Employees") - 1 && value("Locations") === "3", JSON.stringify(labels));
   check("EIN after Sales volume and Annual payroll, before Years in business", labels.indexOf("Annual payroll") === labels.indexOf("Sales volume") + 1 && labels.indexOf("EIN") === labels.indexOf("Annual payroll") + 1 && labels.indexOf("Years in business") === labels.indexOf("EIN") + 1 && value("EIN") === "12-3456789", JSON.stringify(business));
-  check("the SIC code with what it means", value("SIC code") === "1731 – Electrical Work", value("SIC code"));
+  check("the SIC code, then what it means", value("SIC code") === "1731" && value("SIC description") === "Electrical Work", `${value("SIC code")} / ${value("SIC description")}`);
 
   await sleep(500);
 } finally {

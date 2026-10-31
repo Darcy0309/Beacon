@@ -19,3 +19,31 @@ export async function fillPlaces(leads) {
   for (const lead of leads) for (const k of fillPlace(lead, index)) counts[k] += 1;
   return counts;
 }
+
+// Each state's cities and counties, sorted, read once a state.
+const perState = new Map();
+
+/** A state's cities (as the post office names them) and counties (as leads keep them), to pick from: { cities, counties }. */
+export async function statePlaces(state) {
+  if (perState.has(state)) return perState.get(state);
+  const index = await placesIndex();
+  const cities = new Set();
+  const counties = new Set();
+  for (const [city, st, county] of Object.values(index.zips)) {
+    if (st !== state) continue;
+    cities.add(city);
+    if (county) counties.add(county);
+  }
+  const sort = (set) => [...set].sort((a, b) => a.localeCompare(b));
+  const out = { cities: sort(cities), counties: sort(counties) };
+  perState.set(state, out);
+  return out;
+}
+
+/** What a place's other fields say of its blank ones ({ city, state, zip, county }): only those filled. */
+export async function placeFrom(fields) {
+  const index = await placesIndex();
+  const lead = { ...fields };
+  const filled = fillPlace(lead, index);
+  return Object.fromEntries(filled.map((k) => [k, lead[k]]));
+}

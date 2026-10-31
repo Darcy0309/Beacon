@@ -93,6 +93,7 @@ const STYLES = {
   month: { month: "long", year: "numeric" }, // October 2026
   short: { month: "short", day: "numeric" }, // Oct 1
   weekday: { weekday: "short" }, // Thu
+  numeric: { month: "2-digit", day: "2-digit", year: "numeric" }, // 10/01/2026
 };
 
 export function formatIso(iso, style = "long") {

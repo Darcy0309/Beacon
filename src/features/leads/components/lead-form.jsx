@@ -12,6 +12,8 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { createLead, updateLead } from "@/features/leads/actions";
+import PhoneInput from "@/components/shared/phone-input";
+import PlaceFields from "@/features/leads/components/place-fields";
 import { fullName } from "@/lib/format";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
 import { useRole } from "@/components/layout/role-provider";
@@ -103,10 +105,10 @@ export default function LeadForm({ lead, options, trigger }) {
             </Field>
 
             <Field label="Business phone" error={fe("phone")} hint="Add an extension as x203">
-              <Input name="phone" type="tel" inputMode="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} />
+              <PhoneInput name="phone" defaultValue={dv("phone") ?? ""} invalid={invalid("phone")} />
             </Field>
             <Field label="Mobile" error={fe("contact_mobile")}>
-              <Input name="contact_mobile" type="tel" inputMode="tel" defaultValue={dv("contact_mobile")} aria-invalid={invalid("contact_mobile")} />
+              <PhoneInput name="contact_mobile" defaultValue={dv("contact_mobile") ?? ""} invalid={invalid("contact_mobile")} />
             </Field>
             <Field label="Email" error={fe("email")} className="sm:col-span-2">
               <Input name="email" type="email" inputMode="email" defaultValue={dv("email")} maxLength={120} aria-invalid={invalid("email")} />
@@ -119,10 +121,10 @@ export default function LeadForm({ lead, options, trigger }) {
               <Input name="dm_title" defaultValue={dv("dm_title")} maxLength={60} aria-invalid={invalid("dm_title")} />
             </Field>
             <Field label="Decision maker's business phone" error={fe("dm_phone")}>
-              <Input name="dm_phone" type="tel" inputMode="tel" defaultValue={dv("dm_phone")} aria-invalid={invalid("dm_phone")} />
+              <PhoneInput name="dm_phone" defaultValue={dv("dm_phone") ?? ""} invalid={invalid("dm_phone")} />
             </Field>
             <Field label="Decision maker's mobile" error={fe("dm_mobile")}>
-              <Input name="dm_mobile" type="tel" inputMode="tel" defaultValue={dv("dm_mobile")} aria-invalid={invalid("dm_mobile")} />
+              <PhoneInput name="dm_mobile" defaultValue={dv("dm_mobile") ?? ""} invalid={invalid("dm_mobile")} />
             </Field>
             <Field label="Decision maker's email" error={fe("dm_email")} className="sm:col-span-2">
               <Input name="dm_email" type="email" inputMode="email" defaultValue={dv("dm_email")} maxLength={120} aria-invalid={invalid("dm_email")} />
@@ -135,10 +137,10 @@ export default function LeadForm({ lead, options, trigger }) {
               <Input name="contact2_title" defaultValue={dv("contact2_title")} maxLength={60} aria-invalid={invalid("contact2_title")} />
             </Field>
             <Field label="Secondary contact's business phone" error={fe("contact2_phone")}>
-              <Input name="contact2_phone" type="tel" inputMode="tel" defaultValue={dv("contact2_phone")} aria-invalid={invalid("contact2_phone")} />
+              <PhoneInput name="contact2_phone" defaultValue={dv("contact2_phone") ?? ""} invalid={invalid("contact2_phone")} />
             </Field>
             <Field label="Secondary contact's mobile" error={fe("contact2_mobile")}>
-              <Input name="contact2_mobile" type="tel" inputMode="tel" defaultValue={dv("contact2_mobile")} aria-invalid={invalid("contact2_mobile")} />
+              <PhoneInput name="contact2_mobile" defaultValue={dv("contact2_mobile") ?? ""} invalid={invalid("contact2_mobile")} />
             </Field>
             <Field label="Secondary contact's email" error={fe("contact2_email")} className="sm:col-span-2">
               <Input name="contact2_email" type="email" inputMode="email" defaultValue={dv("contact2_email")} maxLength={120} aria-invalid={invalid("contact2_email")} />
@@ -151,16 +153,8 @@ export default function LeadForm({ lead, options, trigger }) {
             <Field label="Street address" error={fe("address")} className="sm:col-span-2">
               <Input name="address" defaultValue={dv("address")} maxLength={120} aria-invalid={invalid("address")} />
             </Field>
-            <Field label="City" error={fe("city")}>
-              <Input name="city" defaultValue={dv("city")} maxLength={60} aria-invalid={invalid("city")} />
-            </Field>
-            <Field label="State" error={fe("state")} hint="Two-letter code">
-              <Input name="state" maxLength={20} placeholder="AZ" defaultValue={dv("state")} aria-invalid={invalid("state")} className="uppercase" />
-            </Field>
-
-            <Field label="ZIP" error={fe("zip")}>
-              <Input name="zip" inputMode="numeric" placeholder="85016" defaultValue={dv("zip")} maxLength={10} aria-invalid={invalid("zip")} />
-            </Field>
+            {/* City, state, ZIP and county, one spelling each: picked from the state's, filled in from the ZIP (Oct 2026). */}
+            <PlaceFields fe={fe} invalid={invalid} dv={dv} />
             <Field label="SIC code" error={fe("sic_code")}>
               <Input name="sic_code" placeholder="6411" defaultValue={dv("sic_code")} maxLength={12} aria-invalid={invalid("sic_code")} />
             </Field>

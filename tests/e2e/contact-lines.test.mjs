@@ -122,7 +122,9 @@ try {
   await sean.click("button", "Edit");
   await until(() => sean.ev(`!!document.querySelector('[role=dialog] input[name="dm_mobile"]')`));
   const fields = await sean.ev(`['contact_mobile', 'decision_maker', 'dm_title', 'dm_phone', 'dm_mobile', 'dm_email'].map((n) => document.querySelector('[role=dialog] [name="' + n + '"]')?.value ?? null)`);
-  check("the lead form has the new fields, filled in", JSON.stringify(fields) === JSON.stringify([MOBILE, "Robert Huff", "President", "(214) 269-7400", "(214) 785-2055", "robert@agsi.test"]), JSON.stringify(fields));
+  // Numbers show as they are kept from now on, 214-269-7400 (Sean, Oct 2026).
+  const dashed = (n) => n.replace(/^\((\d{3})\) (\d{3})-(\d{4})/, "$1-$2-$3");
+  check("the lead form has the new fields, filled in", JSON.stringify(fields) === JSON.stringify([dashed(MOBILE), "Robert Huff", "President", "214-269-7400", "214-785-2055", "robert@agsi.test"]), JSON.stringify(fields));
   await sean.fill('[role=dialog] input[name="dm_mobile"]', "602-555-0177 x9");
   await sean.click("[role=dialog] button[type=submit]");
   check("…and saves them (an extension is fine)", Boolean(await until(() => sql(`select dm_mobile from public.leads where id=${lead}`) === "602-555-0177 x9")));

@@ -15,9 +15,14 @@ import { cn } from "@/lib/utils";
  *
  * The list opens under the field, in the page's flow, so a dialog's
  * scrolling never cuts it off. `value`/`onChange` to control it (a value
- * filled in from elsewhere); `defaultValue` otherwise.
+ * filled in from elsewhere); `defaultValue` otherwise. `onPick` hears a name
+ * taken from the list; `onBlur`, the field left. `unlisted` says what a name
+ * not on the list is not in (a city or county, Oct 2026), `maxLength` caps it.
  */
-export default function SuggestInput({ name, value: controlled, defaultValue = "", onChange, options, placeholder, invalid, id, "aria-label": ariaLabel, className }) {
+export default function SuggestInput({
+  name, value: controlled, defaultValue = "", onChange, onPick, onBlur, options, placeholder, invalid, id, "aria-label": ariaLabel, className,
+  unlisted = "Not in the carrier list: check the spelling.", maxLength = 120, ...rest
+}) {
   const [own, setOwn] = useState(defaultValue ?? "");
   const value = controlled !== undefined ? controlled ?? "" : own;
   const setValue = (v) => {
@@ -35,6 +40,7 @@ export default function SuggestInput({ name, value: controlled, defaultValue = "
   const take = (picked) => {
     setValue(picked);
     setOpen(false);
+    onPick?.(picked);
   };
 
   const onKeyDown = (e) => {
@@ -63,10 +69,10 @@ export default function SuggestInput({ name, value: controlled, defaultValue = "
           setActive(0);
         }}
         onFocus={() => value && setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onBlur={() => { setOpen(false); onBlur?.(value); }}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        maxLength={120}
+        maxLength={maxLength}
         autoComplete="off"
         role="combobox"
         aria-label={ariaLabel}
@@ -75,6 +81,7 @@ export default function SuggestInput({ name, value: controlled, defaultValue = "
         aria-autocomplete="list"
         aria-activedescendant={showing ? `${listId}-${active}` : undefined}
         aria-invalid={invalid}
+        aria-describedby={rest["aria-describedby"]}
       />
       {showing ? (
         <ul id={listId} role="listbox" className="mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md">
@@ -97,8 +104,8 @@ export default function SuggestInput({ name, value: controlled, defaultValue = "
             </li>
           ))}
         </ul>
-      ) : !known && !open ? (
-        <p data-not-listed className="mt-1 text-[0.7rem] text-amber-600 dark:text-amber-400">Not in the carrier list: check the spelling.</p>
+      ) : !known && !open && unlisted ? (
+        <p data-not-listed className="mt-1 text-[0.7rem] text-amber-600 dark:text-amber-400">{unlisted}</p>
       ) : null}
     </div>
   );

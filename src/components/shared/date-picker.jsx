@@ -74,10 +74,13 @@ async function appointmentMarks(month) {
  *              under the calendar as it is pointed at or chosen
  *   future     a typed date with no year means the next one ("Jan 5" in December)
  *   value/onChange to control it; defaultValue otherwise
+ *   display    how a date reads in the field: "long" (Thu, Oct 1, 2026), or
+ *              "numeric" (10/01/2026, as the client's managers write them)
  */
 export default function DatePicker({
   name, value: controlled, defaultValue = "", onChange, min, max, required, invalid, disabled, id,
   "aria-label": ariaLabel = "Date", placeholder = "Type or pick a date", presets = [], marks, future = false, calendarProject = null, className,
+  display = "long",
 }) {
   const today = todayIso();
   const lo = min === "today" ? today : min || null;
@@ -86,7 +89,7 @@ export default function DatePicker({
   const [own, setOwn] = useState(defaultValue || "");
   const value = (isControlled ? controlled : own) || "";
 
-  const [text, setText] = useState(value ? formatIso(value) : "");
+  const [text, setText] = useState(value ? formatIso(value, display) : "");
   const [editing, setEditing] = useState(false);
   const [problem, setProblem] = useState(null);
   const [open, setOpen] = useState(false);
@@ -105,8 +108,8 @@ export default function DatePicker({
 
   // Shown in words whenever nobody is typing in it.
   useEffect(() => {
-    if (!editing) setText(value ? formatIso(value) : "");
-  }, [value, editing]);
+    if (!editing) setText(value ? formatIso(value, display) : "");
+  }, [value, editing, display]);
 
   useEffect(() => {
     if (!open || marks !== "appointments") return;
@@ -142,14 +145,14 @@ export default function DatePicker({
     setProblem(null);
     if (!isControlled) setOwn(iso);
     onChange?.(iso);
-    setText(iso ? formatIso(iso) : "");
+    setText(iso ? formatIso(iso, display) : "");
     if (iso) setMonth(monthStart(iso));
   };
 
   /** Read what was typed. True when it made a date (or was cleared). */
   const read = () => {
     const typed = text.trim();
-    if (!typed || typed === formatIso(value)) {
+    if (!typed || typed === formatIso(value, display)) {
       if (!typed) set("");
       return true;
     }

@@ -25,23 +25,24 @@ check("New Lead dialog opens", await waitFor(`!!document.querySelector('[role="d
 
 const fillAndSubmit = (values) =>
   page.ev(`(() => {
-    const set = (n, v) => { const el = document.querySelector('[role="dialog"] form [name="' + n + '"]'); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); };
+    const set = (n, v) => { const el = document.querySelector('[role="dialog"] form [name="' + n + '"]'); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value').set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
     for (const [n, v] of Object.entries(${JSON.stringify(values)})) set(n, v);
     document.querySelector('[role="dialog"] form button[type="submit"]').click();
   })()`);
 
 // 1. Invalid: every field wrong in a different way.
-await fillAndSubmit({ company_name: "", state: "Freedonia", email: "not-an-email", employees: "lots", zip: "123" });
-check("inline errors render after invalid submit", await waitFor(`document.querySelectorAll('[role="dialog"] form [role="alert"]').length >= 5`));
+// The state is picked from a list of the states' codes (Sean, Oct 2026), so it cannot be written wrong.
+check("the state is a list of the states' codes", await page.ev(`(() => { const s = document.querySelector('[role="dialog"] form select[name="state"]'); return Boolean(s) && [...s.options].some((o) => o.value === 'AZ') && ![...s.options].some((o) => o.value === 'Arizona'); })()`));
+await fillAndSubmit({ company_name: "", email: "not-an-email", employees: "lots", zip: "123" });
+check("inline errors render after invalid submit", await waitFor(`document.querySelectorAll('[role="dialog"] form [role="alert"]').length >= 4`));
 const errs = await page.ev(`[...document.querySelectorAll('[role="dialog"] form [role="alert"]')].map((e) => e.textContent.trim())`);
 check("company name error", errs.some((e) => /company name is required/i.test(e)));
-check("state error", errs.some((e) => /state code/i.test(e)));
 check("email error", errs.some((e) => /valid email/i.test(e)));
 check("employees error", errs.some((e) => /whole number/i.test(e)));
 check("zip error", errs.some((e) => /zip/i.test(e)));
-check("invalid inputs are marked aria-invalid", (await page.ev(`document.querySelectorAll('[role="dialog"] form [aria-invalid="true"]').length`)) >= 5);
+check("invalid inputs are marked aria-invalid", (await page.ev(`document.querySelectorAll('[role="dialog"] form [aria-invalid="true"]').length`)) >= 4);
 check("dialog stays open on error", await page.ev(`!!document.querySelector('[role="dialog"] form input[name="company_name"]')`));
-check("user's typed values are preserved", (await page.ev(`document.querySelector('[role="dialog"] form [name="state"]').value`)) === "Freedonia");
+check("user's typed values are preserved", (await page.ev(`document.querySelector('[role="dialog"] form [name="email"]').value`)) === "not-an-email");
 await shot("lead-form-invalid");
 
 const { sb } = await signIn("admin@beacon.test");

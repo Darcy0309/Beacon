@@ -53,7 +53,7 @@ export const rules = {
     const digits = main.replace(/\D/g, "");
     const ok = (digits.length === 10 || (digits.length === 11 && digits.startsWith("1"))) &&
       /^[+\d\s().-]+$/.test(main);
-    return ok ? null : "Enter a valid phone number, e.g. (602) 555-0100 or (602) 555-0100 x203";
+    return ok ? null : "Enter a 10-digit phone number only, like 602-555-0100 (an extension as x203)";
   },
 
   date: (v) => {
@@ -203,6 +203,7 @@ export const schemas = {
     contact_name: [max(80)],
     contact_title: [max(60)],
     phone: [phone],
+    fax: [phone],
     contact_mobile: [phone],
     email: [email, max(120)],
     decision_maker: [max(80)],

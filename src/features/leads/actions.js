@@ -11,6 +11,7 @@ import { schemas } from "@/lib/validate";
 import { POLICY_LINES } from "@/lib/coverage";
 import { AUTO_TYPES } from "@/lib/business";
 import { sicCode } from "@/lib/sic";
+import { formatPhone } from "@/lib/format";
 
 const AUTO_TYPE_KEYS = new Set(AUTO_TYPES.map(([k]) => k));
 
@@ -20,23 +21,28 @@ const autoTypes = (formData) => {
   return picked.length ? [...new Set(picked)] : null;
 };
 
+// A phone number kept one way, 602-555-0100 (x203), however it was typed (Sean, Oct 2026); validation has turned away what is not one.
+const phoneOf = (formData, key) => { const v = s(formData, key); return v ? formatPhone(v) ?? v : v; };
+
 function leadPayload(formData) {
   return {
     company_name: s(formData, "company_name"),
     contact_name: s(formData, "contact_name"),
     contact_title: s(formData, "contact_title"),
-    phone: s(formData, "phone"),
-    contact_mobile: s(formData, "contact_mobile"),
+    phone: phoneOf(formData, "phone"),
+    // On Prospect Info since Oct 2026, but never saved until now.
+    fax: phoneOf(formData, "fax"),
+    contact_mobile: phoneOf(formData, "contact_mobile"),
     email: s(formData, "email"),
     decision_maker: s(formData, "decision_maker"),
     dm_title: s(formData, "dm_title"),
-    dm_phone: s(formData, "dm_phone"),
-    dm_mobile: s(formData, "dm_mobile"),
+    dm_phone: phoneOf(formData, "dm_phone"),
+    dm_mobile: phoneOf(formData, "dm_mobile"),
     dm_email: s(formData, "dm_email"),
     contact2_name: s(formData, "contact2_name"),
     contact2_title: s(formData, "contact2_title"),
-    contact2_phone: s(formData, "contact2_phone"),
-    contact2_mobile: s(formData, "contact2_mobile"),
+    contact2_phone: phoneOf(formData, "contact2_phone"),
+    contact2_mobile: phoneOf(formData, "contact2_mobile"),
     contact2_email: s(formData, "contact2_email"),
     producer_name: s(formData, "producer_name"),
     website: s(formData, "website"),

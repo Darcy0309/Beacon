@@ -9,8 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Field, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { updateLead } from "@/features/leads/actions";
+import PhoneInput from "@/components/shared/phone-input";
+import PlaceFields from "@/features/leads/components/place-fields";
+import { SECTION_BOX, SECTION_LEGEND as LEGEND } from "@/features/leads/form-section";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
+const SECTION = `grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-2 ${SECTION_BOX}`;
 
 // One person's lines: name and title, then business phone, mobile and email.
 const PEOPLE = [
@@ -22,8 +26,10 @@ const PEOPLE = [
 /**
  * Edit a lead's Prospect Info (Sean, Oct 2026): the business's name, phone,
  * street address, county and website, and its three people (decision
- * maker, contact, secondary contact). Only these are sent, so nothing else
- * on the lead changes. What the business is (employees, autos, SIC…) is on
+ * maker, contact, secondary contact), each in its own box. Phone numbers go
+ * in as 602-555-0100, and the city, state and county are picked from the
+ * state's (a ZIP fills them in). Only these are sent, so nothing else on the
+ * lead changes. What the business is (employees, autos, SIC…) is on
  * the Business tab; notes are on the Notes tab; where it stands is its call
  * result.
  */
@@ -40,6 +46,11 @@ export default function ProspectForm({ lead, trigger }) {
     } else if (state?.error && !state?.fieldErrors) toast.error(state.error);
   }, [state, router]);
   const errors = state?.fieldErrors ? Object.keys(state.fieldErrors).length : 0;
+  const phone = (name, label, hint) => (
+    <Field key={name} label={label} error={fe(name)} hint={hint}>
+      <PhoneInput name={name} defaultValue={dv(name) ?? ""} invalid={invalid(name)} />
+    </Field>
+  );
   const text = (name, label, props = {}) => (
     <Field key={name} label={label} error={fe(name)} className={props.wide ? "sm:col-span-2" : undefined} hint={props.hint}>
       <Input name={name} defaultValue={dv(name)} maxLength={props.max ?? 80} type={props.type} inputMode={props.inputMode} placeholder={props.placeholder}
@@ -64,26 +75,27 @@ export default function ProspectForm({ lead, trigger }) {
             </p>
           ) : null}
           <div className="-mr-1 grid min-h-0 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
-            <Field label="Company name" required error={fe("company_name")} className="sm:col-span-2">
-              <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} autoFocus />
-            </Field>
-            {text("phone", "Business phone", { type: "tel", inputMode: "tel", hint: "Add an extension as x203" })}
-            {text("fax", "Fax", { type: "tel", inputMode: "tel" })}
-            {text("address", "Street address", { wide: true, max: 120 })}
-            <div className="grid grid-cols-[1fr_5rem_7rem] gap-3 sm:col-span-2">
-              {text("city", "City", { max: 60 })}
-              {text("state", "State", { max: 20, placeholder: "AZ", className: "uppercase" })}
-              {text("zip", "ZIP", { max: 10, inputMode: "numeric" })}
-            </div>
-            {text("county", "County", { max: 60 })}
-            {text("website", "Website", { max: 120 })}
+            <fieldset className={SECTION} data-section="Business">
+              <legend className={LEGEND}>Business</legend>
+              <Field label="Company name" required error={fe("company_name")} className="sm:col-span-2">
+                <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} autoFocus />
+              </Field>
+              {phone("phone", "Business phone", "Add an extension as x203")}
+              {phone("fax", "Fax")}
+              {text("website", "Website", { max: 120, wide: true })}
+            </fieldset>
+            <fieldset className={SECTION} data-section="Location">
+              <legend className={LEGEND}>Location</legend>
+              {text("address", "Street address", { wide: true, max: 120 })}
+              <PlaceFields fe={fe} invalid={invalid} dv={dv} />
+            </fieldset>
             {PEOPLE.map(([who, f]) => (
-              <fieldset key={who} className="grid grid-cols-1 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2 sm:grid-cols-2" data-person={who}>
-                <legend className="px-1 text-xs font-semibold">{who}</legend>
+              <fieldset key={who} className={SECTION} data-person={who}>
+                <legend className={LEGEND}>{who}</legend>
                 {text(f.name, "Name")}
                 {text(f.title, "Title", { max: 60 })}
-                {f.phone ? text(f.phone, "Business phone", { type: "tel", inputMode: "tel" }) : null}
-                {text(f.mobile, "Mobile", { type: "tel", inputMode: "tel" })}
+                {f.phone ? phone(f.phone, "Business phone") : null}
+                {phone(f.mobile, "Mobile")}
                 {text(f.email, "Email", { type: "email", inputMode: "email", max: 120, wide: !f.phone })}
               </fieldset>
             ))}

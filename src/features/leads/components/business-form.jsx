@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { updateLead } from "@/features/leads/actions";
+import PhoneInput from "@/components/shared/phone-input";
+import { SECTION_BOX, SECTION_LEGEND } from "@/features/leads/form-section";
 import { AUTO_TYPES, TRAVEL_RADII, xmodText } from "@/lib/business";
 import { sicLookup } from "@/lib/sic";
 
@@ -103,11 +105,11 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
               <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} />
             </Field>
             <Field label="Phone" error={fe("phone")}>
-              <Input name="phone" type="tel" inputMode="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} />
+              <PhoneInput name="phone" defaultValue={dv("phone") ?? ""} invalid={invalid("phone")} />
             </Field>
 
-            <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2 sm:grid-cols-5" data-group="locations">
-              <legend className="px-1 text-xs font-semibold">Locations</legend>
+            <fieldset className={`grid grid-cols-2 gap-3 ${SECTION_BOX} sm:col-span-2 sm:grid-cols-5`} data-group="locations">
+              <legend className={SECTION_LEGEND}>Locations</legend>
               <Field label="Locations" error={fe("location")}>
                 <Input name="location" defaultValue={dv("location")} maxLength={60} aria-invalid={invalid("location")} />
               </Field>
@@ -123,16 +125,16 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
               {num("building_acres", "Acres", { decimal: true, max: 8 })}
             </fieldset>
 
-            <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2 sm:grid-cols-4" data-group="employees">
-              <legend className="px-1 text-xs font-semibold">Employees</legend>
+            <fieldset className={`grid grid-cols-2 gap-3 ${SECTION_BOX} sm:col-span-2 sm:grid-cols-4`} data-group="employees">
+              <legend className={SECTION_LEGEND}>Employees</legend>
               {num("employees", "Total")}
               {num("employees_full_time", "Full-time")}
               {num("employees_part_time", "Part-time")}
               {num("subcontractors_pct", "Sub-contractors %", { decimal: true, max: 6 })}
             </fieldset>
 
-            <fieldset className="grid grid-cols-2 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-group="autos">
-              <legend className="px-1 text-xs font-semibold">Autos</legend>
+            <fieldset className={`grid grid-cols-2 gap-3 ${SECTION_BOX} sm:col-span-2`} data-group="autos">
+              <legend className={SECTION_LEGEND}>Autos</legend>
               {num("autos", "Autos", { max: 6 })}
               {num("drivers", "Drivers", { max: 6 })}
               <Field label="Travel radius" error={fe("travel_radius")}>

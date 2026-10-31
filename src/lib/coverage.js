@@ -13,11 +13,12 @@ export const POLICY_LINES = [
   { key: "auto", label: "Auto", date: "auto_xdate", carrier: "auto_carrier", always: true },
   { key: "health", label: "Group health", date: "health_xdate", carrier: "health_carrier", always: true },
   { key: "personal", label: "Personal lines", date: "personal_lines_xdate", carrier: "personal_lines_carrier", always: true },
-  { key: "dental", label: "Dental", date: "dental_xdate", carrier: "dental_provider" },
-  { key: "vision", label: "Vision", date: "vision_xdate", carrier: "vision_provider" },
+  // The rest, the professional lines first (Sean, Oct 2026).
   { key: "prof", label: "Prof. liability", date: "prof_liab_xdate", carrier: "prof_liab_carrier" },
   { key: "do", label: "D&O", date: "do_xdate", carrier: "do_carrier" },
   { key: "eo", label: "E&O", date: "eo_xdate", carrier: "eo_carrier" },
+  { key: "dental", label: "Dental", date: "dental_xdate", carrier: "dental_provider" },
+  { key: "vision", label: "Vision", date: "vision_xdate", carrier: "vision_provider" },
 ];
 
 /** A carrier name as two spellings of it compare: lower case, letters and digits only. */

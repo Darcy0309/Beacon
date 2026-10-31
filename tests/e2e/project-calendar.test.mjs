@@ -41,12 +41,13 @@ const setDate = async (page, iso) => {
 const warning = (page) => page.ev(`document.querySelector('[data-slot-warning]')?.innerText.replace(/\\s+/g, ' ') ?? null`);
 
 try {
-  section("On the lead sheet, under the call results");
+  section("On the lead sheet, above the call results");
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1500, height: 1000 });
   await sean.go(`/leads/${lead}?project=${DBDV}`, 6000);
   check("the project's calendar is there: the appointment project's, which a DB dev project shares",
     Boolean(await until(() => sean.ev(`document.querySelector('[data-project-calendar="${APPT}"]')?.innerText.includes(${JSON.stringify(`${TAG} Appts`)})`))));
-  check("…below the call results", await sean.ev(`(() => { const r = document.querySelector('[data-project-calendar]').getBoundingClientRect(); const c = [...document.querySelectorAll('.eyebrow')].find((e) => /Call result/i.test(e.textContent)).getBoundingClientRect(); return r.top > c.top && Math.abs(r.left - c.left) < 60; })()`));
+  // On top for a manager (Sean, Oct 2026: the calendar is what they use most, without scrolling down to it).
+  check("…above the call results, in the same column", await sean.ev(`(() => { const r = document.querySelector('[data-project-calendar]').getBoundingClientRect(); const c = [...document.querySelectorAll('.eyebrow')].find((e) => /Call result/i.test(e.textContent)).getBoundingClientRect(); return r.top < c.top && Math.abs(r.left - c.left) < 60; })()`));
   check("the month marks the day with an appointment, and the day blocked out",
     (await sean.ev(`document.querySelector('[data-project-calendar] [data-day="${D1}"]')?.dataset.appointments`)) === "1"
     && (await sean.ev(`document.querySelector('[data-project-calendar] [data-day="${D2}"]')?.dataset.blocked`)) === "day");

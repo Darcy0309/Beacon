@@ -14,19 +14,24 @@ import DatePicker from "@/components/shared/date-picker";
 import SuggestInput from "@/components/shared/suggest-input";
 import { saveCoverage } from "@/features/leads/actions";
 import { POLICY_LINES } from "@/lib/coverage";
+import { SECTION_LINE } from "@/features/leads/form-section";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 // The lines "apply to all" fills in: most of the time they renew together, as the client put it.
 const SHARED = ["pkg", "wc", "auto"];
 const sharedLabel = POLICY_LINES.filter((l) => SHARED.includes(l.key)).map((l) => l.label);
 const listed = (a) => `${a.slice(0, -1).join(", ")} & ${a.at(-1)}`;
+// Two boxes (Sean, Oct 2026): the main lines (liability to personal lines), then the rest.
+const GROUPS = [["main", POLICY_LINES.filter((l) => l.always)], ["other", POLICY_LINES.filter((l) => !l.always)]];
 
 /**
  * Edit a name's coverage from the Coverage tab: its Ultimate X-Date, the
  * prospect's agency and how long they have been with it, and each policy
  * line's X-date and carrier, the carrier suggested from the Insurance Cos.
  * list as it is typed. Dates are typed (MM/DD/YYYY or the like) or picked
- * from a calendar, and a date that is not one is pointed out. Most of the
+ * from a calendar, and read as 01/01/2027 (Sean, Oct 2026); a date that is
+ * not one is pointed out. A line's date and carrier are blank until filled,
+ * so what is missing shows. The main lines are boxed apart from the rest. Most of the
  * time the main policies renew together with one carrier, so the Ultimate
  * X-Date and the liability carrier can each be applied to liability,
  * workers comp and auto at once.
@@ -91,7 +96,7 @@ export default function CoverageForm({ leadId, company, coverage, carriers }) {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_8rem]">
               <Field label="Ultimate XDate" error={fe("ultimate_xdate")}>
-                <DatePicker name="ultimate_xdate" value={vals.ultimate_xdate} onChange={set("ultimate_xdate")} invalid={invalid("ultimate_xdate")} aria-label="Ultimate XDate" placeholder="MM/DD/YYYY, or pick it" />
+                <DatePicker name="ultimate_xdate" value={vals.ultimate_xdate} onChange={set("ultimate_xdate")} invalid={invalid("ultimate_xdate")} aria-label="Ultimate XDate" placeholder="MM/DD/YYYY, or pick it" display="numeric" />
                 <button type="button" onClick={applyDate} disabled={!vals.ultimate_xdate} data-apply-date
                   className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary transition-opacity hover:underline disabled:pointer-events-none disabled:opacity-40">
                   <CopyCheck className="size-3.5" /> Apply date to {listed(sharedLabel)}
@@ -110,21 +115,22 @@ export default function CoverageForm({ leadId, company, coverage, carriers }) {
               </p>
             ) : null}
 
-            <div className="rounded-lg border border-[var(--panel-border)]">
-              <div className="hidden grid-cols-[7.5rem_13.5rem_1fr] gap-3 border-b border-[var(--panel-border)] px-3 py-2 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:grid">
+            <div className="space-y-3">
+              <div className="hidden grid-cols-[7.5rem_13.5rem_1fr] gap-3 px-3 text-[0.62rem] font-bold uppercase tracking-[0.12em] text-muted-foreground sm:grid">
                 <span>Policy line</span><span>X-Date</span><span>Carrier</span>
               </div>
-              <div className="divide-y divide-[var(--panel-border)]">
-                {POLICY_LINES.map((line) => (
+              {GROUPS.map(([group, lines]) => (
+              <div key={group} className={`divide-y divide-[var(--panel-border)] ${SECTION_LINE}`} data-coverage-group={group}>
+                {lines.map((line) => (
                   <div key={line.key} data-coverage-line={line.key} className="grid grid-cols-1 items-start gap-2 px-3 py-2.5 sm:grid-cols-[7.5rem_13.5rem_1fr] sm:gap-3">
                     <span className="pt-2 text-sm font-medium">{line.label}</span>
                     <div>
-                      <DatePicker name={line.date} value={vals[line.date]} onChange={set(line.date)} invalid={invalid(line.date)} aria-label={`${line.label} X-Date`} placeholder="MM/DD/YYYY" />
+                      <DatePicker name={line.date} value={vals[line.date]} onChange={set(line.date)} invalid={invalid(line.date)} aria-label={`${line.label} X-Date`} placeholder="" display="numeric" />
                       {fe(line.date) ? <p role="alert" className="mt-1 text-[0.7rem] font-medium text-destructive">{fe(line.date)}</p> : null}
                     </div>
                     <div className="min-w-0">
                       <SuggestInput name={line.carrier} value={vals[line.carrier]} onChange={set(line.carrier)} options={carriers} invalid={invalid(line.carrier)}
-                        aria-label={`${line.label} carrier`} placeholder="Carrier" />
+                        aria-label={`${line.label} carrier`} />
                       {line.key === SHARED[0] ? (
                         <button type="button" onClick={applyCarrier} disabled={!vals[line.carrier]?.trim()} data-apply-carrier
                           className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary transition-opacity hover:underline disabled:pointer-events-none disabled:opacity-40">
@@ -135,6 +141,7 @@ export default function CoverageForm({ leadId, company, coverage, carriers }) {
                   </div>
                 ))}
               </div>
+              ))}
             </div>
           </div>
 

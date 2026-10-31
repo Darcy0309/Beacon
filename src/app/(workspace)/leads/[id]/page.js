@@ -567,8 +567,9 @@ export default async function LeadSheet({ params, searchParams }) {
                     <ProjectInfoView
                       info={info}
                       toLead={leadPlace(r)}
-                      action={admin ? <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" variant="outline" data-edit-project-info><Pencil /> Edit</Button>} /> : null}
-                      emptyHint={admin ? "Fill it in here, or send the client their link from the project's page." : "An administrator or the client fills it in."}
+                      // Administrators and the client's own people change it (Sean, Oct 2026); managers and agents read it.
+                      action={admin || client ? <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" variant="outline" data-edit-project-info><Pencil /> Edit</Button>} /> : null}
+                      emptyHint={admin ? "Fill it in here, or send the client their link from the project's page." : client ? "Fill it in with Edit." : "An administrator or the client fills it in."}
                     />
                   ) : (
                     <Empty icon={ClipboardList}>{r.project ? "This project's info can't be shown." : "This name is not on a project."}</Empty>
@@ -578,7 +579,7 @@ export default async function LeadSheet({ params, searchParams }) {
             />
           </Card>
 
-          {/* Right: a call-back reminder, then the call result buttons. */}
+          {/* Right: a call-back reminder, the project's calendar (staff's on top, Sean, Oct 2026: they use it most), then the call result buttons. */}
           {/* Pinned beside the sheet; with the calendar under it, it scrolls on its own on a short screen. */}
           <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1">
             {hold?.status === "failed" ? <HoldNotice hold={hold} /> : null}
@@ -595,6 +596,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 }))}
               />
             ) : null}
+            {staff && calendar ? <ProjectCalendar projectId={r.project.id} initial={calendar} today={today} leadLinks /> : null}
             {staff && r.projectType && r.stage !== (r.projectType === "APPT" ? "appt" : "dbdev") ? (
               // The name and its project disagree (the project's type was changed after the name was
               // loaded): say so, rather than offering the other stage's results without a word.
@@ -659,7 +661,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 </div>
               </Card>
             ) : null}
-            {calendar ? <ProjectCalendar projectId={r.project.id} initial={calendar} today={today} leadLinks /> : null}
+            {!staff && calendar ? <ProjectCalendar projectId={r.project.id} initial={calendar} today={today} leadLinks /> : null}
           </div>
         </div>
 

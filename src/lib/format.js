@@ -21,6 +21,39 @@ export function telHref(phone) {
   return number ? `tel:${number}${ext ? `,${ext}` : ""}` : null;
 }
 
+/**
+ * A phone number as it is kept (Sean, Oct 2026): "602-555-0100", with an
+ * extension as "602-555-0100 x203", however it was typed ("(602) 555-0100",
+ * "6025550100", "+1 602.555.0100"). Null when it is not ten digits (the US
+ * country code aside) or carries anything else ("602-555-0100 cell").
+ */
+export function formatPhone(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const ext = text.match(PHONE_EXTENSION)?.[1];
+  const main = text.replace(PHONE_EXTENSION, "");
+  if (!/^[+\d\s().-]+$/.test(main)) return null;
+  let d = main.replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+  if (d.length !== 10) return null;
+  return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}${ext ? ` x${ext}` : ""}`;
+}
+
+/**
+ * A phone number as it is being typed: digits grouped 602-555-0100 as they
+ * come, anything else dropped (a "cell" typed after it), and an extension
+ * once the number is whole ("x", "ext", then up to six digits).
+ */
+export function typePhone(value) {
+  const text = String(value ?? "");
+  const m = /(?:x|ext\.?|extension|#)\s*(\d*)\s*$/i.exec(text);
+  let d = (m ? text.slice(0, m.index) : text).replace(/\D/g, "");
+  if (d.length === 11 && d.startsWith("1")) d = d.slice(1);
+  d = d.slice(0, 10);
+  const main = d.length <= 3 ? d : d.length <= 6 ? `${d.slice(0, 3)}-${d.slice(3)}` : `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+  return m && d.length === 10 ? `${main} x${m[1].slice(0, 6)}` : main;
+}
+
 /** Stable colour for a name, so a record always looks the same. */
 export function colorFor(name = "") {
   let h = 0;
