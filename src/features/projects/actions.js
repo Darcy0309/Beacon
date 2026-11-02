@@ -31,6 +31,7 @@ export async function saveProject(prevState, formData) {
     appt_goal: n(formData, "appt_goal"),
     lead_goal_month: n(formData, "lead_goal_month"),
     appt_goal_month: n(formData, "appt_goal_month"),
+    projected_conversion: n(formData, "projected_conversion"),
     amount_paid: n(formData, "amount_paid"),
     email: s(formData, "email"),
     // A checkbox sends nothing when unticked; the hidden "off" before it always does.

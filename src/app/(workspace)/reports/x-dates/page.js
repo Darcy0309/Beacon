@@ -1,11 +1,13 @@
 import Link from "@/components/shared/intent-link";
-import { ArrowLeft, CalendarSearch, Gauge, ListChecks, X } from "lucide-react";
+import { ArrowLeft, CalendarSearch, Gauge, ListChecks, TrendingUp, X } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import FilterTable from "@/components/shared/filter-table";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import XdateMonths from "@/features/reports/components/xdate-months";
+import PipelineMonths from "@/features/reports/components/pipeline-months";
+import { getProjectedConversion } from "@/features/projects/queries";
 import { getPipelineManagers, getPipelineReport, getXdateMonthLeadsFiltered, getXdatesFiltered, MONTHS, XDATE_BUCKETS } from "@/features/reports/queries";
 import PipelineReport from "@/features/reports/components/pipeline-report";
 import XdateFilterBar from "@/features/reports/components/xdate-filter-bar";
@@ -57,6 +59,8 @@ export default async function XdatesReport({ searchParams }) {
   const client = options.companies.find((c) => c.id === filters.companyId);
   const chosen = options.projects.filter((p) => filters.projectIds.includes(p.id));
   const project = chosen.length === 1 ? chosen[0] : null;
+  // The Pipeline by Month's projected rate: one project's own, else 20%.
+  const rate = project && !isClient ? await getProjectedConversion(project.id) : null;
   const scope = project?.name ?? (chosen.length > 1 ? `${chosen.length} projects` : null) ?? client?.name
     ?? (isClient ? me?.company?.name ?? "Your projects" : "The whole book");
 
@@ -91,6 +95,14 @@ export default async function XdatesReport({ searchParams }) {
             <XdateMonths data={data} href={href} today={today} selected={month === null ? null : { month, bucket }} only={filters.months} />
           </div>
         </Card>
+
+        {/* The same names month by month, as the old system's pipeline sheet (Sean, Nov 2026): staff's. */}
+        {isClient ? null : (
+          <Card data-pipeline-card>
+            <SectionHeader label="Pipeline by Month" icon={TrendingUp} />
+            <PipelineMonths data={data} rate={rate} today={today} />
+          </Card>
+        )}
 
         {pipeline ? (
           <Card id="pipeline" className="scroll-mt-24">

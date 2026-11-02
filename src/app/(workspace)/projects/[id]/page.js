@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download, ClipboardList, Pencil, Send } from "lucide-react";
+import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download, ClipboardList, Pencil, Send, TrendingUp } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import ResultBadge from "@/components/shared/result-badge";
@@ -18,6 +18,7 @@ import ProjectTeam from "@/features/projects/components/project-team";
 import ProjectGoals from "@/features/projects/components/project-goals";
 import { projectDays, projectGoals } from "@/lib/project-goals";
 import XdateMonths from "@/features/reports/components/xdate-months";
+import PipelineMonths from "@/features/reports/components/pipeline-months";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ProjectInfoView from "@/features/project-info/components/project-info-view";
@@ -246,24 +247,6 @@ export default async function ProjectDetail({ params, searchParams }) {
           namesLeft={overview.viableLeft}
         />}
 
-        {/* The client's profile sheet (Sean, Oct 2026): what managers read on every lead sheet. The client
-            fills it in from a private link as they come on board, and from their own sign-in after. */}
-        {info ? (
-          <Card id="project-info" data-project-info-card className="overflow-hidden">
-            <SectionHeader wrap label="Project Info" icon={ClipboardList}
-              action={admin ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  {/* Tied to an appointment project: one sheet for them all, or its own (Sean, Oct 2026). */}
-                  {info.tied_id ? <OwnInfoSwitch projectId={p.id} own={info.own} tiedName={info.tied_name} /> : null}
-                  <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""} defaultName={info.contact_name ?? ""}
-                    trigger={<Button size="sm" variant="outline" data-send-project-info><Send /> Send to client</Button>} />
-                  <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />
-                </div>
-              ) : null} />
-            <ProjectInfoView info={info} wide emptyHint="Send the client their link to fill it in, or fill it in here." />
-          </Card>
-        ) : null}
-
         <Card>
           <SectionHeader
             label="X-Dates by Month"
@@ -278,6 +261,15 @@ export default async function ProjectDetail({ params, searchParams }) {
             <XdateMonths data={xdates} href={xdateHref} today={today} compact />
           </div>
         </Card>
+
+        {/* The old system's pipeline sheet (Sean, Nov 2026): the same leads by month, off the list, viable,
+            appointments projected at the project's rate (20% unless an administrator sets it) and set. Staff's. */}
+        {client ? null : (
+          <Card data-pipeline-card>
+            <SectionHeader label="Pipeline by Month" icon={TrendingUp} />
+            <PipelineMonths data={xdates} rate={p.raw.projected_conversion} today={today} />
+          </Card>
+        )}
 
         <Card id="leads">
           <SectionHeader
@@ -339,6 +331,25 @@ export default async function ProjectDetail({ params, searchParams }) {
           />
           </MovePicker>
         </Card>
+
+        {/* The client's profile sheet (Sean, Oct 2026): what managers read on every lead sheet. The client
+            fills it in from a private link as they come on board, and from their own sign-in after. At the foot
+            of the page (Nov 2026), so its top holds what is looked at most. */}
+        {info ? (
+          <Card id="project-info" data-project-info-card className="overflow-hidden">
+            <SectionHeader wrap label="Project Info" icon={ClipboardList}
+              action={admin ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Tied to an appointment project: one sheet for them all, or its own (Sean, Oct 2026). */}
+                  {info.tied_id ? <OwnInfoSwitch projectId={p.id} own={info.own} tiedName={info.tied_name} /> : null}
+                  <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""} defaultName={info.contact_name ?? ""}
+                    trigger={<Button size="sm" variant="outline" data-send-project-info><Send /> Send to client</Button>} />
+                  <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />
+                </div>
+              ) : null} />
+            <ProjectInfoView info={info} wide emptyHint="Send the client their link to fill it in, or fill it in here." />
+          </Card>
+        ) : null}
       </div>
     </>
   );

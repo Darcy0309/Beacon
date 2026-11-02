@@ -240,3 +240,11 @@ export async function getRenewalLinks(id, fromId = null) {
   ]);
   return { from: from ?? null, to: to ?? [] };
 }
+
+/** A project's projected appointment rate for the Pipeline by Month (Sean, Nov 2026): its %, or null for the 20% default. */
+export async function getProjectedConversion(projectId) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("projects").select("projected_conversion").eq("id", projectId).maybeSingle();
+  if (error) throw error;
+  return data?.projected_conversion ?? null;
+}

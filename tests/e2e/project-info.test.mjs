@@ -80,6 +80,9 @@ try {
   let t = await open(admin, `/projects/${APPT}`);
   check("the project page has a Project Info card, with the office on file", await admin.ev(`!!document.querySelector('[data-project-info-card]')`) && t.includes("Josh Huray") && t.includes("15561 Railroad St"));
   check("…the agent's area code, for the caller ID", await admin.ev(`!!document.querySelector('[data-project-info-card] [data-area-code="715"]')`));
+  // Sean (Nov 2026): the top of the page for what is looked at most; Project Info at its foot, under the leads.
+  check("…at the foot of the page, under Leads on this Project", await admin.ev(`(() => { const info = document.querySelector('[data-project-info-card]'), leads = document.getElementById('leads');
+    return Boolean(info && leads) && leads.compareDocumentPosition(info) === Node.DOCUMENT_POSITION_FOLLOWING && info.getBoundingClientRect().top > leads.getBoundingClientRect().bottom; })()`));
   await admin.click("[data-project-info-card] [data-edit-project-info]");
   check("Edit opens the form", Boolean(await inDialog(admin, "[data-project-info-form]")));
   await admin.fill('[data-dialog-content] input[name="agent_mobile"]', "715-555-0101");
@@ -170,6 +173,8 @@ try {
   await admin.click('[data-own-info="own"]');
   check("Use the shared one: back on the appointment project's", Boolean(await until(() => own()?.own === false)));
   t = await open(admin, `/projects/${DBDV}`);
+  // At the foot of the page (Nov 2026), it can come a moment after the rest.
+  t = (await until(async () => { const x = await admin.text(); return x.includes(`Shared with ${TAG} Appts`) && x; }, { timeout: 8000 })) || t;
   check("…shown again", t.includes(`Shared with ${TAG} Appts`) && t.includes("Mondays & Fridays"));
 
   section("A manager reads it on the lead sheet");

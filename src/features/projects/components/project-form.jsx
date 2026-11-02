@@ -48,6 +48,7 @@ export default function ProjectForm({ project, options, trigger }) {
         appt_goal: project.appt_goal ?? "",
         lead_goal_month: project.lead_goal_month ?? "",
         appt_goal_month: project.appt_goal_month ?? "",
+        projected_conversion: project.projected_conversion ?? "",
       }
     : null;
   const { fe, invalid, dv } = formHelpers(state, record);
@@ -199,6 +200,11 @@ export default function ProjectForm({ project, options, trigger }) {
             </Field>
             <Field label="Appointment goal (total)" error={fe("appt_goal")} hint="Leave empty: per month × the project's months">
               <Input name="appt_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("appt_goal")} aria-invalid={invalid("appt_goal")} data-appt-goal />
+            </Field>
+
+            {/* The Pipeline by Month's projected appointments (Sean, Nov 2026): this share of each month's leads. */}
+            <Field label="Projected appointment rate (%)" error={fe("projected_conversion")} hint="Pipeline by Month: this % of each month's leads. Leave empty for 20%">
+              <Input name="projected_conversion" type="number" inputMode="decimal" min="0" max="100" step="0.5" defaultValue={dv("projected_conversion")} aria-invalid={invalid("projected_conversion")} data-projected-conversion />
             </Field>
 
             <Field label="Description" error={fe("description")} className="sm:col-span-2">

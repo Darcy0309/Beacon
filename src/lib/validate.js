@@ -278,6 +278,8 @@ export const schemas = {
     // …and a month (Sean, Oct 2026): the overall goal follows from it when none is given.
     lead_goal_month: [int({ min: 0, max: 100000 })],
     appt_goal_month: [int({ min: 0, max: 100000 })],
+    // The Pipeline by Month's projected appointment rate, a % (Sean, Nov 2026); none is 20%.
+    projected_conversion: [num({ min: 0, max: 100 })],
     // Lead delivery: addresses separated by commas (a leading "_" sends that one a link).
     email: [max(500), rules.custom((v) => {
       const { bad } = parseDeliveryAddresses(v);
