@@ -1,5 +1,5 @@
 import "server-only";
-import { fillPlace, placeIndex } from "@/lib/fill-places";
+import { cityKey, fillPlace, placeIndex } from "@/lib/fill-places";
 
 /**
  * Each ZIP's city, state and county (src/data/zip-places.json, from GeoNames,
@@ -55,4 +55,24 @@ export async function placeOfZip(zip) {
   const z = /^\d{5}(-?\d{4})?$/.test(t) ? t.slice(0, 5) : /^\d{3,4}$/.test(t) ? t.padStart(5, "0") : null;
   const place = z ? index.zips[z] : null;
   return place ? { zip: z, city: place[0], state: place[1], county: place[2] } : null;
+}
+
+// The ZIPs with a Census point: street addresses (a ZIP of post office boxes alone has none).
+let streetOnce = null;
+const streetZips = () => (streetOnce ??= import("@/data/zip-centroids.json").then((m) => new Set(Object.keys((m.default ?? m).zips))));
+
+/**
+ * A city in its state (Sean, Oct 2026: Tucson, AZ is 85701 and Pima County):
+ * { city (as the post office names it), zips (each of its ZIPs with its
+ * county), zip (its main one: the first of its street-address ZIPs, else its
+ * first), county (that ZIP's) }, or null for a city the state doesn't have.
+ */
+export async function placeOfCity(city, state) {
+  const [index, street] = await Promise.all([placesIndex(), streetZips()]);
+  const c = index.byCity.get(`${state}|${cityKey(city)}`);
+  if (!c?.zips.length) return null;
+  const zips = [...c.zips].sort();
+  const zip = zips.find((z) => street.has(z)) ?? zips[0];
+  const [name, , county] = index.zips[zip];
+  return { city: name, zips: Object.fromEntries(zips.map((z) => [z, index.zips[z][2] ?? null])), zip, county: county ?? null };
 }

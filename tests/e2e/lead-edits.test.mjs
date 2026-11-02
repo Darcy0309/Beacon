@@ -74,6 +74,23 @@ try {
   await type("[data-prospect-form] input[name=zip]", "00000");
   check("a ZIP that is none is said, and changes nothing", Boolean(await until(() => mike.ev("/00000 isn't a ZIP we know/.test(document.querySelector('[data-zip-said]')?.textContent ?? '')")))
     && (await v("[data-prospect-form] select[name=state]")) === "CA");
+  // Sean (Nov 2026): a city typed in its state sets the county and the ZIP: Tucson, AZ is Pima County, 85701.
+  await mike.fill("[data-prospect-form] select[name=state]", "AZ");
+  await type("[data-prospect-form] [data-suggest=city] input", "Tucson");
+  await mike.ev("document.activeElement.blur()");
+  const tucson = await until(async () => { const p = [await v("[data-prospect-form] input[name=zip]"), await v("[data-prospect-form] [data-suggest=county] input")]; return p[1] === "Pima" && p; });
+  check("a city typed: its main ZIP and county put in", JSON.stringify(tucson) === JSON.stringify(["85701", "Pima"]), JSON.stringify(tucson));
+  check("…saying so, and that the city has other ZIPs", /Tucson, AZ: ZIP 85701 and Pima County put in \(Tucson has \d+ ZIP codes/.test(await mike.ev("document.querySelector('[data-zip-said]')?.textContent ?? ''")),
+    await mike.ev("document.querySelector('[data-zip-said]')?.textContent ?? ''"));
+  await type("[data-prospect-form] input[name=zip]", "85716");
+  await until(async () => (await v("[data-prospect-form] [data-suggest=city] input")) === "Tucson");
+  await type("[data-prospect-form] [data-suggest=city] input", "Tuscon");
+  await mike.ev("document.activeElement.blur()");
+  await sleep(600);
+  await type("[data-prospect-form] [data-suggest=city] input", "Tucson");
+  await mike.ev("document.activeElement.blur()");
+  await sleep(800);
+  check("…a ZIP already one of the city's is kept", (await v("[data-prospect-form] input[name=zip]")) === "85716" && (await v("[data-prospect-form] [data-suggest=county] input")) === "Pima");
   await type("[data-prospect-form] input[name=zip]", "85027");
   await until(async () => (await v("[data-prospect-form] select[name=state]")) === "AZ");
 

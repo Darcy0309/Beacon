@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Field, Select } from "@/components/ui/field";
 import SuggestInput from "@/components/shared/suggest-input";
-import { fillPlaceFields, placesInState, zipPlace } from "@/features/leads/place-actions";
+import { cityPlace, fillPlaceFields, placesInState, zipPlace } from "@/features/leads/place-actions";
 import { normalizeState } from "@/lib/csv";
 import { US_STATES } from "@/lib/project-info";
 
@@ -21,8 +21,10 @@ const listsOf = (state) => {
  * that state's as they are typed (a name not on its list is said, and kept
  * if meant). A ZIP typed sets the city, state and county to its own (Sean,
  * Oct 2026: a new ZIP is where the business is), and says so; one that is
- * not a ZIP is said too. The ZIP on file changes nothing as the form opens.
- * A city picked fills in a blank county (and its ZIP when it has just one).
+ * not a ZIP is said too. A city typed or picked in its state sets the county
+ * and the ZIP (Sean, Nov 2026: Tucson, AZ is Pima County, 85701): the ZIP
+ * there kept when it is one of the city's, else the city's main ZIP, saying
+ * how many it has. What is on file changes nothing as the form opens.
  * Renders the City / State / ZIP row across the form's two columns, then
  * County.
  *
@@ -34,9 +36,35 @@ export default function PlaceFields({ fe, invalid, dv }) {
   }));
   const [options, setOptions] = useState({ cities: [], counties: [] });
   const set = (k) => (v) => setPlace((p) => ({ ...p, [k]: v }));
-  // The last ZIP looked up (the one on file to begin with), and what came of it.
+  // The last ZIP and city looked up (those on file to begin with), and what came of it.
   const looked = useRef(String(dv("zip") ?? "").slice(0, 5));
+  const cityAt = (city, state) => `${state}|${String(city ?? "").trim().toLowerCase()}`;
+  const cityLooked = useRef(cityAt(place.city, place.state));
+  // The fields as they are now, for an answer that comes back after more typing.
+  const latest = useRef(place);
+  latest.current = place;
   const [said, setSaid] = useState(null);
+  const countyName = (c) => (c ? (/(county|parish|borough|census area|municipality)$/i.test(c) ? c : `${c} County`) : null);
+  const lookCity = (city, state) => {
+    const at = cityAt(city, state);
+    if (!String(city ?? "").trim() || !/^[A-Z]{2}$/.test(state ?? "") || at === cityLooked.current) return;
+    cityLooked.current = at;
+    cityPlace(city, state).then((got) => {
+      if (cityLooked.current !== at || !got) return; // typed on since, or a city the state doesn't have (said under the field)
+      const now = latest.current;
+      const mine = now.zip.slice(0, 5);
+      const keep = mine in got.zips;
+      const zip = keep ? now.zip : got.zip;
+      const county = keep ? got.zips[mine] : got.county;
+      looked.current = zip.slice(0, 5);
+      cityLooked.current = cityAt(got.city, state);
+      const n = Object.keys(got.zips).length;
+      setPlace((p) => ({ ...p, city: got.city, zip, county: county ?? p.county }));
+      setSaid({ ok: true, text: keep
+        ? `${got.city}, ${state}${county ? `: ${countyName(county)}` : ""}`
+        : `${got.city}, ${state}: ZIP ${zip}${county ? ` and ${countyName(county)}` : ""} put in${n > 1 ? ` (${got.city} has ${n} ZIP codes: change it if the address is in another)` : ""}` });
+    }).catch(() => {});
+  };
   const typeZip = (raw) => {
     const zip = raw.replace(/[^\d-]/g, "").slice(0, 10);
     set("zip")(zip);
@@ -48,7 +76,8 @@ export default function PlaceFields({ fe, invalid, dv }) {
       if (looked.current !== five) return; // typed on since
       if (!got) { setSaid({ ok: false, text: `${five} isn't a ZIP we know: check it.` }); return; }
       setPlace((p) => ({ ...p, city: got.city, state: got.state, county: got.county ?? (got.state === p.state ? p.county : "") }));
-      const county = got.county ? (/(county|parish|borough|census area|municipality)$/i.test(got.county) ? got.county : `${got.county} County`) : null;
+      cityLooked.current = cityAt(got.city, got.state);
+      const county = countyName(got.county);
       setSaid({ ok: true, text: `From ZIP ${five}: ${got.city}, ${got.state}${county ? ` · ${county}` : ""}` });
     }).catch(() => {});
   };
@@ -84,11 +113,12 @@ export default function PlaceFields({ fe, invalid, dv }) {
       <div className="grid grid-cols-[1fr_6rem_7rem] gap-3 sm:col-span-2" data-place-fields>
         <Field label="City" error={fe("city")}>
           <SuggestInput name="city" value={place.city} onChange={set("city")} options={options.cities} maxLength={60} invalid={invalid("city")}
-            onPick={(v) => fill({ city: v })} placeholder={named ? `A city in ${named}` : "Pick the state first"}
+            onPick={(v) => lookCity(v, place.state)} onBlur={(v) => lookCity(v, place.state)} placeholder={named ? `A city in ${named}` : "Pick the state first"}
             unlisted={named && options.cities.length ? `Not a city we know in ${named}: check the spelling.` : null} />
         </Field>
         <Field label="State" error={fe("state")}>
-          <Select name="state" value={place.state} onChange={(e) => setPlace((p) => ({ ...p, state: e.target.value }))} aria-invalid={invalid("state")} data-place-state>
+          <Select name="state" value={place.state} onChange={(e) => { const st = e.target.value; setPlace((p) => ({ ...p, state: st })); lookCity(place.city, st); }}
+            aria-invalid={invalid("state")} data-place-state>
             <option value="">—</option>
             {states.map((s) => <option key={s} value={s}>{s}</option>)}
           </Select>
