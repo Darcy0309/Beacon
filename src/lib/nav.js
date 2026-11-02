@@ -69,31 +69,20 @@ export const navGroups = [
     ],
   },
   {
-    label: "Engagement",
-    items: [
-      { href: "/notifications", label: "Notifications", icon: Bell, roles: ALL },
-      { href: "/feedback", label: "Client Feedback", icon: MessageSquareText, roles: ["admin", "client"] },
-      { href: "/qa", label: "Quality QA", icon: ClipboardCheck, roles: ["admin", "agent"] },
-      { href: "/bulletin", label: "Bulletin Board", icon: Megaphone, roles: ["admin", "manager", "agent"] },
-      { href: "/documents", label: "Documents", icon: FileText, roles: ALL },
-      // The staff with their photos, as the old Meet DCM (a client's own people first).
-      { href: "/team", label: "Meet the Team", icon: UsersRound, roles: ALL },
-      // A client's logo and website, shown in their workspace.
-      { href: "/branding", label: "Branding", icon: Palette, roles: ["client"] },
-    ],
-  },
-  {
     label: "Data & Insights",
+    // Above Engagement (Sean, Nov 2026): what is looked at most, nearer the top.
     items: [
       // Query the whole book at once: industry, ZIPs, renewal month, client…
       { href: "/explore", label: "Lead Explorer", icon: Database, roles: ["admin", "manager"] },
+      // Renewal months across the book, a client or a project; each number opens its names.
+      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin"] },
+      // Appointments waiting on QA (Sean, Nov 2026: with the data, under X-Dates by Month).
+      { href: "/qa", label: "Quality QA", icon: ClipboardCheck, roles: ["admin", "agent"] },
       // The businesses a client (or prospect) wants to target: industries, size, territory (Sean, Oct 2026).
       { href: "/list-builder", label: "List Builder", icon: ListFilter, roles: ["admin", "manager", "client"] },
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
       // Agents get the same page scoped to their own productivity.
       { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "agent", "client"] },
-      // Renewal months across the book, a client or a project; each number opens its names.
-      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin"] },
       // Calls and paid events per day; everyone but an administrator sees only their own.
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.
@@ -107,6 +96,19 @@ export const navGroups = [
       // Every update clients make to their appointments, as they come in.
       { href: "/reports/appointment-updates", label: "Appointment Updates", icon: ClipboardPen, roles: ["admin"] },
       { href: "/alerts", label: "Alert Engine", icon: BellRing, roles: ["admin"] },
+    ],
+  },
+  {
+    label: "Engagement",
+    items: [
+      { href: "/notifications", label: "Notifications", icon: Bell, roles: ALL },
+      { href: "/feedback", label: "Client Feedback", icon: MessageSquareText, roles: ["admin", "client"] },
+      { href: "/bulletin", label: "Bulletin Board", icon: Megaphone, roles: ["admin", "manager", "agent"] },
+      { href: "/documents", label: "Documents", icon: FileText, roles: ALL },
+      // The staff with their photos, as the old Meet DCM (a client's own people first).
+      { href: "/team", label: "Meet the Team", icon: UsersRound, roles: ALL },
+      // A client's logo and website, shown in their workspace.
+      { href: "/branding", label: "Branding", icon: Palette, roles: ["client"] },
     ],
   },
   {
