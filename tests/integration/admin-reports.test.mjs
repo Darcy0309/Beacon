@@ -37,6 +37,13 @@ const A1 = appt(L1, SEAN, "confirmed");
 appt(L2, SEAN);
 appt(L3, SEAN, "invalid");
 appt(L3, RACHEL, "rescheduled");
+// Not our managers' (Sean, Nov 2026): a lead and an appointment with no one behind them (as a list loads
+// them), and a lead and an appointment by the client's own people. None count anywhere.
+const CLIENT = Number(sql("select id from public.users where email = 'client@beacon.test'"));
+const loose = (name, who) => Number(sql(`insert into public.leads (company_name, project_id, stage, promoted_at, dbdv_user_id, call_result_dbdv)
+  values (${lit(`${TAG} ${name}`)}, ${P}, 'appt', now(), ${who}, 'Lead') returning id`));
+appt(loose("Loaded", "null"), "null");
+appt(loose("Theirs", CLIENT), CLIENT);
 // Called: Alpha twice, Bravo once.
 for (const l of [L1, L1, L2]) sql(`insert into public.call_records (lead_id, project_id, user_id) values (${l}, ${P}, ${SEAN})`);
 // Paid: Alpha's lead $5, Bravo's $5 charged back, the confirmed appointment $20 and its confirmation $10.
@@ -60,6 +67,7 @@ try {
   //                                                  leads/invalid/appts/confirmed/pending/invalid appts/rescheduled
   check("Sean's: three leads, one invalid; two appointments, one confirmed, one pending, one invalid", !error && figures(by(SEAN)) === "3/1/2/1/1/1/0", error?.message ?? figures(by(SEAN)));
   check("Rachel's: a rescheduled appointment, still pending", figures(by(RACHEL)) === "0/0/1/0/1/0/1", figures(by(RACHEL)));
+  check("only our managers': nothing loaded with no one behind it, nothing the client's people did", !mine.some((r) => r.user_id == null || Number(r.user_id) === CLIENT), JSON.stringify(mine.map((r) => r.user_id)));
   check("all in this month", mine.length === 2 && mine.every((r) => r.ym === ym), JSON.stringify(mine.map((r) => r.ym)));
   const wider = await admin.sb.rpc("report_counts", { p_from: `${lastMonth}-01`, p_to: today });
   const before = (wider.data ?? []).find((r) => Number(r.project_id) === P && r.ym === lastMonth);

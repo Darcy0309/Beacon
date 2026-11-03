@@ -139,7 +139,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
+      const { imported, errors, total, assigned, unknown = [], people = [], duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
       const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
         existing ? `${existing} already on the project` : "", others ? `${others} on other clients' lists` : ""].filter(Boolean).join(" · ");
       // What the list left out of a place and the rest said for certain (a ZIP's county, a city's ZIP…; Oct 2026).
@@ -152,6 +152,14 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
         const n = unknown.reduce((sum, u) => sum + u.n, 0);
         toast.warning(`${n} row${n === 1 ? "" : "s"} had a call result the system doesn't recognise, so ${n === 1 ? "it starts as a new name" : "they start as new names"}`, {
           description: unknown.slice(0, 6).map((u) => `“${u.text}” (${u.n})`).join(", ") + (unknown.length > 6 ? ", …" : ""),
+          duration: 20000,
+        });
+      }
+      // Managers the old system names who aren't ours (Sean, Nov 2026): their leads and appointments count to no one.
+      if (people.length) {
+        const n = people.reduce((sum, u) => sum + u.n, 0);
+        toast.warning(`${n} row${n === 1 ? "" : "s"} named a manager the system doesn't have, so the reports don't count ${n === 1 ? "it" : "them"} to anyone`, {
+          description: people.slice(0, 6).map((u) => `“${u.text}” (${u.n})`).join(", ") + (people.length > 6 ? ", …" : ""),
           duration: 20000,
         });
       }

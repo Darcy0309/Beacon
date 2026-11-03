@@ -280,7 +280,7 @@ export default async function AdminReports({ sp, today }) {
           {bill.length === 0 ? <p className="p-5 text-sm text-muted-foreground">No active clients&apos; projects for this choice.</p> : null}
         </div>
         <p className="border-t border-[var(--panel-border)] px-5 py-2.5 text-xs text-muted-foreground">
-          Billing rates are set on each project (Edit › Billing per lead / per appointment); a project without them shows —. Leads and appointments count when they were developed or set; invalid ones aren&apos;t billed.
+          Billing rates are set on each project (Edit › Billing per lead / per appointment); a project without them shows —. Leads and appointments count when our managers developed or set them; invalid ones aren&apos;t billed.
         </p>
       </Card>
     </div>

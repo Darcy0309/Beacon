@@ -228,12 +228,58 @@ export const APPOINTMENT_ALIASES = {
   appointmenttime: "appt_time", appttime: "appt_time",
 };
 
+/**
+ * The old system's record of who did what when (Sean, Nov 2026: so the reports
+ * count migrated leads and appointments in the months they were developed and
+ * set): when a lead was developed and by whom, when its appointment was set
+ * and by whom. The names are matched to our managers on import.
+ */
+export const HISTORY_ALIASES = {
+  datedeveloped: "developed_at", developeddate: "developed_at", developedon: "developed_at", leaddeveloped: "developed_at",
+  leaddevelopeddate: "developed_at", datepromoted: "developed_at", promoteddate: "developed_at", leadcreatedate: "developed_at", leadcreateddate: "developed_at",
+  developedby: "developed_by", dbdvmanager: "developed_by", dbdevmanager: "developed_by", dbdvuser: "developed_by", dbdevuser: "developed_by",
+  dbdvrep: "developed_by", dbdevrep: "developed_by", leadmanager: "developed_by", manager: "developed_by", accountmanager: "developed_by",
+  apptcreatedate: "set_at", apptcreateddate: "set_at", appointmentcreatedate: "set_at", appointmentcreateddate: "set_at", appointmentcreated: "set_at",
+  apptsetdate: "set_at", appointmentsetdate: "set_at", dateset: "set_at", apptdateset: "set_at",
+  setby: "set_by", apptsetby: "set_by", appointmentsetby: "set_by", setter: "set_by", apptsetter: "set_by", apptmanager: "set_by", apptuser: "set_by",
+};
+
+/**
+ * Finds our staff by the names an old export writes ("Sean Fitzgerald", "sean fitzgerald",
+ * "Sean F", "Fitzgerald, Sean", or an email): their id, or null. A short form two people
+ * share ("Sean F" for two Seans F.) finds neither.
+ */
+export function staffMatcher(users) {
+  const index = new Map();
+  const clash = new Set();
+  const key = (v) => String(v ?? "").toLowerCase().replace(/[^a-z0-9@.]+/g, " ").trim();
+  const put = (k, id) => {
+    if (!k) return;
+    if (index.has(k) && index.get(k) !== id) clash.add(k);
+    else index.set(k, id);
+  };
+  for (const u of users ?? []) {
+    const first = key(u.first_name), last = key(u.last_name);
+    put(key(`${first} ${last}`), u.id);
+    put(key(`${last} ${first}`), u.id);
+    if (first && last) put(`${first} ${last[0]}`, u.id);
+    put(key(u.email), u.id);
+  }
+  return (name) => {
+    const k = key(name);
+    return k && !clash.has(k) ? index.get(k) ?? null : null;
+  };
+}
+
+/** A day the old system gives (2025-03-14) as a moment: noon in Arizona, the same day in every US time zone. */
+export const dayAt = (day) => (day ? `${day}T19:00:00Z` : null);
+
 /** Date columns, wherever they live — these need parsing rather than copying. */
 const DATE_COLUMNS = new Set([
   "qa_date_dbdv", "qa_date_appt", "shopping_date", "appt_date",
   "ultimate_xdate", "pkg_xdate", "wc_xdate", "auto_xdate", "health_xdate",
   "dental_xdate", "vision_xdate", "prof_liab_xdate", "do_xdate", "eo_xdate",
-  "homeowner_xdate", "personal_auto_xdate",
+  "homeowner_xdate", "personal_auto_xdate", "developed_at", "set_at",
 ]);
 
 // What old lists put in a field that has nothing in it: read as blank.
@@ -350,6 +396,7 @@ export function mapAllHeaders(headerRow) {
     if (INSURANCE_ALIASES[key]) return { table: "insurance", column: INSURANCE_ALIASES[key] };
     if (APPOINTMENT_ALIASES[key]) return { table: "appointment", column: APPOINTMENT_ALIASES[key] };
     if (NAME_PART_ALIASES[key]) return { table: "name", column: NAME_PART_ALIASES[key] };
+    if (HISTORY_ALIASES[key]) return { table: "history", column: HISTORY_ALIASES[key] };
     return null;
   });
 }
@@ -440,6 +487,7 @@ export function rowsToImport(csvRows) {
     const appointment = {};
     const notes = {};
     const parts = {};
+    const history = {};
 
     resolved.forEach((target, i) => {
       if (!target) return;
@@ -464,6 +512,7 @@ export function rowsToImport(csvRows) {
       if (target.table === "lead") lead[target.column] = parsed;
       else if (target.table === "notes") notes[target.column] = parsed;
       else if (target.table === "insurance") insurance[target.column] = parsed;
+      else if (target.table === "history") history[target.column] = parsed;
       else appointment[target.column] = parsed;
     });
 
@@ -506,6 +555,8 @@ export function rowsToImport(csvRows) {
       lead,
       insurance: Object.keys(insurance).length ? insurance : null,
       notes: Object.keys(notes).length ? notes : null,
+      // When the old system says it was developed and set, and by whom.
+      history: Object.keys(history).length ? history : null,
       // A time with no date is not a booking.
       appointment: appointment.appt_date ? appointment : null,
       status: statusFromCallResults(lead.call_result_dbdv, lead.call_result_appt),

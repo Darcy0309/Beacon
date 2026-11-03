@@ -3,7 +3,7 @@
 /** CSV lead import (the legacy Imports module). */
 
 import { revalidatePath } from "next/cache";
-import { MAX_IMPORT_MB, parseCsv, rowsToImport } from "@/lib/csv";
+import { MAX_IMPORT_MB, dayAt, parseCsv, rowsToImport, staffMatcher } from "@/lib/csv";
 import { removalMatcher } from "@/lib/dedupe";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -175,12 +175,14 @@ export async function importLeadsCsv(prevState, formData) {
   // Everything the import looks up, asked for at once rather than one after another.
   // The sheet's call-result columns place each name in the lifecycle. Old
   // and new result names both work (call_results.aliases holds the old ones).
-  const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }] = await Promise.all([
+  const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }, { data: staff }] = await Promise.all([
     currentAppUser(supabase),
     supabase.from("projects").select("id, company_id, appt_project_id, type:project_types(code)").eq("id", projectId).maybeSingle(),
     supabase.from("lead_statuses").select("id, code"),
     supabase.from("call_results").select("id, project_type, name, aliases, viable, effect, status_code"),
     supabase.from("appointment_statuses").select("id").eq("name", "Scheduled").maybeSingle(),
+    // Who the old system says developed a lead and set its appointment (Sean, Nov 2026).
+    supabase.from("users").select("id, first_name, last_name, email").in("role", ["admin", "manager", "agent"]).limit(2000),
   ]);
   if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
   const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
@@ -270,6 +272,15 @@ export async function importLeadsCsv(prevState, formData) {
 
   const now = new Date().toISOString();
   const unknownResults = new Map();
+  // The old system's names for our managers; those it names who aren't ours, counted to say so.
+  const staffId = staffMatcher(staff);
+  const unknownPeople = new Map();
+  const whoIs = (name) => {
+    if (!name) return null;
+    const id = staffId(name);
+    if (!id) unknownPeople.set(name.trim(), (unknownPeople.get(name.trim()) ?? 0) + 1);
+    return id;
+  };
   let errors = skipped;
   let imported = 0;
   let details = 0;
@@ -293,7 +304,7 @@ export async function importLeadsCsv(prevState, formData) {
   // leads do, rather than holding them up.
   for (let i = 0; i < parsed.length; i += IMPORT_CHUNK) {
     const chunk = parsed.slice(i, i + IMPORT_CHUNK);
-    const payload = chunk.map(({ lead, status }) => {
+    const payload = chunk.map(({ lead, status, history }) => {
       let target = projectId;
       let stageType = projectType;
       const said = projectType === "DBDV" ? lead.call_result_dbdv : lead.call_result_appt;
@@ -312,10 +323,16 @@ export async function importLeadsCsv(prevState, formData) {
       }
       // New names start on the client's first result: Viable-CallBack (DBDev) or Lead-No Contact (Appt).
       result ??= firstResult[stageType];
+      // When it was developed and by whom, as the old system says: the reports count it then, to them.
+      const developedBy = whoIs(history?.developed_by);
       return {
         ...lead,
         project_id: target,
-        ...(source ? { source_project_id: source, promoted_at: now } : {}),
+        ...(source ? { source_project_id: source, promoted_at: dayAt(history?.developed_at) ?? now } : {}),
+        // Loaded onto an appointment project, a lead the old system says was developed.
+        ...(!source && stageType === "APPT" && history?.developed_at ? { promoted_at: dayAt(history.developed_at) } : {}),
+        ...(developedBy ? { dbdv_user_id: developedBy } : {}),
+        ...(history?.set_at ? { appt_created_date: dayAt(history.set_at) } : {}),
         result_id: result?.id ?? null,
         resolved_at: result && !result.viable ? now : null,
         status_id: statusId[result?.status_code] ?? statusId[status] ?? statusId.new ?? null,
@@ -353,7 +370,9 @@ export async function importLeadsCsv(prevState, formData) {
           status_id: apptStatus?.id ?? null,
           rep_name: source.lead.producer_name ?? null,
           list_source: source.lead.list_source || listSource,
-          appt_create_date: now,
+          appt_create_date: dayAt(source.history?.set_at) ?? now,
+          // Set by whom the old system says; else by whoever developed the lead.
+          user_id: whoIs(source.history?.set_by) ?? (source.history?.set_by ? null : staffId(source.history?.developed_by ?? "")),
         });
       }
     });
@@ -420,5 +439,6 @@ export async function importLeadsCsv(prevState, formData) {
   revalidatePath("/work", "layout");
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
+  const people = [...unknownPeople].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
+  return ok({ people, imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
 }

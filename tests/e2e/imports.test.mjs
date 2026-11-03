@@ -66,10 +66,20 @@ sql(`insert into public.client_removals (company_id, reason, source, company_nam
 const sg = (name) => sql(`select coalesce(contact_name, '') || '|' || coalesce(contact2_name, '') || '|' || coalesce(address, '') || '|' || coalesce(city, '') || '|' || coalesce(phone, '')
   || '|' || coalesce(fax, '') || '|' || coalesce(sales_volume, '') || '|' || coalesce(ein, '') from public.leads where company_name = ${lit(`${TAG} ${name}`)} order by id`);
 
-/** Open the import form on the test project with `csv` chosen. */
-async function chooseFile(page, csv) {
+// The old system's history (Sean, Nov 2026): when each lead was developed and its appointment set, and by whom.
+const apptProject = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Appts`)}, ${company},
+  (select id from public.project_types where code = 'APPT'), 1) returning id`));
+const historyFile = path.join(path.dirname(file), "history.csv");
+writeFileSync(historyFile, ["Company,Phone,Call Result Appt,Date Developed,Developed By,Appt Create Date,Set By,Appointment Date",
+  `"${TAG} Hist A",602-555-0201,Appointment,3/14/2025,Sean Fitzgerald,04/02/2025,Rachel Colestock,4/20/2025`,
+  `"${TAG} Hist B",602-555-0202,Lead-No Contact,5/1/2025,Nobody Known,,,`].join("\n"));
+const developed = (name) => sql(`select coalesce((promoted_at at time zone public.business_tz())::date::text, '') || '|' || coalesce(dbdv_user_id::text, '')
+  from public.leads where company_name = ${lit(`${TAG} ${name}`)}`);
+
+/** Open the import form on the test project (or `into`) with `csv` chosen. */
+async function chooseFile(page, csv, into = project) {
   await page.go("/imports", 4000);
-  await page.fill('select[name="project_id"]', String(project));
+  await page.fill('select[name="project_id"]', String(into));
   const { root } = await page.send("DOM.getDocument");
   const { nodeId } = await page.send("DOM.querySelector", { nodeId: root.nodeId, selector: 'input[name="file"]' });
   await page.send("DOM.setFileInputFiles", { nodeId, files: [csv] });
@@ -224,6 +234,17 @@ try {
   check("a county alone: nothing more", place("County Only") === "AZ|Maricopa", place("County Only"));
   check("a ZIP that lost its leading zero: put right, and filled in", place("Lost Zero") === "Boston|MA|02108|Suffolk", place("Lost Zero"));
 
+  section("The old system's dates and managers");
+  await chooseFile(admin, historyFile, apptProject);
+  await admin.click("button[type=submit]", "Import leads");
+  check("an old list imports", /Imported 2 of 2/.test((await admin.waitToast(/Imported 2 of 2/, 15000)) ?? ""));
+  check("a lead developed when the old system says, by the manager it names", developed("Hist A") === "2025-03-14|2", developed("Hist A"));
+  const set = sql(`select (a.appt_create_date at time zone public.business_tz())::date || '|' || coalesce(a.user_id::text, '') from public.appointments a
+    join public.leads l on l.id = a.lead_id where l.company_name = ${lit(`${TAG} Hist A`)}`);
+  check("…its appointment set when it was, by whom", set === "2025-04-02|4", set);
+  check("a manager who isn't ours: the date kept, no one named", developed("Hist B") === "2025-05-01|", developed("Hist B"));
+  check("…and the import says who", Boolean(await until(async () => /manager the system doesn't have[\s\S]*Nobody Known/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
+
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);
   const before = Number((await admin.ev(`document.querySelector('[data-sic-count]')?.textContent ?? '0'`)).replace(/\D/g, ""));
@@ -242,6 +263,10 @@ try {
   sql(`delete from public.lead_notes where lead_id in (select id from public.leads where project_id = ${project})`);
   sql(`delete from public.insurance_details where lead_id in (select id from public.leads where project_id = ${project})`);
   sql(`delete from public.leads where project_id = ${project}`);
+  sql(`delete from public.appointments where lead_id in (select id from public.leads where project_id = ${apptProject})`);
+  sql(`delete from public.leads where project_id = ${apptProject}`);
+  sql(`delete from public.import_batches where project_id = ${apptProject}`);
+  sql(`delete from public.projects where id = ${apptProject}`);
   sql(`delete from public.import_batches where project_id = ${project}`);
   sql(`delete from public.activity_log where created_at > now() - interval '10 minutes' and action like 'import%'`);
   sql(`delete from public.projects where id = ${project}`);

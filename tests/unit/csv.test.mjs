@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the CSV lead importer. */
-import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, parseDrivers, parseXmod, TEMPLATE_HEADERS, cleanValue } from "../../src/lib/csv.js";
+import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, parseDrivers, parseXmod, TEMPLATE_HEADERS, cleanValue, staffMatcher, dayAt } from "../../src/lib/csv.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -139,6 +139,23 @@ check("an XMOD read as written", JSON.stringify([".85", "0.85", "1.5", "1.50", "
 }
 check("the template has Drivers and XMOD after Autos, before Sales Volume",
   TEMPLATE_HEADERS.slice(TEMPLATE_HEADERS.indexOf("Autos"), TEMPLATE_HEADERS.indexOf("Autos") + 4).join(",") === "Autos,Drivers,XMOD,Sales Volume");
+
+// The old system's history (Sean, Nov 2026): when a lead was developed and set, and by whom.
+{
+  const { rows } = rowsToImport([["Company", "Date Developed", "DBDev Manager", "Appt Create Date", "Set By", "Appointment Date"],
+    ["Old Co", "3/14/2025", "Sean Fitzgerald", "04/02/2025", "Mike P", "4/20/2025"], ["New Co", "", "", "", "", ""]]);
+  check("an old list's dates developed and set, and its managers, read on import",
+    JSON.stringify(rows[0]?.history) === JSON.stringify({ developed_at: "2025-03-14", developed_by: "Sean Fitzgerald", set_at: "2025-04-02", set_by: "Mike P" }), JSON.stringify(rows[0]?.history));
+  check("…none on a row without them", rows[1]?.history === null, JSON.stringify(rows[1]?.history));
+  check("…the history columns aren't the lead's", !("developed_at" in (rows[0]?.lead ?? {})) && !("developed_by" in (rows[0]?.lead ?? {})));
+  check("other spellings: Developed By, Date Set, Appt Setter", mapAllHeaders(["Developed By", "Date Set", "Appt Setter", "Lead Developed Date"]).map((t) => t?.column).join(",") === "developed_by,set_at,set_by,developed_at");
+  const who = staffMatcher([{ id: 2, first_name: "Sean", last_name: "Fitzgerald", email: "sean@beacon.test" }, { id: 3, first_name: "Mike", last_name: "Preston", email: "mike@x.test" },
+    { id: 9, first_name: "Sam", last_name: "Fox" }, { id: 10, first_name: "Sara", last_name: "Fox" }]);
+  check("a manager found by full name, either way round, any case, by first name and initial, or email",
+    JSON.stringify(["Sean Fitzgerald", "sean  fitzgerald", "Fitzgerald, Sean", "Mike P", "mike@x.test", "Nobody Here", ""].map(who)) === JSON.stringify([2, 2, 2, 3, 3, null, null]));
+  check("…a short form two people share finds neither", who("S Fox") === null && who("Sam F") === 9);
+  check("a day given as noon in Arizona: the same day in every US time zone", dayAt("2025-03-14") === "2025-03-14T19:00:00Z" && dayAt(null) === null);
+}
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
 process.exit(failures ? 1 : 0);
