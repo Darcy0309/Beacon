@@ -8,10 +8,13 @@ import { personShort, sortPipeline } from "@/lib/pipeline";
 
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/** Which names a number in the X-dates report stands for. */
+/**
+ * Which names a number in the X-dates report stands for. Off the list: every name resolved, the
+ * appointments among them (Sean, Nov 2026: as the Pipeline by Month counts it).
+ */
 export const XDATE_BUCKETS = {
+  resolved: "Off the list",
   appointment: "Appointments",
-  off: "Off the list",
   viable: "Viable left",
 };
 
@@ -51,6 +54,8 @@ function shapeXdates(data) {
       total: Number(r?.total ?? 0),
       appointment: Number(r?.appointments ?? 0),
       off: Number(r?.off_list ?? 0),
+      // Off the list with the appointments: every name resolved.
+      resolved: Number(r?.off_list ?? 0) + Number(r?.appointments ?? 0),
       viable: Number(r?.viable_left ?? 0),
     };
   };
@@ -59,7 +64,7 @@ function shapeXdates(data) {
   return {
     months,
     undated: row(0),
-    totals: { total: sum("total"), appointment: sum("appointment"), off: sum("off"), viable: sum("viable") },
+    totals: { total: sum("total"), appointment: sum("appointment"), off: sum("off"), resolved: sum("resolved"), viable: sum("viable") },
   };
 }
 

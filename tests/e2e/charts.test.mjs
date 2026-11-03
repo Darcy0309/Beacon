@@ -24,10 +24,12 @@ const tipText = (page) => page.ev(`(() => { const t = document.querySelector('[r
   return { title: t.firstElementChild.textContent, lines: [...t.querySelectorAll('[data-tip-line]')].map((l) => ({ key: l.dataset.tipLine, text: l.innerText.replace(/\\s+/g, ' '), lit: l.className.includes('bg-foreground/10') })),
     total: t.querySelector('.border-t')?.innerText.replace(/\\s+/g, ' ') ?? null }; })()`);
 /** Where the open tip sits against what it points at, and the window. */
-const placement = (page, anchorSelector) => page.ev(`(() => { const t = document.querySelector('[role=tooltip][data-tip-open]').getBoundingClientRect();
+// Measured once the tip has opened: its opening animation scales it, off-centre until it ends.
+const settledTip = (page) => until(() => page.ev(`getComputedStyle(document.querySelector('[role=tooltip][data-tip-open]')).transform === 'none'`));
+const placement = async (page, anchorSelector) => (await settledTip(page), page.ev(`(() => { const t = document.querySelector('[role=tooltip][data-tip-open]').getBoundingClientRect();
   const a = document.querySelector(${JSON.stringify(anchorSelector)}).getBoundingClientRect();
   return { above: t.bottom <= a.top + 0.5, centred: Math.abs((t.left + t.width / 2) - (a.left + a.width / 2)) < 2 || t.left <= 8.5 || t.right >= innerWidth - 8.5,
-    inWindow: t.left >= 0 && t.right <= innerWidth && t.top >= 0 && t.bottom <= innerHeight }; })()`);
+    inWindow: t.left >= 0 && t.right <= innerWidth && t.top >= 0 && t.bottom <= innerHeight }; })()`));
 /** The middle of an element, near its top: where a pointer rests on a bar. */
 const pointAt = (page, selector) => page.ev(`(() => { const s = document.querySelector(${JSON.stringify(selector)}); s.scrollIntoView({ block: 'center' });
   const r = s.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + Math.min(8, r.height / 2) }; })()`);
@@ -55,12 +57,13 @@ try {
 
     const tip = await tipText(admin);
     const row = await admin.ev(`[...document.querySelectorAll('tbody tr')].find((r) => r.cells[0]?.innerText.startsWith(${JSON.stringify(name)}))?.innerText.split('\\t').map((s) => s.trim())`);
-    // The table reads: month, total, appointments, off the list, viable left.
-    const [, total, appts, off, viable] = row ?? [];
+    // The table reads: month, total, off the list (the appointments among them; Sean, Nov 2026), appointments, viable left.
+    const [, total, off, appts, viable] = row ?? [];
     const value = (key) => tip?.lines.find((l) => l.key === key)?.text.match(/ ([\d,]+) \d+%$/)?.[1];
     check("the tooltip names the month", tip?.title === name, tip?.title);
     check("…with the table's numbers", value("viable") === viable && value("off") === off && value("appointment") === appts && tip.total === `Total ${total}`,
       `${JSON.stringify(tip)} vs ${JSON.stringify(row)}`);
+    check("off the list counts the appointments too, with the rest resolved", Number(off) >= Number(appts) && Number(off) + Number(viable) === Number(total), JSON.stringify(row));
     check("…the colour under the pointer lit", JSON.stringify(tip.lines.filter((l) => l.lit).map((l) => l.key)) === '["viable"]', JSON.stringify(tip.lines));
     const at = await placement(admin, `[data-month-column="${month}"] [data-tip-anchor]`);
     check("…above its column, centred on it, inside the window", at.above && at.centred && at.inWindow, JSON.stringify(at));

@@ -3,20 +3,33 @@ import TipLayer from "@/components/shared/tip-layer";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-// Bottom to top in each column, and left to right in the table.
+// Bottom to top in each column. Off the list is every name resolved (Sean, Nov 2026: as the
+// Pipeline by Month counts it): the appointments at the foot, the rest of it above them, in grey;
+// the grey opens all of it, the green the appointments alone.
 const SEGMENTS = [
-  { key: "appointment", label: "Appointments", color: "var(--chart-win)" },
-  { key: "off", label: "Off the list", color: "var(--chart-done)" },
-  { key: "viable", label: "Viable left", color: "var(--chart-viable)" },
+  { key: "appointment", bucket: "appointment", label: "Appointments", color: "var(--chart-win)" },
+  { key: "off", bucket: "resolved", label: "Off the list", color: "var(--chart-done)" },
+  { key: "viable", bucket: "viable", label: "Viable left", color: "var(--chart-viable)" },
 ];
+// Left to right in the table: off the list (with the appointments), the appointments among them, viable.
+const COLUMNS = [
+  { key: "resolved", label: "Off the list" },
+  { key: "appointment", label: "Appointments" },
+  { key: "viable", label: "Viable left" },
+];
+const FIGURES = ["total", "appointment", "off", "resolved", "viable"];
 
 const pct = (n, total) => (total ? Math.round((n / total) * 100) : 0);
 
-/** Each month's figures for its tooltip: every colour with its share, and the total. */
+/** Each month's figures for its tooltip: viable, off the list, and the appointments among them, each with its share; the total. */
 const monthTips = (months) =>
   Object.fromEntries(months.map((m) => [m.month, {
     title: m.label,
-    rows: SEGMENTS.slice().reverse().map((s) => ({ key: s.key, label: s.label, color: s.color, value: m[s.key].toLocaleString(), share: `${pct(m[s.key], m.total)}%` })),
+    rows: [
+      { key: "viable", label: "Viable left", color: "var(--chart-viable)", value: m.viable.toLocaleString(), share: `${pct(m.viable, m.total)}%` },
+      { key: "off", label: "Off the list", color: "var(--chart-done)", value: m.resolved.toLocaleString(), share: `${pct(m.resolved, m.total)}%` },
+      { key: "appointment", label: "· Appointments", color: "var(--chart-win)", value: m.appointment.toLocaleString(), share: `${pct(m.appointment, m.total)}%` },
+    ],
     total: m.total.toLocaleString(),
     foot: m.total ? "Click a colour to see those names" : null,
   }]));
@@ -35,9 +48,9 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
   const picked = only?.length ? new Set(only) : null;
   const counted = picked ? months.filter((m) => picked.has(m.month)) : months;
   const totals = picked
-    ? Object.fromEntries(["total", ...SEGMENTS.map((s) => s.key)].map((k) => [k, counted.reduce((n, m) => n + m[k], 0)]))
+    ? Object.fromEntries(FIGURES.map((k) => [k, counted.reduce((n, m) => n + m[k], 0)]))
     : data.totals;
-  const none = { total: 0, ...Object.fromEntries(SEGMENTS.map((s) => [s.key, 0])) };
+  const none = Object.fromEntries(FIGURES.map((k) => [k, 0]));
   const max = Math.max(1, ...months.map((m) => m.total));
   const thisMonth = today ? Number(today.slice(5, 7)) : new Date().getMonth() + 1;
   const isOpen = (month, bucket) => selected?.month === month && (selected?.bucket ?? null) === bucket;
@@ -50,7 +63,7 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
     return (
       <Link
         href={href(m.month, bucket)}
-        aria-label={`${m.label}: ${n} ${bucket ? SEGMENTS.find((s) => s.key === bucket).label.toLowerCase() : "renewals"}`}
+        aria-label={`${m.label}: ${n} ${bucket ? COLUMNS.find((c) => c.key === bucket).label.toLowerCase() : "renewals"}`}
         className={cn(
           "rounded px-1.5 py-0.5 font-semibold tabular-nums transition-colors hover:bg-primary/10 hover:text-primary",
           isOpen(m.month, bucket) && "bg-primary/15 text-primary"
@@ -88,16 +101,16 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
                 >
                   {SEGMENTS.map((s) =>
                     m[s.key] && !href ? (
-                      <span key={s.key} data-seg={s.key} data-tip-row={s.key} aria-label={`${m.label}: ${m[s.key]} ${s.label.toLowerCase()}`}
+                      <span key={s.key} data-seg={s.key} data-tip-row={s.key} aria-label={`${m.label}: ${m[s.bucket] ?? m[s.key]} ${s.label.toLowerCase()}`}
                         className="block w-full" style={{ height: `${(m[s.key] / m.total) * 100}%`, background: s.color, minHeight: 2 }} />
                     ) : m[s.key] ? (
                       <Link
                         key={s.key}
-                        href={href(m.month, s.key)}
+                        href={href(m.month, s.bucket)}
                         data-seg={s.key}
                         data-tip-row={s.key}
-                        aria-label={`${m.label}: ${m[s.key]} ${s.label.toLowerCase()}`}
-                        className={cn("block w-full transition-opacity hover:opacity-80", isOpen(m.month, s.key) && "outline-2 -outline-offset-2 outline-foreground")}
+                        aria-label={`${m.label}: ${m[s.bucket] ?? m[s.key]} ${s.label.toLowerCase()}`}
+                        className={cn("block w-full transition-opacity hover:opacity-80", isOpen(m.month, s.bucket) && "outline-2 -outline-offset-2 outline-foreground")}
                         style={{ height: `${(m[s.key] / m.total) * 100}%`, background: s.color, minHeight: 2 }}
                       />
                     ) : null
@@ -123,7 +136,7 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
             <TableRow>
               <TableHead>Renewal month</TableHead>
               <TableHead className="text-right">Total</TableHead>
-              {SEGMENTS.map((s) => <TableHead key={s.key} className="text-right">{s.label}</TableHead>)}
+              {COLUMNS.map((c) => <TableHead key={c.key} className="text-right">{c.label}</TableHead>)}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -133,14 +146,14 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
                   {m.label}{m.month === thisMonth ? <span className="ml-2 text-xs font-normal text-muted-foreground">this month</span> : null}
                 </TableCell>
                 <TableCell className="text-right">{number(m, null)}</TableCell>
-                {SEGMENTS.map((s) => <TableCell key={s.key} className="text-right">{number(m, s.key)}</TableCell>)}
+                {COLUMNS.map((c) => <TableCell key={c.key} className="text-right">{number(m, c.key)}</TableCell>)}
               </TableRow>
             ))}
             <TableRow className="border-t-2 font-semibold">
               <TableCell>{picked ? "These months" : "All months"}</TableCell>
               <TableCell className="text-right tabular-nums">{(totals.total + (picked ? none : undated).total).toLocaleString()}</TableCell>
-              {SEGMENTS.map((s) => (
-                <TableCell key={s.key} className="text-right tabular-nums">{(totals[s.key] + (picked ? none : undated)[s.key]).toLocaleString()}</TableCell>
+              {COLUMNS.map((c) => (
+                <TableCell key={c.key} className="text-right tabular-nums">{(totals[c.key] + (picked ? none : undated)[c.key]).toLocaleString()}</TableCell>
               ))}
             </TableRow>
           </TableBody>
