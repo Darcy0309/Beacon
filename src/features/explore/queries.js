@@ -4,6 +4,7 @@ import "server-only";
 import { cache } from "react";
 import { cityState, colorFor, initialsOf, shortDate } from "@/lib/format";
 import { PAGE_SIZE } from "@/lib/paging";
+import { bySicGroup } from "@/lib/sic";
 import { createClient } from "@/lib/supabase/server";
 import { getBusinessTimeZone } from "@/lib/server/business-day";
 
@@ -68,7 +69,8 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
   // The day a lead was last called or changed, on the business's clock: "10/14/2026".
   const day = new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "numeric" });
   if (error) throw error;
-  const byIndustry = await sicLabelled(supabase, data?.by_industry ?? [], "code");
+  // By 4-digit group (Sean, Nov 2026), each named as the SIC list names it.
+  const byIndustry = await sicLabelled(supabase, bySicGroup(data?.by_industry), "code");
   return {
     total: data?.total ?? 0,
     rows: (data?.rows ?? []).map((r) => ({

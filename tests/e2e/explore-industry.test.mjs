@@ -19,7 +19,7 @@ const EATING = description("5812");
 const PLUMBING = description("1711");
 // Codes on leads must be on the SIC list: one six-digit code its four-digit code describes. Any added here go again after.
 const added = [];
-const made = ["5812", "1711-04", "1711-04", "0742"].map((code, i) => {
+const made = ["5812", "171199", "171199", "0742"].map((code, i) => {
   if (sql(`select count(*) from public.sic_codes where code = ${lit(code)}`) === "0") {
     sql(`insert into public.sic_codes (code) values (${lit(code)})`);
     added.push(code);
@@ -36,7 +36,7 @@ try {
   await admin.ev(`[...document.querySelectorAll('button[aria-haspopup="listbox"]')].find((b) => b.previousElementSibling?.textContent.trim() === 'Industry')?.click()`);
   const options = await until(async () => { const o = await admin.ev(`[...document.querySelectorAll('[role=listbox] [role=option]')].map((o) => o.querySelector('[title]')?.textContent ?? '')`); return o.length ? o : null; });
   check("a code with its own description reads both", EATING === "" || options.includes(`5812 – ${EATING}`), JSON.stringify(options?.slice(0, 12)));
-  check("…a six-digit code by its four-digit code's description", PLUMBING === "" || options.includes(`1711-04 – ${PLUMBING}`), JSON.stringify(options?.filter((o) => o.startsWith("1711"))));
+  check("…a six-digit code by its four-digit code's description", PLUMBING === "" || options.includes(`171199 – ${PLUMBING}`), JSON.stringify(options?.filter((o) => o.startsWith("1711"))));
   const codes = (options ?? []).map((o) => o.split(" – ")[0]);
   const sorted = [...codes].sort((a, b) => a.replace(/\D/g, "").localeCompare(b.replace(/\D/g, "")) || a.localeCompare(b));
   check("…in code order", JSON.stringify(codes) === JSON.stringify(sorted), JSON.stringify(codes.slice(0, 15)));
@@ -48,7 +48,12 @@ try {
 
   section("The By Industry card");
   const card = await admin.ev(`(() => { const c = document.querySelector('[data-breakdown="By Industry"]'); return { text: c.innerText, scroll: !!c.querySelector('[data-breakdown-scroll]'), more: /Show \\d+ more/.test(c.innerText) }; })()`);
-  check("its rows read code and description", PLUMBING === "" || card.text.includes(`1711-04 – ${PLUMBING}`), card.text.slice(0, 300));
+  // By 4-digit group (Sean, Nov 2026): a shorter list, each group named as the SIC list names it.
+  check("its rows read each 4-digit group and its description", PLUMBING === "" || card.text.includes(`1711 – ${PLUMBING}`), card.text.slice(0, 300));
+  check("…no 6-digit code on its own", !/\b\d{4}-?\d{2} – /.test(card.text), card.text.slice(0, 300));
+  // The figure counts up as it appears: read once it has.
+  const plumbing = () => admin.ev(`Number([...document.querySelectorAll('[data-breakdown="By Industry"] [data-list-row]')].find((r) => r.textContent.includes('1711 – '))?.querySelector('.tabular-nums')?.textContent.replace(/\\D/g, '') ?? 0)`);
+  check("…a group counting all its codes' leads", Boolean(await until(async () => (await plumbing()) >= 2)), await plumbing());
   check("…scrolling in place: no Show N more", !card.more && card.scroll, JSON.stringify({ scroll: card.scroll, more: card.more }));
   const rows = await admin.ev(`[...document.querySelectorAll('[data-breakdown="By Industry"] [data-list-row] .truncate')].map((e) => e.textContent.trim()).filter(Boolean)`);
   const rowCodes = rows.filter((r) => r !== "No SIC code").map((r) => r.split(" – ")[0]);

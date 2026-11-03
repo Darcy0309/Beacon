@@ -114,3 +114,20 @@ export function sicPairsFromRows(rows) {
   }
   return out;
 }
+
+/**
+ * Counts by SIC code put together by their 4-digit group (Sean, Nov 2026: Lead Explorer's By
+ * Industry, a shorter list): 078101 and 078102 count as 0781. `items`: [{ code, count }]; those with
+ * no code stay one row. The label is left for the group's own name to fill in.
+ */
+export function bySicGroup(items) {
+  const out = new Map();
+  for (const i of items ?? []) {
+    const digits = String(i.code ?? "").replace(/\D/g, "");
+    const group = digits.length >= 4 ? digits.slice(0, 4) : i.code || null;
+    const key = group ?? "";
+    const row = out.get(key) ?? out.set(key, { code: group, count: 0 }).get(key);
+    row.count += Number(i.count ?? 0);
+  }
+  return [...out.values()];
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for reading a master list of SIC codes and descriptions. */
-import { sicCode, sicKey, sicLookup, sicMatcher, sicPairsFromRows } from "../../src/lib/sic.js";
+import { bySicGroup, sicCode, sicKey, sicLookup, sicMatcher, sicPairsFromRows } from "../../src/lib/sic.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -51,5 +51,10 @@ is("a description the list cut short is found by its start", codeFor("Overhead T
 is("…but not by a start too short to be one thing", codeFor("General Contractors-Industrial Buildings and Warehouses"), null);
 is("a description of two industries is no code (a wrong one is worse)", codeFor("Ophthalmic Goods"), null);
 is("…nor is one not on the list", codeFor("Offices & Clinics of Doctors of Medicine"), null);
+
+// Lead Explorer's By Industry by 4-digit group (Sean, Nov 2026).
+is("6-digit codes counted by their 4-digit group; no code its own row",
+  bySicGroup([{ code: "078101", count: 2 }, { code: "078102", count: 28 }, { code: "152100", count: 33 }, { code: "0781", count: 1 }, { code: null, count: 4 }, { code: "", count: 1 }]),
+  [{ code: "0781", count: 31 }, { code: "1521", count: 33 }, { code: null, count: 5 }]);
 
 console.log("\nAll SIC checks passed.");
