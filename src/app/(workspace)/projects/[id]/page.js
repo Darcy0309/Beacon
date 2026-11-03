@@ -153,7 +153,10 @@ export default async function ProjectDetail({ params, searchParams }) {
   const goalDays = projectDays({ start: raw.start_date, end: raw.end_date, today });
   const { leads: leadGoal, appts: apptGoal } = projectGoals({ raw, done: s, month: canManage ? monthCounts[p.id] ?? { leads: 0, appointments: 0 } : null, days: goalDays });
 
-  const xdateHref = (m, b) => `/reports/x-dates?project=${p.id}&month=${m}${b ? `&bucket=${b}` : ""}#names`;
+  // X-Dates by Month is the appointment projects' report (Sean, Nov 2026): a DB dev project's month bars are figures only,
+  // and its Full report is its appointment project's.
+  const xdateHref = dbdev ? null : (m, b) => `/reports/x-dates?project=${p.id}&month=${m}${b ? `&bucket=${b}` : ""}#names`;
+  const xdateReport = dbdev ? (raw.appt_project_id ? `/reports/x-dates?project=${raw.appt_project_id}` : null) : `/reports/x-dates?project=${p.id}`;
   const rates = { id: p.id, name: p.name, type: p.type, lead: Number(raw.lead_rate ?? 0), appointment: Number(raw.appointment_rate ?? 0), confirmation: Number(raw.confirmation_rate ?? 0),
     specialGoal: raw.special_goal ?? null, specialRate: Number(raw.special_rate ?? 0) };
   const special = dbdev ? specialPayLabel(rates.specialGoal, rates.specialRate) : null;
@@ -251,11 +254,11 @@ export default async function ProjectDetail({ params, searchParams }) {
           <SectionHeader
             label="X-Dates by Month"
             icon={CalendarSearch}
-            action={(
-              <Link href={`/reports/x-dates?project=${p.id}`} className="flex items-center gap-1 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75">
-                Full report <ArrowRight className="size-3" />
+            action={xdateReport ? (
+              <Link href={xdateReport} className="flex items-center gap-1 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-opacity hover:opacity-75" data-xdate-report>
+                {dbdev ? "Appointment project's report" : "Full report"} <ArrowRight className="size-3" />
               </Link>
-            )}
+            ) : null}
           />
           <div className="p-5">
             <XdateMonths data={xdates} href={xdateHref} today={today} compact />
@@ -263,13 +266,12 @@ export default async function ProjectDetail({ params, searchParams }) {
         </Card>
 
         {/* The old system's pipeline sheet (Sean, Nov 2026): the same leads by month, off the list, viable,
-            appointments projected at the project's rate (20% unless an administrator sets it) and set. Staff's. */}
-        {client ? null : (
-          <Card data-pipeline-card>
-            <SectionHeader label="Pipeline by Month" icon={TrendingUp} />
-            <PipelineMonths data={xdates} rate={p.raw.projected_conversion} today={today} />
-          </Card>
-        )}
+            appointments projected at the project's rate (20% unless an administrator sets it) and set. The
+            client's people see it too, for each of their projects. */}
+        <Card data-pipeline-card>
+          <SectionHeader label="Pipeline by Month" icon={TrendingUp} />
+          <PipelineMonths data={xdates} rate={p.raw.projected_conversion} today={today} />
+        </Card>
 
         <Card id="leads">
           <SectionHeader

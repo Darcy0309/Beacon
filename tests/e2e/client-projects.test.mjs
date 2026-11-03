@@ -28,6 +28,10 @@ const L = Number(sql(`insert into public.leads (company_name, project_id, assign
 const MONTH = 6;
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${L}, make_date(extract(year from current_date)::int + 1, ${MONTH}, 15))`);
 sql(`insert into public.call_records (user_id, project_id, lead_id, call_date, notes) values (${SEAN}, ${DBDV}, ${L}, now() - interval '1 hour', ${lit(TAG)}), (${SEAN}, ${DBDV}, ${L}, now() - interval '2 hours', ${lit(TAG)})`);
+// A lead on their appointment project, renewing the same month: X-Dates by Month is the appointment projects' (Nov 2026).
+const apptViable = sql("select id from public.call_results where project_type = 'APPT' and viable and callable order by id limit 1");
+const L2 = Number(sql(`insert into public.leads (company_name, project_id, stage, assigned_user_id, result_id) values (${lit(`${TAG} Pacific Plumbing`)}, ${APPT}, 'appt', ${SEAN}, ${apptViable}) returning id`));
+sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${L2}, make_date(extract(year from current_date)::int + 1, ${MONTH}, 20))`);
 
 const browser = await launchBrowser();
 const when = (page, expr, timeout = 20000) => until(() => page.ev(expr), { timeout });
@@ -56,11 +60,18 @@ try {
   check("no reps on the project, nor their names", !/Reps on this Project/i.test(page) && !/across \d+ reps?/.test(page));
   check("leads on it, without the Assigned filter", /Fusion Air/.test(page) && !(await client.ev("!!document.querySelector('select[aria-label=\"Filter by Assigned\"]')")));
   check("…with the manager on each lead (not Unassigned)", Boolean(await client.ev(`[...document.querySelectorAll('tr')].some((r) => r.textContent.includes(${JSON.stringify(`${TAG} Fusion Air`)}) && /Sean F\./.test(r.textContent))`)));
-  check("X-date months open their names, as for administrators", Boolean(await client.ev("!!document.querySelector('a[href^=\"/reports/x-dates?project=\"]')")));
-  await client.go(`/reports/x-dates?project=${DBDV}&month=${MONTH}#names`, 6000);
-  const monthNames = (await when(client, "(document.querySelector('main') ?? document.body).innerText.includes('Fusion Air') && (document.querySelector('main') ?? document.body).innerText.replace(/\\s+/g, ' ')")) ?? "";
-  check("…the month's names, with their manager, and back to the project", /Fusion Air/.test(monthNames) && /Sean F\./.test(monthNames)
-    && (await client.ev("document.querySelector('[data-back-to-project]')?.getAttribute('href')")) === `/projects/${DBDV}`, monthNames.slice(0, 200));
+  check("its X-dates open its appointment project's report", (await client.ev("document.querySelector('[data-xdate-report]')?.getAttribute('href')")) === `/reports/x-dates?project=${APPT}`);
+  await client.go(`/projects/${APPT}`, 6000);
+  check("X-date months open their names, as for administrators", Boolean(await when(client, "!!document.querySelector('a[href^=\"/reports/x-dates?project=\"]')")));
+  await client.go(`/reports/x-dates?project=${APPT}&month=${MONTH}#names`, 6000);
+  const monthNames = (await when(client, "(document.querySelector('main') ?? document.body).innerText.includes('Pacific Plumbing') && (document.querySelector('main') ?? document.body).innerText.replace(/\\s+/g, ' ')")) ?? "";
+  check("…the month's names, with their manager, and back to the project", /Pacific Plumbing/.test(monthNames) && /Sean F\./.test(monthNames)
+    && (await client.ev("document.querySelector('[data-back-to-project]')?.getAttribute('href')")) === `/projects/${APPT}`, monthNames.slice(0, 200));
+  // Sean (Nov 2026): in their own menu, filtered by project and renewal month only.
+  check("X-Dates by Month is in their Data & Insights", await client.ev("!!document.querySelector('aside nav a[href=\"/reports/x-dates\"]')"));
+  const filterLabels = await client.ev("[...document.querySelectorAll('[data-xdate-filters] .eyebrow, [data-xdate-filters] button')].map((e) => e.textContent.trim()).join(' | ')");
+  check("…filtered by Project and Renewal month alone", /Project/.test(filterLabels) && /Renewal month/.test(filterLabels) && !/Client|Sales Rep|Type|Manager/.test(filterLabels), filterLabels);
+  check("…with the Pipeline by Month, and no Pipeline Report", await client.ev("!!document.querySelector('[data-pipeline-card]') && !document.querySelector('[data-pipeline-report]')"));
   check("…no client picker for them", !(await client.ev("[...document.querySelectorAll('button, select')].some((b) => /All clients/.test(b.textContent))")));
   await client.go(`/reports/x-dates?project=${THEIRS}&month=${MONTH}#names`, 5000);
   check("…and nothing of another client's", !/Not Yours/.test(await text(client)) || !/Fusion|Someone/.test(await text(client)));

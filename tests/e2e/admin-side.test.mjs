@@ -74,15 +74,18 @@ try {
   await shot(admin, "admin-project");
 
   section("X-dates by month, and the names behind a number");
+  // The appointment projects' report (Sean, Nov 2026): a DB dev project's page opens its appointment project's.
+  const CAPITAL_APPT = Number(sql(`select appt_project_id from public.projects where id = ${CAPITAL}`));
   await admin.go(`/projects/${CAPITAL}`, 4000);
-  await admin.click("a", "Full report");
-  check("Full report opens the X-dates for this project", await until(async () => (await admin.url()) === `/reports/x-dates?project=${CAPITAL}`), await admin.url());
+  await admin.click("a", "Appointment project's report");
+  check("a DB dev project's page opens its appointment project's X-dates", await until(async () => (await admin.url()) === `/reports/x-dates?project=${CAPITAL_APPT}`), await admin.url());
   await sleep(1500);
-  const month = Number(sql(`select extract(month from public.lead_renewal_date(l.id))::int from public.leads l where l.project_id=${CAPITAL}
+  const month = Number(sql(`select extract(month from public.lead_renewal_date(l.id))::int from public.leads l where l.project_id=${CAPITAL_APPT}
     group by 1 order by count(*) desc limit 1`));
-  const viable = count(`and r.viable and extract(month from public.lead_renewal_date(l.id)) = ${month}`);
+  const viable = Number(sql(`select count(*) from public.leads l join public.call_results r on r.id=l.result_id where l.project_id=${CAPITAL_APPT}
+    and r.viable and extract(month from public.lead_renewal_date(l.id)) = ${month}`));
   const monthName = new Date(Date.UTC(2026, month - 1, 1)).toLocaleString("en-US", { month: "long", timeZone: "UTC" });
-  const link = `a[href="/reports/x-dates?project=${CAPITAL}&month=${month}&bucket=viable#names"]`;
+  const link = `a[href="/reports/x-dates?project=${CAPITAL_APPT}&month=${month}&bucket=viable#names"]`;
   const shown = await admin.ev(`[...document.querySelectorAll(${JSON.stringify(link)})].map((a) => a.textContent.trim()).filter(Boolean)[0] ?? ''`);
   check(`${monthName}: viable left matches the database`, num(shown) === viable && viable > 0, `${shown} vs ${viable}`);
   await admin.click(link);

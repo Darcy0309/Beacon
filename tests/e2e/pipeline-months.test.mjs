@@ -4,13 +4,13 @@
  * X-Dates report: each month's leads, those off the list (resolved,
  * appointments and invalid ones among them), viable, appointments projected
  * at 20% or the rate an administrator sets on the project, the conversion,
- * and those set. Staff's; a client's people don't see it.
+ * and those set. A client's people see it for each of their projects (Sean, Nov 2026).
  *
  * Removes everything it made.
  *
  *   node tests/e2e/pipeline-months.test.mjs
  */
-import { check, finish, section, sleep, until } from "../support/assert.mjs";
+import { check, finish, section, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
@@ -50,6 +50,11 @@ try {
   check("each month's conversion: January 20%, March 0%, none for a month with no leads", JSON.stringify(row(rows, "conversion").slice(1, 5)) === JSON.stringify(["", "20%", "—", "0%"]), JSON.stringify(row(rows, "conversion")));
   check("the appointments set", JSON.stringify(row(rows, "actual").slice(1, 5)) === JSON.stringify(["1", "1", "0", "0"]), JSON.stringify(row(rows, "actual")));
   check("…and the overall conversion: 1 of 7 is 14%", /Overall conversion: 14%/.test(await admin.ev("document.querySelector('[data-pipeline-overall]').textContent")));
+  // Sean (Nov 2026): the totals and the viable leads stand out, bolder and larger than the rest.
+  const looks = await admin.ev(`[...document.querySelectorAll('[data-pipeline-card] [data-pipeline-row]')].map((r) => { const c = getComputedStyle(r.cells[2]); return [r.dataset.pipelineRow, Number(c.fontWeight), parseFloat(c.fontSize)]; })`);
+  const by = Object.fromEntries(looks.map(([k, w, size]) => [k, { w, size }]));
+  check("Total by month and Viable leads in bold, larger than the other rows",
+    by.total.w >= 700 && by.viable.w >= 700 && by.total.size > by.off.size && by.viable.size > by.projected.size && by.off.w < 700, JSON.stringify(looks));
 
   section("The project's own rate");
   await admin.click("button", "Edit");
@@ -70,9 +75,12 @@ try {
   section("A client's people");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1500, height: 1100 });
   await client.go(`/projects/${P}`, 6000);
-  await until(() => client.ev("!!document.getElementById('leads')"));
-  await sleep(500);
-  check("don't see it", !(await client.ev("!!document.querySelector('[data-pipeline-card]')")));
+  const theirs = await until(() => table(client).then((r) => r.length === 6 && r));
+  check("see it on their project, at its rate", Boolean(theirs) && row(theirs, "projected")[0] === "Projected appts (50%)" && row(theirs, "total by month")[1] === "7",
+    JSON.stringify(theirs && row(theirs, "projected")));
+  await client.go(`/reports/x-dates?project=${P}`, 6000);
+  const report2 = await until(() => table(client).then((r) => r.length === 6 && r));
+  check("…and on the X-Dates by Month opened from it", Boolean(report2) && row(report2, "total by month")[1] === "7");
 } finally {
   browser.close();
   sql(`delete from public.leads where project_id = ${P}`);

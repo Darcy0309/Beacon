@@ -17,10 +17,11 @@ export default function PipelineMonths({ data, rate, today }) {
   const p = pipelineByMonth(data.months, rate);
   const thisMonth = today ? Number(today.slice(5, 7)) : null;
   const cols = [p.total, ...p.months];
+  // [label, figure, format, no total, stands out]: the totals and the viable leads larger and bolder (Sean, Nov 2026).
   const rows = [
-    ["Total by month", "total", n],
+    ["Total by month", "total", n, false, true],
     ["Off the list (resolved)", "off", n],
-    ["Viable leads", "viable", n],
+    ["Viable leads", "viable", n, false, true],
     [`Projected appts (${p.rate}%)`, "projected", n],
     ["Conversion % (total leads)", "conversion", pct, true],
     ["Actual appts", "appointments", n],
@@ -40,11 +41,11 @@ export default function PipelineMonths({ data, rate, today }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(([label, key, fmt, noTotal]) => (
-              <TableRow key={key} data-pipeline-row={key}>
-                <TableCell className="whitespace-nowrap font-medium">{label}</TableCell>
+            {rows.map(([label, key, fmt, noTotal, stands]) => (
+              <TableRow key={key} data-pipeline-row={key} data-stands-out={stands || undefined} className={cn(stands && "bg-muted/50")}>
+                <TableCell className={cn("whitespace-nowrap font-medium", stands && "text-base font-bold text-foreground")}>{label}</TableCell>
                 {cols.map((c, i) => (
-                  <TableCell key={c.short} className={cn("text-right tabular-nums", i === 0 && "font-semibold")}>
+                  <TableCell key={c.short} className={cn("text-right tabular-nums", i === 0 && "font-semibold", stands && "text-base font-bold text-foreground")}>
                     {i === 0 && noTotal ? "" : fmt(c[key])}
                   </TableCell>
                 ))}

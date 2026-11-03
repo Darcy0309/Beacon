@@ -34,8 +34,11 @@ export default async function XdatesReport({ searchParams }) {
   // keeps it to their projects; the client, Sales Rep and manager pickers, and the Pipeline Report, are ours.
   const me = await getCurrentUser();
   const isClient = me?.role === "client";
-  const read = readXdateFilters(sp);
+  // No DB dev / appointments choice any more (Sean, Nov 2026): the renewals are the appointment projects' (`appt`);
+  // the Pipeline Report under them still has both kinds, with their pay.
+  const read = { ...readXdateFilters(sp), type: null };
   const filters = isClient ? { ...read, companyId: null, repId: null, userIds: [] } : read;
+  const appt = { ...filters, type: "APPT" };
   const month = /^(0|[1-9]|1[0-2])$/.test(sp?.month ?? "") ? Number(sp.month) : null;
   const bucket = XDATE_BUCKETS[sp?.bucket] ? sp.bucket : null;
   const list = readListParams(sp);
@@ -43,8 +46,8 @@ export default async function XdatesReport({ searchParams }) {
   const todayP = getBusinessToday();
   const [options, data, names, today, tz, reps, managers, pipeline] = await Promise.all([
     getLookups(),
-    getXdatesFiltered(filters),
-    month === null ? null : getXdateMonthLeadsFiltered({ month, bucket, filters, page: list.page, perPage: list.perPage }),
+    getXdatesFiltered(appt),
+    month === null ? null : getXdateMonthLeadsFiltered({ month, bucket, filters: appt, page: list.page, perPage: list.perPage }),
     todayP,
     getBusinessTimeZone(),
     isClient ? [] : getSalesReps(),
@@ -60,7 +63,7 @@ export default async function XdatesReport({ searchParams }) {
   const chosen = options.projects.filter((p) => filters.projectIds.includes(p.id));
   const project = chosen.length === 1 ? chosen[0] : null;
   // The Pipeline by Month's projected rate: one project's own, else 20%.
-  const rate = project && !isClient ? await getProjectedConversion(project.id) : null;
+  const rate = project ? await getProjectedConversion(project.id) : null;
   const scope = project?.name ?? (chosen.length > 1 ? `${chosen.length} projects` : null) ?? client?.name
     ?? (isClient ? me?.company?.name ?? "Your projects" : "The whole book");
 
@@ -89,20 +92,19 @@ export default async function XdatesReport({ searchParams }) {
         ) : null}
         <Card>
           <SectionHeader label="Renewals by Month" icon={CalendarSearch} />
-          <XdateFilterBar filters={filters} showClient={!isClient} showManagers={!isClient}
+          {/* A client's people: their projects and the renewal months (Sean, Nov 2026). */}
+          <XdateFilterBar filters={appt} showClient={!isClient} showManagers={!isClient} showType={false}
             options={{ companies: options.companies, projects: options.projects, reps, managers }} />
           <div className="p-5">
             <XdateMonths data={data} href={href} today={today} selected={month === null ? null : { month, bucket }} only={filters.months} />
           </div>
         </Card>
 
-        {/* The same names month by month, as the old system's pipeline sheet (Sean, Nov 2026): staff's. */}
-        {isClient ? null : (
-          <Card data-pipeline-card>
-            <SectionHeader label="Pipeline by Month" icon={TrendingUp} />
-            <PipelineMonths data={data} rate={rate} today={today} />
-          </Card>
-        )}
+        {/* The same names month by month, as the old system's pipeline sheet (Sean, Nov 2026): a client's people see their own. */}
+        <Card data-pipeline-card>
+          <SectionHeader label="Pipeline by Month" icon={TrendingUp} />
+          <PipelineMonths data={data} rate={rate} today={today} />
+        </Card>
 
         {pipeline ? (
           <Card id="pipeline" className="scroll-mt-24">

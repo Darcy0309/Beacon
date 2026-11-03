@@ -13,8 +13,9 @@ const MONTH_OPTIONS = MONTH_SHORT.map((m, i) => ({ value: String(i + 1), label: 
  *   filters   readXdateFilters()
  *   options   { companies, projects: [{ id, name, company_id, type }], reps, managers }
  *   showClient   the client and Sales Rep pickers (not for a client's own view)
+ *   showType     the DB dev / appointments picker (not on X-Dates by Month: appointment projects only; Nov 2026)
  */
-export default function XdateFilterBar({ filters, options, showClient = true, showManagers = true }) {
+export default function XdateFilterBar({ filters, options, showClient = true, showManagers = true, showType = true }) {
   const clears = ["page", "month", "bucket"];
   const projects = options.projects.filter((p) => (!filters.companyId || p.company_id === filters.companyId) && (!filters.type || p.type === filters.type));
   return (
@@ -27,8 +28,10 @@ export default function XdateFilterBar({ filters, options, showClient = true, sh
             options={(options.reps ?? []).map((r) => ({ value: String(r.id), label: r.name }))} />
         </>
       ) : null}
-      <ParamSelect name="type" label="Type" value={filters.type ?? ""} placeholder="DB Dev & Appts" clears={[...clears, "project"]}
-        options={PROJECT_TYPES.map(([value, label]) => ({ value, label }))} />
+      {showType ? (
+        <ParamSelect name="type" label="Type" value={filters.type ?? ""} placeholder="DB Dev & Appts" clears={[...clears, "project"]}
+          options={PROJECT_TYPES.map(([value, label]) => ({ value, label }))} />
+      ) : null}
       <ParamMulti name="project" label="Project" values={filters.projectIds.map(String)} clears={clears}
         options={projects.map((p) => ({ value: String(p.id), label: p.name }))} />
       {showManagers ? (

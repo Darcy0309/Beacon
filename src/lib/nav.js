@@ -75,7 +75,8 @@ export const navGroups = [
       // Query the whole book at once: industry, ZIPs, renewal month, client…
       { href: "/explore", label: "Lead Explorer", icon: Database, roles: ["admin", "manager"] },
       // Renewal months across the book, a client or a project; each number opens its names.
-      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin"] },
+      // A client's people too (Sean, Nov 2026): their own appointment projects, by project and renewal month.
+      { href: "/reports/x-dates", label: "X-Dates by Month", icon: CalendarSearch, roles: ["admin", "client"] },
       // Appointments waiting on QA (Sean, Nov 2026: with the data, under X-Dates by Month).
       { href: "/qa", label: "Quality QA", icon: ClipboardCheck, roles: ["admin", "agent"] },
       // The businesses a client (or prospect) wants to target: industries, size, territory (Sean, Oct 2026).

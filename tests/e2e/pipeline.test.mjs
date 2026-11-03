@@ -62,7 +62,8 @@ try {
   await admin.go(`/reports/x-dates?client=${company}`, 7000);
   await when(admin, "!!document.querySelector('[data-pipeline-report]')");
   const labels = await admin.ev("[...document.querySelectorAll('[data-xdate-filters] .eyebrow, [data-xdate-filters] button')].map((e) => e.textContent.trim()).join(' | ')");
-  check("Client, Sales Rep, Type, Project, Manager and Renewal month", ["Client", "Sales Rep", "Type", "Project", "Manager", "Renewal month"].every((l) => labels.includes(l)), labels);
+  // No DB dev / appointments choice (Sean, Nov 2026): X-Dates by Month is the appointment projects'.
+  check("Client, Sales Rep, Project, Manager and Renewal month, no Type", ["Client", "Sales Rep", "Project", "Manager", "Renewal month"].every((l) => labels.includes(l)) && !labels.includes("Type"), labels);
   check("…projects, managers and months as drop-downs of check boxes, All at the top",
     (await admin.ev("['project', 'managers', 'months'].every((k) => !!document.querySelector(`[data-param-multi=\"${k}\"]`))")) === true);
 
@@ -108,7 +109,7 @@ try {
   check("by manager: Rachel's alone", Boolean(await rowText(admin, `${P}-${RACHEL}`)) && !(await rowText(admin, `${P}-${SEAN}`)));
   await admin.go(`/reports/x-dates?client=${company}&type=DBDV`, 6000);
   await when(admin, "!!document.querySelector('[data-pipeline-report]')");
-  check("DB dev only", Boolean(await rowText(admin, `${Q}-${SEAN}`)) && !(await rowText(admin, `${P}-${SEAN}`)));
+  check("an old link's DB dev choice set aside: the Pipeline Report keeps both kinds", Boolean(await rowText(admin, `${Q}-${SEAN}`)) && Boolean(await rowText(admin, `${P}-${SEAN}`)));
   await admin.go(`/reports/x-dates?client=${company}&months=${M2}`, 6000);
   await when(admin, "!!document.querySelector('[data-pipeline-report]')");
   const m2 = await admin.ev(`[...document.querySelector('[data-pipeline-row="${P}-${SEAN}"]')?.cells ?? []].map((c) => c.innerText.trim())`);
