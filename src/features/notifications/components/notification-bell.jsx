@@ -363,7 +363,8 @@ export default function NotificationBell() {
           <span
             key={`badge-${shake}`}
             className={cn(
-              "absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[0.6rem] font-bold tabular-nums text-accent-foreground shadow",
+              // White on a strong red, ringed off the button: readable at a glance in either theme.
+              "absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-600 px-1 text-[0.7rem] font-bold leading-none tabular-nums text-white shadow ring-2 ring-background",
               shake > 0 && "animate-badge-shake"
             )}
           >
