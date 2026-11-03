@@ -36,12 +36,11 @@ const rows = async (table, select, order = {}) => {
   return data ?? [];
 };
 
-const [leads, companies, projects, imports, agencies, managers] = await Promise.all([
+const [leads, companies, projects, imports, managers] = await Promise.all([
   rows("leads", "id, company_name", { lead_date: { ascending: false, nullsFirst: false }, id: { ascending: false } }),
   rows("companies", "id, name", { name: {} }),
   rows("projects", "id, name", { id: {} }),
   rows("import_batches", "file_name", { created_at: { ascending: false } }),
-  rows("agencies", "name", { name: {} }),
   admin.supabase.from("users").select("first_name").eq("role", "manager").limit(1).then((r) => r.data ?? []),
 ]);
 
@@ -64,7 +63,8 @@ const PAGES = [
   ["/clients", "Clients", companies.slice(0, 2).map((c) => c.name)],
   ["/projects", "Projects", [project.name]],
   ["/account-managers", "Account Managers", managers.length ? [managers[0].first_name] : ["Team"]],
-  ["/insurance-companies", "Insurance Companies", agencies.length ? [agencies[0].name] : ["Carriers"]],
+  // Those with leads first (Sean, Nov 2026), so the list's first is not the A to Z first.
+  ["/insurance-companies", "Insurance Companies", ["Carriers", "X-Dates", "All states"]],
   ["/feedback", "Feedback", ["Average rating"]],
   ["/qa", "QA", ["Recent scored calls"]],
   ["/bulletin", "Bulletin", ["Bulletin"]],

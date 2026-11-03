@@ -65,7 +65,6 @@ export const navGroups = [
       // A client's people see their own projects (Sean, Oct 2026), without what is ours to see or change.
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "client"] },
       { href: "/account-managers", label: "Account Managers", icon: UserCog, roles: ["admin"] },
-      { href: "/insurance-companies", label: "Insurance Cos.", icon: Building2, roles: ["admin"] },
     ],
   },
   {
@@ -84,6 +83,8 @@ export const navGroups = [
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
       // Agents get the same page scoped to their own productivity.
       { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "agent", "client"] },
+      // The carriers, with the states, leads and clients our leads give them (Sean, Nov 2026: here, under Reports).
+      { href: "/insurance-companies", label: "Insurance Cos.", icon: Building2, roles: ["admin"] },
       // Calls and paid events per day; everyone but an administrator sees only their own.
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.

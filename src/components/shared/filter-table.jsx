@@ -335,7 +335,8 @@ function FacetGroup({ group, value, onChange }) {
  * mode), or joined by MULTI_SEP in a list filtered here, whose values are names
  * that may hold a comma. The list floats over the page (a card never cuts it
  * off); a long one has a box on top to find an option by typing. Closes on a
- * click outside or Escape.
+ * click outside or Escape. `all` (a label, such as "All states"): that choice
+ * first, ticked while none is picked, clearing the rest.
  */
 const FIND_FROM = 13;
 function MultiFacet({ group, value, onChange }) {
@@ -351,7 +352,7 @@ function MultiFacet({ group, value, onChange }) {
     else next.add(v);
     set(next);
   };
-  const summary = picked.size === 0 ? "All"
+  const summary = picked.size === 0 ? group.all ?? "All"
     : picked.size === 1 ? group.options.find((o) => picked.has(String(o.value)))?.label ?? "1 selected"
     : `${picked.size} selected`;
   const long = group.options.length >= FIND_FROM;
@@ -379,6 +380,15 @@ function MultiFacet({ group, value, onChange }) {
             </div>
           ) : null}
           <div role="listbox" aria-multiselectable aria-label={group.label} className="max-h-80 min-h-0 overflow-y-auto overscroll-contain p-1" onWheel={(e) => e.stopPropagation()}>
+            {group.all && !words.length ? (
+              <button type="button" role="option" aria-selected={picked.size === 0} onClick={() => set(new Set())} data-option-all
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-semibold transition-colors hover:bg-muted/60">
+                <span className={cn("flex size-4 shrink-0 items-center justify-center rounded border", picked.size === 0 ? "border-primary bg-primary text-primary-foreground" : "border-input")}>
+                  {picked.size === 0 ? <Check className="size-3" /> : null}
+                </span>
+                <span className="flex-1">{group.all}</span>
+              </button>
+            ) : null}
             {shown.map((o, i) => {
               const on = picked.has(String(o.value));
               const heading = o.group && o.group !== shown[i - 1]?.group ? o.group : null;
