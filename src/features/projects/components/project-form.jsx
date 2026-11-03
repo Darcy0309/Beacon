@@ -49,6 +49,8 @@ export default function ProjectForm({ project, options, trigger }) {
         lead_goal_month: project.lead_goal_month ?? "",
         appt_goal_month: project.appt_goal_month ?? "",
         projected_conversion: project.projected_conversion ?? "",
+        bill_lead_rate: project.bill_lead_rate ?? "",
+        bill_appointment_rate: project.bill_appointment_rate ?? "",
       }
     : null;
   const { fe, invalid, dv } = formHelpers(state, record);
@@ -205,6 +207,14 @@ export default function ProjectForm({ project, options, trigger }) {
             {/* The Pipeline by Month's projected appointments (Sean, Nov 2026): this share of each month's leads. */}
             <Field label="Projected appointment rate (%)" error={fe("projected_conversion")} hint="Pipeline by Month: this % of each month's leads. Leave empty for 20%">
               <Input name="projected_conversion" type="number" inputMode="decimal" min="0" max="100" step="0.5" defaultValue={dv("projected_conversion")} aria-invalid={invalid("projected_conversion")} data-projected-conversion />
+            </Field>
+
+            {/* What the client is billed (Sean, Nov 2026): Reports' billing listing; a manager's pay is under Pay rates. */}
+            <Field label="Billing per lead ($)" error={fe("bill_lead_rate")} hint="What the client is billed for each lead">
+              <Input name="bill_lead_rate" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={dv("bill_lead_rate")} aria-invalid={invalid("bill_lead_rate")} data-bill-lead-rate />
+            </Field>
+            <Field label="Billing per appointment ($)" error={fe("bill_appointment_rate")} hint="…and for each appointment">
+              <Input name="bill_appointment_rate" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={dv("bill_appointment_rate")} aria-invalid={invalid("bill_appointment_rate")} data-bill-appointment-rate />
             </Field>
 
             <Field label="Description" error={fe("description")} className="sm:col-span-2">

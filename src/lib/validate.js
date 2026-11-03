@@ -280,6 +280,9 @@ export const schemas = {
     appt_goal_month: [int({ min: 0, max: 100000 })],
     // The Pipeline by Month's projected appointment rate, a % (Sean, Nov 2026); none is 20%.
     projected_conversion: [num({ min: 0, max: 100 })],
+    // What the client is billed for a lead and an appointment (Reports' billing listing; Nov 2026).
+    bill_lead_rate: [num({ min: 0, max: 100000 })],
+    bill_appointment_rate: [num({ min: 0, max: 100000 })],
     // Lead delivery: addresses separated by commas (a leading "_" sends that one a link).
     email: [max(500), rules.custom((v) => {
       const { bad } = parseDeliveryAddresses(v);

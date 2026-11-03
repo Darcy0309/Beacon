@@ -8,12 +8,15 @@
  *   npm run test:e2e      (SHOTS=<dir> to keep screenshots)
  */
 import { check, finish, section, sleep, until } from "../support/assert.mjs";
-import { sql } from "../support/db.mjs";
+import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
 const SHOTS = process.env.SHOTS;
 const browser = await launchBrowser({ mouse: true });
 const shot = (page, name) => (SHOTS ? page.screenshot(`${SHOTS}/${name}.png`) : null);
+const TAG = `CH-E2E ${Date.now()}`;
+const PROJECT = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
+  values (${lit(`${TAG} Appts`)}, (select id from public.companies order by id limit 1), (select id from public.project_types where code = 'APPT'), 1) returning id`));
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 const open = (page) => page.ev(`[...document.querySelectorAll('[role=tooltip][data-tip-open]')].filter((t) => getComputedStyle(t).visibility === 'visible').map((t) => t.dataset.tipOpen)`);
@@ -33,10 +36,16 @@ try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1600, height: 1000 });
 
   section("X-Dates by Month");
+  // The appointment projects' renewals (Nov 2026): their busiest month, given one of each colour to hover on a project of the test's own.
+  const month = Number(sql(`select coalesce((select extract(month from public.lead_renewal_date(l.id))::int from public.leads l
+    join public.projects p on p.id = l.project_id join public.project_types t on t.id = p.project_type_id
+    where t.code = 'APPT' and public.lead_renewal_date(l.id) is not null group by 1 order by count(*) desc, 1 limit 1), 9)`));
+  for (const result of ["Lead-No Contact", "Lead-Never Shops", "Appointment"]) {
+    const id = Number(sql(`insert into public.leads (company_name, project_id, stage, result_id) values (${lit(`${TAG} ${result}`)}, ${PROJECT}, 'appt',
+      public.call_result_from_text('APPT', ${lit(result)})) returning id`));
+    sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${id}, make_date(2027, ${month}, 15))`);
+  }
   await admin.go("/reports/x-dates", 5000);
-  // The month with the most renewals, which has every colour to hover.
-  const month = Number(sql(`select extract(month from public.lead_renewal_date(l.id))::int from public.leads l
-    where public.lead_renewal_date(l.id) is not null group by 1 order by count(*) desc, 1 limit 1`));
   const name = MONTHS[month - 1];
   {
     check("no tooltip until a month is hovered", JSON.stringify(await open(admin)) === "[]");
@@ -78,10 +87,13 @@ try {
   }
 
   section("Reports: six months of leads and appointments");
-  await admin.go("/reports", 5000);
+  // The administrators' chart opens on the current month (Sean, Nov 2026); 6M for the six.
+  // Leads count in the month they were developed: the test's own, this month.
+  sql(`update public.leads set promoted_at = now() where project_id = ${PROJECT}`);
+  await admin.go("/reports?ch=6", 5000);
   {
     check("no browser title tooltips on the bars", await admin.ev(`!document.querySelector('[data-months-chart] [title]')`));
-    const key = await admin.ev(`[...document.querySelectorAll('[data-months-chart] [data-tip]')].at(-2)?.dataset.tip`);
+    const key = await admin.ev(`[...document.querySelectorAll('[data-months-chart] [data-tip]')].filter((m) => !/: 0 leads/.test(m.getAttribute('aria-label'))).at(-1)?.dataset.tip`);
     await admin.hover(await pointAt(admin, `[data-months-chart] [data-tip="${key}"] [data-tip-row="leads"]`));
     check("hovering a month shows its figures", await until(async () => JSON.stringify(await open(admin)) === JSON.stringify([key])), JSON.stringify(await open(admin)));
     const tip = await tipText(admin);
@@ -95,6 +107,8 @@ try {
   }
 } finally {
   browser.close();
+  sql(`delete from public.leads where project_id = ${PROJECT}`);
+  sql(`delete from public.projects where id = ${PROJECT}`);
 }
 
 finish("charts");

@@ -13,6 +13,8 @@ import { reportsView } from "@/features/dashboard/role-views";
 import { getReports } from "@/features/dashboard/queries";
 import { getReps, getMyWorkload } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
+import { getBusinessToday } from "@/lib/server/business-day";
+import AdminReports from "@/features/reports/components/admin-reports";
 
 export const dynamic = "force-dynamic";
 
@@ -32,11 +34,22 @@ const SUBTITLE = {
   client: "Delivery and appointment performance",
 };
 
-export default async function ReportsPage() {
+export default async function ReportsPage({ searchParams }) {
   // Cached per request — the layout has usually resolved this already.
   const me = await getCurrentUser();
   const role = me?.role ?? "client";
   const view = reportsView(role);
+
+  // An administrator's Reports (Sean, Nov 2026): each figure over its own months, and the billing listing.
+  if (role === "admin") {
+    const [sp, today] = await Promise.all([searchParams, getBusinessToday()]);
+    return (
+      <>
+        <Topbar title="Reports" sub={SUBTITLE.admin} />
+        <div className="flex-1 p-4 sm:p-6"><AdminReports sp={sp} today={today} /></div>
+      </>
+    );
+  }
 
   const [reps, r, mine] = await Promise.all([
     view.reps ? getReps() : null,
