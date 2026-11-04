@@ -132,7 +132,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
         </div>
       )}
 
-      <nav className={cn("scrollbar-on-hover flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-4", collapsed ? "px-2" : "px-3")}>
+      <nav className={cn("flex-1 space-y-4 overflow-y-auto overflow-x-hidden pb-4", collapsed ? "scrollbar-none px-2" : "scrollbar-on-hover px-3")}>
         {groups.map((group) => (
           <div key={group.label}>
             {collapsed ? (

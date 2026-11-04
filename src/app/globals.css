@@ -584,6 +584,14 @@ option {
   background: var(--border);
   background-clip: content-box;
 }
+/* No scrollbar at all, the list still scrolling by wheel or touch: the collapsed side menu, whose
+   icons a Windows scrollbar's width would push off centre (Nov 2026). */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
 
 /* Page transition on navigation */
 @keyframes page-in {
