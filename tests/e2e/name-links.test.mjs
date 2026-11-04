@@ -44,8 +44,9 @@ try {
   check("a user's name opens their form", Boolean(await until(() => admin.ev(`!!document.querySelector('[role=dialog]')`))));
   await admin.go("/insurance-companies", 5000);
   await until(() => admin.ev(`!!document.querySelector('[data-carrier-link]')`));
-  await admin.click("[data-carrier-link]");
-  check("an insurance company's name opens its form", Boolean(await until(() => admin.ev(`!!document.querySelector('[role=dialog]')`))));
+  // Its report since Sean's Nov 2026 rework; its row's menu edits it.
+  const carrierHref = await admin.ev(`document.querySelector('[data-carrier-link]')?.getAttribute('href')`);
+  check("an insurance company's name opens its report", /^\/insurance-companies\/\d+$/.test(carrierHref ?? ""), carrierHref);
 
   section("Account managers, documents, imports, activity");
   await admin.go("/account-managers", 5000);

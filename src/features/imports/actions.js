@@ -337,7 +337,7 @@ export async function importLeadsCsv(prevState, formData) {
         resolved_at: result && !result.viable ? now : null,
         status_id: statusId[result?.status_code] ?? statusId[status] ?? statusId.new ?? null,
         list_source: lead.list_source || listSource,
-        lead_date: now,
+        lead_date: dayAt(lead.lead_date) ?? now,
         import_date: now,
       };
     });

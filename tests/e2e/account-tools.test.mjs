@@ -80,8 +80,8 @@ try {
   const saved = await until(() => sql(`select association || ' | ' || territory from public.agencies where name = ${lit(CARRIER)}`) || null);
   check("an administrator adds a carrier, its lines and its states (written as codes)", saved === "P&C, Workers comp | AZ, NM, CA", saved);
   await admin.go(`/insurance-companies?q=${encodeURIComponent(CARRIER)}`, 4000);
-  // Its States column counts its leads' states (Sean, Nov 2026); those it writes in stay on its form.
-  check("…listed with its lines", /P&C, Workers comp/.test(await admin.text()));
+  // Its lines and states stay on its form (Sean, Nov 2026: the list shows what our leads give it).
+  check("…listed", (await admin.text()).includes(CARRIER));
   await admin.click("[data-add-carrier]");
   await until(() => admin.ev(`!!document.querySelector('[role=dialog] input[name="name"]')`));
   await admin.fill('[role=dialog] input[name="name"]', CARRIER.toUpperCase().replace(" ", "-"));

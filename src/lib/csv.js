@@ -132,6 +132,8 @@ export const COLUMN_ALIASES = {
   callresultdbdv: "call_result_dbdv", calldbdv: "call_result_dbdv",
   callresultappt: "call_result_appt", callappt: "call_result_appt",
   qadatedbdv: "qa_date_dbdv", qadateappt: "qa_date_appt",
+  // When the old system took the name on (Sean, Nov 2026: a carrier's report lists it); the day it's imported when not given.
+  leaddate: "lead_date", datecreated: "lead_date", leadcreated: "lead_date",
   shoppingdate: "shopping_date",
   // A list's notes are the client's notes on the name; the old system's
   // "notes to client" column carries its call history, which is internal.
@@ -241,7 +243,7 @@ export const HISTORY_ALIASES = {
   dbdvrep: "developed_by", dbdevrep: "developed_by", leadmanager: "developed_by", manager: "developed_by", accountmanager: "developed_by",
   apptcreatedate: "set_at", apptcreateddate: "set_at", appointmentcreatedate: "set_at", appointmentcreateddate: "set_at", appointmentcreated: "set_at",
   apptsetdate: "set_at", appointmentsetdate: "set_at", dateset: "set_at", apptdateset: "set_at",
-  setby: "set_by", apptsetby: "set_by", appointmentsetby: "set_by", setter: "set_by", apptsetter: "set_by", apptmanager: "set_by", apptuser: "set_by",
+  setby: "set_by", apptrep: "set_by", apptsetby: "set_by", appointmentsetby: "set_by", setter: "set_by", apptsetter: "set_by", apptmanager: "set_by", apptuser: "set_by",
 };
 
 /**
@@ -279,7 +281,7 @@ const DATE_COLUMNS = new Set([
   "qa_date_dbdv", "qa_date_appt", "shopping_date", "appt_date",
   "ultimate_xdate", "pkg_xdate", "wc_xdate", "auto_xdate", "health_xdate",
   "dental_xdate", "vision_xdate", "prof_liab_xdate", "do_xdate", "eo_xdate",
-  "homeowner_xdate", "personal_auto_xdate", "developed_at", "set_at",
+  "homeowner_xdate", "personal_auto_xdate", "developed_at", "set_at", "lead_date",
 ]);
 
 // What old lists put in a field that has nothing in it: read as blank.
@@ -530,6 +532,10 @@ export function rowsToImport(csvRows) {
       errors++;
       continue;
     }
+    // The old system's template (Sean, Nov 2026): its QA dates are when the lead was developed
+    // (QA_DATE_DBDV) and its appointment set (QA_DATE_APPT); kept on the lead as well.
+    if (lead.qa_date_dbdv) history.developed_at ??= lead.qa_date_dbdv;
+    if (lead.qa_date_appt) history.set_at = lead.qa_date_appt;
     if (lead.state) {
       const code = normalizeState(lead.state);
       // Drop an unrecognised state rather than storing a wrong one; the column

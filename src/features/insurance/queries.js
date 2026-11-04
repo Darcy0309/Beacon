@@ -16,12 +16,13 @@ const toCarrierView = (a, f) => ({
   lines: a.association ?? "—",
   association: a.association ?? "",
   territory: a.territory ?? "",
-  // From the carrier fields on our leads (carrier_footprint): the states they're in, how many, and the clients they're for.
+  // From the carrier fields on our leads (carrier_footprint): the states they're in, with the leads in each, and how many.
   stateCodes: [...(f?.states ?? [])].sort(),
+  byState: Object.fromEntries(Object.entries(f?.by_state ?? {}).map(([st, n]) => [st, Number(n)])),
   states: f?.states?.length ?? 0,
   xdates: Number(f?.leads ?? 0),
+  // The clients with it among their Top Carriers, on their projects' Project Info (Sean, Nov 2026).
   clients: Number(f?.clients ?? 0),
-  status: Number(f?.leads ?? 0) > 12 ? "Preferred" : "Active",
 });
 
 /** Every carrier's name, A to Z: what the carrier fields on a lead sheet suggest. */
@@ -64,3 +65,27 @@ export async function listInsuranceCompanies(params) {
 
 /** The states picked (?states=AZ,NM), as their two letters; anything else dropped. */
 export const statesOf = (v) => [...new Set(String(v ?? "").toUpperCase().split(",").map((s) => s.trim()).filter((s) => US_STATES.includes(s)))];
+
+/** One carrier, by id: { id, name, association, territory }, or null. */
+export async function getCarrier(id) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("agencies").select("id, name, association, territory").eq("id", id).is("deleted_at", null).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+/** The clients a carrier is a Top Carrier of, each with its leads (X-dates) naming the carrier, in the states picked. */
+export async function getCarrierClients(id, states = []) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("carrier_clients", { p_agency: id, p_states: states.length ? states : null });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ ...r, xdates: Number(r.xdates), states: [...(r.states ?? [])].sort() }));
+}
+
+/** A client's leads (X-dates) naming the carrier, in the states picked: the business, its place, project, renewals and lines. */
+export async function getCarrierClientLeads(id, companyId, states = []) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("carrier_client_leads", { p_agency: id, p_company: companyId, p_states: states.length ? states : null });
+  if (error) throw error;
+  return data ?? [];
+}
