@@ -1,6 +1,7 @@
 "use client";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { FIGURE_CELL } from "@/features/insurance/figure-cell";
 
 /**
  * A carrier's states (Sean, Nov 2026): the number alone in its row, so ten or more of them don't
@@ -8,12 +9,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  */
 export default function CarrierStates({ name, byState }) {
   const states = Object.entries(byState ?? {}).sort(([a], [b]) => a.localeCompare(b));
-  if (!states.length) return <span className="font-semibold tabular-nums text-muted-foreground">0</span>;
+  if (!states.length) return <span className="block px-4 py-3.5 text-center tabular-nums text-muted-foreground">0</span>;
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button type="button" aria-label={`${name}: ${states.length} state${states.length === 1 ? "" : "s"}, show them`} data-carrier-states-open
-          className="rounded px-1.5 py-0.5 font-semibold tabular-nums text-primary transition-colors hover:bg-primary/10">
+          className={`${FIGURE_CELL} cursor-pointer`}>
           {states.length}
         </button>
       </PopoverTrigger>
