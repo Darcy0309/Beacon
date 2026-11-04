@@ -1,6 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLinkStatus } from "next/link";
 import Link from "@/components/shared/intent-link";
 import { usePathname } from "next/navigation";
@@ -84,12 +85,39 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
     ? `${user.first_name?.[0] ?? ""}${user.last_name?.[0] ?? ""}`.toUpperCase() || "?"
     : "?";
 
+  // The collapsed rail's names (Nov 2026): the one pointed at or focused, in a tip to its right,
+  // drawn over the page (the panel's rounded edge would cut it off), in place of the browser's slow title.
+  const [tip, setTip] = useState(null); // { label, top, left }
+  const showTip = (label) => (e) => {
+    if (!collapsed) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    setTip({ label, top: r.top + r.height / 2, left: r.right + 10 });
+  };
+  const hideTip = () => setTip(null);
+  useEffect(() => {
+    if (!tip) return undefined;
+    window.addEventListener("scroll", hideTip, true);
+    return () => window.removeEventListener("scroll", hideTip, true);
+  }, [tip]);
+  useEffect(() => { if (!collapsed) setTip(null); }, [collapsed]);
+  const tipProps = (label) => (collapsed ? { onMouseEnter: showTip(label), onMouseLeave: hideTip, onFocus: showTip(label), onBlur: hideTip } : {});
+
   const groups = navGroups
     .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(role)) }))
     .filter((g) => g.items.length > 0);
 
   return (
     <div className="flex h-full flex-col">
+      {tip && typeof document !== "undefined"
+        ? createPortal(
+            <div role="tooltip" data-rail-tip className="pointer-events-none fixed z-[70] -translate-y-1/2" style={{ top: tip.top, left: tip.left }}>
+              <div className="animate-popover-in whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs font-medium text-popover-foreground shadow-lg">
+                {tip.label}
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
       {/* brand + collapse control */}
       {collapsed ? (
         <div className="flex flex-col items-center px-2 py-5">
@@ -150,8 +178,9 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    onClick={onNavigate}
-                    title={collapsed ? item.label : undefined}
+                    onClick={(e) => { hideTip(); onNavigate?.(e); }}
+                    {...tipProps(item.label)}
+                    aria-label={collapsed ? item.label : undefined}
                     data-nav-active={active || undefined}
                     className={cn(
                       "relative flex items-center rounded-lg text-sm font-medium transition-all duration-150",
@@ -199,9 +228,10 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
           {/* Signing out asks first: the button is small and sits by the navigation. */}
           <button
             type="button"
-            title="Sign out"
+            title={collapsed ? undefined : "Sign out"}
             aria-label="Sign out"
-            onClick={() => setLeaving(true)}
+            {...tipProps("Sign out")}
+            onClick={() => { hideTip(); setLeaving(true); }}
             className="signout-button flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           >
             <SignOutIcon />
