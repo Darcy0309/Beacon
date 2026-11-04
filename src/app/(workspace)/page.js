@@ -46,6 +46,9 @@ import ClientActivity from "@/features/dashboard/components/client-activity";
 import SalePipeline from "@/features/dashboard/components/sale-pipeline";
 import { CLIENT_PERIODS, PIPELINE_PERIODS, appointmentsTile, clientPeriod, clientPeriodFrom, leadsTile, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
+import CallActivityCard from "@/features/dashboard/components/call-activity";
+import { getCallActivity } from "@/features/phone/queries";
+import { twilioConfig } from "@/lib/server/twilio";
 
 export const dynamic = "force-dynamic";
 
@@ -164,6 +167,19 @@ export default async function Dashboard({ searchParams }) {
     };
   });
 
+  // Call Activity (Nov 2026): every manager's calls on the Lighthouse phone, for administrators and managers,
+  // over the day chosen (?ck=, ?cd=; today to begin with). Once the Twilio line is set up: before, there are none.
+  const callsP = (isManager || view.audience === "company") && twilioConfig()
+    ? basics.then(async ([businessToday, rules]) => {
+      const v = readView(sp, { keyParam: "ck", dateParam: "cd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
+      return { view: v, rows: await getCallActivity(v.range) };
+    }).catch((err) => {
+      // The rest of the dashboard still shows.
+      console.error("[dashboard] call activity", err?.message ?? err);
+      return null;
+    })
+    : Promise.resolve(null);
+
   // A client's top row (Sean, Oct 2026): leads, appointments and their results over the period chosen
   // (?cp=, all time to begin with), and the viable leads renewing over the months ahead (?up=, three).
   const client = view.audience === "client";
@@ -212,6 +228,11 @@ export default async function Dashboard({ searchParams }) {
     clientScheduleP,
     clientActivityP,
   ]);
+  const calls = await callsP;
+  const callCard = calls ? (
+    <CallActivityCard rows={calls.rows} view={calls.view}
+      {...viewControls(sp, calls.view, { keyParam: "ck", dateParam: "cd", options: VIEW_PERIODS })} />
+  ) : null;
   const production = company?.production ?? null;
   const team = company?.team ?? null;
   const chart = company?.chart ?? null;
@@ -488,6 +509,8 @@ export default async function Dashboard({ searchParams }) {
             }
             {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
         ) : null}
+        {/* An administrator's: below Daily Production. */}
+        {!manager ? callCard : null}
 
         {manager ? (
           <>
@@ -512,6 +535,9 @@ export default async function Dashboard({ searchParams }) {
               </div>
               <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long").replace(/, \d{4}$/, "")} />
             </div>
+
+            {/* Row four: everyone's calls on the Lighthouse phone. */}
+            {callCard}
           </>
         ) : (
         <>

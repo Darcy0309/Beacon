@@ -9,7 +9,9 @@ import Link from "@/components/shared/intent-link";
 import { createClient } from "@/lib/supabase/client";
 import { KEYS, callClock, dialable, formatDial, numberOfTel, searchDigits, telOf } from "@/lib/phone";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import { deviceLine } from "@/features/phone/lines";
+import { createTwilioLine } from "@/features/phone/twilio-line";
 import { closeCallNotification, showCallNotification, startRingtone } from "@/features/phone/incoming";
 
 const PhoneContext = createContext(null);
@@ -95,7 +97,10 @@ const PRESSABLE = "button, a, input, textarea, select, label, [role=button]";
  * calls. Its window is dragged anywhere by any part of it that is not a
  * button or the number.
  *
- * Calls go through a line (lines.js). Today's is the computer's own calling
+ * Calls go through a line (lines.js). With Twilio's keys on the server, the
+ * Twilio line (twilio-line.js): calls made and taken in the browser, with
+ * mute, keypad tones and recording, and a call hung up at the other end
+ * ending here too. Without them, the computer's own calling
  * app, PanTerra's Streams when it is the default for phone links: Lighthouse
  * hands it the number and keeps the time, but cannot hear the call, so mute,
  * hold, tones and recording stay off, and calls coming in ring in Streams,
@@ -109,7 +114,23 @@ const PRESSABLE = "button, a, input, textarea, select, label, [role=button]";
  * reported the same way).
  */
 export function PhoneProvider({ children, tracked = false }) {
-  const line = deviceLine;
+  // The device line until the Twilio line is ready (or for good, while the server has no Twilio keys).
+  const [line, setLine] = useState(deviceLine);
+  useEffect(() => {
+    let gone = false;
+    let made = null;
+    createTwilioLine().then(
+      (l) => {
+        if (gone) l?.destroy();
+        else if (l) setLine((made = l));
+      },
+      (err) => console.warn("[phone] Twilio line unavailable:", err?.message ?? err)
+    );
+    return () => {
+      gone = true;
+      made?.destroy();
+    };
+  }, []);
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("keypad");
   const [value, setValue] = useState("");
@@ -117,7 +138,11 @@ export function PhoneProvider({ children, tracked = false }) {
   const leadRef = useRef(null); // the same, for a missed call recorded later by its timer
   const [checked, setChecked] = useState(null); // the digits whose lookup has answered
   const lookingUp = useRef(null); // the digits being looked up (a ref: setting it must not run the lookup again)
-  const [call, setCall] = useState(null); // the call on: { number, lead, startedAt, dir, test }; none once ended
+  const [call, setCall] = useState(null); // the call on: { number, lead, startedAt, dir, test, lineId }; none once ended
+  const callRef = useRef(null);
+  useEffect(() => {
+    callRef.current = call;
+  }, [call]);
   const [ringing, setRinging] = useState(null); // a call coming in: { id, number, test }
   const ringingRef = useRef(null);
   const stopRing = useRef(null);
@@ -318,11 +343,11 @@ export function PhoneProvider({ children, tracked = false }) {
     (number, who, { fromLink = false } = {}) => {
       const tel = telOf(number);
       if (!tel || ringingRef.current) return;
-      line.call(tel);
+      const lineId = line.call(tel);
       // A phone link pressed is already reported by the activity tracker; one dialed here is reported now.
       if (!fromLink) report(who?.id);
       setControls({ muted: false, held: false, recording: false, keys: false });
-      setCall({ number: dialable(number), lead: who ?? null, startedAt: Date.now(), dir: "out" });
+      setCall({ number: dialable(number), lead: who ?? null, startedAt: Date.now(), dir: "out", lineId });
       setNow(Date.now());
     },
     [line, report]
@@ -374,7 +399,7 @@ export function PhoneProvider({ children, tracked = false }) {
     if (!r.test) line.answer(r.id);
     stopRinging(r.id);
     setControls({ muted: false, held: false, recording: false, keys: false });
-    setCall({ number: r.number, lead, startedAt: Date.now(), dir: "in", test: r.test });
+    setCall({ number: r.number, lead, startedAt: Date.now(), dir: "in", test: r.test, lineId: r.test ? null : r.id });
     setNow(Date.now());
     setTab("keypad");
     setOpen(true);
@@ -401,8 +426,22 @@ export function PhoneProvider({ children, tracked = false }) {
     [call, finishRing]
   );
 
-  // Calls coming in on the line (none on today's; a PanTerra line rings here).
+  // Calls coming in on the line (none on the device line; the Twilio line rings here).
   useEffect(() => line.onIncoming((c) => ring({ id: c.id, number: c.number })), [line, ring]);
+
+  // A call ended on the line: hung up at the other end (kept under Recent, as End does), or the caller gone while it rang.
+  const endCallRef = useRef(endCall);
+  useEffect(() => {
+    endCallRef.current = endCall;
+  }, [endCall]);
+  useEffect(
+    () =>
+      line.onEnded(({ id }) => {
+        if (ringingRef.current?.id === id) finishRing("missed");
+        else if (id && callRef.current?.lineId === id) endCallRef.current();
+      }),
+    [line, finishRing]
+  );
 
   // Answer and Decline pressed on the desktop notification (public/sw.js passes them on).
   useEffect(() => {
@@ -541,7 +580,7 @@ export function PhoneProvider({ children, tracked = false }) {
 
   const context = useMemo(() => ({ openPhone, ring, active }), [openPhone, ring, active]);
   const who = call?.lead?.co ? call.lead : lead;
-  const callLabel = call?.test ? "Test call" : call?.dir === "in" ? "On the call" : "In your calling app";
+  const callLabel = call?.test ? "Test call" : call?.dir === "in" || line.can.hangUp ? "On the call" : "In your calling app";
 
   return (
     <PhoneContext.Provider value={context}>
@@ -695,12 +734,18 @@ export function PhoneProvider({ children, tracked = false }) {
                         const on = controls[key];
                         return (
                           <button key={cap} type="button" disabled={!can} aria-pressed={can ? on : undefined} data-phone-control={cap}
-                            title={can ? label : `${label}: comes with the PanTerra connection`}
+                            title={can ? label : `${label}: ${line.lacks}`}
                             onClick={() => {
                               setControls((c) => ({ ...c, [key]: !c[key] }));
                               if (cap === "mute") line.setMuted(!on);
                               if (cap === "hold") line.setHeld(!on);
-                              if (cap === "record") line.setRecording(!on);
+                              // Recording is asked of the server: when it cannot, the button goes back, saying why.
+                              if (cap === "record") {
+                                Promise.resolve(line.setRecording(!on)).catch((err) => {
+                                  setControls((c) => ({ ...c, recording: on }));
+                                  toast.error(err?.message || "Recording could not be changed.");
+                                });
+                              }
                             }}
                             className={cn("flex flex-col items-center gap-1 rounded-xl py-2 text-[0.66rem] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40",
                               on ? (cap === "record" ? "bg-rose-500/15 text-rose-500" : "bg-primary/15 text-primary") : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
@@ -749,7 +794,7 @@ export function PhoneProvider({ children, tracked = false }) {
                     </p>
                   ) : null}
 
-                  {/* How a call coming in rings, until a PanTerra line brings real ones. */}
+                  {/* How a call coming in rings, until a line that takes calls (Twilio) brings real ones. */}
                   {!active && !line.can.receive ? (
                     <div className="mt-3 border-t border-[var(--panel-border)] pt-2 text-center text-[0.66rem] text-muted-foreground">
                       {testIn ? (
