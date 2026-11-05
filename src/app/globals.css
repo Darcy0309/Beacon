@@ -1104,8 +1104,27 @@ html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4
   0% { transform: scale(1); opacity: 0.55; }
   100% { transform: scale(2.3); opacity: 0; }
 }
+/* Or a scene drawn behind the call, in the manner of an anime's sky (Sean, Nov 2026; call-scenes.jsx),
+   covering the screen under a light veil at its top and foot, where the call's words and buttons are
+   (the screen takes the dark theme while it plays). */
+.phone-call-scene {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #070b14;
+  animation: phone-backdrop-in 0.8s ease both;
+}
+.phone-call-scene canvas { display: block; width: 100%; height: 100%; }
+.phone-call-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(5 8 16 / 0.5) 0%, rgb(5 8 16 / 0.12) 34%, rgb(5 8 16 / 0.08) 60%, rgb(5 8 16 / 0.45) 100%);
+}
 @media (prefers-reduced-motion: reduce) {
-  .phone-call-backdrop, .phone-call-backdrop span { animation: none; }
+  .phone-call-backdrop, .phone-call-backdrop span, .phone-call-scene { animation: none; }
   .phone-wave { animation: none; opacity: 0; }
 }
 
@@ -1114,6 +1133,8 @@ html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4
   position: relative;
   /* Its own layer: the call's backdrop (z-index -1) sits over its wallpaper, under what it shows. */
   isolation: isolate;
+  /* Its own text colour, so the dark theme it takes behind a scene carries to all it shows. */
+  color: var(--foreground);
   overflow: hidden;
   border-radius: calc(2.75rem - 8px);
   background: var(--card);

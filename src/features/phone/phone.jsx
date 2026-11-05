@@ -13,6 +13,7 @@ import { colorFor, initialsOf } from "@/lib/format";
 import { toast } from "sonner";
 import { deviceLine } from "@/features/phone/lines";
 import { createTwilioLine } from "@/features/phone/twilio-line";
+import { CallScene, SCENE_NAMES } from "@/features/phone/call-scenes";
 import {
   RINGTONES, closeCallNotification, keepRingtone, previewRingtone, readRingtone, showCallNotification, startRingtone,
 } from "@/features/phone/incoming";
@@ -42,6 +43,25 @@ const readWallpaper = () => {
     return WALLPAPERS.some(([k]) => k === w) ? w : "plain";
   } catch {
     return "plain";
+  }
+};
+/**
+ * Behind a call ringing or on (Sean, Nov 2026), picked under the phone's Settings: light drifting in
+ * the call's colours (globals.css), nothing, or a scene drawn live in the manner of an anime's sky
+ * (call-scenes.jsx). Kept on this computer.
+ */
+export const CALL_BACKGROUNDS = [
+  ["light", "Moving light"], ["none", "None"], ["sakura", "Sakura dusk"], ["starfall", "Starfall"],
+  ["neon", "Neon city"], ["moonlit", "Moonlit sea"],
+];
+const CALL_FILMS = SCENE_NAMES;
+const CALL_BACKGROUND_KEY = "lighthouse.phone.call-background";
+const readCallBackground = () => {
+  try {
+    const b = localStorage.getItem(CALL_BACKGROUND_KEY);
+    return CALL_BACKGROUNDS.some(([k]) => k === b) ? b : "light";
+  } catch {
+    return "light";
   }
 };
 const readPos = () => {
@@ -160,6 +180,16 @@ export function PhoneProvider({ children, tracked = false }) {
   const [controls, setControls] = useState({ muted: false, held: false, recording: false, keys: false });
   const [recent, setRecent] = useState([]);
   const [wallpaper, setWallpaperState] = useState("plain");
+  const [callBackground, setCallBackgroundState] = useState("light");
+  useEffect(() => setCallBackgroundState(readCallBackground()), []);
+  const setCallBackground = (b) => {
+    setCallBackgroundState(b);
+    try {
+      localStorage.setItem(CALL_BACKGROUND_KEY, b);
+    } catch {
+      // Private browsing: it lasts until the page is closed.
+    }
+  };
   useEffect(() => setWallpaperState(readWallpaper()), []);
   const setWallpaper = (w) => {
     setWallpaperState(w);
@@ -636,10 +666,16 @@ export function PhoneProvider({ children, tracked = false }) {
               !small && "touch-none [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_input]:cursor-text",
               !small && (dragging ? "cursor-grabbing select-none" : "cursor-grab"))}>
             {/* The screen: the camera's island at its top (a green light while a call is on), the home bar at its foot. */}
-            <div className="phone-screen flex min-h-0 flex-1 flex-col" data-phone-screen data-wallpaper={wallpaper}>
+            {/* A scene behind a call: the screen takes the dark theme while it plays, so the call reads on it. */}
+            <div className={cn("phone-screen flex min-h-0 flex-1 flex-col", (ringing || active) && CALL_FILMS.includes(callBackground) && "dark")}
+              data-phone-screen data-wallpaper={wallpaper}>
               <div aria-hidden className="phone-island" data-live={active || ringing ? "" : undefined} />
               {/* A call ringing or on: soft light drifting behind it, its colours the call's (globals.css). */}
-              {ringing || active ? (
+              {(ringing || active) && CALL_FILMS.includes(callBackground) ? (
+                <div aria-hidden className="phone-call-scene" data-phone-film={callBackground}>
+                  <CallScene scene={callBackground} />
+                </div>
+              ) : (ringing || active) && callBackground === "light" ? (
                 <div aria-hidden className="phone-call-backdrop" data-mood={ringing ? "ringing" : ringingOut ? "calling" : "talking"} data-phone-backdrop>
                   <span /><span /><span />
                 </div>
@@ -727,7 +763,8 @@ export function PhoneProvider({ children, tracked = false }) {
                   {ringing.test ? <p className="mt-5 text-[0.66rem] text-muted-foreground">A test: nobody is on the line.</p> : null}
                 </div>
               ) : tab === "settings" ? (
-                <PhoneSettings wallpaper={wallpaper} onWallpaper={setWallpaper} onDone={() => setTab("keypad")} />
+                <PhoneSettings wallpaper={wallpaper} onWallpaper={setWallpaper} callBackground={callBackground} onCallBackground={setCallBackground}
+                  onDone={() => setTab("keypad")} />
               ) : tab === "recent" ? (
                 <Recent list={recent} disabled={active} onPick={(r) => { setValue(r.number); setLead(r.leadId ? { id: r.leadId, co: r.co } : null); setChecked(null); setTab("keypad"); }}
                   onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
@@ -903,9 +940,10 @@ function CallerAvatar({ who, waves = null, className }) {
 /** The calls made and taken lately in this browser: who, which way, when, how long; one picked fills the keypad, the button calls back. */
 /**
  * The phone's settings: its wallpaper, picked from swatches (it changes behind them as one is picked),
- * and its ringtone (Sean, Nov 2026), heard as it is picked. Both kept on this computer.
+ * what plays behind a call (the one picked playing in its swatch), and its ringtone (Sean, Nov 2026),
+ * heard as it is picked. All kept on this computer.
  */
-function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
+function PhoneSettings({ wallpaper, onWallpaper, callBackground, onCallBackground, onDone }) {
   const [ringtone, setRingtone] = useState("classic");
   const [playing, setPlaying] = useState(null);
   const [muted, setMuted] = useState(false);
@@ -942,6 +980,31 @@ function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
             <span className={wallpaper === k ? "text-primary" : "text-muted-foreground"}>{label}</span>
           </button>
         ))}
+      </div>
+
+      <div className="mt-6 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">During a call</div>
+      <div role="radiogroup" aria-label="During a call" className="mt-3 grid grid-cols-3 gap-2.5">
+        {CALL_BACKGROUNDS.map(([k, label]) => {
+          const on = callBackground === k;
+          const film = CALL_FILMS.includes(k);
+          return (
+            <button key={k} type="button" role="radio" aria-checked={on} onClick={() => onCallBackground(k)} data-call-background-pick={k}
+              className="group flex flex-col items-center gap-1 text-[0.62rem] font-medium">
+              <span className={cn("relative h-24 w-full overflow-hidden rounded-xl border transition-transform group-hover:scale-[1.04] group-active:scale-95",
+                on ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")}>
+                {film ? (
+                  // The one picked plays; the rest are a still of it.
+                  <CallScene scene={k} playing={on} className="size-full" />
+                ) : k === "light" ? (
+                  <span className="phone-call-backdrop" data-mood="calling" style={{ zIndex: 0, opacity: 0.9 }}><span /><span /><span /></span>
+                ) : (
+                  <span className="flex size-full items-center justify-center bg-background/60 text-muted-foreground">—</span>
+                )}
+              </span>
+              <span className={cn("w-full truncate text-center", on ? "text-primary" : "text-muted-foreground")}>{label}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="mt-6 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">Ringtone</div>
