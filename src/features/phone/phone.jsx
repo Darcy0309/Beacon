@@ -3,12 +3,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight, CircleDot, CircleX, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
-  PhoneMissed, PhoneOff, PhoneOutgoing, Play, Settings, Square, X,
+  PhoneMissed, PhoneOff, PhoneOutgoing, Play, Settings, Square, UserRound, X,
 } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import { createClient } from "@/lib/supabase/client";
 import { KEYS, callClock, dialable, formatDial, numberOfTel, searchDigits, telOf } from "@/lib/phone";
 import { cn } from "@/lib/utils";
+import { colorFor, initialsOf } from "@/lib/format";
 import { toast } from "sonner";
 import { deviceLine } from "@/features/phone/lines";
 import { createTwilioLine } from "@/features/phone/twilio-line";
@@ -637,6 +638,12 @@ export function PhoneProvider({ children, tracked = false }) {
             {/* The screen: the camera's island at its top (a green light while a call is on), the home bar at its foot. */}
             <div className="phone-screen flex min-h-0 flex-1 flex-col" data-phone-screen data-wallpaper={wallpaper}>
               <div aria-hidden className="phone-island" data-live={active || ringing ? "" : undefined} />
+              {/* A call ringing or on: soft light drifting behind it, its colours the call's (globals.css). */}
+              {ringing || active ? (
+                <div aria-hidden className="phone-call-backdrop" data-mood={ringing ? "ringing" : ringingOut ? "calling" : "talking"} data-phone-backdrop>
+                  <span /><span /><span />
+                </div>
+              ) : null}
               <header onDoubleClick={(e) => { if (!(e.target instanceof Element && e.target.closest(PRESSABLE))) dock(); }}
                 data-phone-bar title={small ? undefined : "Drag anywhere to move · double-click here to put it back in the corner"}
                 className="flex items-center justify-between gap-2 border-b border-[var(--panel-border)] px-3 pb-2 pt-1.5">
@@ -648,19 +655,20 @@ export function PhoneProvider({ children, tracked = false }) {
                     </button>
                   ) : null}
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold">Phone</div>
-                    <div className="flex min-w-0 items-center gap-1.5 text-[0.66rem] text-muted-foreground">
-                      <span className="truncate" title={line.note} data-phone-line={line.id}>{line.label}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold">Phone</span>
                       {receiving ? (
                         // Calls coming in: ringing here, or not, and why (Nov 2026).
                         <span data-phone-receiving={receiving.receiving ? "on" : receiving.problem ? "off" : "connecting"}
                           title={receiving.receiving ? "Calls to the company's number ring here" : receiving.problem ?? "Connecting to Twilio…"}
-                          className={cn("flex shrink-0 items-center gap-1 font-medium", receiving.receiving ? "text-emerald-500" : receiving.problem ? "text-amber-500" : "")}>
+                          className={cn("flex shrink-0 items-center gap-1 rounded-full px-1.5 py-px text-[0.6rem] font-semibold",
+                            receiving.receiving ? "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400" : receiving.problem ? "bg-amber-500/12 text-amber-600 dark:text-amber-400" : "bg-muted text-muted-foreground")}>
                           <span aria-hidden className={cn("size-1.5 rounded-full", receiving.receiving ? "bg-emerald-500" : receiving.problem ? "bg-amber-500" : "animate-pulse bg-muted-foreground")} />
                           {receiving.receiving ? "Taking calls" : receiving.problem ? "Not taking calls" : "Connecting…"}
                         </span>
                       ) : null}
                     </div>
+                    <div className="truncate text-[0.66rem] text-muted-foreground" title={line.note} data-phone-line={line.id}>{line.label}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -688,11 +696,12 @@ export function PhoneProvider({ children, tracked = false }) {
 
               {ringing ? (
                 // A call coming in: who, and Answer or Decline.
-                <div className="flex flex-1 flex-col items-center justify-center px-4 pb-6 pt-5 text-center" data-phone-ringing={ringing.test ? "test" : ""} aria-live="assertive">
+                <div className="flex flex-1 flex-col items-center px-4 pb-8 pt-8 text-center" data-phone-ringing={ringing.test ? "test" : ""} aria-live="assertive">
                   <span className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-emerald-500">
                     <PhoneIncoming className="size-3.5 animate-pulse" /> Incoming call{ringing.test ? " · test" : ""}
                   </span>
-                  <div className="mt-3 text-2xl font-semibold tabular-nums" data-phone-caller>{formatDial(ringing.number)}</div>
+                  <CallerAvatar who={lead} waves="var(--neon-emerald)" className="mt-6" />
+                  <div className="mt-4 text-2xl font-semibold tabular-nums" data-phone-caller>{formatDial(ringing.number)}</div>
                   <div className="mt-1 min-h-[1.25rem] text-xs">
                     {lead?.co ? (
                       <Link href={`/leads/${lead.id}`} className="font-medium text-primary hover:underline" data-phone-lead={lead.id}>{lead.co}</Link>
@@ -701,7 +710,7 @@ export function PhoneProvider({ children, tracked = false }) {
                     ) : null}
                     {lead?.contact ? <span className="text-muted-foreground"> · {lead.contact}</span> : null}
                   </div>
-                  <div className="mt-6 flex items-start justify-center gap-12">
+                  <div className="mt-auto flex items-start justify-center gap-14 pt-6">
                     <button type="button" onClick={decline} aria-label="Decline the call" data-phone-decline className="group flex flex-col items-center gap-1.5 text-xs font-medium text-muted-foreground">
                       <span className="flex size-14 items-center justify-center rounded-full bg-rose-500 text-white shadow-[0_0_18px_-6px_rgb(244_63_94)] transition-transform group-hover:scale-105 group-active:scale-95">
                         <PhoneOff className="size-6" />
@@ -715,7 +724,7 @@ export function PhoneProvider({ children, tracked = false }) {
                       Answer
                     </button>
                   </div>
-                  {ringing.test ? <p className="mt-4 text-[0.66rem] text-muted-foreground">A test: nobody is on the line.</p> : null}
+                  {ringing.test ? <p className="mt-5 text-[0.66rem] text-muted-foreground">A test: nobody is on the line.</p> : null}
                 </div>
               ) : tab === "settings" ? (
                 <PhoneSettings wallpaper={wallpaper} onWallpaper={setWallpaper} onDone={() => setTab("keypad")} />
@@ -723,7 +732,8 @@ export function PhoneProvider({ children, tracked = false }) {
                 <Recent list={recent} disabled={active} onPick={(r) => { setValue(r.number); setLead(r.leadId ? { id: r.leadId, co: r.co } : null); setChecked(null); setTab("keypad"); }}
                   onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
               ) : (
-                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-4 pt-3">
+                <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto px-4", active ? "pb-6 pt-6" : "pb-4 pt-3")}>
+                  {active ? <CallerAvatar who={who} waves={ringingOut ? "var(--neon-amber)" : null} className="mx-auto mb-3" /> : null}
                   {/* The number, typed or pressed; Enter calls. Clear on its left takes all of it, Backspace on its right a digit. */}
                   <div className="flex items-center gap-1">
                     {!active && value ? (
@@ -768,7 +778,7 @@ export function PhoneProvider({ children, tracked = false }) {
 
                   {active && !controls.keys ? (
                     // During a call: what the line can do; the rest off, saying why.
-                    <div className="mt-2 grid grid-cols-4 gap-2" data-phone-controls>
+                    <div className="mt-5 grid grid-cols-4 gap-2" data-phone-controls>
                       {[["mute", "Mute", MicOff, "muted"], ["hold", "Hold", Pause, "held"], ["tones", "Keypad", Grid3x3, "keys"], ["record", "Record", CircleDot, "recording"]].map(([cap, label, Icon, key]) => {
                         const can = line.can[cap];
                         const on = controls[key];
@@ -812,8 +822,8 @@ export function PhoneProvider({ children, tracked = false }) {
                     </div>
                   )}
 
-                  {/* Call, or end the call. */}
-                  <div className="mt-3 flex items-center justify-center gap-4">
+                  {/* Call, or end the call (at the foot during a call, where a phone has it). */}
+                  <div className={cn("flex items-center justify-center gap-4", active ? "mt-auto pt-5" : "mt-3")}>
                     {active ? (
                       <button type="button" onClick={endCall} aria-label="End the call" data-phone-end
                         title={line.can.hangUp || call.test ? "End the call" : "End: stops the timer here (hang up in your calling app)"}
@@ -859,13 +869,34 @@ export function PhoneProvider({ children, tracked = false }) {
                   ) : null}
                 </div>
               )}
-              <div aria-hidden className="phone-home-bar" />
+              <div aria-hidden className="phone-home-bar mt-auto" />
             </div>
           </section>
         </div>
       ) : null}
 
     </PhoneContext.Provider>
+  );
+}
+
+/**
+ * Who a call is with, as a phone shows a contact (Nov 2026): the lead's initials in its colour, or a
+ * person for a number that is nobody's lead. `waves` (a colour): while it rings, waves spread from it.
+ */
+function CallerAvatar({ who, waves = null, className }) {
+  const name = who?.co ?? null;
+  return (
+    <span className={cn("relative flex size-16 shrink-0 items-center justify-center", className)} data-phone-avatar={name ? initialsOf(name) : ""}>
+      {waves ? (
+        <span aria-hidden className="absolute inset-0" style={{ "--wave": waves }} data-phone-waves>
+          <span className="phone-wave" /><span className="phone-wave" /><span className="phone-wave" />
+        </span>
+      ) : null}
+      <span className={cn("relative flex size-16 items-center justify-center rounded-full text-lg font-semibold text-white shadow-sm", !name && "bg-muted text-muted-foreground")}
+        style={name ? { background: colorFor(name) } : undefined}>
+        {name ? initialsOf(name) : <UserRound className="size-7" />}
+      </span>
+    </span>
   );
 }
 
@@ -948,7 +979,15 @@ function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
 }
 
 function Recent({ list, disabled, onPick, onCall }) {
-  if (!list.length) return <p className="px-4 py-10 text-center text-sm text-muted-foreground" data-phone-recent>No calls yet.</p>;
+  if (!list.length) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-8 text-center" data-phone-recent>
+        <span className="mb-1 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground"><Clock className="size-5" /></span>
+        <p className="text-sm font-medium">No calls yet</p>
+        <p className="text-xs text-muted-foreground">The calls you make and take show here, to call back in one tap.</p>
+      </div>
+    );
+  }
   return (
     <ul className="min-h-0 flex-1 divide-y divide-[var(--panel-border)] overflow-y-auto" data-phone-recent>
       {list.map((r) => {
@@ -958,11 +997,17 @@ function Recent({ list, disabled, onPick, onCall }) {
           <li key={`${r.at}-${r.number}`} className="flex items-center gap-2 px-4 py-2.5" data-phone-recent-row data-dir={r.dir ?? "out"} data-outcome={r.missed ? "missed" : r.declined ? "declined" : "talked"}>
             <Icon className={cn("size-4 shrink-0", missed ? "text-rose-500" : "text-muted-foreground")} aria-hidden />
             <button type="button" onClick={() => onPick(r)} className="min-w-0 flex-1 text-left">
-              <div className={cn("truncate text-sm font-medium", missed && "text-rose-500")}>{r.co ?? formatDial(r.number)}</div>
+              {/* Who, and how it went (always seen, at the right); then the number and when. */}
+              <div className="flex items-baseline gap-2">
+                <span className={cn("min-w-0 flex-1 truncate text-sm font-medium", missed && "text-rose-500")}>{r.co ?? formatDial(r.number)}</span>
+                <span className={cn("shrink-0 text-[0.7rem] tabular-nums", missed ? "font-medium text-rose-500" : "text-muted-foreground")} data-phone-recent-outcome>
+                  {r.missed ? "Missed" : r.declined ? "Declined" : r.noAnswer ? "No answer" : callClock(r.ms)}
+                </span>
+              </div>
               <div className="truncate text-[0.7rem] text-muted-foreground tabular-nums">
                 {r.co ? `${formatDial(r.number)} · ` : ""}
                 {new Date(r.at).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                {" · "}{r.missed ? "Missed" : r.declined ? "Declined" : r.noAnswer ? "No answer" : callClock(r.ms)}{r.test ? " · test" : ""}
+                {r.test ? " · test" : ""}
               </div>
             </button>
             <button type="button" onClick={() => onCall(r)} disabled={disabled} aria-label={`Call ${r.co ?? formatDial(r.number)}`}

@@ -1050,9 +1050,70 @@ html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4
   50% { opacity: 1; box-shadow: 0 0 72px 6px var(--phone-glow); }
 }
 
+/* A call on the phone, or ringing (Sean, Nov 2026): soft light drifting slowly behind the screen, its
+   colours the call's (amber calling out, green ringing in, cool once talking), and waves spreading from
+   who it is with until it is answered (phone.jsx, .phone-call-backdrop and CallerAvatar). Still for
+   anyone who asks for less motion. */
+.phone-call-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.5;
+  transition: opacity 0.6s ease;
+  animation: phone-backdrop-in 0.8s ease both;
+}
+.dark .phone-call-backdrop { opacity: 0.42; }
+.phone-call-backdrop span {
+  position: absolute;
+  width: 75%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  filter: blur(40px);
+  animation: phone-drift 16s ease-in-out infinite alternate;
+  transition: background-color 0.8s ease;
+}
+.phone-call-backdrop span:nth-child(1) { top: -14%; left: -22%; background: var(--call-1); }
+.phone-call-backdrop span:nth-child(2) { bottom: -18%; right: -26%; background: var(--call-2); animation-duration: 21s; animation-delay: -7s; }
+.phone-call-backdrop span:nth-child(3) { top: 34%; left: 22%; width: 58%; background: var(--call-3); animation-duration: 26s; animation-delay: -13s; }
+.phone-call-backdrop[data-mood="calling"] { --call-1: var(--neon-amber); --call-2: var(--primary); --call-3: var(--neon-magenta); }
+.phone-call-backdrop[data-mood="ringing"] { --call-1: var(--neon-emerald); --call-2: var(--neon-cyan); --call-3: var(--neon-emerald); }
+.phone-call-backdrop[data-mood="talking"] { --call-1: var(--primary); --call-2: var(--neon-emerald); --call-3: var(--neon-cyan); }
+/* Talking: the same light, slower, so it does not pull the eye from the call. */
+.phone-call-backdrop[data-mood="talking"] span { animation-duration: 30s; }
+@keyframes phone-backdrop-in { from { opacity: 0; } }
+@keyframes phone-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(22%, 14%) scale(1.18); }
+  100% { transform: translate(-10%, 24%) scale(0.92); }
+}
+/* The waves from the avatar: three, one after another. */
+.phone-wave {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--wave, var(--neon-emerald));
+  opacity: 0;
+  animation: phone-wave 2.4s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+  pointer-events: none;
+}
+.phone-wave:nth-child(2) { animation-delay: 0.8s; }
+.phone-wave:nth-child(3) { animation-delay: 1.6s; }
+@keyframes phone-wave {
+  0% { transform: scale(1); opacity: 0.55; }
+  100% { transform: scale(2.3); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .phone-call-backdrop, .phone-call-backdrop span { animation: none; }
+  .phone-wave { animation: none; opacity: 0; }
+}
+
 /* The screen, set in the body: dark at its edge, a faint sheen of glass across its top corner. */
 .phone-screen {
   position: relative;
+  /* Its own layer: the call's backdrop (z-index -1) sits over its wallpaper, under what it shows. */
+  isolation: isolate;
   overflow: hidden;
   border-radius: calc(2.75rem - 8px);
   background: var(--card);
