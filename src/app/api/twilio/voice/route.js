@@ -27,6 +27,7 @@ const answer = (inner) => new NextResponse(twiml(inner), { headers: { "content-t
  *   ?step=after   the ring ended: voicemail unless someone answered
  *   ?step=left    a voicemail was left: the administrators are told, with a link to hear it
  *   ?step=status  how a call's leg to one person went (rang, answered, ended, for how long): Call Activity
+ *   ?step=transcribed  Twilio's transcript of a voicemail, added to its notification
  *
  * Only Twilio can ask: every request carries its signature, made with the account's Auth Token.
  */
@@ -55,6 +56,15 @@ export async function POST(request) {
   const statusOf = (dir, userId) =>
     ` statusCallback="${xml(`${publicOrigin(request.headers)}${self("status")}&dir=${dir}&user=${userId}`)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST"`;
 
+  // A voicemail's words, once Twilio has transcribed them (it can for one up to two minutes long).
+  if (step === "transcribed") {
+    const text = String(params.TranscriptionText ?? "").trim();
+    if (admin && params.TranscriptionStatus === "completed" && text && /^RE[0-9a-f]{32}$/i.test(params.RecordingSid ?? "")) {
+      const { error } = await admin.rpc("phone_voicemail_transcript", { p_recording: params.RecordingSid, p_text: text.slice(0, 4000) });
+      if (error) console.error("[twilio/voice] transcript", error.message);
+    }
+    return new NextResponse(null, { status: 204 });
+  }
   if (step === "status") {
     await logLeg(admin, params, here.searchParams);
     return new NextResponse(null, { status: 204 });
@@ -62,7 +72,7 @@ export async function POST(request) {
   if (step === "after") {
     // The call in, as a whole: answered by someone, or not (Call Activity counts it missed when it rang no one).
     await logLeg(admin, { ...params, CallStatus: params.DialCallStatus === "completed" ? "completed" : "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
-    return answer(params.DialCallStatus === "completed" ? "<Hangup/>" : voicemail(self("left")));
+    return answer(params.DialCallStatus === "completed" ? "<Hangup/>" : voicemail(self("left"), `${publicOrigin(request.headers)}${self("transcribed")}`));
   }
   if (step === "left") {
     await tellOfVoicemail(admin, params, publicOrigin(request.headers));
@@ -85,7 +95,7 @@ export async function POST(request) {
   // A call to the Twilio number: everyone with the phone open rings (the first to answer takes it), else voicemail.
   const ring = admin ? await presentStaff(admin) : [];
   await logLeg(admin, { ...params, CallStatus: ring.length ? "initiated" : "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
-  if (!ring.length) return answer(voicemail(self("left")));
+  if (!ring.length) return answer(voicemail(self("left"), `${publicOrigin(request.headers)}${self("transcribed")}`));
   const clients = ring.map((id) => `<Client${statusOf("in", id)}>${xml(identityOf(id))}</Client>`).join("");
   return answer(`<Dial timeout="${RING_SECONDS}" answerOnBridge="true" action="${xml(self("after"))}" method="POST">${clients}</Dial>`);
 }
@@ -110,9 +120,9 @@ async function logLeg(admin, params, query, { whole = false } = {}) {
   if (error) console.error("[twilio/voice] call activity", error.message);
 }
 
-/** The greeting, and up to three minutes of message; # or silence ends it. */
-function voicemail(action) {
-  return `${say(VOICEMAIL_GREETING)}<Record maxLength="180" timeout="6" finishOnKey="#" playBeep="true" trim="trim-silence" action="${xml(action)}" method="POST"/>${say("We did not get a message. Goodbye.")}<Hangup/>`;
+/** The greeting, and up to three minutes of message; # or silence ends it. Twilio writes out its words (`transcribed`, an address). */
+function voicemail(action, transcribed) {
+  return `${say(VOICEMAIL_GREETING)}<Record maxLength="180" timeout="6" finishOnKey="#" playBeep="true" trim="trim-silence" action="${xml(action)}" method="POST" transcribe="true" transcribeCallback="${xml(transcribed)}"/>${say("We did not get a message. Goodbye.")}<Hangup/>`;
 }
 
 /** The staff with the phone open now, the most recently seen first (at most MAX_RINGS). */

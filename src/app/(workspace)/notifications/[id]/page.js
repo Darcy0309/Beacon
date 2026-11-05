@@ -12,6 +12,8 @@ import { getNotificationThread } from "@/features/notifications/queries";
 import { KIND_ICONS, KIND_LABELS, ROLE_LABELS, linkLabel } from "@/features/notifications/kinds";
 import { colorFor } from "@/lib/format";
 import LinkedText from "@/components/shared/linked-text";
+import CallRecordingCard from "@/features/notifications/components/call-recording-card";
+import { voicemailOf } from "@/features/notifications/voicemail";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +30,8 @@ export default async function NotificationPage({ params }) {
 
   const { notification: n, person, messages } = thread;
   const Icon = KIND_ICONS[n.kind] ?? Bell;
+  // A voicemail on the Lighthouse phone: its recording to play, rather than a link to it (Nov 2026).
+  const voicemail = n.kind === "system" && !person ? voicemailOf(n) : null;
 
   return (
     <>
@@ -47,6 +51,10 @@ export default async function NotificationPage({ params }) {
             <div className="space-y-5 p-5">
               <h2 className="text-lg font-semibold leading-snug">{n.title}</h2>
 
+              {voicemail ? (
+                <CallRecordingCard voicemail={voicemail} at={n.created_at} leadHref={n.link} />
+              ) : (
+              <>
               <dl className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5 text-sm">
                 <dt className="eyebrow">From</dt>
                 <dd className="flex min-w-0 items-center gap-2">
@@ -76,6 +84,8 @@ export default async function NotificationPage({ params }) {
                   <LinkedText text={n.body} />
                 </p>
               ) : null}
+              </>
+              )}
 
               {n.link ? (
                 <Button asChild>
