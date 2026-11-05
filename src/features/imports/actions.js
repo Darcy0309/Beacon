@@ -175,7 +175,7 @@ export async function importLeadsCsv(prevState, formData) {
   // Everything the import looks up, asked for at once rather than one after another.
   // The sheet's call-result columns place each name in the lifecycle. Old
   // and new result names both work (call_results.aliases holds the old ones).
-  const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }, { data: staff }] = await Promise.all([
+  const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }, { data: staff }, { data: invalidStatus }] = await Promise.all([
     currentAppUser(supabase),
     supabase.from("projects").select("id, company_id, appt_project_id, type:project_types(code)").eq("id", projectId).maybeSingle(),
     supabase.from("lead_statuses").select("id, code"),
@@ -183,6 +183,7 @@ export async function importLeadsCsv(prevState, formData) {
     supabase.from("appointment_statuses").select("id").eq("name", "Scheduled").maybeSingle(),
     // Who the old system says developed a lead and set its appointment (Sean, Nov 2026).
     supabase.from("users").select("id, first_name, last_name, email").in("role", ["admin", "manager", "agent"]).limit(2000),
+    supabase.from("appointment_statuses").select("id").eq("name", "Invalid").maybeSingle(),
   ]);
   if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
   const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
@@ -304,7 +305,8 @@ export async function importLeadsCsv(prevState, formData) {
   // leads do, rather than holding them up.
   for (let i = 0; i < parsed.length; i += IMPORT_CHUNK) {
     const chunk = parsed.slice(i, i + IMPORT_CHUNK);
-    const payload = chunk.map(({ lead, status, history }) => {
+    const payload = chunk.map((parsedRow) => {
+      const { lead, status, history } = parsedRow;
       let target = projectId;
       let stageType = projectType;
       const said = projectType === "DBDV" ? lead.call_result_dbdv : lead.call_result_appt;
@@ -323,6 +325,8 @@ export async function importLeadsCsv(prevState, formData) {
       }
       // New names start on the client's first result: Viable-CallBack (DBDev) or Lead-No Contact (Appt).
       result ??= firstResult[stageType];
+      // An appointment the old system marked invalid (Sean, Nov 2026): it comes in as one, appointment date or not.
+      parsedRow.invalidAppt = result?.effect === "appointment_invalid";
       // When it was developed and by whom, as the old system says: the reports count it then, to them.
       const developedBy = whoIs(history?.developed_by);
       return {
@@ -359,18 +363,24 @@ export async function importLeadsCsv(prevState, formData) {
       if (!source) return;
       if (source.insurance) insuranceRows.push({ lead_id: row.id, ...source.insurance });
       if (source.notes?.internal_notes) noteRows.push({ lead_id: row.id, notes: source.notes.internal_notes });
-      if (source.appointment) {
+      if (source.appointment || source.invalidAppt) {
+        // The old system clears an invalid appointment's set date (Sean, Nov 2026): then the nearest it
+        // keeps, the appointment's own date, else the day the lead was developed; the import's day last.
+        const setDay = source.history?.set_at
+          ?? (source.invalidAppt ? source.appointment?.appt_date ?? source.history?.developed_at : null);
+        const setAt = dayAt(setDay) ?? now;
         appointmentRows.push({
           lead_id: row.id,
           project_id: row.project_id,
           set_project_id: row.project_id,
           set_stage: row.stage,
-          appt_date: source.appointment.appt_date,
-          appt_time: source.appointment.appt_time ?? null,
-          status_id: apptStatus?.id ?? null,
+          appt_date: source.appointment?.appt_date ?? null,
+          appt_time: source.appointment?.appt_time ?? null,
+          status_id: (source.invalidAppt ? invalidStatus?.id : apptStatus?.id) ?? null,
+          ...(source.invalidAppt ? { invalid_at: setAt, status_update_date: setAt } : {}),
           rep_name: source.lead.producer_name ?? null,
           list_source: source.lead.list_source || listSource,
-          appt_create_date: dayAt(source.history?.set_at) ?? now,
+          appt_create_date: setAt,
           // Set by whom the old system says; else by whoever developed the lead.
           user_id: whoIs(source.history?.set_by) ?? (source.history?.set_by ? null : staffId(source.history?.developed_by ?? "")),
         });

@@ -72,7 +72,9 @@ const apptProject = Number(sql(`insert into public.projects (name, company_id, p
 const historyFile = path.join(path.dirname(file), "history.csv");
 writeFileSync(historyFile, ["Company,Phone,Call Result Appt,Date Developed,Developed By,Appt Create Date,Set By,Appointment Date",
   `"${TAG} Hist A",602-555-0201,Appointment,3/14/2025,Sean Fitzgerald,04/02/2025,Rachel Colestock,4/20/2025`,
-  `"${TAG} Hist B",602-555-0202,Lead-No Contact,5/1/2025,Nobody Known,,,`].join("\n"));
+  `"${TAG} Hist B",602-555-0202,Lead-No Contact,5/1/2025,Nobody Known,,,`,
+  // Marked invalid in the old system, which clears its set date: dated by its appointment's.
+  `"${TAG} Hist C",602-555-0203,Appointment-Invalid,5/2/2025,Sean Fitzgerald,,Rachel Colestock,6/10/2025`].join("\n"));
 const developed = (name) => sql(`select coalesce((promoted_at at time zone public.business_tz())::date::text, '') || '|' || coalesce(dbdv_user_id::text, '')
   from public.leads where company_name = ${lit(`${TAG} ${name}`)}`);
 
@@ -237,11 +239,14 @@ try {
   section("The old system's dates and managers");
   await chooseFile(admin, historyFile, apptProject);
   await admin.click("button[type=submit]", "Import leads");
-  check("an old list imports", /Imported 2 of 2/.test((await admin.waitToast(/Imported 2 of 2/, 15000)) ?? ""));
+  check("an old list imports", /Imported 3 of 3/.test((await admin.waitToast(/Imported 3 of 3/, 15000)) ?? ""));
   check("a lead developed when the old system says, by the manager it names", developed("Hist A") === "2025-03-14|2", developed("Hist A"));
   const set = sql(`select (a.appt_create_date at time zone public.business_tz())::date || '|' || coalesce(a.user_id::text, '') from public.appointments a
     join public.leads l on l.id = a.lead_id where l.company_name = ${lit(`${TAG} Hist A`)}`);
   check("…its appointment set when it was, by whom", set === "2025-04-02|4", set);
+  const invalid = sql(`select (a.appt_create_date at time zone public.business_tz())::date || '|' || (a.invalid_at is not null) || '|' || s.name || '|' || coalesce(a.user_id::text, '')
+    from public.appointments a join public.appointment_statuses s on s.id = a.status_id join public.leads l on l.id = a.lead_id where l.company_name = ${lit(`${TAG} Hist C`)}`);
+  check("an invalid appointment comes in invalid, its blank set date its appointment's, to whoever set it", invalid === "2025-06-10|true|Invalid|4", invalid);
   check("a manager who isn't ours: the date kept, no one named", developed("Hist B") === "2025-05-01|", developed("Hist B"));
   check("…and the import says who", Boolean(await until(async () => /manager the system doesn't have[\s\S]*Nobody Known/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
 
