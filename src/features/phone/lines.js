@@ -9,10 +9,12 @@
 // the browser itself, which takes its place once the server has Twilio's keys.
 
 /**
- * A line: { id, label, note, lacks, can: { mute, hold, tones, record, receive, hangUp },
+ * A line: { id, label, note, lacks, can: { mute, hold, tones, record, receive, hangUp, answered },
  * call(tel) → id, hangUp(), setMuted(on), setHeld(on), tone(key),
  * setRecording(on) (may reject, saying why), onIncoming(handler) → stop,
- * onEnded(handler) → stop, answer(id), decline(id) }.
+ * onEnded(handler) → stop, onAnswered(handler) → stop, answer(id), decline(id) }.
+ * `can.answered`: the line says when a call out is answered (onAnswered, { id }); until then it is
+ * still ringing. Without it, a call counts as on from the moment it is dialed.
  * `lacks`: why a control that is off is off.
  * `onIncoming`: calls coming in, each { id, number }, to ring the phone.
  * `onEnded`: a call ended on the line itself, { id } (the id call() gave, or
@@ -27,7 +29,7 @@ export const deviceLine = {
   note: "Calls open in your calling app (PanTerra Streams, when it is your default for phone links). Mute, hold and recording come with the PanTerra connection.",
   lacks: "comes with the PanTerra connection",
   // Calls coming in ring in the calling app, not here; and a call is hung up there.
-  can: { mute: false, hold: false, tones: false, record: false, receive: false, hangUp: false },
+  can: { mute: false, hold: false, tones: false, record: false, receive: false, hangUp: false, answered: false },
   /** Hand the number to the computer: through a frame of its own, so this page never navigates away. */
   call(tel) {
     if (typeof document === "undefined" || !tel) return;
@@ -49,6 +51,9 @@ export const deviceLine = {
   },
   // Nor does it see a call end: End here stops the timer.
   onEnded() {
+    return () => {};
+  },
+  onAnswered() {
     return () => {};
   },
   answer() {},

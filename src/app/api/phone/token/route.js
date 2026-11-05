@@ -11,9 +11,8 @@ const TTL = 600;
 
 /**
  * The phone's calling token, for the Twilio line in this browser: who it is
- * on Twilio, good for TTL seconds. Each one fetched also says this person
- * has the phone open (phone_presence), so a call coming in rings them.
- * 404 while Twilio is not set up: the phone keeps the computer's calling app.
+ * on Twilio, good for TTL seconds. 404 while Twilio is not set up: the phone
+ * keeps the computer's calling app.
  */
 export async function GET() {
   const me = await getCurrentUser();
@@ -23,13 +22,25 @@ export async function GET() {
 
   const identity = identityOf(me.id);
   const token = voiceToken({ ...config, identity, ttl: TTL });
-
-  const admin = createAdminClient();
-  if (admin) {
-    const { error } = await admin.from("phone_presence").upsert({ user_id: me.id, seen_at: new Date().toISOString() });
-    // Calls out still work; only calls coming in would miss this person.
-    if (error) console.error("[phone/token] presence", error.message);
-  }
-
   return NextResponse.json({ token, identity, ttl: TTL }, { headers: { "cache-control": "no-store" } });
+}
+
+/**
+ * This browser is registered with Twilio, so a call coming in can ring it
+ * (twilio-line.js says so when it registers, and again with each new token
+ * while it stays registered): phone_presence, which the voice webhook rings.
+ * Only a registered browser counts: one that merely fetched a token would be
+ * rung and answer busy (Nov 2026).
+ */
+export async function POST() {
+  const me = await getCurrentUser();
+  if (!canCall(me)) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  const admin = createAdminClient();
+  if (!admin) return NextResponse.json({ error: "The server's key is not set" }, { status: 503 });
+  const { error } = await admin.from("phone_presence").upsert({ user_id: me.id, seen_at: new Date().toISOString() });
+  if (error) {
+    console.error("[phone/token] presence", error.message);
+    return NextResponse.json({ error: "Calls in could not be turned on for you." }, { status: 500 });
+  }
+  return new NextResponse(null, { status: 204 });
 }

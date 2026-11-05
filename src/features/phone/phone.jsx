@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownRight, CircleDot, CircleX, Clock, Delete, GripHorizontal, Grid3x3, MicOff, Pause, Phone, PhoneIncoming,
-  PhoneMissed, PhoneOff, PhoneOutgoing, Settings, X,
+  PhoneMissed, PhoneOff, PhoneOutgoing, Play, Settings, Square, X,
 } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import { createClient } from "@/lib/supabase/client";
@@ -12,7 +12,10 @@ import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { deviceLine } from "@/features/phone/lines";
 import { createTwilioLine } from "@/features/phone/twilio-line";
-import { closeCallNotification, showCallNotification, startRingtone } from "@/features/phone/incoming";
+import {
+  RINGTONES, closeCallNotification, keepRingtone, previewRingtone, readRingtone, showCallNotification, startRingtone,
+} from "@/features/phone/incoming";
+import { soundOn } from "@/features/notifications/sound";
 
 const PhoneContext = createContext(null);
 
@@ -138,7 +141,9 @@ export function PhoneProvider({ children, tracked = false }) {
   const leadRef = useRef(null); // the same, for a missed call recorded later by its timer
   const [checked, setChecked] = useState(null); // the digits whose lookup has answered
   const lookingUp = useRef(null); // the digits being looked up (a ref: setting it must not run the lookup again)
-  const [call, setCall] = useState(null); // the call on: { number, lead, startedAt, dir, test, lineId }; none once ended
+  // The call on: { number, lead, startedAt, answeredAt, dir, test, lineId }; none once ended. answeredAt: null while
+  // a call out still rings (on a line that says when it is answered); its time is counted from then.
+  const [call, setCall] = useState(null);
   const callRef = useRef(null);
   useEffect(() => {
     callRef.current = call;
@@ -347,7 +352,8 @@ export function PhoneProvider({ children, tracked = false }) {
       // A phone link pressed is already reported by the activity tracker; one dialed here is reported now.
       if (!fromLink) report(who?.id);
       setControls({ muted: false, held: false, recording: false, keys: false });
-      setCall({ number: dialable(number), lead: who ?? null, startedAt: Date.now(), dir: "out", lineId });
+      const at = Date.now();
+      setCall({ number: dialable(number), lead: who ?? null, startedAt: at, answeredAt: line.can.answered ? null : at, dir: "out", lineId });
       setNow(Date.now());
     },
     [line, report]
@@ -360,7 +366,8 @@ export function PhoneProvider({ children, tracked = false }) {
     const endedAt = Date.now();
     remember({
       number: call.number, leadId: call.lead?.id ?? lead?.id ?? null, co: call.lead?.co ?? lead?.co ?? null,
-      at: call.startedAt, ms: endedAt - call.startedAt, dir: call.dir ?? "out", test: call.test || undefined,
+      at: call.startedAt, ms: call.answeredAt ? endedAt - call.answeredAt : 0, dir: call.dir ?? "out", test: call.test || undefined,
+      noAnswer: !call.answeredAt || undefined,
     });
     setCall(null);
     setValue("");
@@ -399,7 +406,8 @@ export function PhoneProvider({ children, tracked = false }) {
     if (!r.test) line.answer(r.id);
     stopRinging(r.id);
     setControls({ muted: false, held: false, recording: false, keys: false });
-    setCall({ number: r.number, lead, startedAt: Date.now(), dir: "in", test: r.test, lineId: r.test ? null : r.id });
+    const at = Date.now();
+    setCall({ number: r.number, lead, startedAt: at, answeredAt: at, dir: "in", test: r.test, lineId: r.test ? null : r.id });
     setNow(Date.now());
     setTab("keypad");
     setOpen(true);
@@ -428,6 +436,23 @@ export function PhoneProvider({ children, tracked = false }) {
 
   // Calls coming in on the line (none on the device line; the Twilio line rings here).
   useEffect(() => line.onIncoming((c) => ring({ id: c.id, number: c.number })), [line, ring]);
+
+  // Whether calls coming in can ring here (the Twilio line; null on a line that has no say): { receiving, problem }.
+  const [receiving, setReceiving] = useState(null);
+  useEffect(() => {
+    setReceiving(null);
+    return line.onStatus?.(setReceiving);
+  }, [line]);
+
+  // A call out answered at the other end: its time starts now (until then it says Calling…).
+  useEffect(
+    () =>
+      line.onAnswered(({ id }) => {
+        setCall((c) => (c && c.lineId === id && !c.answeredAt ? { ...c, answeredAt: Date.now() } : c));
+        setNow(Date.now());
+      }),
+    [line]
+  );
 
   // A call ended on the line: hung up at the other end (kept under Recent, as End does), or the caller gone while it rang.
   const endCallRef = useRef(endCall);
@@ -581,6 +606,7 @@ export function PhoneProvider({ children, tracked = false }) {
   const context = useMemo(() => ({ openPhone, ring, active }), [openPhone, ring, active]);
   const who = call?.lead?.co ? call.lead : lead;
   const callLabel = call?.test ? "Test call" : call?.dir === "in" || line.can.hangUp ? "On the call" : "In your calling app";
+  const ringingOut = active && !call.answeredAt;
 
   return (
     <PhoneContext.Provider value={context}>
@@ -602,7 +628,8 @@ export function PhoneProvider({ children, tracked = false }) {
             data-dragging={dragging || undefined}
             onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd}
             title={small ? undefined : "Drag anywhere to move it"}
-            className={cn("phone-device animate-pop-in flex w-[21rem] max-w-[calc(100vw-2rem)] flex-col",
+            // One size whatever it shows, as a phone is (Nov 2026): what is longer (Settings, Recent) scrolls inside it.
+            className={cn("phone-device animate-pop-in flex h-[41rem] w-[21rem] max-w-[calc(100vw-2rem)] flex-col",
               placed ? "max-h-[calc(100svh-1rem)]" : "max-h-[calc(100svh-2rem)]",
               !small && "touch-none [&_a]:cursor-pointer [&_button:not(:disabled)]:cursor-pointer [&_input]:cursor-text",
               !small && (dragging ? "cursor-grabbing select-none" : "cursor-grab"))}>
@@ -621,7 +648,18 @@ export function PhoneProvider({ children, tracked = false }) {
                   ) : null}
                   <div className="min-w-0">
                     <div className="text-sm font-semibold">Phone</div>
-                    <div className="truncate text-[0.66rem] text-muted-foreground" title={line.note} data-phone-line={line.id}>{line.label}</div>
+                    <div className="flex min-w-0 items-center gap-1.5 text-[0.66rem] text-muted-foreground">
+                      <span className="truncate" title={line.note} data-phone-line={line.id}>{line.label}</span>
+                      {receiving ? (
+                        // Calls coming in: ringing here, or not, and why (Nov 2026).
+                        <span data-phone-receiving={receiving.receiving ? "on" : receiving.problem ? "off" : "connecting"}
+                          title={receiving.receiving ? "Calls to the company's number ring here" : receiving.problem ?? "Connecting to Twilio…"}
+                          className={cn("flex shrink-0 items-center gap-1 font-medium", receiving.receiving ? "text-emerald-500" : receiving.problem ? "text-amber-500" : "")}>
+                          <span aria-hidden className={cn("size-1.5 rounded-full", receiving.receiving ? "bg-emerald-500" : receiving.problem ? "bg-amber-500" : "animate-pulse bg-muted-foreground")} />
+                          {receiving.receiving ? "Taking calls" : receiving.problem ? "Not taking calls" : "Connecting…"}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -649,7 +687,7 @@ export function PhoneProvider({ children, tracked = false }) {
 
               {ringing ? (
                 // A call coming in: who, and Answer or Decline.
-                <div className="flex flex-col items-center px-4 pb-6 pt-5 text-center" data-phone-ringing={ringing.test ? "test" : ""} aria-live="assertive">
+                <div className="flex flex-1 flex-col items-center justify-center px-4 pb-6 pt-5 text-center" data-phone-ringing={ringing.test ? "test" : ""} aria-live="assertive">
                   <span className="flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-emerald-500">
                     <PhoneIncoming className="size-3.5 animate-pulse" /> Incoming call{ringing.test ? " · test" : ""}
                   </span>
@@ -721,8 +759,9 @@ export function PhoneProvider({ children, tracked = false }) {
                       <span className="text-muted-foreground" data-phone-lead="">No lead with this number</span>
                     ) : null}
                     {who?.contact ? <span className="text-muted-foreground"> · {who.contact}</span> : null}
-                    <div className={cn("mt-0.5 font-medium tabular-nums", active ? "text-emerald-500" : "text-muted-foreground")} data-phone-status={active ? "active" : "idle"}>
-                      {active ? `${callLabel} · ${callClock(now - call.startedAt)}` : "Ready"}
+                    <div className={cn("mt-0.5 font-medium tabular-nums", ringingOut ? "animate-pulse text-amber-500" : active ? "text-emerald-500" : "text-muted-foreground")}
+                      data-phone-status={active ? "active" : "idle"} data-phone-answered={active ? String(!ringingOut) : undefined}>
+                      {ringingOut ? "Calling…" : active ? `${callLabel} · ${callClock(now - call.answeredAt)}` : "Ready"}
                     </div>
                   </div>
 
@@ -794,6 +833,13 @@ export function PhoneProvider({ children, tracked = false }) {
                     </p>
                   ) : null}
 
+                  {/* Calls coming in can't ring here: why, where it can be seen (Nov 2026). */}
+                  {!active && receiving?.problem ? (
+                    <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-center text-[0.66rem] text-amber-600 dark:text-amber-400" data-phone-receiving-problem>
+                      Calls to the company&apos;s number can&apos;t ring here: {receiving.problem}
+                    </p>
+                  ) : null}
+
                   {/* How a call coming in rings, until a line that takes calls (Twilio) brings real ones. */}
                   {!active && !line.can.receive ? (
                     <div className="mt-3 border-t border-[var(--panel-border)] pt-2 text-center text-[0.66rem] text-muted-foreground">
@@ -823,8 +869,34 @@ export function PhoneProvider({ children, tracked = false }) {
 }
 
 /** The calls made and taken lately in this browser: who, which way, when, how long; one picked fills the keypad, the button calls back. */
-/** The phone's settings: its wallpaper, picked from swatches; it changes behind them as one is picked. */
+/**
+ * The phone's settings: its wallpaper, picked from swatches (it changes behind them as one is picked),
+ * and its ringtone (Sean, Nov 2026), heard as it is picked. Both kept on this computer.
+ */
 function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
+  const [ringtone, setRingtone] = useState("classic");
+  const [playing, setPlaying] = useState(null);
+  const [muted, setMuted] = useState(false);
+  const stopPreview = useRef(null);
+  useEffect(() => {
+    setRingtone(readRingtone());
+    setMuted(!soundOn());
+    return () => stopPreview.current?.();
+  }, []);
+  const preview = (k) => {
+    stopPreview.current?.();
+    stopPreview.current = null;
+    if (playing === k) return setPlaying(null);
+    const stop = previewRingtone(k);
+    stopPreview.current = stop;
+    setPlaying(k);
+    setTimeout(() => setPlaying((p) => (p === k ? null : p)), RINGTONES.find(([key]) => key === k)?.[2] ?? 4000);
+  };
+  const pick = (k) => {
+    setRingtone(k);
+    keepRingtone(k);
+    if (playing !== k) preview(k);
+  };
   return (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4" data-phone-settings>
       <div className="text-[0.66rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">Wallpaper</div>
@@ -839,6 +911,33 @@ function PhoneSettings({ wallpaper, onWallpaper, onDone }) {
           </button>
         ))}
       </div>
+
+      <div className="mt-6 text-[0.66rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">Ringtone</div>
+      <div role="radiogroup" aria-label="Ringtone" className="mt-2 space-y-1">
+        {RINGTONES.map(([k, label]) => (
+          <div key={k} className={cn("flex items-center gap-1 rounded-xl border transition-colors",
+            ringtone === k ? "border-primary/50 bg-primary/10" : "border-transparent hover:bg-background/40")}>
+            <button type="button" role="radio" aria-checked={ringtone === k} onClick={() => pick(k)} data-ringtone-pick={k}
+              className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 text-left text-sm">
+              <span aria-hidden className={cn("flex size-4 shrink-0 items-center justify-center rounded-full border",
+                ringtone === k ? "border-primary" : "border-muted-foreground/50")}>
+                {ringtone === k ? <span className="size-2 rounded-full bg-primary" /> : null}
+              </span>
+              <span className={cn("truncate", ringtone === k && "font-medium text-primary")}>{label}</span>
+            </button>
+            <button type="button" onClick={() => preview(k)} aria-label={playing === k ? `Stop ${label}` : `Play ${label}`} data-ringtone-play={k}
+              className="mr-1.5 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-primary/15 hover:text-primary">
+              {playing === k ? <Square className="size-3.5" /> : <Play className="size-3.5" />}
+            </button>
+          </div>
+        ))}
+      </div>
+      {muted ? (
+        <p className="mt-2 text-[0.66rem] text-amber-600 dark:text-amber-400" data-ringtone-muted>
+          Notification sounds are off (in the bell), so calls ring without a sound. Turn them on there to hear it.
+        </p>
+      ) : null}
+
       <button type="button" onClick={onDone} data-phone-settings-done
         className="mt-5 w-full rounded-full border border-[var(--panel-border)] bg-background/50 py-2 text-sm font-medium transition-colors hover:border-primary/40 hover:bg-primary/10">
         Done
@@ -862,7 +961,7 @@ function Recent({ list, disabled, onPick, onCall }) {
               <div className="truncate text-[0.7rem] text-muted-foreground tabular-nums">
                 {r.co ? `${formatDial(r.number)} · ` : ""}
                 {new Date(r.at).toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" })}
-                {" · "}{r.missed ? "Missed" : r.declined ? "Declined" : callClock(r.ms)}{r.test ? " · test" : ""}
+                {" · "}{r.missed ? "Missed" : r.declined ? "Declined" : r.noAnswer ? "No answer" : callClock(r.ms)}{r.test ? " · test" : ""}
               </div>
             </button>
             <button type="button" onClick={() => onCall(r)} disabled={disabled} aria-label={`Call ${r.co ?? formatDial(r.number)}`}
