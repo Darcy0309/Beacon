@@ -32,6 +32,9 @@ const DIGITS = `480555${tail}`;
 // Its decision maker's own number: a second Call button on the lead sheet.
 const DM_PHONE = `(602) 555-${tail}`;
 const DM_DIGITS = `602555${tail}`;
+// A whole number as the phone shows it: with its country code (Nov 2026).
+const SHOWN = `+1 ${PHONE}`;
+const DM_SHOWN = `+1 ${DM_PHONE}`;
 const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, decision_maker, dm_phone, project_id, assigned_user_id)
   values (${lit(`${TAG} Delta Door`)}, 'Dana Reyes', ${lit(PHONE)}, 'Dale Reyes', ${lit(DM_PHONE)}, ${APPT}, ${SEAN}) returning id`));
 const startedAt = sql("select now()::text");
@@ -51,7 +54,7 @@ try {
 
   section("Dialing");
   for (const k of DIGITS) await sean.click(`[data-phone-key="${k}"]`);
-  check("the number grouped as it is pressed", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === PHONE, await sean.ev(`document.querySelector('[data-phone-number]').value`));
+  check("the number grouped as it is pressed, whole with its country code", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === SHOWN, await sean.ev(`document.querySelector('[data-phone-number]').value`));
   check("…and the lead it belongs to found", Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)), await text("[data-phone-lead]"));
   await sean.click("[data-phone-backspace]");
   check("Backspace takes the last digit off", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === PHONE.slice(0, -1));
@@ -60,7 +63,7 @@ try {
   check("Clear takes the whole number off, and its lead", await until(() => sean.ev(`document.querySelector('[data-phone-number]').value === '' && !document.querySelector('[data-phone-lead]')
     && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'idle' && !document.querySelector('[data-phone-clear]') && !document.querySelector('[data-phone-backspace]')`)));
   for (const k of DIGITS) await sean.click(`[data-phone-key="${k}"]`);
-  check("…ready for the next", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === PHONE && Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)));
+  check("…ready for the next", (await sean.ev(`document.querySelector('[data-phone-number]').value`)) === SHOWN && Boolean(await until(async () => (await text("[data-phone-lead]")) === `${TAG} Delta Door`)));
 
   section("A call");
   await sean.ev(`window.__dialed = []; new MutationObserver((m) => m.forEach((r) => r.addedNodes.forEach((n) => n.dataset?.phoneDial && window.__dialed.push(n.dataset.phoneDial)))).observe(document.body, { childList: true })`);
@@ -111,7 +114,7 @@ try {
   await sleep(1100);
   await sean.click('[data-person="Decision maker"] [data-contact-line="Business"] a[href^="tel:"]');
   check("another Call button while a call is still on: the first ends, the new one calls", Boolean(await until(() => sean.ev(`window.__dialed.includes('tel:+1${DM_DIGITS}')
-    && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'active' && document.querySelector('[data-phone-number]').value === ${JSON.stringify(DM_PHONE)}`))),
+    && document.querySelector('[data-phone-status]')?.dataset.phoneStatus === 'active' && document.querySelector('[data-phone-number]').value === ${JSON.stringify(DM_SHOWN)}`))),
     JSON.stringify(await sean.ev("window.__dialed")));
   await sean.click("[data-phone-end]");
   await sean.click('[data-phone-tab="recent"]');
@@ -200,7 +203,7 @@ try {
   check("a test call is on its way, with time to look away", Boolean(await ringer.ev(`!!document.querySelector('[data-phone-test-pending]')`)));
   const ringing = await until(() => ringer.ev(`document.querySelector('[data-phone-ringing]')?.dataset.phoneRinging ?? null`), { timeout: 9000 });
   check("it rings: Incoming call, the number, Answer and Decline", ringing === "test" && /Incoming call/.test((await rtext("[data-phone-ringing]")) ?? "")
-    && /^\(\d{3}\) \d{3}-\d{4}$/.test((await rtext("[data-phone-caller]")) ?? "") && await ringer.ev(`!!document.querySelector('[data-phone-answer]') && !!document.querySelector('[data-phone-decline]')`), await rtext("[data-phone-ringing]"));
+    && /^\+1 \(\d{3}\) \d{3}-\d{4}$/.test((await rtext("[data-phone-caller]")) ?? "") && await ringer.ev(`!!document.querySelector('[data-phone-answer]') && !!document.querySelector('[data-phone-decline]')`), await rtext("[data-phone-ringing]"));
   check("…and while it rings, the window cannot be closed", await ringer.ev(`!document.querySelector('[data-phone-close]')`));
   const notes = granted ? await until(async () => { const n = await shown(); return n.length ? n : null; }, { timeout: 4000 }) : null;
   check("…and on the desktop, with Answer and Decline on it", !granted || (notes?.[0]?.title === "Incoming call (test)" && JSON.stringify(notes[0].actions) === JSON.stringify(["Answer", "Decline"])), JSON.stringify(notes));

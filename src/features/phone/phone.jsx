@@ -790,7 +790,7 @@ export function PhoneProvider({ children, tracked = false }) {
                       }}
                       inputMode="tel" autoComplete="off" placeholder="Enter a number" aria-label="Number to call"
                       className={cn("min-w-0 flex-1 bg-transparent py-1 text-center font-semibold tabular-nums tracking-wide outline-none placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground",
-                        formatDial(active ? call.number : value).length > 14 ? "text-xl" : "text-2xl")} />
+                        formatDial(active ? call.number : value).length > 17 ? "text-xl" : "text-2xl")} />
                     {!active && value ? (
                       <button type="button" onClick={() => setValue((v) => v.slice(0, -1))} aria-label="Delete the last digit" data-phone-backspace
                         className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">

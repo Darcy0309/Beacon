@@ -17,19 +17,28 @@ export function dialable(text) {
 }
 
 /**
- * A number as it reads while it is dialed: a US number grouped as it grows
- * ("602", "(602) 555", "(602) 555-0144"; with its leading 1, "1 (602)
- * 555-0144"); anything else (short codes, *, #, +44…) as typed.
+ * A number as it reads: a whole US number with its country code, "+1 (602) 555-0144" (Sean, Nov 2026),
+ * whether it came typed (6025550144), with its leading 1 (16025550144) or as a call brings it
+ * (+16025550144); one still being dialed grouped as it grows ("602", "(602) 555", "+1 (602) 55");
+ * anything else (short codes, *, #, +44…) as typed.
  */
 export function formatDial(value) {
   const v = dialable(value);
-  if (!v || /[*#+]/.test(v)) return v;
-  const lead = v.length === 11 && v.startsWith("1") ? "1 " : "";
-  const d = lead ? v.slice(1) : v;
+  if (!v || /[*#]/.test(v)) return v;
+  let d = v;
+  let plus = false;
+  if (v.startsWith("+1")) {
+    d = v.slice(2);
+    plus = true;
+  } else if (v.startsWith("+")) return v;
+  else if (v.length === 11 && v.startsWith("1")) d = v.slice(1);
   if (d.length > 10) return v;
-  if (d.length <= 3) return lead + d;
-  if (d.length <= 6) return `${lead}(${d.slice(0, 3)}) ${d.slice(3)}`;
-  return `${lead}(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  // The country code once the number is whole, or as it was typed.
+  const cc = plus || d.length === 10 ? "+1 " : "";
+  if (!d) return plus ? "+1" : "";
+  if (d.length <= 3) return `${cc}${d}`;
+  if (d.length <= 6) return `${cc}(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `${cc}(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
 /** A dialed number as a tel: link, US numbers with their country code. Null for none. */
