@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for a voicemail's notification, read back for its card: who, how long, the recording, the lead, the transcript. */
-import { voicemailOf } from "../../src/features/notifications/voicemail.js";
+import { notificationText, voicemailOf } from "../../src/features/notifications/voicemail.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -20,6 +20,11 @@ check("…with its lead, an hour's length, and its transcript over two lines",
 
 check("not a voicemail: another notice, or one with no recording", voicemailOf({ title: "Account notice", body: listen }) === null &&
   voicemailOf({ title: "Voicemail from (480) 555-0101", body: "0:06 long" }) === null && voicemailOf(null) === null);
+
+const shown = notificationText({ title: "Voicemail from (510) 831-0107", body: `0:06 long\n${listen}` });
+check("it reads as the call missed, without the recording's address", shown.title === "You missed a call from (510) 831-0107" && shown.body === "Left a voicemail · 0:06", JSON.stringify(shown));
+check("…naming the lead when it is one's", notificationText({ title: "Voicemail from (480) 555-0101", body: `Delta Door · Dana Reyes\n1:15 long\n${listen}` }).body === "Left a voicemail · 1:15 · Delta Door · Dana Reyes");
+check("any other notification reads as it is", JSON.stringify(notificationText({ title: "New lead", body: "Delta Door" })) === JSON.stringify({ title: "New lead", body: "Delta Door" }));
 
 console.log(failures ? `\n${failures} voicemail check(s) failed.\n` : "\nAll voicemail checks passed.\n");
 process.exit(failures ? 1 : 0);

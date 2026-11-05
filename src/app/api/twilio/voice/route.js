@@ -7,8 +7,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-// How long a call coming in rings the staff before it goes to voicemail (the phone misses it at 30s).
-const RING_SECONDS = 25;
+// How long a call coming in rings the staff before it goes to voicemail (Sean, Nov 2026: 25 seconds was
+// too short, a longer ringtone heard only twice). The phone's own limit is longer still (phone.jsx, RING_MS).
+const RING_SECONDS = 45;
 // Someone whose browser fetched a calling token this recently has the phone open (tokens last 10 minutes).
 const PRESENT_MS = 12 * 60 * 1000;
 // Twilio rings at most ten browsers at once.

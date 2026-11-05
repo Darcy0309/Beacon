@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { pushServer, sendPush } from "@/lib/server/push";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { notificationText } from "@/features/notifications/voicemail";
 
 export const dynamic = "force-dynamic";
 
@@ -74,8 +75,8 @@ export async function POST(request) {
         {
           id: n.id,
           kind: n.kind,
-          title: n.title,
-          body: [n.sender_name ? `From ${n.sender_name}` : null, n.body ? String(n.body).slice(0, 400) : null].filter(Boolean).join("\n"),
+          title: notificationText(n).title,
+          body: [n.sender_name ? `From ${n.sender_name}` : null, notificationText(n).body ? String(notificationText(n).body).slice(0, 400) : null].filter(Boolean).join("\n"),
           url: `/notifications/${n.id}`,
         },
       ])

@@ -10,6 +10,7 @@ import { markNotificationRead, markAllNotificationsRead } from "@/features/notif
 import { announceNotificationsChanged } from "@/features/notifications/active-chat";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
+import { notificationText } from "@/features/notifications/voicemail";
 
 /**
  * The inbox on /notifications. Opening an item shows it in full, with the
@@ -105,10 +106,10 @@ export default function NotificationInbox({ rows, unread, empty }) {
                 </span>
                 <button type="button" onClick={() => open(n)} className="group min-w-0 flex-1 cursor-pointer text-left">
                   <span className={cn("flex items-center gap-1 text-sm", read ? "text-foreground/85" : "font-semibold")}>
-                    <span className="truncate">{n.title}</span>
+                    <span className="truncate">{notificationText(n).title}</span>
                     <ChevronRight className="size-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
                   </span>
-                  {n.body ? <span className="mt-0.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{n.body}</span> : null}
+                  {notificationText(n).body ? <span className="mt-0.5 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{notificationText(n).body}</span> : null}
                   <span className="mt-1 block text-[0.7rem] text-muted-foreground">
                     {n.from ? `From ${n.from} · ` : ""}
                     {n.when}

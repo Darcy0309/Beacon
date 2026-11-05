@@ -16,6 +16,7 @@ import { chimeOnce } from "@/features/notifications/sound";
 import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
+import { notificationText } from "@/features/notifications/voicemail";
 
 const SHOWN = 8;
 const POLL_MS = 60_000;
@@ -230,13 +231,15 @@ export default function NotificationBell() {
               desktop.current.set(n.id, shown);
               shown.onclose = () => desktop.current.delete(n.id);
             }
-            toast(n.title, {
+            // As it reads (a voicemail as the call missed: voicemail.js).
+            const text = notificationText(n);
+            toast(text.title, {
               id: toastId(n.id),
               description:
-                n.sender_name || n.body ? (
+                n.sender_name || text.body ? (
                   <>
                     {n.sender_name ? <span className="block font-medium">From {n.sender_name}</span> : null}
-                    {n.body ? <span className="line-clamp-3">{n.body}</span> : null}
+                    {text.body ? <span className="line-clamp-3">{text.body}</span> : null}
                   </>
                 ) : undefined,
               icon: (() => {
@@ -416,8 +419,8 @@ export default function NotificationBell() {
                         <Icon className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{n.title}</span>
-                        {n.body ? <span className="line-clamp-2 text-xs text-muted-foreground">{n.body}</span> : null}
+                        <span className="block truncate text-sm font-semibold">{notificationText(n).title}</span>
+                        {notificationText(n).body ? <span className="line-clamp-2 text-xs text-muted-foreground">{notificationText(n).body}</span> : null}
                         <span className="mt-0.5 block truncate text-[0.66rem] text-muted-foreground">
                           {n.sender_name ? `From ${n.sender_name} · ` : ""}
                           {ago(n.created_at)}

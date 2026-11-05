@@ -63,7 +63,8 @@ const keepPos = (p) => {
 const EDGE = 8;
 const STEP = 24;
 // How long a call coming in rings before it is missed, and how long a test call waits to ring.
-const RING_MS = 30_000;
+// A real call's ring ends when Twilio gives up on it (45s, then voicemail: app/api/twilio/voice); this is a backstop.
+const RING_MS = 60_000;
 const TEST_DELAY_MS = 5_000;
 // A test call's number when no call has been made yet.
 const TEST_NUMBER = "6025550100";

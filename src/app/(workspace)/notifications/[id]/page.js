@@ -13,7 +13,7 @@ import { KIND_ICONS, KIND_LABELS, ROLE_LABELS, linkLabel } from "@/features/noti
 import { colorFor } from "@/lib/format";
 import LinkedText from "@/components/shared/linked-text";
 import CallRecordingCard from "@/features/notifications/components/call-recording-card";
-import { voicemailOf } from "@/features/notifications/voicemail";
+import { notificationText, voicemailOf } from "@/features/notifications/voicemail";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +49,7 @@ export default async function NotificationPage({ params }) {
           <Card className={person ? "" : "xl:max-w-3xl"}>
             <SectionHeader label={KIND_LABELS[n.kind] ?? "Notification"} icon={Icon} />
             <div className="space-y-5 p-5">
-              <h2 className="text-lg font-semibold leading-snug">{n.title}</h2>
+              <h2 className="text-lg font-semibold leading-snug">{voicemail ? notificationText(n).title : n.title}</h2>
 
               {voicemail ? (
                 <CallRecordingCard voicemail={voicemail} at={n.created_at} leadHref={n.link} />

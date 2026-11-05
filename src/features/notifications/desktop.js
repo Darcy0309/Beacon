@@ -26,6 +26,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { pushPublicKey } from "@/features/notifications/push-actions";
+import { notificationText } from "@/features/notifications/voicemail";
 
 const OFF_KEY = "lighthouse:desktop-notifications-off";
 const FRONT_KEY = "lighthouse:front-tab"; // "<tab id> <time>" while a tab is in front
@@ -104,8 +105,9 @@ export function trackFrontTab() {
 export function showDesktop(n, onOpen) {
   if (push.active || desktopPermission() !== "granted" || store.get(OFF_KEY) === "1" || anyTabInFront()) return null;
   try {
-    const shown = new window.Notification(n.title, {
-      body: [n.sender_name ? `From ${n.sender_name}` : null, n.body].filter(Boolean).join("\n"),
+    const text = notificationText(n);
+    const shown = new window.Notification(text.title, {
+      body: [n.sender_name ? `From ${n.sender_name}` : null, text.body].filter(Boolean).join("\n"),
       tag: `lighthouse-notification-${n.id}`,
       icon: ICON,
       badge: ICON,

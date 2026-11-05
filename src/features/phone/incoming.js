@@ -86,7 +86,8 @@ function tone(ctx, at, freqs, dur, { type = "sine", vol = 0.12, struck = false, 
     gain.gain.setValueAtTime(vol, at + Math.max(0.04, dur - 0.05));
     gain.gain.exponentialRampToValueAtTime(0.0001, at + dur);
   }
-  gain.connect(ctx.destination);
+  // Into the ringtone's own volume (playTone), so stopping it can fade it out.
+  gain.connect(ctx.ringOut ?? ctx.destination);
   // `lowpass` (Hz) softens a bright wave into a reed's or a string's; `vibrato` (cents) wavers it, as a player does.
   let into = gain;
   if (lowpass) {
@@ -165,7 +166,7 @@ const TONES = {
     play: (ctx, at) => melody(ctx, at, [["C5", 1], ["G5", 1], ["E5", 1], ["G5", 1], ["C6", 1], ["G5", 1], ["A5", 1], ["G5", 2]], 0.15, { struck: true, vol: 0.16 }),
   },
   westminster: {
-    label: "Westminster chimes", every: 7000,
+    label: "Westminster chimes", every: 8000,
     play: (ctx, at) => melody(ctx, at, [["Gs4", 1], ["Fs4", 1], ["E4", 1], ["B3", 2], ["E4", 1], ["Gs4", 1], ["Fs4", 1], ["B3", 2]], 0.55, { struck: true, vol: 0.14 }),
   },
   elise: {
@@ -230,7 +231,12 @@ function playTone(key, { once = false } = {}) {
   let timer = null;
   const ring = () => {
     try {
-      ctx ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (!ctx) {
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // The ringtone's own volume, every note through it.
+        ctx.ringOut = ctx.createGain();
+        ctx.ringOut.connect(ctx.destination);
+      }
       if (ctx.state === "suspended") ctx.resume();
       t.play(ctx, ctx.currentTime + 0.05);
     } catch {
@@ -239,10 +245,21 @@ function playTone(key, { once = false } = {}) {
   };
   ring();
   if (!once) timer = setInterval(ring, t.every);
+  // Stopped (answered, declined, missed, another picked): faded out over a moment, not cut off mid-note.
   const stop = () => {
     clearInterval(timer);
-    ctx?.close?.().catch?.(() => {});
+    const c = ctx;
     ctx = null;
+    if (!c) return;
+    try {
+      const now = c.currentTime;
+      c.ringOut.gain.cancelScheduledValues(now);
+      c.ringOut.gain.setValueAtTime(c.ringOut.gain.value, now);
+      c.ringOut.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    } catch {
+      // Already closed.
+    }
+    setTimeout(() => c.close?.().catch?.(() => {}), 400);
   };
   if (once) setTimeout(stop, t.every);
   return stop;

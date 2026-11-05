@@ -22,3 +22,18 @@ export function voicemailOf(n) {
   const lead = lines[0] && !/ long$|^Listen: |^Transcript: /.test(lines[0]) ? lines[0] : null;
   return { from, recordingSid, seconds, lead, transcript };
 }
+
+/**
+ * How a notification reads wherever it is shown (the pop-up, the bell, the inbox, the desktop): its
+ * title and body; a voicemail as the call missed (Nov 2026), not its recording's address:
+ * "You missed a call from (510) 831-0107", "Left a voicemail · 0:06 · Delta Door · Dana Reyes".
+ */
+export function notificationText(n) {
+  const v = voicemailOf(n);
+  if (!v) return { title: n?.title ?? "", body: n?.body ?? null };
+  const length = v.seconds ? `${Math.floor(v.seconds / 60)}:${String(v.seconds % 60).padStart(2, "0")}` : null;
+  return {
+    title: `You missed a call from ${v.from}`,
+    body: ["Left a voicemail", length, v.lead].filter(Boolean).join(" · "),
+  };
+}
