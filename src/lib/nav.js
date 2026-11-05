@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
-  UserCog, Building2, MessageSquareText, ClipboardCheck, Megaphone, FileText,
+  UserCog, Building2, Combine, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
   CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter,
 } from "lucide-react";
@@ -81,6 +81,8 @@ export const navGroups = [
       // The businesses a client (or prospect) wants to target: industries, size, territory (Sean, Oct 2026).
       { href: "/list-builder", label: "List Builder", icon: ListFilter, roles: ["admin", "manager", "client"] },
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
+      // A project list's names we already have elsewhere with a renewal date, to bring in (Sean, Nov 2026).
+      { href: "/reports/matches", label: "Match Tool", icon: Combine, roles: ["admin"] },
       // Agents get the same page scoped to their own productivity.
       { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "agent", "client"] },
       // The carriers, with the states, leads and clients our leads give them (Sean, Nov 2026: here, under Reports).

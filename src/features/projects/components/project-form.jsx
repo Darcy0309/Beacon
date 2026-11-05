@@ -188,8 +188,8 @@ export default function ProjectForm({ project, options, trigger }) {
             <Field label="Start date" error={fe("start_date")}>
               <DatePicker name="start_date" defaultValue={dv("start_date")} invalid={invalid("start_date")} aria-label="Start date" presets={["today"]} />
             </Field>
-            <Field label="End date" error={fe("end_date")}>
-              <DatePicker name="end_date" defaultValue={dv("end_date")} invalid={invalid("end_date")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
+            <Field label="Due date" error={fe("end_date")}>
+              <DatePicker name="end_date" defaultValue={dv("end_date")} invalid={invalid("end_date")} aria-label="Due date" presets={["nextMonth", "nextYear"]} />
             </Field>
             <Field label="Leads per month" error={fe("lead_goal_month")} hint="The client's goal each month">
               <Input name="lead_goal_month" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("lead_goal_month")} aria-invalid={invalid("lead_goal_month")} data-lead-goal-month />

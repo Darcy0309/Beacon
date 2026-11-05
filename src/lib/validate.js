@@ -633,7 +633,7 @@ export const cross = {
   project(values, errors) {
     if (!errors.start_date && !errors.end_date && values.start_date && values.end_date &&
         values.end_date < values.start_date) {
-      errors.end_date = "End date must be on or after the start date";
+      errors.end_date = "The due date must be on or after the start date";
     }
   },
   /** A producer ticked to get leads by email needs an address to send them to. */

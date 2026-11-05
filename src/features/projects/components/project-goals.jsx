@@ -63,7 +63,7 @@ export default function ProjectGoals({ leads, appts, days, hint = null }) {
         <div className="flex gap-5 text-sm md:flex-col md:gap-1 md:text-right" data-project-days>
           {days.daysPassed != null ? <span><strong className="tabular-nums">{days.daysPassed}</strong> <span className="text-muted-foreground">day{days.daysPassed === 1 ? "" : "s"} passed</span></span> : null}
           {days.daysLeft != null ? <span><strong className="tabular-nums">{days.daysLeft}</strong> <span className="text-muted-foreground">day{days.daysLeft === 1 ? "" : "s"} to go</span></span> : null}
-          {days.daysPassed == null && days.daysLeft == null ? <span className="text-xs text-muted-foreground">Set its start and end dates to see its pace.</span> : null}
+          {days.daysPassed == null && days.daysLeft == null ? <span className="text-xs text-muted-foreground">Set its start and due dates to see its pace.</span> : null}
         </div>
       </div>
     </Card>
