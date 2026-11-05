@@ -156,6 +156,9 @@ check("the template has Drivers and XMOD after Autos, before Sales Volume",
     JSON.stringify(old[0]?.history) === JSON.stringify({ developed_by: "Old System", set_by: "Jen Bell", developed_at: "2025-03-14", set_at: "2025-04-02" }), JSON.stringify(old[0]?.history));
   check("…a lead with no appointment: developed only", JSON.stringify(old[1]?.history) === JSON.stringify({ developed_by: "Old System", developed_at: "2024-06-01" }), JSON.stringify(old[1]?.history));
   check("LEADDATE: when the old system took the name on", rowsToImport([["COMPANYNAME", "LEADDATE"], ["Dated Co", "8/17/2023"]]).rows[0]?.lead.lead_date === "2023-08-17");
+  const created = rowsToImport([["COMPANYNAME", "LEADDATE", "QA_DATE_DBDV"], ["Blank Co", "", "3/14/2025"], ["Both Co", "8/17/2023", "3/14/2025"]]).rows;
+  check("…left empty (as the old system leaves it): QA_DATE_DBDV is when the lead was created", created[0]?.lead.lead_date === "2025-03-14" && created[1]?.lead.lead_date === "2023-08-17",
+    JSON.stringify(created.map((r) => r.lead.lead_date)));
   check("…the QA dates kept on the lead too", old[0]?.lead.qa_date_dbdv === "2025-03-14" && old[0]?.lead.qa_date_appt === "2025-04-02");
   check("other spellings: Developed By, Date Set, Appt Setter", mapAllHeaders(["Developed By", "Date Set", "Appt Setter", "Lead Developed Date"]).map((t) => t?.column).join(",") === "developed_by,set_at,set_by,developed_at");
   const who = staffMatcher([{ id: 2, first_name: "Sean", last_name: "Fitzgerald", email: "sean@beacon.test" }, { id: 3, first_name: "Mike", last_name: "Preston", email: "mike@x.test" },

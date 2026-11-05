@@ -535,6 +535,8 @@ export function rowsToImport(csvRows) {
     // The old system's template (Sean, Nov 2026): its QA dates are when the lead was developed
     // (QA_DATE_DBDV) and its appointment set (QA_DATE_APPT); kept on the lead as well.
     if (lead.qa_date_dbdv) history.developed_at ??= lead.qa_date_dbdv;
+    // …and QA_DATE_DBDV is when the lead was created too: the old system leaves LEADDATE empty (Sean, Nov 2026).
+    if (lead.qa_date_dbdv && !lead.lead_date) lead.lead_date = lead.qa_date_dbdv;
     if (lead.qa_date_appt) history.set_at = lead.qa_date_appt;
     if (lead.state) {
       const code = normalizeState(lead.state);
