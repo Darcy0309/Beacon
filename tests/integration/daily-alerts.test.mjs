@@ -48,18 +48,23 @@ try {
     sean.length === 1 && sean[0].title === `X-date in 30 days: ${TAG} Sine Wave` && sean[0].link === `/leads/${solo}` && /Renewing Feb 1/.test(sean[0].body), JSON.stringify(sean));
   check("…not of one off the list, nor of one renewing another day", !JSON.stringify(sean).includes("Off The List") && !JSON.stringify(sean).includes("Too Soon"));
   const mike = notes(MIKE, "lead");
-  check("a name nobody holds goes to its project's rep", mike.length === 1 && mike[0].link === `/leads/${unheld}`, JSON.stringify(mike));
+  // With any other name of Mike's renewing that day (whatever its year), in one notification.
+  check("a name nobody holds goes to its project's rep", mike.length === 1 && (mike[0].link === `/leads/${unheld}` || `${mike[0].title} ${mike[0].body}`.includes("Nobody Holds It")), JSON.stringify(mike));
   run("send_xdate_warnings");
   check("once a day: running again sends nothing", notes(SEAN, "lead").length === 1);
 
   sql(`delete from public.alert_sends where key like '%:${DAY}'`);
   sql(`delete from public.notifications where title like ${lit(`%${TAG}%`)} or body like ${lit(`%${TAG}%`)}`);
   name("Second Church", SEAN, DUE);
+  // The month and day are what count (Sean, Nov 2026): next year typed for this year's renewal, or last year's still on it.
+  name("Typed Next Year", SEAN, "2032-02-01");
+  name("Last Year Kept", SEAN, "2030-02-01");
   run("send_xdate_warnings");
   const digest = notes(SEAN, "lead");
   check("several names: one notification, how many and which, to the call lists",
-    digest.length === 1 && digest[0].title === "2 X-dates in 30 days" && digest[0].body.includes("Second Church") && digest[0].body.includes("Sine Wave") && digest[0].link === "/work",
+    digest.length === 1 && digest[0].title === "4 X-dates in 30 days" && digest[0].body.includes("Second Church") && digest[0].body.includes("Sine Wave") && digest[0].link === "/work",
     JSON.stringify(digest));
+  check("…an X-date with another year counted by its month and day", digest[0]?.body.includes("Typed Next Year") && digest[0]?.body.includes("Last Year Kept"), digest[0]?.body);
 
   section("Appointment reminder");
   const appt = (lead, date, confirmed = false, status = "Scheduled") =>
