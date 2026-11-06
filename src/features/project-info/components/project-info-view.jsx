@@ -2,15 +2,16 @@ import { Ban, Building2, CalendarX2, Landmark, MapPin, MessageSquareText, Naviga
 import ToneBadge from "@/components/shared/tone-badge";
 import { mapLink } from "@/lib/appointment-links";
 import { mediumDate, telHref } from "@/lib/format";
+import { SECTION_LINE } from "@/features/leads/form-section";
 import { addressLine, areaCode, directionsLink, hasProfile, producerName, weekdayList, yesNoOf, yesWith } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
 
 const blank = (v) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
 
-/** A part of the Project Info, titled. */
+/** A part of the Project Info, titled, boxed in the darker line the lead's edit forms have (Sean, Nov 2026). */
 function Section({ title, icon: Icon, name, children }) {
   return (
-    <section data-info-section={name} className="border-b border-[var(--panel-border)] last:border-b-0">
+    <section data-info-section={name} className={cn("overflow-hidden", SECTION_LINE)}>
       <h3 className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
         <Icon className="size-3.5 text-primary" aria-hidden /> {title}
       </h3>
@@ -40,9 +41,10 @@ function Rows({ rows }) {
  * code managers set their caller ID to, and the office's address a link:
  * with `toLead` (the lead's city), directions from the office to it in
  * Google Maps, for the miles and the drive time; else the office on the map.
- * Then the appointments it takes, the producers, the carriers and about the
- * agency. `action`: buttons for its top bar (Edit, Send to client). `wide`:
- * two columns on a wide screen.
+ * Then, in the order the client's team reads them (Nov 2026), the producers
+ * taking appointments, the carriers, the appointments it takes, and about the
+ * agency; each boxed. `action`: buttons for its top bar (Edit, Send to
+ * client). `wide`: two columns on a wide screen.
  */
 export default function ProjectInfoView({ info, toLead = null, action = null, wide = false, emptyHint = null }) {
   const office = addressLine(info);
@@ -164,9 +166,10 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
           No Project Info yet.{emptyHint ? ` ${emptyHint}` : ""}
         </p>
       )}
-      <div className={cn(wide && "lg:grid lg:grid-cols-2 lg:divide-x lg:divide-[var(--panel-border)]")}>
-        <div>{agent}{appointments}</div>
-        <div className={cn("border-t border-[var(--panel-border)]", wide && "lg:border-t-0")}>{producers}{carriers}{about}</div>
+      {/* Agent & office, Producers, Carriers, Appointments, About the agency; on a wide screen the first three, then the last two beside them. */}
+      <div className={cn("space-y-3 p-3", wide && "lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0")}>
+        <div className="space-y-3">{agent}{producers}{carriers}</div>
+        <div className="space-y-3">{appointments}{about}</div>
       </div>
     </div>
   );

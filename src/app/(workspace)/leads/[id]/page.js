@@ -469,8 +469,17 @@ export default async function LeadSheet({ params, searchParams }) {
           <Card className="overflow-hidden">
             <Tabs
               label="About this name"
-              initial={["files", "info"].includes(sp?.tab) ? sp.tab : undefined}
+              // Notes, Business, Coverage, Project Info, Policy Files (Sean, Nov 2026); Business still opens first, as before.
+              initial={["files", "info"].includes(sp?.tab) ? sp.tab : "business"}
               tabs={[
+                {
+                  id: "notes",
+                  label: "Notes",
+                  count: noteCount || null,
+                  content: (
+                    <LeadNotes leadId={lead.id} clientNote={r.client_note} internalNotes={r.internal_notes} description={r.description} canEdit={staff} showInternal={seesInternal} />
+                  ),
+                },
                 {
                   id: "business",
                   label: "Business",
@@ -547,21 +556,6 @@ export default async function LeadSheet({ params, searchParams }) {
                   ),
                 },
                 {
-                  // Files the prospect sent, kept with the lead and sent to the client with it.
-                  id: "files",
-                  label: "Policy Files",
-                  count: files.length || null,
-                  content: <LeadFiles leadId={lead.id} initial={files} canDelete={staff} />,
-                },
-                {
-                  id: "notes",
-                  label: "Notes",
-                  count: noteCount || null,
-                  content: (
-                    <LeadNotes leadId={lead.id} clientNote={r.client_note} internalNotes={r.internal_notes} description={r.description} canEdit={staff} showInternal={seesInternal} />
-                  ),
-                },
-                {
                   // The client's profile sheet (Sean, Oct 2026): the agent and office (its area code is the caller ID
                   // to call from; its address opens directions to this business), producers, what qualifies an
                   // appointment. Administrators and the client change it; everyone else reads it.
@@ -578,6 +572,13 @@ export default async function LeadSheet({ params, searchParams }) {
                   ) : (
                     <Empty icon={ClipboardList}>{r.project ? "This project's info can't be shown." : "This name is not on a project."}</Empty>
                   ),
+                },
+                {
+                  // Files the prospect sent, kept with the lead and sent to the client with it.
+                  id: "files",
+                  label: "Policy Files",
+                  count: files.length || null,
+                  content: <LeadFiles leadId={lead.id} initial={files} canDelete={staff} />,
                 },
               ]}
             />

@@ -179,7 +179,8 @@ try {
 
   section("A manager reads it on the lead sheet");
   t = await open(sean, `/leads/${LEAD}?tab=info`);
-  check("the Project Info tab sits to the right of Notes", JSON.stringify(await sean.ev(`[...document.querySelectorAll('[role=tablist]')[0].querySelectorAll('[role=tab]')].map((b) => b.dataset.tab).slice(-2)`)) === '["notes","info"]');
+  // Notes, Business, Coverage, Project Info, Policy Files (Sean, Nov 2026): Project Info between Coverage and Policy Files.
+  check("the Project Info tab sits between Coverage and Policy Files", JSON.stringify(await sean.ev(`[...document.querySelectorAll('[role=tablist]')[0].querySelectorAll('[role=tab]')].map((b) => b.dataset.tab).slice(-3)`)) === '["coverage","info","files"]');
   check("…opened with ?tab=info, showing the shared Project Info", await sean.ev(`!document.querySelector('[data-tab-panel="info"]').hidden`) && t.includes("Mondays & Fridays"));
   await sean.ev(`document.querySelector('[role=tablist]').scrollIntoView({ block: 'start' })`);
   await shot(sean, "project-info-lead-tab");

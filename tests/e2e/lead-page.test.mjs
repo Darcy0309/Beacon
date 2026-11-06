@@ -133,6 +133,16 @@ try {
     && html.includes("print()") && html.includes("20 (15 full-time, 5 part-time)") && html.includes("1234567") && html.includes("Claims last 3 yrs") && html.includes("8 drivers") && /XMOD[\s\S]{0,200}0\.85/.test(html), `${printed.status} ${html.slice(0, 120)}`);
   check("…not to someone signed out", (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { redirect: "manual" })).status !== 200);
 
+  section("The middle tile, in the team's order (Nov 2026)");
+  await sean.go(`/leads/${lead}`, 5000);
+  const tabs = await sean.ev(`[...document.querySelectorAll('[role=tablist][aria-label="About this name"] [role=tab]')].map((t) => t.dataset.tab)`);
+  check("tabs: Notes, Business, Coverage, Project Info, Policy Files", JSON.stringify(tabs) === JSON.stringify(["notes", "business", "coverage", "info", "files"]), JSON.stringify(tabs));
+  check("…Business open to begin with, as before", (await sean.ev(`document.querySelector('[role=tablist][aria-label="About this name"] [role=tab][aria-selected="true"]')?.dataset.tab`)) === "business");
+  await sean.click('[role=tab][data-tab="info"]');
+  const sections = await until(() => sean.ev(`[...document.querySelectorAll('[data-info-section]')].map((s) => s.dataset.infoSection)`).then((l) => (l?.length ? l : null)));
+  check("Project Info: Agent & office, Producers, Carriers, Appointments, About the agency", JSON.stringify(sections) === JSON.stringify(["agent", "producers", "carriers", "appointments", "about"]), JSON.stringify(sections));
+  check("…each boxed in a dark line", await sean.ev(`[...document.querySelectorAll('[data-info-section]')].every((s) => { const c = getComputedStyle(s); return parseFloat(c.borderTopWidth) >= 2 && parseFloat(c.borderLeftWidth) >= 2; })`));
+
   section("Policy Files");
   await sean.click('[role=tab][data-tab="files"]');
   await until(() => sean.ev(`!!document.querySelector('[data-file-input]')`));
