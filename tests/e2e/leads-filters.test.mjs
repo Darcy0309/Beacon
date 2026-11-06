@@ -3,7 +3,8 @@
  * Oct 2026): a lead opened from the Lead Explorer, the Leads list or the
  * Appointments list goes back there with its filters as they were; the Leads
  * list filters by client, project, manager, call result and the days a lead
- * was last called or changed, as the Appointments list does.
+ * was last called, as the Appointments list does. Last worked is last called
+ * (Sean, Nov 2026): a lead imported or edited, never called, is not worked.
  *
  * Removes everything it made.
  *
@@ -31,7 +32,7 @@ const [EMAIL, BRANCH, INVALID] = [resultOf("Lead-Email"), resultOf("Lead-Branch"
 sql(`update public.leads set result_id = ${EMAIL} where id = ${A}`);
 sql(`update public.leads set result_id = ${BRANCH} where id = ${B}`);
 sql(`update public.leads set result_id = ${INVALID} where id = ${C}`);
-// Called back in March: the one the days filter finds (each was changed just now, when made).
+// Called back in March: the one the days filter finds. The other two were changed just now (made), but never called.
 sql(`update public.leads set date_last_worked = '2026-03-10 18:00:00+00' where id = ${A}`);
 sql(`insert into public.appointments (lead_id, user_id, project_id, appt_date, appt_time, status_id, qa_status)
   values (${C}, ${SEAN}, ${P3}, ((now() at time zone public.business_tz())::date + 1), '10:00 AM', (select id from public.appointment_statuses where name='Scheduled'), 'passed')`);
@@ -52,6 +53,12 @@ try {
   check("the lead says Back to Lead Explorer", b1?.text === "Back to Lead Explorer", JSON.stringify(b1));
   await admin.click(`a[href="${b1?.href}"]`);
   check("…and goes back with the filters as they were", Boolean(await until(async () => (await admin.url()) === explore)), await admin.url());
+  // Last worked there is last called: March for the one called, nothing for those only made (changed) today.
+  const worked = (id) => admin.ev(`document.querySelector('a[href^="/leads/${id}?from="]')?.closest('tr')?.querySelector('[data-last-worked]')?.textContent?.trim() ?? null`);
+  const workedA = await until(() => worked(A), { timeout: 8000 });
+  check("the Explorer's Last worked: the day last called", workedA === "03/10/2026", workedA);
+  const workedB = await until(() => worked(B), { timeout: 8000 });
+  check("…and none for a lead never called, though changed today", workedB === "—", workedB);
 
   section("The Leads list's filters");
   const list = async (query, expect) => { await admin.go(`/leads?q=${encodeURIComponent(TAG)}${query}`, 5000); return (await until(async () => { const r = await shown(); return expect(r) ? r : null; }, { timeout: 6000 })) ?? shown(); };
@@ -80,9 +87,17 @@ try {
   const three = await list(`&result=${EMAIL},${BRANCH},${INVALID}`, (r) => r.length === 3);
   check("…and from the address, all three", three.length === 3, JSON.stringify(three));
   const byDays = await list(`&from=2026-03-01&to=2026-03-31`, (r) => r.length === 1);
-  check("by the days last called or changed", JSON.stringify(byDays) === JSON.stringify([`${TAG} Alpha Roofing`]), JSON.stringify(byDays));
-  // Called in March, but changed since (when the test set that): the later of the two shows.
-  check("…each with when it was last called or changed, the later", /^\d{2}\/\d{2}\/\d{4}$/.test((await admin.ev(`document.querySelector('[data-last-worked]')?.textContent`)) ?? ""));
+  check("by the days last called", JSON.stringify(byDays) === JSON.stringify([`${TAG} Alpha Roofing`]), JSON.stringify(byDays));
+  // Called in March, though changed since (when the test set that): the day it was called shows, not the change.
+  check("…each with the day it was last called, not last changed", (await admin.ev(`document.querySelector('[data-last-worked]')?.textContent`)) === "03/10/2026",
+    await admin.ev(`document.querySelector('[data-last-worked]')?.textContent`));
+  // Changed today (made), never called: not worked today, and no Last worked at all.
+  const today = sql("select ((now() at time zone public.business_tz())::date)::text");
+  const byToday = await list(`&from=${today}&to=${today}`, (r) => r.length === 0);
+  check("a lead only changed today (imported, edited), never called, is not worked today", byToday.length === 0, JSON.stringify(byToday));
+  await list("", (r) => r.length === 3);
+  const blank = await admin.ev(`[...document.querySelectorAll('a[data-lead-link]')].filter((a) => a.textContent.includes(${JSON.stringify(`${TAG} Bravo`)})).map((a) => a.closest('tr')?.querySelector('[data-last-worked]')?.textContent?.trim())[0] ?? null`);
+  check("…its Last worked blank, as its own page says Not yet", blank === "—", blank);
 
   section("Back to the Leads list, and to Appointments");
   const filteredList = `/leads?q=${encodeURIComponent(TAG)}&rep=${SEAN}`;

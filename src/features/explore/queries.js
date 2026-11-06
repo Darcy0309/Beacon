@@ -66,7 +66,7 @@ export async function exploreLeads(criteria, { page = 1, perPage = PAGE_SIZE } =
     supabase.rpc("lead_explore", { criteria, page, per_page: perPage }),
     getBusinessTimeZone(),
   ]);
-  // The day a lead was last called or changed, on the business's clock: "10/14/2026".
+  // The day a lead was last called, on the business's clock: "10/14/2026" (lead_explore's last_worked).
   const day = new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "numeric" });
   if (error) throw error;
   // By 4-digit group (Sean, Nov 2026), each named as the SIC list names it.

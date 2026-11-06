@@ -138,7 +138,7 @@ export async function getLeadOption(id) {
  * database. `projectId` narrows it to one project, where it can also be
  * filtered by rep. The Leads page's filters too (Sean, Oct 2026):
  * `clientId` (its projects' leads), `worked` ({ from, to }: instants), a
- * lead last called or changed between them, and `resultIds`, a lead on any
+ * lead last called between them, and `resultIds`, a lead on any
  * of those call results.
  */
 /**
@@ -189,10 +189,8 @@ export async function listLeads(params, { projectId, clientId = null, worked = n
       if (clientProjects) query = query.in("project_id", clientProjects);
       if (resultIds.length) query = query.in("result_id", resultIds.map(Number));
       if (names) query = applyNameFilters(query, names);
-      if (worked) {
-        const [from, to] = [worked.from.toISOString(), worked.to.toISOString()];
-        query = query.or(`and(date_last_worked.gte.${from},date_last_worked.lt.${to}),and(updated_at.gte.${from},updated_at.lt.${to})`);
-      }
+      // Last worked between them: last called, not merely changed (an import, a transfer, an edit) (Sean, Nov 2026).
+      if (worked) query = query.gte("date_last_worked", worked.from.toISOString()).lt("date_last_worked", worked.to.toISOString());
       return paged(query, p, {
         // search_text: company, contact, city, email and phone (also as digits), indexed.
         search: ["search_text"],

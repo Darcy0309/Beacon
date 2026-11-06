@@ -40,7 +40,7 @@ const COLUMNS = [
   ["Ultimate X-Date", (r) => r.ultimate_xdate],
   ["Current Carrier", (r) => r.carrier_name],
   ["Assigned Rep", (r) => r.rep_name],
-  // The day it was last called or changed, on the business's clock.
+  // The day it was last called, on the business's clock.
   ["Last Worked", (r) => (r.lastWorked === "—" ? "" : r.lastWorked)],
   ["Lead ID", (r) => r.id],
 ];

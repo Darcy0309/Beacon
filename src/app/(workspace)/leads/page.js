@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
 export default async function LeadsPage({ searchParams }) {
   const sp = await searchParams;
   // Filtered as the Appointments list is (Sean, Oct 2026): call result and manager (the table's), then
-  // client, project and the days a lead was last called or changed.
+  // client, project and the days a lead was last called.
   const params = readListParams(sp, ["result", "rep"]);
   const id = (v) => (typeof v === "string" && /^[1-9]\d{0,17}$/.test(v) ? v : "");
   if (params.filters.rep && !id(params.filters.rep)) delete params.filters.rep;
@@ -57,12 +57,10 @@ export default async function LeadsPage({ searchParams }) {
   // This list's address, for each lead's back link; and what the date filter's form carries along.
   const here = listAddress("/leads", sp);
   const kept = Object.entries(sp ?? {}).filter(([k, v]) => !["from", "to", "page"].includes(k) && typeof v === "string");
-  // The day a lead was last called or changed, on the business's clock.
+  // The day a lead was last called, on the business's clock: worked is called, as the lead's own page has
+  // it (Sean, Nov 2026). Imported, brought over from another list or edited is not worked: none yet is "—".
   const day = new Intl.DateTimeFormat("en-US", { timeZone, month: "2-digit", day: "2-digit", year: "numeric" });
-  const lastWorked = (raw) => {
-    const at = [raw?.date_last_worked, raw?.updated_at].filter(Boolean).map((v) => Date.parse(v)).sort((a, b) => b - a)[0];
-    return at ? day.format(new Date(at)) : "—";
-  };
+  const lastWorked = (raw) => (raw?.date_last_worked ? day.format(new Date(raw.date_last_worked)) : "—");
   // Filtered by call result, several at once, in the order Sean's sheet lists them, each stage's under its name.
   const resultOptions = orderResults(results).map((r) => ({
     value: String(r.id), label: `${r.name} (${r.project_type === "APPT" ? "Appt" : "DB dev"})`,
