@@ -115,5 +115,19 @@ eq("a duplicate left off before: that location again", removed(rows[4].lead)?.so
 eq("…but not the record kept from its group", removed(rows[3].lead), null);
 eq("nothing on the list, nothing taken off", removalMatcher([])(rows[0].lead), null);
 
+// Sean's review (Nov 2026): a first name alone is not the same person.
+{
+  const r = (company_name, contact_name, address, city, zip, phone) => ({ lead: { company_name, contact_name, address, city, state: "AZ", zip, phone } });
+  const list = [
+    r("European Custom Upholstery", "Eva", "2514 E Mohawk Ln", "Phoenix", "85050", "602-263-5516"),
+    r("Fine Line Mfg", "Eva", "4506 E Kerby Ave", "Phoenix", "85040", "480-303-0222"),
+    r("Fence For Less - Discount Fence Inc", "Dan Widney", "6014 W Michelle Dr", "Glendale", "85308", "602-548-7706"),
+    r("Fence For Less", "Dan Widney", "6014 W Michelle Dr", "Glendale", "85308", "602-938-5077"),
+  ];
+  const groups = findDuplicates(list);
+  check("two businesses with an Eva in one city are two businesses", !groups.some((g) => g.rows.includes(0) && g.rows.includes(1)), JSON.stringify(groups));
+  check("…the same Dan Widney at one address one business", groups.some((g) => g.rows.includes(2) && g.rows.includes(3) && g.why.includes("contact")), JSON.stringify(groups));
+}
+
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll dedupe tests passed.\n");
 process.exit(failures ? 1 : 0);

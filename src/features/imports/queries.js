@@ -70,7 +70,7 @@ export async function listImports(params) {
 export async function getCheckProjects() {
   const supabase = await createClient();
   const { data, error } = await supabase.from("projects")
-    .select("id, name, state, company_id, company:companies(name, state, group:agencies(id, name)), type:project_types(code), status:project_statuses(name)")
+    .select("id, name, state, company_id, appt_project_id, company:companies(name, state, group:agencies(id, name)), type:project_types(code), status:project_statuses(name)")
     .is("deleted_at", null).order("name");
   if (error) throw error;
   return (data ?? []).map((p) => {
@@ -80,6 +80,7 @@ export async function getCheckProjects() {
       id: p.id,
       name: p.name,
       clientId: p.company_id,
+      apptProjectId: p.appt_project_id ?? null,
       client: company?.name ?? "—",
       groupId: group?.id ?? null,
       group: group?.name ?? null,

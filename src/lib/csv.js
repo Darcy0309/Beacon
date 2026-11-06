@@ -494,7 +494,8 @@ export function rowsToImport(csvRows) {
     resolved.forEach((target, i) => {
       if (!target) return;
       // An exported value that would open as a formula carries an apostrophe before it (lead-export.js): taken off here.
-      const value = (raw[i] ?? "").trim().replace(/^'(?=[=+\-@])/, "");
+      // …and an "&" an old export wrote as its code ("Dr Spray Paint U0026 Body", Nov 2026) is an "&" again.
+      const value = (raw[i] ?? "").trim().replace(/^'(?=[=+\-@])/, "").replace(/\\?u0026/gi, "&");
       if (!value) return;
       if (target.table === "name") {
         const v = cleanValue(target.column, value);

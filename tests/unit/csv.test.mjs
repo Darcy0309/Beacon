@@ -155,6 +155,7 @@ check("the template has Drivers and XMOD after Autos, before Sales Volume",
   check("the old template: its reps the managers, QA_DATE_DBDV and QA_DATE_APPT the dates developed and set",
     JSON.stringify(old[0]?.history) === JSON.stringify({ developed_by: "Old System", set_by: "Jen Bell", developed_at: "2025-03-14", set_at: "2025-04-02" }), JSON.stringify(old[0]?.history));
   check("…a lead with no appointment: developed only", JSON.stringify(old[1]?.history) === JSON.stringify({ developed_by: "Old System", developed_at: "2024-06-01" }), JSON.stringify(old[1]?.history));
+  check("an old export's \\u0026 is an &", rowsToImport([["COMPANYNAME"], ["Dr Spray Paint U0026 Body"], ["A \\u0026 B"]]).rows.map((r) => r.lead.company_name).join("|") === "Dr Spray Paint & Body|A & B");
   check("LEADDATE: when the old system took the name on", rowsToImport([["COMPANYNAME", "LEADDATE"], ["Dated Co", "8/17/2023"]]).rows[0]?.lead.lead_date === "2023-08-17");
   const created = rowsToImport([["COMPANYNAME", "LEADDATE", "QA_DATE_DBDV"], ["Blank Co", "", "3/14/2025"], ["Both Co", "8/17/2023", "3/14/2025"]]).rows;
   check("…left empty (as the old system leaves it): QA_DATE_DBDV is when the lead was created", created[0]?.lead.lead_date === "2025-03-14" && created[1]?.lead.lead_date === "2023-08-17",

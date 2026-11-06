@@ -60,7 +60,8 @@ try {
 
   const manager = await (await browser.newContext({ as: "mike@beacon.test" })).newPage();
   await manager.go(`/projects/${project}`, 5000);
-  check("an account manager is not", /Leads on this Project/i.test(await manager.text()) && (await link(manager)) === null);
+  // Projects are administrators' and clients' since Oct 2026: an account manager has no project page, and no export.
+  check("an account manager is not", /Leads on this Project|don.t have access/i.test(await manager.text()) && (await link(manager)) === null);
   manager.close();
 
   section("Who can fetch it");
@@ -109,6 +110,16 @@ try {
   check("the export is in the activity log: who, how many, which project",
     Number(sql(`select count(*) from public.activity_log where action = 'leads.export' and entity_id = ${project}`)) === before + 1 && logged === `${ADMIN}|1,005 leads from ${TAG} Car Wash / AZ`, logged);
   check("a refused one is not", Number(sql(`select count(*) from public.activity_log where action = 'leads.export' and entity_id = ${project} and user_id <> ${ADMIN}`)) === 0);
+
+  section("With its linked project (Sean, Nov 2026)");
+  sql(`update public.projects set appt_project_id = ${project} where id = ${other}`);
+  for (const [from, label] of [[project, "the appointment project with its DB Dev project's names"], [other, "the DB Dev project with its appointment project's leads"]]) {
+    const r = await get(`/api/projects/${from}/export?both=1`, "admin@beacon.test");
+    const t = await r.text();
+    check(`${label}, in one file`, r.status === 200 && parseCsv(t).length - 1 === 1006 && t.includes("Elsewhere Co") && t.includes("Parkview Car Wash")
+      && /_both_\d{4}-\d{2}-\d{2}\.csv"/.test(r.headers.get("content-disposition") ?? ""), `${parseCsv(t).length - 1} rows · ${r.headers.get("content-disposition")}`);
+  }
+  sql(`update public.projects set appt_project_id = null where id = ${other}`);
 
   section("A project with no leads");
   const empty = parseCsv(await (await get(`/api/projects/${other}/export`, "admin@beacon.test")).text());

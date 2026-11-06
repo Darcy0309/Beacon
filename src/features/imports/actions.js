@@ -63,12 +63,15 @@ const MAX_CHECK_PROJECTS = 300;
  * import): each with its client and project, to say where it already is.
  * The importing project's own client's projects are its family's business.
  */
-async function otherNames(supabase, ids, companyId) {
+async function otherNames(supabase, ids, project) {
   const list = [...new Set((ids ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, MAX_CHECK_PROJECTS);
   if (!list.length) return [];
-  const { data, error } = await supabase.from("projects").select("id, company_id").in("id", list).is("deleted_at", null);
+  const { data, error } = await supabase.from("projects").select("id, appt_project_id").in("id", list).is("deleted_at", null);
   if (error) throw error;
-  const others = (data ?? []).filter((p) => p.company_id !== companyId).map((p) => p.id);
+  // Any project but the importing one's family (itself, its appointment project, the DB Dev projects feeding it), which is
+  // checked already: the client's own other projects too (Sean, Nov 2026).
+  const family = new Set([project.id, project.appt_project_id].filter(Boolean));
+  const others = (data ?? []).filter((p) => !family.has(p.id) && p.appt_project_id !== project.id).map((p) => p.id);
   return others.length ? namesOn(supabase, others, (p) => `${p.client} · ${p.name}`) : [];
 }
 
@@ -111,7 +114,7 @@ export async function importChecks(projectId, checkIds = []) {
   if (!project) return fail("That project no longer exists.");
   try {
     const [removals, existing, others] = await Promise.all([
-      removalsOf(supabase, project.company_id), familyNames(supabase, project), otherNames(supabase, checkIds, project.company_id),
+      removalsOf(supabase, project.company_id), familyNames(supabase, project), otherNames(supabase, checkIds, project),
     ]);
     return ok({ client: project.client, removals, existing, others });
   } catch (e) {
@@ -198,7 +201,7 @@ export async function importLeadsCsv(prevState, formData) {
       removalsOf(supabase, project.company_id),
       familyNames(supabase, { id: project.id, appt_project_id: project.appt_project_id, type: projectType }),
       // The other clients' projects chosen to check against (an Agency Group's, in a territory).
-      otherNames(supabase, String(formData.get("check_projects") ?? "").split(","), project.company_id),
+      otherNames(supabase, String(formData.get("check_projects") ?? "").split(","), project),
     ]);
     const removed = removalMatcher(removals);
     const there = removalMatcher(family);
@@ -404,7 +407,8 @@ export async function importLeadsCsv(prevState, formData) {
 
   // The duplicates left off, remembered as Deletions: a later list of this client's leaves those locations out.
   let deletions = 0;
-  if (project.company_id && dropped.length) {
+  // Only when asked to (Sean, Nov 2026): duplicates left off are not taken off the client's lists on their own.
+  if (project.company_id && dropped.length && formData.get("save_deletions") === "1") {
     for (let i = 0; i < dropped.length; i += IMPORT_CHUNK) {
       const { error: dropError } = await supabase.from("client_removals").insert(dropped.slice(i, i + IMPORT_CHUNK).map((d) => ({
         ...d, company_id: project.company_id, reason: "deletion", source: "import", note: `Duplicate left off ${file.name}`, removed_by: me?.id ?? null,

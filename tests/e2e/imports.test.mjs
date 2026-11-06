@@ -160,10 +160,18 @@ try {
   await admin.click("[data-review-duplicates]");
   const groups = await until(async () => Number(await admin.ev(`document.querySelectorAll('[data-duplicate-group]').length`)) || 0);
   check("Review duplicates shows each group", groups === 2, groups);
+  // Every duplicate kept at once, and back to one of each (Sean, Nov 2026: not group by group).
+  await admin.click("[data-keep-every]");
+  check("“Keep every one” keeps every duplicate", Boolean(await until(async () => (await admin.ev(`document.querySelector('[data-import-summary]').textContent`)).includes("5 of 7"))));
+  await admin.click("[data-keep-one-each]");
+  check("…“Keep one of each” leaves them off again", Boolean(await until(async () => (await admin.ev(`document.querySelector('[data-import-summary]').textContent`)).includes("3 of 7"))));
   // The two offices are two places the client wants called: both kept.
   await admin.ev(`[...document.querySelectorAll('[data-duplicate-group]')].find((g) => g.textContent.includes('Acculevel')).querySelector('[data-keep-all]').click()`);
   const after = await until(async () => (await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`)).includes("4 of 7") && admin.ev(`document.querySelector('[data-import-summary]').textContent`));
   check("…and keeping both offices puts one back", /4 of 7/.test(after || ""), after);
+  // Saved as Deletions only when asked (Sean, Nov 2026).
+  check("the ones left off are not saved as Deletions unless ticked", (await admin.ev(`document.querySelector('[data-save-deletions]')?.checked`)) === false);
+  await admin.ev(`document.querySelector('[data-save-deletions]').click()`);
   await admin.click("button[type=submit]", "Import leads");
   const sgSaid = await admin.waitToast(/Imported 4 of 7/, 20000);
   check("it imports, saying what it left off", /Imported 4 of 7.*1 duplicate left off.*2 taken off before/.test(sgSaid ?? ""), sgSaid);
@@ -174,7 +182,7 @@ try {
   check("the FEIN kept", sg("Accurate Svc").endsWith("|39-1178301"), sg("Accurate Svc"));
   check("SalesGenie's 6-digit SIC (1771-05) kept as the SIC sheets write it", sql(`select sic_code from public.leads where company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "177105");
   check("names taken off before are not imported", sg("Called Before Co") === "" && sg("Old Branch") === "", `${sg("Called Before Co")} / ${sg("Old Branch")}`);
-  check("the duplicate left off is a Deletion on the client's list, for later lists",
+  check("…ticked: the duplicate left off is a Deletion on the client's list, for later lists",
     sql(`select reason || '|' || source || '|' || address from public.client_removals where company_id = ${company} and company_name = ${lit(`${TAG} Dix Concrete Inc`)}`) === "deletion|import|W4437 Schmidt Rd");
   check("the import's history says so", sql(`select row_count || '|' || imported_count || '|' || duplicate_count || '|' || removed_count from public.import_batches
     where project_id = ${project} and file_name = 'salesgenie.csv'`) === "7|4|1|2");
@@ -210,6 +218,31 @@ try {
     sql(`delete from public.projects where id = ${ruralProject}`);
     sql(`delete from public.companies where id = ${rural}`);
     sql(`delete from public.agencies where id = ${group}`);
+  }
+
+  section("The client's own other projects, and names imported anyway (Nov 2026)");
+  // Capital-Nebraska's list checked against Capital-Maricopa: the same client's other project.
+  const sibling = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Sibling`)}, ${company},
+    (select id from public.project_types where code = 'DBDV'), 1) returning id`));
+  sql(`insert into public.leads (project_id, company_name, phone) values (${sibling}, ${lit(`${TAG} Ours Already`)}, '715-555-3101')`);
+  const ownFile = path.join(path.dirname(file), "own-client.csv");
+  writeFileSync(ownFile, ["Company,Phone", `"${TAG} Ours Already",715-555-3101`, `"${TAG} Brand New",715-555-3102`].join("\n"));
+  try {
+    await chooseFile(admin, ownFile);
+    await until(async () => /2 of 2 rows/.test(await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`)), { timeout: 15000 });
+    await admin.click("[data-other-clients-open]");
+    check("the client's own other project can be checked", Boolean(await until(() => admin.ev(`!!document.querySelector('[data-other-project="${sibling}"]')`))));
+    check("…not the project itself", !(await admin.ev(`!!document.querySelector('[data-other-project="${project}"]')`)));
+    await admin.ev(`document.querySelector('[data-other-project="${sibling}"]').click()`);
+    check("…ticked, the name on it is found", Boolean(await until(async () => /1 of 2 rows/.test(await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`)), { timeout: 15000 })));
+    await admin.ev(`document.querySelector('[data-others-in]').click()`);
+    check("“Import these anyway” puts it back", Boolean(await until(async () => /2 of 2 rows/.test(await admin.ev(`document.querySelector('[data-import-summary]')?.textContent ?? ''`)))));
+    await admin.click("button[type=submit]", "Import leads");
+    const said = await admin.waitToast(/Imported 2 of 2/, 20000);
+    check("…and both are imported", /Imported 2 of 2/.test(said ?? "") && sql(`select count(*) from public.leads where project_id = ${project} and company_name in (${lit(`${TAG} Ours Already`)}, ${lit(`${TAG} Brand New`)})`) === "2", said);
+  } finally {
+    sql(`delete from public.leads where project_id = ${sibling}`);
+    sql(`delete from public.projects where id = ${sibling}`);
   }
 
   section("A place half given, filled in (Oct 2026)");

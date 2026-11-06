@@ -278,16 +278,30 @@ export default async function ProjectDetail({ params, searchParams }) {
             label="Leads on this Project"
             icon={ListChecks}
             action={admin ? (
-              // Administrators only: every lead on the project, in the import template's columns. A plain download link.
-              <a
-                href={`/api/projects/${p.id}/export`}
-                download
-                data-export-project
-                title="Every lead on this project with its current data, in the import template's columns"
-                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-              >
-                <Download className="size-3.5" /> Export CSV
-              </a>
+              // Administrators only: every lead on the project, in the import template's columns. A plain download link;
+              // or with its linked project too, DB Dev and Appt in one file, as the old system exported a project (Sean, Nov 2026).
+              <span className="flex flex-wrap gap-2">
+                <a
+                  href={`/api/projects/${p.id}/export`}
+                  download
+                  data-export-project
+                  title="Every lead on this project with its current data, in the import template's columns"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <Download className="size-3.5" /> Export CSV
+                </a>
+                {!dbdev || raw.appt_project_id ? (
+                  <a
+                    href={`/api/projects/${p.id}/export?both=1`}
+                    download
+                    data-export-both
+                    title={dbdev ? "This DB Dev project's names and its appointment project's, in one file" : "This appointment project's leads and its DB Dev projects' names, in one file"}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                  >
+                    <Download className="size-3.5" /> {dbdev ? "With Appt project" : "With DB Dev"}
+                  </a>
+                ) : null}
+              </span>
             ) : null}
           />
           {/* Moving names to another project (Sean, Oct 2026): administrators and account managers tick them here. */}

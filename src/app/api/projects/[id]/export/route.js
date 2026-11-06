@@ -28,7 +28,7 @@ const LEAD_COLUMNS = `id, company_name, contact_name, contact_title, phone, cont
  * notes (the internal ones too). Administrators only. Every lead on the
  * project, in the order they are called, streamed a batch at a time.
  */
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   const me = await getCurrentUser();
   if (me?.role !== "admin") return new Response("Only an administrator can export a project.", { status: 403 });
   const { id } = await params;
@@ -36,11 +36,16 @@ export async function GET(_request, { params }) {
 
   const supabase = await createClient();
   try {
-    const [{ data: project }, { count }] = await Promise.all([
-      supabase.from("projects").select("id, name").eq("id", id).maybeSingle(),
-      supabase.from("leads").select("id", { count: "exact", head: true }).eq("project_id", id),
-    ]);
+    const { data: project } = await supabase.from("projects").select("id, name, appt_project_id").eq("id", id).maybeSingle();
     if (!project) return new Response("No such project.", { status: 404 });
+    // ?both=1 (Sean, Nov 2026): the project with its linked one, a DB Dev project's appointment project
+    // or an appointment project's DB Dev projects, as the old system exported a project whole.
+    let ids = [project.id];
+    if (new URL(request.url).searchParams.get("both") === "1") {
+      const { data: feeders } = await supabase.from("projects").select("id").eq("appt_project_id", project.id).is("deleted_at", null);
+      ids = [...new Set([project.id, project.appt_project_id, ...(feeders ?? []).map((f) => f.id)].filter(Boolean))];
+    }
+    const { count } = await supabase.from("leads").select("id", { count: "exact", head: true }).in("project_id", ids);
 
     // What each SIC code means, for the template's description column.
     const sic = new Map();
@@ -52,7 +57,7 @@ export async function GET(_request, { params }) {
     }
 
     const batch = async (after) => {
-      const { data, error } = await supabase.from("leads").select(LEAD_COLUMNS).eq("project_id", id).gt("id", after).order("id").limit(BATCH);
+      const { data, error } = await supabase.from("leads").select(LEAD_COLUMNS).in("project_id", ids).gt("id", after).order("id").limit(BATCH);
       if (error) throw error;
       return data ?? [];
     };
@@ -67,7 +72,7 @@ export async function GET(_request, { params }) {
 
     // The first batch before anything is sent, so a failure is an error and not half a file.
     const first = await batch(0);
-    await logActivity(supabase, "leads.export", { entity: "project", entityId: project.id, userId: me.id, detail: `${(count ?? 0).toLocaleString()} leads from ${project.name}` });
+    await logActivity(supabase, "leads.export", { entity: "project", entityId: project.id, userId: me.id, detail: `${(count ?? 0).toLocaleString()} leads from ${project.name}${ids.length > 1 ? " and its linked project" : ""}` });
 
     const encoder = new TextEncoder();
     const body = new ReadableStream({
@@ -88,7 +93,7 @@ export async function GET(_request, { params }) {
     return new Response(body, {
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${exportFileName(project.name, new Date().toISOString().slice(0, 10))}"`,
+        "Content-Disposition": `attachment; filename="${exportFileName(ids.length > 1 ? `${project.name}_both` : project.name, new Date().toISOString().slice(0, 10))}"`,
         "X-Total-Count": String(count ?? 0),
         "Cache-Control": "no-store",
       },

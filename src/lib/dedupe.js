@@ -52,8 +52,11 @@ export function placeKey(lead) {
   return street && zip ? `${street}|${zip}` : null;
 }
 
-/** The people a lead names. */
-const people = (lead) => [lead.contact_name, lead.contact2_name, lead.decision_maker].map(personKey).filter(Boolean);
+/**
+ * The people a lead names, by their whole names: a first name alone ("Dave", "Eva") is not one
+ * person, so two businesses with a Dave in one city are not one business (Sean, Nov 2026).
+ */
+const people = (lead) => [lead.contact_name, lead.contact2_name, lead.decision_maker].map(personKey).filter((p) => p && p.includes(" "));
 
 /** How filled in a lead is: its fields with something in them. */
 const filled = (lead) => Object.values(lead).filter((v) => v !== null && v !== undefined && String(v).trim() !== "").length;

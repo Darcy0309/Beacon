@@ -106,6 +106,10 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
   const [showRemoved, setShowRemoved] = useState(false);
   const [showExisting, setShowExisting] = useState(false);
   const [showOthers, setShowOthers] = useState(false);
+  // The duplicates left off saved as Deletions for the client, only when asked (Sean, Nov 2026: not on its own).
+  const [saveDeletions, setSaveDeletions] = useState(false);
+  // Names found on the other projects checked: left out unless these are to go in anyway.
+  const [othersIn, setOthersIn] = useState(false);
   // Other clients' projects to check the list against (Oct 2026): chosen by Agency Group and territory, then ticked.
   const [checkIds, setCheckIds] = useState(() => new Set());
   const checking = useRef(null);
@@ -222,7 +226,9 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
     }
     form.set("file", upload);
     form.set("duplicates", String(dropped.length));
-    form.set("check_projects", [...checkIds].join(","));
+    // In anyway: the server need not look for them on the other projects again.
+    form.set("check_projects", othersIn ? "" : [...checkIds].join(","));
+    form.set("save_deletions", saveDeletions ? "1" : "");
     form.set("dropped", JSON.stringify(dropped.map((i) => {
       const l = p.rows[i].lead;
       return { company_name: l.company_name, contact_name: l.contact_name, phone: l.phone, ein: l.ein, address: l.address, city: l.city, state: l.state, zip: l.zip };
@@ -252,6 +258,8 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
     } else n.add(i);
     return n;
   });
+  // Every duplicate kept, or one of each group again (Sean, Nov 2026: not 71 groups one by one).
+  const keepEvery = (on) => setKeep(() => new Set(plan.rows.map((_, i) => i).filter((i) => on || !plan.groups.some((g) => g.rows.includes(i) && g.keep !== i))));
   const keepAll = (group, on) => setKeep((s) => {
     const n = new Set(s);
     for (const i of group.rows) {
@@ -262,12 +270,14 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
   });
 
   const dropped = plan ? droppedOf(plan, keep) : [];
-  const toImport = plan ? plan.rows.length - dropped.length - plan.removedRows.length - plan.existingRows.length - plan.otherRows.length : 0;
+  const toImport = plan ? plan.rows.length - dropped.length - plan.removedRows.length - plan.existingRows.length - (othersIn ? 0 : plan.otherRows.length) : 0;
   const changeChecks = (ids) => {
     setCheckIds(ids);
     recheck(inputRef.current?.files?.[0] ?? null, projectId, ids);
   };
-  const ownClient = checkProjects.find((p) => String(p.id) === String(projectId))?.clientId ?? null;
+  // The project's own family (itself, its appointment project, the DB Dev projects feeding it) is checked already.
+  const chosen = checkProjects.find((p) => String(p.id) === String(projectId));
+  const family = new Set(chosen ? [chosen.id, chosen.apptProjectId, ...checkProjects.filter((p) => p.apptProjectId === chosen.id).map((p) => p.id)].filter(Boolean) : []);
 
   return (
     <Card>
@@ -303,7 +313,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
               <Input name="list_source" maxLength={80} defaultValue={state?.values?.list_source ?? ""} />
             </Field>
           </div>
-          <OtherClients projects={checkProjects} ownClient={ownClient} picked={checkIds} onChange={changeChecks} />
+          <OtherClients projects={checkProjects} family={family} picked={checkIds} onChange={changeChecks} />
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -377,10 +387,22 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
                         <Copy className="size-4 text-amber-500" />
                         <span>
                           <span className="font-semibold tabular-nums" data-duplicate-count>{dropped.length.toLocaleString()}</span> duplicate{dropped.length === 1 ? "" : "s"} in {plan.groups.length.toLocaleString()} group{plan.groups.length === 1 ? "" : "s"} left off
-                          <span className="text-muted-foreground"> · kept: the record with the FEIN, then the most contacts, then the most filled in. Left-off records are saved as Deletions for this client.</span>
+                          <span className="text-muted-foreground"> · kept: the record with the FEIN, then the most contacts, then the most filled in.</span>
                         </span>
                         <span className="ml-auto shrink-0 font-semibold text-primary">{reviewing ? "Hide" : "Review duplicates"}</span>
                       </button>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--panel-border)] px-3 py-2 text-xs">
+                        <button type="button" onClick={() => keepEvery(true)} disabled={!dropped.length} className="font-semibold text-primary hover:underline disabled:opacity-40" data-keep-every>
+                          Keep every one
+                        </button>
+                        <button type="button" onClick={() => keepEvery(false)} className="font-semibold text-primary hover:underline" data-keep-one-each>
+                          Keep one of each
+                        </button>
+                        <label className="ml-auto flex cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={saveDeletions} onChange={(e) => setSaveDeletions(e.target.checked)} className="size-4 accent-[var(--primary)]" data-save-deletions />
+                          Save the ones left off as Deletions for this client
+                        </label>
+                      </div>
                       {reviewing ? (
                         <div className="max-h-[32rem] space-y-3 overflow-y-auto border-t border-[var(--panel-border)] p-3">
                           {plan.groups.map((g, gi) => {
@@ -484,10 +506,14 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
                         {showOthers ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                         <Users className="size-4 text-violet-500" />
                         <span>
-                          <span className="font-semibold tabular-nums" data-others-count>{plan.otherRows.length.toLocaleString()}</span> on the other clients&apos; lists checked, left out
+                          <span className="font-semibold tabular-nums" data-others-count>{plan.otherRows.length.toLocaleString()}</span> on the other projects checked, {othersIn ? "imported anyway" : "left out"}
                         </span>
                         <span className="ml-auto shrink-0 font-semibold text-primary">{showOthers ? "Hide" : "Show"}</span>
                       </button>
+                      <label className="flex cursor-pointer items-center gap-2 border-t border-[var(--panel-border)] px-3 py-2 text-xs">
+                        <input type="checkbox" checked={othersIn} onChange={(e) => setOthersIn(e.target.checked)} className="size-4 accent-[var(--primary)]" data-others-in />
+                        Import these anyway
+                      </label>
                       {showOthers ? (
                         <ul className="max-h-72 divide-y divide-[var(--panel-border)] overflow-y-auto border-t border-[var(--panel-border)] text-xs">
                           {plan.otherRows.map(({ i, entry }) => (
@@ -517,15 +543,16 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
 /**
  * The other clients' projects to check a list against (Oct 2026): the
  * Agency Group (Rural Insurance, Erie…) and territory narrow the projects
- * shown; those ticked are the ones checked. The importing client's own
- * projects are its family, checked already.
+ * shown; those ticked are the ones checked. The client's own other projects
+ * are there too (Nov 2026); the project's family is checked already.
  */
-function OtherClients({ projects, ownClient, picked, onChange }) {
+function OtherClients({ projects, family, picked, onChange }) {
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState("");
   const [state, setState] = useState("");
   const [activeOnly, setActiveOnly] = useState(true);
-  const others = projects.filter((p) => p.clientId !== ownClient);
+  // The client's own other projects too (Sean, Nov 2026: Capital-Maricopa from Capital-Nebraska), not this project's family.
+  const others = projects.filter((p) => !family.has(p.id));
   const groups = [...new Map(others.filter((p) => p.groupId).map((p) => [p.groupId, p.group])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
   const states = [...new Set(others.map((p) => p.state).filter(Boolean))].sort();
   const shown = others.filter((p) => (!group || String(p.groupId) === group) && (!state || p.state === state) && (!activeOnly || p.status === "Active"));
@@ -544,7 +571,7 @@ function OtherClients({ projects, ownClient, picked, onChange }) {
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-muted/40" data-other-clients-open>
         {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
         <Users className="size-4 text-violet-500" />
-        <span>Check other clients&apos; lists for duplicates</span>
+        <span>Check other projects for duplicates (this client&apos;s and other clients&apos;)</span>
         <span className="ml-auto shrink-0 text-xs text-muted-foreground" data-other-picked>
           {picked.size ? `${picked.size.toLocaleString()} project${picked.size === 1 ? "" : "s"} checked` : "None checked"}
         </span>
