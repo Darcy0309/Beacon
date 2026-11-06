@@ -61,12 +61,13 @@ const front = async (p) => {
   await sleep(400);
 };
 const BELL = 'button[aria-label^="Notifications"]';
-const switchState = (p) => p.ev(`document.querySelector('[data-notification-panel] [data-desktop-switch]')?.dataset.desktopSwitch ?? null`);
+// The switch is on the Notifications page (Nov 2026: not in the bell's list).
+const switchState = (p) => p.ev(`document.querySelector('[data-desktop-switch]')?.dataset.desktopSwitch ?? null`);
 const openBell = async (p) => {
-  if (!(await p.ev(`!!document.querySelector('[data-notification-panel]')`))) await p.click(BELL);
+  if ((await p.path()) !== "/notifications") await p.go("/notifications", 4000);
   return until(() => switchState(p));
 };
-const switchButton = (p, text) => p.click("[data-notification-panel] [data-desktop-switch] button", text);
+const switchButton = (p, text) => p.click("[data-desktop-switch] button", text);
 
 try {
   const a = await tab();
@@ -76,17 +77,21 @@ try {
   await a.go("/leads", 4000);
 
   section("The switch");
+  await a.click(BELL);
+  await until(() => a.ev(`!!document.querySelector('[data-notification-panel]')`));
+  check("not in the bell's list", !(await a.ev(`!!document.querySelector('[data-notification-panel] [data-desktop-switch], [data-notification-panel] [data-sound-switch]')`)));
+  await a.key("Escape");
   check("before the browser is asked, the bell offers to turn them on", (await openBell(a)) === "ask",
     await a.ev(`document.querySelector('[data-desktop-switch]')?.innerText`));
   await permission(a, "granted"); // what clicking Allow in the browser's prompt does
   check("once the browser allows them, the switch says they are on, by itself", Boolean(await until(async () => (await switchState(a)) === "on")));
   const tests = async () => (await shown(a)).filter((x) => x.title === "Desktop notifications are on").length;
-  await switchButton(a, "Test");
-  check("Test shows a pop-up on the desktop", Boolean(await until(async () => (await tests()) === 1)), JSON.stringify(await shown(a)));
+  // No Test button (Nov 2026): turning them on shows one instead.
+  check("no Test button beside them", !(await a.ev(`[...document.querySelectorAll('[data-desktop-switch] button')].some((b) => b.textContent.trim() === 'Test')`)));
   await switchButton(a, "Turn off");
   check("Turn off: off", Boolean(await until(async () => (await switchState(a)) === "off")));
   await switchButton(a, "Turn on");
-  check("Turn on: on, with a test pop-up to show it works", Boolean(await until(async () => (await switchState(a)) === "on" && (await tests()) === 2)));
+  check("Turn on: on, with a test pop-up to show it works", Boolean(await until(async () => (await switchState(a)) === "on" && (await tests()) === 1)));
   await a.key("Escape");
   check("the inbox page has the same switch", await (async () => {
     const inbox = await tab();

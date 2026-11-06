@@ -13,7 +13,6 @@ import { KIND_ICONS } from "@/features/notifications/kinds";
 import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/features/notifications/active-chat";
 import { closePushed, offerDesktopOnce, pushSupported, showDesktop, syncPush, tabInFront, trackFrontTab } from "@/features/notifications/desktop";
 import { chimeOnce } from "@/features/notifications/sound";
-import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 import { notificationText } from "@/features/notifications/voicemail";
@@ -433,8 +432,7 @@ export default function NotificationBell() {
               )}
             </div>
 
-            <DesktopSwitch className="border-t border-[var(--panel-border)] px-4 py-2.5" />
-
+            {/* The desktop and sound settings live on the Notifications page, not in this list (Nov 2026). */}
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}

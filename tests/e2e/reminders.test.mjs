@@ -105,9 +105,10 @@ try {
   check("the sheet no longer lists it as to come", await sean.ev(`!document.querySelector('[data-reminder="${id}"]')`));
 
   section("Sound on and off");
-  await sean.click('button[aria-label^="Notifications"]');
+  // On the Notifications page, not the bell's list (Nov 2026).
+  await sean.go("/notifications", 5000);
   await until(() => sean.ev(`!!document.querySelector('[data-sound-switch]')`));
-  check("the bell says a sound plays", (await sean.ev(`document.querySelector('[data-sound-switch]').dataset.soundSwitch`)) === "on");
+  check("the Notifications page says a sound plays", (await sean.ev(`document.querySelector('[data-sound-switch]').dataset.soundSwitch`)) === "on");
   await sean.click("[data-sound-switch] button");
   check("…and it can be turned off", Boolean(await until(async () => (await sean.ev(`document.querySelector('[data-sound-switch]')?.dataset.soundSwitch`)) === "off")));
   const quiet = await sean.ev("window.__notes ?? 0");
@@ -116,7 +117,7 @@ try {
   await sleep(800);
   check("…when nothing plays", (await sean.ev("window.__notes ?? 0")) === quiet);
   await sean.click("[data-sound-switch] button");
-  await sean.key("Escape");
+  await sean.go(`/leads/${lead}`, 4000);
 
   section("Cancelling one");
   await sean.mouseClick("[data-set-reminder]");
