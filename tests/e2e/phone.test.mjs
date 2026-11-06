@@ -121,6 +121,13 @@ try {
   const both = await until(() => sean.ev(`[...document.querySelectorAll('[data-phone-recent-row]')].slice(0, 2).map((r) => r.innerText.replace(/\\s+/g, ' '))`).then((r) => (r.length === 2 ? r : null)));
   check("…both under Recent, the newest first, each with its lead (a decision maker's number too)",
     (both?.[0] ?? "").includes(DM_PHONE) && (both?.[0] ?? "").includes(`${TAG} Delta Door`) && (both?.[1] ?? "").includes(PHONE), JSON.stringify(both));
+  // Clear history (Nov 2026): asked once, then the list is empty, here and after a reload.
+  await sean.click("[data-phone-recent-clear]");
+  check("Clear history asks first", Boolean(await until(() => sean.ev(`!!document.querySelector('[data-phone-recent-clear-yes]') && document.querySelectorAll('[data-phone-recent-row]').length >= 2`))),
+    JSON.stringify(await sean.ev(`({ yes: !!document.querySelector('[data-phone-recent-clear-yes]'), rows: document.querySelectorAll('[data-phone-recent-row]').length })`)));
+  await sean.click("[data-phone-recent-clear-yes]");
+  check("…then the calls are gone", Boolean(await until(() => sean.ev(`document.querySelectorAll('[data-phone-recent-row]').length === 0 && /No calls yet/.test(document.querySelector('[data-phone-recent]')?.innerText ?? '')`))));
+  check("…for good", (await sean.ev(`localStorage.getItem('lighthouse.phone.recent')`)) === "[]");
   await sean.click('[data-phone-tab="keypad"]');
 
   section("Settings: the phone's wallpaper");
