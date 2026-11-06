@@ -510,7 +510,11 @@ export function PhoneProvider({ children, tracked = false }) {
         if (e.data.action === "answer") answer();
         else if (e.data.action === "decline") decline();
         else setOpen(true);
-      } else if (e.data.action !== "decline") setOpen(true);
+      } else {
+        // A call already over (answered, declined, gone): its notification goes, whatever was pressed on it.
+        closeCallNotification(String(e.data.id));
+        if (e.data.action !== "decline") setOpen(true);
+      }
     };
     navigator.serviceWorker.addEventListener("message", onMessage);
     return () => navigator.serviceWorker.removeEventListener("message", onMessage);
@@ -767,7 +771,8 @@ export function PhoneProvider({ children, tracked = false }) {
                   onDone={() => setTab("keypad")} />
               ) : tab === "recent" ? (
                 <Recent list={recent} disabled={active} onPick={(r) => { setValue(r.number); setLead(r.leadId ? { id: r.leadId, co: r.co } : null); setChecked(null); setTab("keypad"); }}
-                  onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }} />
+                  onCall={(r) => { setValue(r.number); setTab("keypad"); startCall(r.number, r.leadId ? { id: r.leadId, co: r.co } : null); }}
+                  onClear={() => { setRecent([]); keepRecent([]); }} />
               ) : (
                 <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto px-4", active ? "pb-6 pt-6" : "pb-4 pt-3")}>
                   {active ? <CallerAvatar who={who} waves={ringingOut ? "var(--neon-amber)" : null} className="mx-auto mb-3" /> : null}
@@ -1041,7 +1046,9 @@ function PhoneSettings({ wallpaper, onWallpaper, callBackground, onCallBackgroun
   );
 }
 
-function Recent({ list, disabled, onPick, onCall }) {
+/** The calls made and taken, newest first, each to call back; cleared on asking twice (Nov 2026). */
+function Recent({ list, disabled, onPick, onCall, onClear }) {
+  const [clearing, setClearing] = useState(false);
   if (!list.length) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-8 text-center" data-phone-recent>
@@ -1052,6 +1059,23 @@ function Recent({ list, disabled, onPick, onCall }) {
     );
   }
   return (
+    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--panel-border)] px-4 py-2 text-xs" data-phone-recent-head>
+      {clearing ? (
+        <>
+          <span className="font-medium">Clear all {list.length} calls?</span>
+          <span className="flex gap-3">
+            <button type="button" onClick={() => setClearing(false)} className="font-semibold text-muted-foreground hover:text-foreground">Cancel</button>
+            <button type="button" onClick={() => { setClearing(false); onClear(); }} className="font-semibold text-rose-500 hover:opacity-75" data-phone-recent-clear-yes>Clear</button>
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="text-muted-foreground">{list.length} recent call{list.length === 1 ? "" : "s"}</span>
+          <button type="button" onClick={() => setClearing(true)} className="font-semibold text-primary hover:opacity-75" data-phone-recent-clear>Clear history</button>
+        </>
+      )}
+    </div>
     <ul className="min-h-0 flex-1 divide-y divide-[var(--panel-border)] overflow-y-auto" data-phone-recent>
       {list.map((r) => {
         const missed = r.missed || r.declined;
@@ -1081,5 +1105,6 @@ function Recent({ list, disabled, onPick, onCall }) {
         );
       })}
     </ul>
+    </div>
   );
 }

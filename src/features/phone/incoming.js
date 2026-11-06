@@ -19,6 +19,9 @@ const ACTIONS = [
 ];
 const tagOf = (id) => `lighthouse-call-${id}`;
 let plain = null; // a notification shown without the worker, to close again
+// The calls whose notification is wanted still. Showing one can take seconds (the worker starting); a call
+// answered, declined or gone meanwhile must not pop up after it, and stay (Sean, Nov 2026).
+const wanted = new Set();
 
 /**
  * Show a call's desktop notification, while nobody is looking at Lighthouse
@@ -27,6 +30,7 @@ let plain = null; // a notification shown without the worker, to close again
  */
 export async function showCallNotification({ id, title, body }, onShow) {
   if (!desktopAllowed() || tabInFront()) return false;
+  wanted.add(id);
   const options = { body, tag: tagOf(id), icon: ICON, badge: BADGE, requireInteraction: true, renotify: true, data: { kind: "call", id } };
   try {
     // The worker the push notifications use; set up here when it is not yet, and waited for until it is running.
@@ -35,13 +39,17 @@ export async function showCallNotification({ id, title, body }, onShow) {
       await navigator.serviceWorker.register("/sw.js", { scope: "/" });
       reg = await Promise.race([navigator.serviceWorker.ready, new Promise((ok) => setTimeout(() => ok(null), 4000))]);
     }
+    if (!wanted.has(id)) return false; // over while the worker was starting
     if (reg?.active) {
       await reg.showNotification(title, { ...options, actions: ACTIONS });
+      // Over while it was being shown: taken away again at once.
+      if (!wanted.has(id)) closeShown(reg, id);
       return true;
     }
   } catch {
     // No worker here: a plain one, without its buttons.
   }
+  if (!wanted.has(id)) return false;
   try {
     plain = new window.Notification(title, options);
     plain.onclick = () => {
@@ -55,13 +63,17 @@ export async function showCallNotification({ id, title, body }, onShow) {
   }
 }
 
-/** Take a call's desktop notification away (answered, declined, missed). */
+const closeShown = async (reg, id) => {
+  for (const n of (await reg?.getNotifications({ tag: tagOf(id) })) ?? []) n.close();
+};
+
+/** Take a call's desktop notification away (answered, declined, missed), and keep one still on its way from showing. */
 export async function closeCallNotification(id) {
+  wanted.delete(id);
   plain?.close();
   plain = null;
   try {
-    const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/") : null;
-    for (const n of (await reg?.getNotifications({ tag: tagOf(id) })) ?? []) n.close();
+    await closeShown("serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/") : null, id);
   } catch {
     // Nothing to close.
   }
