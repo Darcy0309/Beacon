@@ -11,7 +11,7 @@
 
 import { revalidatePath } from "next/cache";
 import { currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
-import { paged } from "@/lib/server/query-helpers";
+import { leadsSource, paged } from "@/lib/server/query-helpers";
 import { applyNameFilters } from "@/features/leads/queries";
 import { createClient } from "@/lib/supabase/server";
 import { zipPoint } from "@/lib/server/zip-radius";
@@ -112,7 +112,7 @@ export async function matchingNames(projectId, { q = "", result = "", rep = "", 
   if (!(await manager(supabase))) return fail("Only administrators and account managers move names.");
   const ids = [];
   for (let page = 1; page <= 5; page += 1) {
-    const query = applyNameFilters(supabase.from("leads").select("id").eq("project_id", idOf(projectId)).is("deleted_at", null).order("id"), names);
+    const query = applyNameFilters(supabase.from(leadsSource(q)).select("id").eq("project_id", idOf(projectId)).is("deleted_at", null).order("id"), names);
     const { data, error } = await paged(query, { page, perPage: 1000, q: String(q ?? ""), filters: { result: idOf(result), rep: idOf(rep) } },
       { search: ["search_text"], columns: { result: "result_id", rep: "assigned_user_id" } });
     if (error) return fail(error);

@@ -14,7 +14,8 @@ import { REACH_ERROR, isNetworkError } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
 const MIN_CHARS = 2;
-const DEBOUNCE_MS = 250;
+// Short, so results follow typing closely; a stale request is cancelled anyway (Nov 2026).
+const DEBOUNCE_MS = 150;
 // What can be searched, and a page each kind opens: a role sees only the kinds it can open.
 const GROUPS = [
   ["leads", "Leads", Target, "/leads/1"],
@@ -148,7 +149,10 @@ export default function GlobalSearch() {
       ...groups.map((g) => ({
         key: g.key,
         label: g.label,
-        count: g.total > g.items.length ? `${g.items.length} of ${g.total.toLocaleString()}` : String(g.total),
+        // Leads aren't counted past the few shown (Nov 2026: counting them was most of a search's time): "5+".
+        // Other kinds are counted to 101: "5 of 100+".
+        count: g.total == null ? `${g.items.length}+`
+          : g.total > g.items.length ? `${g.items.length} of ${g.total > 100 ? "100+" : g.total.toLocaleString()}` : String(g.total),
         items: g.items.map((i) => ({ key: `${g.key}:${i.id}`, href: i.href, title: i.title, subtitle: i.subtitle, icon: GROUP_ICONS[g.key] ?? Search })),
       })),
     ],

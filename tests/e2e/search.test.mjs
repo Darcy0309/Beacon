@@ -70,7 +70,8 @@ try {
     check("before typing, it lists every kind an administrator can open",
       JSON.stringify(await kinds(admin)) === JSON.stringify(["leads", "clients", "projects", "users", "documents", "carriers"]), JSON.stringify(await kinds(admin)));
     await palette(admin, `${TAG} plumbing`);
-    check("the leads group counts every match", (await until(() => groupCount(admin, "leads"))) === "5 of 8", await groupCount(admin, "leads"));
+    // Leads aren't counted past those shown (Nov 2026).
+    check("the leads group says there are more than shown", (await until(() => groupCount(admin, "leads"))) === "5+", await groupCount(admin, "leads"));
     await shot(admin, "search-admin");
 
     await palette(admin, `${TAG} Drain, LLC`);

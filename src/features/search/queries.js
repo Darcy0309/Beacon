@@ -48,23 +48,22 @@ const SEARCH_GROUPS = [
 /** The kinds of record a role may search: those whose pages it can open. */
 export const searchGroupsFor = (role) => SEARCH_GROUPS.filter((g) => rolesForPath(g.sample)?.includes(role));
 
-/**
- * Search every kind of record this role can open, at once — global_search()
- * in the database: every word typed must appear; a phone number matches
- * however it is punctuated. Returns the non-empty groups, each with its
- * total and the first few hits.
- */
-export async function globalSearch(q, role, { perGroup = 5 } = {}) {
-  const groups = searchGroupsFor(role);
-  if (!groups.length) return [];
+/** global_search() for the kinds named; every kind when none are. */
+export async function searchRows(q, keys = SEARCH_GROUPS.map((g) => g.key), perGroup = 5) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("global_search", { q, per_group: perGroup, groups: groups.map((g) => g.key) });
+  const { data, error } = await supabase.rpc("global_search", { q, per_group: perGroup, groups: keys });
   if (error) throw error;
+  return data;
+}
+
+/** global_search()'s rows as the palette's groups, for the kinds a role may open. */
+export function shapeGroups(data, groups) {
   return groups
     .map((g) => ({
       key: g.key,
       label: g.label,
-      total: Number(data?.[g.key]?.total ?? 0),
+      // null: more than shown, not counted (the leads).
+      total: data?.[g.key]?.total == null ? null : Number(data[g.key].total),
       items: (data?.[g.key]?.items ?? []).map((r) => ({
         id: r.id,
         title: r.title || "—",

@@ -44,6 +44,14 @@ export function paged(query, { page = 1, perPage = PAGE_SIZE, q = "", filters = 
   return query.range(from, from + perPage - 1);
 }
 
+/**
+ * Leads to read, by whether something is typed in a search box (Nov 2026): the leads_searchable
+ * view then, the leads the person may see with the policy's rule written in, which can use the
+ * search index (the table's Row Level Security keeps Postgres from it, so a search read every lead);
+ * the table otherwise. Read-only: `supabase.from(leadsSource(q)).select(…)`.
+ */
+export const leadsSource = (q) => (String(q ?? "").trim() ? "leads_searchable" : "leads");
+
 /** Run a paged query; a page past the end (a stale link) falls back to page 1. */
 export async function runPaged(build, params) {
   let { data, error, count } = await build(params);

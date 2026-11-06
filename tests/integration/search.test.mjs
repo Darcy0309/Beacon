@@ -12,6 +12,7 @@
  */
 import { check, finish, section } from "../support/assert.mjs";
 import { signIn } from "../support/auth.mjs";
+import { ANON_KEY as ANON } from "../support/env.mjs";
 import { sql, lit } from "../support/db.mjs";
 
 // One word, so a search can include it to stay inside this test's own rows.
@@ -87,7 +88,10 @@ try {
   section("Ctrl+K: totals, the client and status, and only the groups asked for");
   {
     const hit = await search(admin, `${TAG} plumbing`);
-    check("the total counts every match", hit.leads?.total === 7, JSON.stringify(hit.leads?.total));
+    // Leads aren't counted past the five shown (Nov 2026: the count was most of a search's time): null, "more".
+    check("more matches than shown: not counted", hit.leads?.total === null, JSON.stringify(hit.leads?.total));
+    const few = await search(admin, `${TAG} drain`);
+    check("…fewer: counted, all of them", Number(few.leads?.total) === few.leads?.items?.length && few.leads.items.length > 0 && few.leads.items.length < 5, JSON.stringify(few.leads?.total));
     check("but lists at most five", hit.leads?.items?.length === 5);
     const drain = (await search(admin, `${TAG} drain`)).leads?.items?.find((x) => Number(x.id) === DRAIN);
     check("a lead says whose it is and where it stands", drain?.client === `${TAG} Insurance Group` && drain?.status === "New" && drain?.place === "Mesa, AZ",
@@ -105,6 +109,29 @@ try {
   {
     const hit = await search(client, `${TAG} plumbing`);
     check("the client's search sees none of them", (hit.leads?.total ?? 0) === 0, JSON.stringify(hit.leads));
+    // The leads are searched past Row Level Security, its rule written in (Nov 2026): a client's own leads found, no one's deleted ones.
+    const theirs = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
+      values (${lit(`${TAG} Their Project`)}, (select company_id from public.users where email = 'client@beacon.test'), ${typeId}, 1) returning id`));
+    const own = Number(sql(`insert into public.leads (company_name, project_id) values (${lit(`${TAG} Their Own Bakery`)}, ${theirs}) returning id`));
+    const gone = Number(sql(`insert into public.leads (company_name, project_id) values (${lit(`${TAG} Their Gone Bakery`)}, ${theirs}) returning id`));
+    sql(`delete from public.leads where id = ${gone}`);
+    const mine = await search(client, `${TAG} bakery`);
+    check("…but finds their own", ids(mine.leads?.items).includes(own), JSON.stringify(mine.leads));
+    check("…and nobody finds a deleted one", !ids(mine.leads?.items).includes(gone) && !ids((await search(admin, `${TAG} bakery`)).leads?.items).includes(gone));
+    // The lists' search view (leads_searchable) sees what the table's policy lets them see, no more.
+    const viewOwn = await client.sb.from("leads_searchable").select("id").ilike("search_text", `%${TAG.toLowerCase()} their%`);
+    check("the lists' search: a client's own leads, not the deleted one", !viewOwn.error && JSON.stringify((viewOwn.data ?? []).map((r) => r.id)) === JSON.stringify([own]), viewOwn.error?.message ?? JSON.stringify(viewOwn.data));
+    const viewOthers = await client.sb.from("leads_searchable").select("id").ilike("search_text", `%${TAG.toLowerCase()} az pro plumbing%`);
+    check("…never another client's", !viewOthers.error && (viewOthers.data ?? []).length === 0, JSON.stringify(viewOthers.data));
+    const viewAdmin = await admin.sb.from("leads_searchable").select("id").ilike("search_text", `%${TAG.toLowerCase()}%`);
+    const tableAdmin = await admin.sb.from("leads").select("id").ilike("search_text", `%${TAG.toLowerCase()}%`).is("deleted_at", null);
+    check("…an administrator's the same as the table's", JSON.stringify((viewAdmin.data ?? []).map((r) => r.id).sort()) === JSON.stringify((tableAdmin.data ?? []).map((r) => r.id).sort()) && (viewAdmin.data ?? []).length > 5,
+      `${viewAdmin.data?.length} vs ${tableAdmin.data?.length}`);
+    const anon = await fetch(`${process.env.TEST_SUPABASE_URL ?? "http://127.0.0.1:54321"}/rest/v1/leads_searchable?select=id&limit=1`, { headers: { apikey: ANON } });
+    check("…and nobody signed out sees it", anon.status >= 400 || (await anon.json()).length === 0, anon.status);
+    // Gone again before the Explorer's counts below.
+    sql(`delete from public.leads where project_id = ${theirs}`);
+    sql(`delete from public.projects where id = ${theirs}`);
   }
 
   section("Lead Explorer: renewal month from any policy line");

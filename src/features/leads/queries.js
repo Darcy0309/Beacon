@@ -2,7 +2,7 @@
 
 import "server-only";
 import { apptWhen, cityState, colorFor, fullName, initialsOf, shortDate, shortName, timeAgo } from "@/lib/format";
-import { inner, one, paged, runPaged } from "@/lib/server/query-helpers";
+import { inner, leadsSource, one, paged, runPaged } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { sicLookup } from "@/lib/sic";
 
@@ -116,7 +116,7 @@ export async function getRecentLeads(limit = 6) {
 export async function searchLeadOptions(q) {
   const supabase = await createClient();
   const { data, error } = await paged(
-    supabase.from("leads").select("id, company_name, contact_name, city, state").order("company_name").order("id"),
+    supabase.from(leadsSource(q)).select("id, company_name, contact_name, city, state").order("company_name").order("id"),
     { q, perPage: 20 },
     // search_text: company, contact, city, email and phone (also as digits), indexed.
     { search: ["search_text"] }
@@ -183,7 +183,7 @@ export async function listLeads(params, { projectId, clientId = null, worked = n
   const { rows, total } = await runPaged(
     (p) => {
       let query = sortNames(supabase
-        .from("leads")
+        .from(leadsSource(p.q))
         .select(leadListSelect({ status: Boolean(p.filters?.status) }), { count: "exact" }), sort);
       if (projectId) query = query.eq("project_id", Number(projectId));
       if (clientProjects) query = query.in("project_id", clientProjects);

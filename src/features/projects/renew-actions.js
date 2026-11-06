@@ -10,7 +10,7 @@
 
 import { revalidatePath } from "next/cache";
 import { currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
-import { paged } from "@/lib/server/query-helpers";
+import { paged, leadsSource } from "@/lib/server/query-helpers";
 import { applyNameFilters } from "@/features/leads/queries";
 import { carryInfoOnTie } from "@/features/project-info/server";
 import { createClient } from "@/lib/supabase/server";
@@ -36,15 +36,15 @@ async function viableResults(supabase) {
 }
 
 /** The viable names still on a project, narrowed by its list's search and filters when given. */
-function viableQuery(supabase, projectId, viable, names, opts) {
-  return applyNameFilters(supabase.from("leads").select("id", opts).eq("project_id", projectId).is("deleted_at", null)
+function viableQuery(supabase, projectId, viable, names, opts, q = "") {
+  return applyNameFilters(supabase.from(leadsSource(q)).select("id", opts).eq("project_id", projectId).is("deleted_at", null)
     .eq("stage", "dbdev").in("result_id", viable).order("id"), names);
 }
 
 async function matchingIds(supabase, projectId, viable, { q = "", result = "", rep = "", ...names } = {}) {
   const ids = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const { data, error } = await paged(viableQuery(supabase, projectId, viable, names),
+    const { data, error } = await paged(viableQuery(supabase, projectId, viable, names, undefined, q),
       { page, perPage: 1000, q: String(q ?? ""), filters: { result: idOf(result), rep: idOf(rep) } },
       { search: ["search_text"], columns: { result: "result_id", rep: "assigned_user_id" } });
     if (error) throw error;
