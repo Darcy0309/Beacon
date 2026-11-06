@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addMatches } from "@/features/matches/actions";
 import { LINE_LABELS } from "@/lib/carrier-report";
-import { byRenewalMonth, monthsAhead, pickMatches } from "@/lib/match-report";
+import { byRenewalMonth, monthsOfYear, pickMatches } from "@/lib/match-report";
 import { cn } from "@/lib/utils";
 
 // The rows listed at most; the rest are still added.
@@ -22,7 +22,8 @@ const LINES = [["pkg", "pkg_xdate", "pkg_carrier"], ["wc", "wc_xdate", "wc_carri
 const day = (iso) => (iso ? `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}` : "—");
 
 /**
- * A project's matches (Sean, Nov 2026): picked by the months they renew in (each with how many),
+ * A project's matches (Sean, Nov 2026): picked by the months they renew in, the twelve of them, each
+ * whatever the year (each with how many),
  * so many of them, soonest first, brought to the DB Dev list at Viable-Staged with their renewal
  * dates, or on to the appointment project as leads at Lead-No Contact.
  */
@@ -55,7 +56,7 @@ export default function AddMatches({ projectId, isDbdev, hasAppt, matches, today
         <div>
           <div className="eyebrow mb-2">Renewing in <span className="normal-case tracking-normal text-muted-foreground">· pick months, or none for all</span></div>
           <div className="flex flex-wrap gap-1.5">
-            {monthsAhead(today).map(({ key, label }) => {
+            {monthsOfYear(today).map(({ key, label }) => {
               const on = months.includes(key);
               return (
                 <button key={key} type="button" onClick={() => toggle(key)} aria-pressed={on} disabled={!counts[key]} data-match-month={key}

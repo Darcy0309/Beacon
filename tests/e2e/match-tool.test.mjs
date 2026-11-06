@@ -12,6 +12,7 @@
 import { check, finish, section, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
+import { renewingSoon } from "../../src/lib/match-report.js";
 
 const TAG = `MT-E2E ${Date.now()}`;
 const type = (code) => sql(`select id from public.project_types where code = '${code}'`);
@@ -32,7 +33,7 @@ lead(Q, "Best Roofing", "602-555-2002", { pkg_xdate: "2024-12-20", pkg_carrier: 
 const T1 = lead(P, "Acme Plumbing", "602-555-2001");
 const T2 = lead(P, "Best Roofing", "602-555-2002");
 lead(P, "Nobody Else", "602-555-2003");
-// The month and year each next renews, as the page's month buttons are keyed.
+// The month and year each next renews (the summary's Renew column counts by them).
 const monthOf = (d) => sql(`select to_char(public.next_renewal('${d}', (now() at time zone public.business_tz())::date), 'YYYY-MM')`);
 const DEC = monthOf("2024-12-20"), MAR = monthOf("2025-03-01");
 const at = (id) => sql(`select l.project_id || '|' || r.name || '|' || (l.matched_at is not null) from public.leads l join public.call_results r on r.id = l.result_id where l.id = ${id}`);
@@ -49,6 +50,12 @@ try {
   // Client, Project, Goal, Leads, Owed, Done, Matches, Renew soon, Developed, Matches added, Start, Due, Days behind
   check("a project's goal, leads, owed, % done and matches", JSON.stringify(row?.slice(2, 7)) === JSON.stringify(["10", "0", "10", "0%", "2"]), JSON.stringify(row));
   check("…developed and matched since its start, and days behind its Due Date", row?.[8] === "0" && row?.[9] === "0" && Number(row?.[12]) > 0, JSON.stringify(row));
+  // "Renew …": the next four months, not this one (Sean, Nov 2026); its matches renew in December and March.
+  const soon = renewingSoon(sql("select ((now() at time zone public.business_tz())::date)::text"));
+  const header = await admin.ev(`[...document.querySelectorAll('th')].map((h) => h.textContent.trim()).find((t) => t.startsWith('Renew')) ?? null`);
+  check("Renew: the next four months, not this one", header === `Renew ${soon.label}`, `${header} (want Renew ${soon.label})`);
+  const want = [DEC, MAR].filter((k) => soon.months.some((m) => m.key === k)).length;
+  check("…counting the matches renewing in them", row?.[7] === String(want), `${row?.[7]} (want ${want}: ${DEC}, ${MAR})`);
   await admin.ev(`window.__csv = null; const make = URL.createObjectURL.bind(URL);
     URL.createObjectURL = (b) => { b.text().then((t) => { window.__csv = t; }); return make(b); };
     const click = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { if (this.download) return; return click.call(this); };`);
@@ -60,9 +67,12 @@ try {
   section("A project's matches");
   await admin.ev(`document.querySelector('[data-match-row="${P}"] [data-match-link]').click()`);
   check("its matches open", Boolean(await until(async () => (await admin.path()) === `/reports/matches/${P}` && admin.ev(`document.querySelectorAll('[data-match]').length === 2`), { timeout: 15000 })), await admin.url());
-  const dec = await admin.ev(`document.querySelector('[data-match-month="${DEC}"]')?.textContent.trim()`);
-  check("by renewal month, each with how many", /Dec\s*1/.test(dec ?? "") && /Mar\s*1/.test(await admin.ev(`document.querySelector('[data-match-month="${MAR}"]')?.textContent.trim()`)), dec);
-  await admin.ev(`document.querySelector('[data-match-month="${DEC}"]').click()`);
+  // One button a month, twelve of them, whatever the year (Sean, Nov 2026); keyed by the month alone.
+  const months = await admin.ev(`[...document.querySelectorAll('[data-match-month]')].map((b) => b.dataset.matchMonth)`);
+  check("twelve month buttons, one a month, no year apart", months?.length === 12 && new Set(months).size === 12, JSON.stringify(months));
+  const dec = await admin.ev(`document.querySelector('[data-match-month="12"]')?.textContent.trim()`);
+  check("by renewal month, each with how many", /Dec\s*1/.test(dec ?? "") && /Mar\s*1/.test(await admin.ev(`document.querySelector('[data-match-month="03"]')?.textContent.trim()`)), dec);
+  await admin.ev(`document.querySelector('[data-match-month="12"]').click()`);
   check("December picked: its match, to add", Boolean(await until(() => admin.ev(`document.querySelectorAll('[data-match]').length === 1 && !!document.querySelector('[data-match="${T2}"][data-picked]')`))));
   await admin.ev(`document.querySelector('[data-match-to="dbdev"]').click()`);
   await admin.click("[data-add-matches-go]");

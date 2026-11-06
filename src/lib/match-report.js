@@ -23,6 +23,16 @@ export function monthsAhead(today) {
   });
 }
 
+/**
+ * The months the report's "Renew …" column counts (Sean, Nov 2026): the next four, not this one, whose
+ * renewals have already come or are too near to work for: in November, December to March. Each as
+ * monthsAhead() has it; `label` the column's ("Dec–Mar").
+ */
+export function renewingSoon(today) {
+  const months = monthsAhead(today).slice(1, 5);
+  return { months, label: `${months[0].label}–${months[months.length - 1].label}` };
+}
+
 /** A project's figures: the leads still owed, the share of the goal done (Sean: done, not owed), and days behind. */
 export function goalFigures({ goal, leads, start, due, today }) {
   const g = Number(goal) || 0;
@@ -44,21 +54,34 @@ export function daysBehind({ goal, leads, start, due, today }) {
   return short <= 0 ? 0 : Math.round(short / perDay);
 }
 
-/** The matches to bring in: those renewing in the months picked ("2026-12"; all when none), soonest first, `n` of them at most. */
+/**
+ * The twelve months to pick matches by (Sean, Nov 2026: one button a month, not this November and next
+ * apart; a renewal comes round each year), from `today`'s on: [{ key: "11", month: 11, label: "Nov" }, …,
+ * { key: "10", month: 10, label: "Oct" }].
+ */
+export function monthsOfYear(today) {
+  const m0 = Number(today.slice(5, 7)) - 1;
+  return Array.from({ length: 12 }, (_, i) => {
+    const month = ((m0 + i) % 12) + 1;
+    return { key: String(month).padStart(2, "0"), month, label: MONTHS[month - 1] };
+  });
+}
+
+/** The matches to bring in: those renewing in the months picked ("12", whatever the year; all when none), soonest first, `n` of them at most. */
 export function pickMatches(matches, months = [], n = Infinity) {
   const want = new Set(months.map(String));
   return (matches ?? [])
-    .filter((m) => !want.size || want.has(String(m.renewal).slice(0, 7)))
+    .filter((m) => !want.size || want.has(String(m.renewal).slice(5, 7)))
     .sort((a, b) => String(a.renewal).localeCompare(String(b.renewal)) || String(a.company).localeCompare(String(b.company)))
     .slice(0, Math.max(0, n));
 }
 
-/** How many matches renew each month and year: { "2027-03": 12, "2026-12": 4 }. */
+/** How many matches renew each month, whatever the year: { "03": 12, "12": 4 }. */
 export function byRenewalMonth(matches) {
   const out = {};
   for (const m of matches ?? []) {
-    const k = String(m.renewal ?? "").slice(0, 7);
-    if (k) out[k] = (out[k] ?? 0) + 1;
+    const k = String(m.renewal ?? "").slice(5, 7);
+    if (/^\d{2}$/.test(k)) out[k] = (out[k] ?? 0) + 1;
   }
   return out;
 }

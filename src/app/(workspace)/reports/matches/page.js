@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import MatchResults from "@/features/matches/components/match-results";
 import { getMatchResults, getMatchSummary } from "@/features/matches/queries";
-import { goalFigures, matchReportCsv, monthsAhead } from "@/lib/match-report";
+import { goalFigures, matchReportCsv, renewingSoon } from "@/lib/match-report";
 import { formatIso } from "@/lib/dates";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
@@ -21,7 +21,7 @@ const day = (iso) => (iso ? formatIso(iso, "medium") : "—");
 /**
  * The Match Tool's report (Sean, Nov 2026; the old system's match job): each active project's lead
  * goal, its leads, those owed and the share done, its matches (the names on its list we already
- * have elsewhere with a renewal date), how many renew in the next three months, the leads our
+ * have elsewhere with a renewal date), how many renew in the next four months (not this one), the leads our
  * managers developed and the matches added since its start, and how far behind its Due Date it
  * runs. A project's matches open to be brought in. Administrators only.
  */
@@ -29,8 +29,7 @@ export default async function MatchReport() {
   const me = await getCurrentUser();
   if (me?.role !== "admin") notFound();
   const [rows, today, results] = await Promise.all([getMatchSummary(), getBusinessToday(), getMatchResults()]);
-  const soon = monthsAhead(today).slice(0, 3);
-  const soonLabel = `${soon[0].label}–${soon[2].label}`;
+  const { months: soon, label: soonLabel } = renewingSoon(today);
 
   return (
     <>
