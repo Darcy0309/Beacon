@@ -6,7 +6,8 @@ import SectionHeader from "@/components/shared/section-header";
 import CsvButton from "@/components/shared/csv-button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getMatchSummary } from "@/features/matches/queries";
+import MatchResults from "@/features/matches/components/match-results";
+import { getMatchResults, getMatchSummary } from "@/features/matches/queries";
 import { goalFigures, matchReportCsv, monthsAhead } from "@/lib/match-report";
 import { formatIso } from "@/lib/dates";
 import { getBusinessToday } from "@/lib/server/business-day";
@@ -27,7 +28,7 @@ const day = (iso) => (iso ? formatIso(iso, "medium") : "—");
 export default async function MatchReport() {
   const me = await getCurrentUser();
   if (me?.role !== "admin") notFound();
-  const [rows, today] = await Promise.all([getMatchSummary(), getBusinessToday()]);
+  const [rows, today, results] = await Promise.all([getMatchSummary(), getBusinessToday(), getMatchResults()]);
   const soon = monthsAhead(today).slice(0, 3);
   const soonLabel = `${soon[0].label}–${soon[2].label}`;
 
@@ -38,6 +39,7 @@ export default async function MatchReport() {
         <Card data-match-report>
           <SectionHeader label="Matches by project" icon={Combine}
             action={<CsvButton csv={matchReportCsv(rows, today)} fileName={`Matches_${today}.csv`} disabled={!rows.length} data-export-matches />} />
+          <MatchResults names={results.names} excluded={results.excluded} />
           <div className="overflow-x-auto">
             <Table className="min-w-[72rem] text-sm">
               <TableHeader>
@@ -52,7 +54,7 @@ export default async function MatchReport() {
               <TableBody>
                 {rows.map((r) => {
                   const f = goalFigures({ goal: r.lead_goal, leads: r.leads, start: r.start_date, due: r.due_date, today });
-                  const renewSoon = soon.reduce((n, m) => n + Number(r.by_month?.[m.month] ?? 0), 0);
+                  const renewSoon = soon.reduce((n, m) => n + Number(r.by_month?.[m.key] ?? 0), 0);
                   return (
                     <TableRow key={r.project_id} data-match-row={r.project_id}>
                       <TableCell className="max-w-48 truncate" title={r.client}>{r.client ?? "—"}</TableCell>

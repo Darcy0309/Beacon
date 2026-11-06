@@ -7,12 +7,19 @@
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayNumber = (iso) => Math.round(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000);
 
-/** The twelve renewal months from `today`'s, as they come round: [{ month: 11, label: "Nov" }, …, { month: 10, label: "Oct" }]. */
+/**
+ * The renewal months from `today`'s on, as they come round: this month, the next eleven, and this
+ * month next year (the days of it already gone renew then), each by its month and year:
+ * [{ key: "2026-11", label: "Nov" }, …, { key: "2027-11", label: "Nov '27" }]. A label carries its
+ * year only when the month is shown twice.
+ */
 export function monthsAhead(today) {
-  const first = Number(today.slice(5, 7));
-  return Array.from({ length: 12 }, (_, i) => {
-    const month = ((first - 1 + i) % 12) + 1;
-    return { month, label: MONTHS[month - 1] };
+  const y = Number(today.slice(0, 4));
+  const m0 = Number(today.slice(5, 7)) - 1;
+  return Array.from({ length: 13 }, (_, i) => {
+    const year = y + Math.floor((m0 + i) / 12);
+    const month = ((m0 + i) % 12) + 1;
+    return { key: `${year}-${String(month).padStart(2, "0")}`, month, label: i === 12 ? `${MONTHS[month - 1]} '${String(year).slice(2)}` : MONTHS[month - 1] };
   });
 }
 
@@ -37,20 +44,20 @@ export function daysBehind({ goal, leads, start, due, today }) {
   return short <= 0 ? 0 : Math.round(short / perDay);
 }
 
-/** The matches to bring in: those renewing in the months picked (all when none), soonest first, `n` of them at most. */
+/** The matches to bring in: those renewing in the months picked ("2026-12"; all when none), soonest first, `n` of them at most. */
 export function pickMatches(matches, months = [], n = Infinity) {
-  const want = new Set(months.map(Number));
+  const want = new Set(months.map(String));
   return (matches ?? [])
-    .filter((m) => !want.size || want.has(Number(String(m.renewal).slice(5, 7))))
+    .filter((m) => !want.size || want.has(String(m.renewal).slice(0, 7)))
     .sort((a, b) => String(a.renewal).localeCompare(String(b.renewal)) || String(a.company).localeCompare(String(b.company)))
     .slice(0, Math.max(0, n));
 }
 
-/** How many matches renew each month: { 3: 12, 12: 4 }. */
+/** How many matches renew each month and year: { "2027-03": 12, "2026-12": 4 }. */
 export function byRenewalMonth(matches) {
   const out = {};
   for (const m of matches ?? []) {
-    const k = Number(String(m.renewal).slice(5, 7));
+    const k = String(m.renewal ?? "").slice(0, 7);
     if (k) out[k] = (out[k] ?? 0) + 1;
   }
   return out;

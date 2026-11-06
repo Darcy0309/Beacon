@@ -9,7 +9,8 @@ const is = (label, got, want) => {
   else { console.error(`✗ ${label} — got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`); failures++; }
 };
 
-is("renewal months from this one round to last", monthsAhead("2026-11-05").map((m) => m.label).join(" "), "Nov Dec Jan Feb Mar Apr May Jun Jul Aug Sep Oct");
+is("renewal months from this one round to the same next year, each its month and year", monthsAhead("2026-11-05").map((m) => `${m.key} ${m.label}`),
+  ["2026-11 Nov", "2026-12 Dec", "2027-01 Jan", "2027-02 Feb", "2027-03 Mar", "2027-04 Apr", "2027-05 May", "2027-06 Jun", "2027-07 Jul", "2027-08 Aug", "2027-09 Sep", "2027-10 Oct", "2027-11 Nov '27"]);
 // 100 leads over 100 days (Jan 1 to Apr 10): a lead a day.
 is("on pace: none behind", daysBehind({ goal: 100, leads: 50, start: "2026-01-01", due: "2026-04-10", today: "2026-02-19" }), 0);
 is("…20 short of the pace on day 50: 20 days behind", daysBehind({ goal: 100, leads: 30, start: "2026-01-01", due: "2026-04-10", today: "2026-02-19" }), 20);
@@ -23,8 +24,9 @@ const matches = [
   { lead_id: 1, company: "B", renewal: "2027-02-10" }, { lead_id: 2, company: "A", renewal: "2026-12-01" },
   { lead_id: 3, company: "C", renewal: "2027-06-01" }, { lead_id: 4, company: "D", renewal: "2026-12-20" },
 ];
-is("matches by renewal month", byRenewalMonth(matches), { 2: 1, 12: 2, 6: 1 });
-is("the matches to bring in: those renewing in the months picked, soonest first, so many", pickMatches(matches, [12, 2], 2).map((m) => m.lead_id), [2, 4]);
+is("matches by renewal month and year", byRenewalMonth(matches), { "2027-02": 1, "2026-12": 2, "2027-06": 1 });
+is("the matches to bring in: those renewing in the months picked, soonest first, so many", pickMatches(matches, ["2026-12", "2027-02"], 2).map((m) => m.lead_id), [2, 4]);
+is("…this November and next November two months", pickMatches([{ lead_id: 5, renewal: "2027-11-02" }, { lead_id: 6, renewal: "2026-11-20" }], ["2026-11"]).map((m) => m.lead_id), [6]);
 is("…every month when none picked", pickMatches(matches, [], 10).map((m) => m.lead_id), [2, 4, 1, 3]);
 const csv = matchReportCsv([{ client: "Capital, Inc", project: "Prescott_DBDev", status: "Active", lead_goal: 800, leads: 405, matches: 535, developed: 300, matched: 105,
   start_date: "2026-01-01", due_date: "2026-12-31" }], "2026-11-05").split("\r\n");

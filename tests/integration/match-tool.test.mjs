@@ -40,6 +40,10 @@ const T2 = lead(P, "Best Roofing", { phone: "602-555-9999", zip: "85001", city: 
 const T3 = lead(P, "Gamma Co", { phone: "602-555-1003", city: "Mesa", state: "AZ" });
 lead(P, "Delta Signs", { phone: "602-555-1001" }, { wc_xdate: "2027-01-01" });
 lead(P, "Acme Plumbing Two", { phone: "602-555-1001", result_id: Number(sql("select id from public.call_results where project_type = 'DBDV' and name = 'DoNotCall'")) });
+// Echo's record elsewhere is a Lead-Disco#: no match, unless that result is ticked to qualify.
+lead(Q, "Echo Pools", { phone: "602-555-1004", result_id: Number(sql("select id from public.call_results where project_type = 'APPT' and name = 'Lead-Disco#'")) }, { auto_xdate: "2025-08-01" });
+const T5 = lead(P, "Echo Pools", { phone: "602-555-1004" });
+const savedSetting = sql("select coalesce(value::text, '') from public.app_settings where key = 'match_results'");
 // A record of Gamma's on the project's own appointment project: not a source.
 lead(PA, "Gamma Co Again", { phone: "602-555-1003" }, { wc_xdate: "2025-06-01" });
 
@@ -62,11 +66,19 @@ try {
 
   check("a business name as the import reads it", sql("select concat_ws('|', public.business_key('The Acme Plumbing, Inc.'), public.business_key('Acme Plumbing Co'), public.business_key('A & J Electric LLC'))") === "acmeplumbing|acmeplumbing|aandjelectric");
 
+  check("not a record whose own call result disqualifies it (Lead-Disco#)", !got[T5]);
+  sql(`insert into public.app_settings (key, value) values ('match_results', '{"exclude": ["Lead-Invalid"]}') on conflict (key) do update set value = excluded.value`);
+  const ticked = await admin.sb.rpc("project_matches", { p_project: P });
+  check("…a match once that result is ticked to qualify", (ticked.data ?? []).some((m) => m.lead_id === T5));
+  if (savedSetting) sql(`update public.app_settings set value = ${lit(savedSetting)}::jsonb where key = 'match_results'`);
+  else sql("delete from public.app_settings where key = 'match_results'");
+
   section("The Match report");
   const sum = await admin.sb.rpc("match_summary");
   const row = (sum.data ?? []).find((r) => Number(r.project_id) === P);
-  check("each active project: its goal, its matches by renewal month", !sum.error && row?.lead_goal === 10 && Number(row.matches) === 2
-    && JSON.stringify(Object.fromEntries(Object.entries(row.by_month).sort())) === JSON.stringify({ 12: 1, 3: 1 }), sum.error?.message ?? JSON.stringify(row));
+  check("each active project: its goal, its matches by the month and year they next renew", !sum.error && row?.lead_goal === 10 && Number(row.matches) === 2
+    && JSON.stringify(Object.fromEntries(Object.entries(row.by_month).sort())) === JSON.stringify(Object.fromEntries([[next("2024-12-20").slice(0, 7), 1], [next("2025-03-01").slice(0, 7), 1]].sort())),
+    sum.error?.message ?? JSON.stringify(row));
 
   section("Bringing them in");
   const toDbdev = await admin.sb.rpc("add_matches", { p_project: P, p_leads: [T1], p_to: "dbdev" });

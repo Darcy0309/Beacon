@@ -55,13 +55,13 @@ export default function AddMatches({ projectId, isDbdev, hasAppt, matches, today
         <div>
           <div className="eyebrow mb-2">Renewing in <span className="normal-case tracking-normal text-muted-foreground">· pick months, or none for all</span></div>
           <div className="flex flex-wrap gap-1.5">
-            {monthsAhead(today).map(({ month, label }) => {
-              const on = months.includes(month);
+            {monthsAhead(today).map(({ key, label }) => {
+              const on = months.includes(key);
               return (
-                <button key={month} type="button" onClick={() => toggle(month)} aria-pressed={on} disabled={!counts[month]} data-match-month={month}
+                <button key={key} type="button" onClick={() => toggle(key)} aria-pressed={on} disabled={!counts[key]} data-match-month={key}
                   className={cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-40",
                     on ? "border-primary bg-primary/15 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40 hover:text-primary")}>
-                  {label} <span className="tabular-nums opacity-70">{(counts[month] ?? 0).toLocaleString()}</span>
+                  {label} <span className="tabular-nums opacity-70">{(counts[key] ?? 0).toLocaleString()}</span>
                 </button>
               );
             })}

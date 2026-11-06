@@ -32,6 +32,9 @@ lead(Q, "Best Roofing", "602-555-2002", { pkg_xdate: "2024-12-20", pkg_carrier: 
 const T1 = lead(P, "Acme Plumbing", "602-555-2001");
 const T2 = lead(P, "Best Roofing", "602-555-2002");
 lead(P, "Nobody Else", "602-555-2003");
+// The month and year each next renews, as the page's month buttons are keyed.
+const monthOf = (d) => sql(`select to_char(public.next_renewal('${d}', (now() at time zone public.business_tz())::date), 'YYYY-MM')`);
+const DEC = monthOf("2024-12-20"), MAR = monthOf("2025-03-01");
 const at = (id) => sql(`select l.project_id || '|' || r.name || '|' || (l.matched_at is not null) from public.leads l join public.call_results r on r.id = l.result_id where l.id = ${id}`);
 
 const browser = await launchBrowser({ mouse: true });
@@ -57,9 +60,9 @@ try {
   section("A project's matches");
   await admin.ev(`document.querySelector('[data-match-row="${P}"] [data-match-link]').click()`);
   check("its matches open", Boolean(await until(async () => (await admin.path()) === `/reports/matches/${P}` && admin.ev(`document.querySelectorAll('[data-match]').length === 2`), { timeout: 15000 })), await admin.url());
-  const dec = await admin.ev(`document.querySelector('[data-match-month="12"]')?.textContent.trim()`);
-  check("by renewal month, each with how many", /Dec\s*1/.test(dec ?? "") && /Mar\s*1/.test(await admin.ev(`document.querySelector('[data-match-month="3"]')?.textContent.trim()`)), dec);
-  await admin.ev(`document.querySelector('[data-match-month="12"]').click()`);
+  const dec = await admin.ev(`document.querySelector('[data-match-month="${DEC}"]')?.textContent.trim()`);
+  check("by renewal month, each with how many", /Dec\s*1/.test(dec ?? "") && /Mar\s*1/.test(await admin.ev(`document.querySelector('[data-match-month="${MAR}"]')?.textContent.trim()`)), dec);
+  await admin.ev(`document.querySelector('[data-match-month="${DEC}"]').click()`);
   check("December picked: its match, to add", Boolean(await until(() => admin.ev(`document.querySelectorAll('[data-match]').length === 1 && !!document.querySelector('[data-match="${T2}"][data-picked]')`))));
   await admin.ev(`document.querySelector('[data-match-to="dbdev"]').click()`);
   await admin.click("[data-add-matches-go]");

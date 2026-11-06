@@ -28,3 +28,16 @@ export async function addMatches(projectId, leadIds, to) {
   revalidatePath(`/reports/matches/${project}`);
   return ok({ added: data ?? 0, skipped: ids.length - (data ?? 0) });
 }
+
+/** The call results a match's record may not have (the rest qualify), as an administrator chooses them. */
+export async function setMatchResults(excluded) {
+  const names = [...new Set((Array.isArray(excluded) ? excluded : []).map((n) => String(n ?? "").trim()).filter(Boolean))].slice(0, 200);
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only an administrator can choose these.");
+  const { error } = await supabase.from("app_settings").upsert({ key: "match_results", value: { exclude: names }, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  if (error) return fail(error);
+  await logActivity(supabase, "matches.results", { entity: "setting", detail: `${names.length} call results left out of matching`, userId: me.id });
+  revalidatePath("/reports/matches", "layout");
+  return ok({ excluded: names });
+}
