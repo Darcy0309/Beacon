@@ -212,7 +212,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
                 hint={picked.effect === "appointment_invalid" ? "The client is emailed the lead sheet, marked CANCELLED, with these: say why. Earlier notes stay, a trail of what took place."
                   : picked.effect === "confirm" ? "The client is emailed the lead sheet, marked CONFIRMED, with these: add anything they need to know. Earlier notes stay."
                   : "The client sees these, with the lead sheet. Add to them: earlier ones stay, a trail of what took place."}>
-                <StampedTextarea name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
+                <StampedTextarea dictation name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
                   placeholder={picked.effect === "appointment_invalid" ? "e.g. Cancelled: the owner is out of town until next month"
                     : picked.effect === "confirm" ? "e.g. Confirmed with Daniel; bring the current dec pages"
                     : "e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am"} data-client-note />
@@ -220,7 +220,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
             ) : null}
 
             <Field label={sendsSheet(picked) ? "Call notes" : "Notes"} error={fe("notes")} hint={sendsSheet(picked) ? "Internal: the client never sees them. Added to the lead's internal notes." : "Added to the lead's internal notes."}>
-              <StampedTextarea ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")} />
+              <StampedTextarea dictation ref={notesRef} name="notes" rows={2} maxLength={1000} defaultValue={dv("notes")} aria-invalid={invalid("notes")} />
             </Field>
 
             {/* What is missing, all at once, as the old system said it. */}

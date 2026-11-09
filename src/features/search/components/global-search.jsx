@@ -11,6 +11,9 @@ import {
 import { navGroups, rolesForPath } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
 import { REACH_ERROR, isNetworkError } from "@/lib/reach";
+import { toast } from "sonner";
+import MicButton from "@/components/shared/mic-button";
+import { useDictation } from "@/lib/use-dictation";
 import { cn } from "@/lib/utils";
 
 const MIN_CHARS = 2;
@@ -69,6 +72,19 @@ export default function GlobalSearch() {
   const [error, setError] = useState("");
   const [modKey, setModKey] = useState("Ctrl");
   const inputRef = useRef(null);
+  // Talk to type the search (Sean, Nov 2026), where the browser can: what is said follows what was typed.
+  const talk = useDictation({ onError: (message) => toast.error(message) });
+  const toggleTalk = () => {
+    if (talk.listening) return talk.stop();
+    const typed = q.trim();
+    inputRef.current?.focus();
+    // A spoken search reads as typed: no full stop at its end.
+    talk.start((text) => setQ([typed, text.replace(/[.?!]+$/, "")].filter(Boolean).join(" ")));
+  };
+  // Closed: listening ends with it.
+  useEffect(() => {
+    if (!open && talk.listening) talk.stop();
+  }, [open, talk]);
 
   // The shortcut hint depends on the platform; decided after hydration so
   // the server and client render the same markup.
@@ -260,6 +276,7 @@ export default function GlobalSearch() {
                     className="h-full w-full min-w-0 bg-transparent text-base font-medium outline-none placeholder:font-normal placeholder:text-muted-foreground"
                   />
                   {loading ? <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-label="Searching" /> : null}
+                  {talk.supported ? <MicButton listening={talk.listening} onToggle={toggleTalk} /> : null}
                   {q ? (
                     <button
                       type="button"

@@ -64,6 +64,8 @@ function Note({ leadId, kind, text, canEdit }) {
           <StampedTextarea
             ref={box}
             name="text"
+            // Talk to type (Sean, Nov 2026), where the browser can.
+            dictation
             // Tall enough for what is there (about 70 characters a line), within reason.
             rows={Math.min(14, Math.max(4, Math.ceil(String(text ?? "").length / 70) + String(text ?? "").split("\n").length))}
             maxLength={k.max}
