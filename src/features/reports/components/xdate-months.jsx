@@ -1,5 +1,5 @@
 import Link from "@/components/shared/intent-link";
-import TipLayer from "@/components/shared/tip-layer";
+import ReportChart from "@/components/shared/report-chart";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -51,7 +51,6 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
     ? Object.fromEntries(FIGURES.map((k) => [k, counted.reduce((n, m) => n + m[k], 0)]))
     : data.totals;
   const none = Object.fromEntries(FIGURES.map((k) => [k, 0]));
-  const max = Math.max(1, ...months.map((m) => m.total));
   const thisMonth = today ? Number(today.slice(5, 7)) : new Date().getMonth() + 1;
   const isOpen = (month, bucket) => selected?.month === month && (selected?.bucket ?? null) === bucket;
 
@@ -76,59 +75,34 @@ export default function XdateMonths({ data, href, selected, today, compact = fal
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-        {SEGMENTS.slice().reverse().map((s) => (
-          <span key={s.key} className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full" style={{ background: s.color }} /> {s.label}
-          </span>
-        ))}
-        <span>Total {totals.total.toLocaleString()}</span>
-        {undated.total ? <span>No renewal date {undated.total.toLocaleString()}</span> : null}
-      </div>
-
-      {/* Hovering a month (or focusing one of its colours) shows its figures above its column. */}
-      <TipLayer tips={monthTips(months)} className={cn("flex items-stretch gap-1.5 sm:gap-3", compact ? "h-44" : "h-60")}>
-        {months.map((m, i) => (
-          <div key={m.month} data-tip={m.month} data-month-column={m.month} data-picked={picked ? picked.has(m.month) || undefined : undefined}
-            className={cn("group/month relative flex min-w-0 flex-1 flex-col items-center gap-2 transition-opacity", picked && !picked.has(m.month) && "opacity-25")}>
-            <div className="flex min-h-0 w-full flex-1 flex-col justify-end rounded-t transition-colors group-hover/month:bg-foreground/[0.04]">
-              {m.total ? (
-                <div
-                  data-tip-anchor
-                  // A hairline between the colours, so each reads on its own.
-                  className="animate-grow-height flex w-full flex-col-reverse gap-px overflow-hidden rounded-t-md transition-[height] duration-500"
-                  style={{ height: `${(m.total / max) * 100}%`, animationDelay: `${i * 45}ms` }}
-                >
-                  {SEGMENTS.map((s) =>
-                    m[s.key] && !href ? (
-                      <span key={s.key} data-seg={s.key} data-tip-row={s.key} aria-label={`${m.label}: ${m[s.bucket] ?? m[s.key]} ${s.label.toLowerCase()}`}
-                        className="block w-full" style={{ height: `${(m[s.key] / m.total) * 100}%`, background: s.color, minHeight: 2 }} />
-                    ) : m[s.key] ? (
-                      <Link
-                        key={s.key}
-                        href={href(m.month, s.bucket)}
-                        data-seg={s.key}
-                        data-tip-row={s.key}
-                        aria-label={`${m.label}: ${m[s.bucket] ?? m[s.key]} ${s.label.toLowerCase()}`}
-                        className={cn("block w-full transition-opacity hover:opacity-80", isOpen(m.month, s.bucket) && "outline-2 -outline-offset-2 outline-foreground")}
-                        style={{ height: `${(m[s.key] / m.total) * 100}%`, background: s.color, minHeight: 2 }}
-                      />
-                    ) : null
-                  )}
-                </div>
-              ) : (
-                <div data-tip-anchor className="h-0.5 w-full rounded bg-[var(--panel-border)]" />
-              )}
-            </div>
-            <span className={cn(
-              "text-[0.62rem] font-semibold uppercase tracking-[0.08em] sm:text-[0.66rem]",
-              m.month === thisMonth ? "text-primary" : "text-muted-foreground"
-            )}>
-              {m.short}
-            </span>
-          </div>
-        ))}
-      </TipLayer>
+      {/* Figures up the left and a bar/line/area/pie menu (client, Nov 2026). Hovering a month (or focusing
+          one of its colours) shows its figures above its column; each colour opens the names behind it. */}
+      <ReportChart
+        id={compact ? "xdate-months-project" : "xdate-months"}
+        stacked
+        height={compact ? "h-44" : "h-60"}
+        series={SEGMENTS}
+        tips={monthTips(months)}
+        legendExtra={(
+          <>
+            <span>Total {totals.total.toLocaleString()}</span>
+            {undated.total ? <span>No renewal date {undated.total.toLocaleString()}</span> : null}
+          </>
+        )}
+        points={months.map((m) => ({
+          key: m.month,
+          label: m.short,
+          values: Object.fromEntries(SEGMENTS.map((s) => [s.key, m[s.key]])),
+          // Without `href` (a client's view of their project), figures only: the names behind them are an administrator's report.
+          href: href ? Object.fromEntries(SEGMENTS.map((s) => [s.key, href(m.month, s.bucket)])) : undefined,
+          segLabel: Object.fromEntries(SEGMENTS.map((s) => [s.key, `${m.label}: ${m[s.bucket] ?? m[s.key]} ${s.label.toLowerCase()}`])),
+          selected: SEGMENTS.find((s) => isOpen(m.month, s.bucket))?.key,
+          current: m.month === thisMonth,
+          // Renewal months picked (X-Dates filters; Sean, Oct 2026): the others faded, and left out of the pie.
+          faded: picked ? !picked.has(m.month) : false,
+          attrs: { "data-month-column": m.month, "data-picked": picked ? picked.has(m.month) || undefined : undefined },
+        }))}
+      />
 
       {compact ? null : (
         <Table>

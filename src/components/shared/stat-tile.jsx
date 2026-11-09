@@ -1,12 +1,13 @@
 import CountUp from "@/components/shared/count-up";
-import Sparkline from "@/components/shared/sparkline";
+import ReportChart from "@/components/shared/report-chart";
 import EdgeTrace from "@/components/shared/edge-trace";
 import { cn } from "@/lib/utils";
 
 /**
  * Metric tile: accent edge, icon chip, wide-tracked label, large figure, and a
- * sparkline bleeding to the bottom edge in the tile's accent hue. The figure
- * counts up and the sparkline rises from zero as the tile appears.
+ * small chart at the foot in the tile's accent hue, its figures up the left.
+ * `seriesLabels` name the series' points for its tooltips ("Sep"). The figure
+ * counts up and the chart rises from zero as the tile appears.
  * Pass `trace` to add the animated streak that laps the border. `action`
  * shares the note's line (a period switch); `children` after it.
  */
@@ -17,6 +18,7 @@ export default function StatTile({
   icon: Icon,
   accent = "var(--neon-cyan)",
   series,
+  seriesLabels,
   bars = false,
   trace = false,
   action,
@@ -84,13 +86,23 @@ export default function StatTile({
       </div>
 
       {/* Pinned to the foot of the tile: tiles in a row stretch to the tallest,
-          and a note that wraps must not push one chart lower than its neighbours. */}
+          and a note that wraps must not push one chart lower than its neighbours.
+          Its figures up the left and a bar/line/area menu in the corner (client, Nov 2026). */}
       {series?.length ? (
-        <Sparkline
-          values={series}
-          color={accent}
-          bars={bars}
-          className="tile-spark mt-auto block h-16 w-full shrink-0"
+        <ReportChart
+          id={`tile:${label}`}
+          variant="tile"
+          defaultType={bars ? "bar" : "area"}
+          series={[{ key: "v", label, color: accent }]}
+          points={series.map((v, i) => ({
+            key: String(i),
+            label: seriesLabels?.[i] ?? "",
+            title: seriesLabels?.[i],
+            values: { v: Number(v) || 0 },
+          }))}
+          height="h-20"
+          className="tile-spark mt-auto w-full shrink-0 px-3 pb-3"
+          data-tile-chart=""
         />
       ) : null}
 

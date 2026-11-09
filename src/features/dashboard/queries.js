@@ -79,6 +79,8 @@ export async function getReports() {
     conversion: leads ? Math.round((appts / leads) * 100) : 0,
     avgRating: ratings.count ? Math.round(Number(ratings.avg) * 10) / 10 : 0,
     byStatus: r?.by_status ?? {},
+    // The same by stage: { APPT: {name: n}, DBDV: {name: n} }.
+    byResult: r?.by_result ?? {},
     // [[state, count], ...] — the top eight, busiest first.
     byState: r?.by_state ?? [],
     apptByStatus: r?.appt_by_status ?? {},

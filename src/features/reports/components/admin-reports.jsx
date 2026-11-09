@@ -3,7 +3,7 @@ import Link from "@/components/shared/intent-link";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
-import TipLayer from "@/components/shared/tip-layer";
+import ReportChart from "@/components/shared/report-chart";
 import ParamSelect from "@/components/shared/param-select";
 import DateRangePicker from "@/components/shared/date-range-picker";
 import CsvButton from "@/components/shared/csv-button";
@@ -70,7 +70,6 @@ export default async function AdminReports({ sp, today }) {
   const chRep = /^\d+$/.test(sp?.chrep ?? "") ? Number(sp.chrep) : null;
   const chMonths = months.slice(6 - period("ch"));
   const chart = monthSeries(chRep ? rows.filter((r) => project(r.project_id).salesRepId === chRep) : rows, chMonths);
-  const chMax = Math.max(1, ...chart.map((m) => Math.max(m.leads, m.appts)));
   const chTotal = { leads: chart.reduce((n, m) => n + m.leads, 0), appts: chart.reduce((n, m) => n + m.appts, 0) };
 
   // By manager, and the outcomes.
@@ -88,9 +87,9 @@ export default async function AdminReports({ sp, today }) {
   return (
     <div className="space-y-4" data-admin-reports>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatTile label="Leads Delivered" value={lt.leads.toLocaleString()} icon={Target} accent="var(--neon-cyan)" series={series.map((m) => m.leads)}
+        <StatTile label="Leads Delivered" value={lt.leads.toLocaleString()} icon={Target} accent="var(--neon-cyan)" series={series.map((m) => m.leads)} seriesLabels={series.map((m) => m.label)}
           note={`${plural(ltProjects, "project")}${lt.invalid_leads ? ` · ${lt.invalid_leads} invalid` : ""}`} action={<Period param="lt" current={period("lt")} params={params} />} />
-        <StatTile label="Appointments Set" value={at.appts.toLocaleString()} icon={CalendarCheck} accent="var(--neon-emerald)" series={series.map((m) => m.appts)}
+        <StatTile label="Appointments Set" value={at.appts.toLocaleString()} icon={CalendarCheck} accent="var(--neon-emerald)" series={series.map((m) => m.appts)} seriesLabels={series.map((m) => m.label)}
           note={`${pct(at.appts, atLeads)}% of leads`} action={<Period param="at" current={period("at")} params={params} />}>
           <p className="mt-1 text-xs text-muted-foreground" data-appts-split>
             <span className="font-semibold text-foreground">{at.confirmed.toLocaleString()}</span> confirmed · <span className="font-semibold text-foreground">{at.invalid_appts.toLocaleString()}</span> invalid
@@ -141,23 +140,13 @@ export default async function AdminReports({ sp, today }) {
           action={<span className="flex items-center gap-3"><ParamSelect name="chrep" label="Sales Rep" value={chRep ? String(chRep) : ""} options={repOptions} placeholder="All" clears={[]} />
             <Period param="ch" current={period("ch")} params={params} /></span>} />
         <div className="p-5">
-          <div className="mb-4 flex items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ background: "var(--neon-cyan)" }} /> Leads</span>
-            <span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments</span>
-          </div>
-          <TipLayer tips={monthBarTips(chart)} className="flex h-56 items-stretch gap-3" data-months-chart>
-            {chart.map((m, i) => (
-              <div key={m.key} data-tip={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`} className="flex min-h-0 flex-1 flex-col items-center gap-2">
-                <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
-                  {[["leads", "var(--neon-cyan)"], ["appts", "var(--neon-emerald)"]].map(([k, c], j) => (
-                    <div key={k} data-tip-row={k} data-tip-anchor={(k === "leads") === (m.leads >= m.appts) ? "" : undefined}
-                      className="animate-grow-height w-1/3 max-w-16 rounded-t" style={{ height: `${(m[k] / chMax) * 100}%`, background: c, boxShadow: `0 0 12px -3px ${c}`, animationDelay: `${i * 70 + j * 35}ms` }} />
-                  ))}
-                </div>
-                <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{m.label}</span>
-              </div>
-            ))}
-          </TipLayer>
+          {/* Figures up the left and a bar/line/area menu (client, Nov 2026); hovering a month shows its figures. */}
+          <ReportChart id="admin-reports-months" height="h-56" tips={monthBarTips(chart)} data-months-chart=""
+            series={[{ key: "leads", label: "Leads", color: "var(--neon-cyan)" }, { key: "appts", label: "Appointments", color: "var(--neon-emerald)" }]}
+            points={chart.map((m) => ({
+              key: m.key, label: m.label, values: { leads: m.leads, appts: m.appts },
+              attrs: { role: "img", "aria-label": `${m.label}: ${m.leads} leads, ${m.appts} appointments` },
+            }))} />
         </div>
         {/* The figures under the bars, as the pipeline sheet has them. */}
         <div className="overflow-x-auto border-t border-[var(--panel-border)]">

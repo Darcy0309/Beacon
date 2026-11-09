@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { setClientGoal } from "@/features/dashboard/actions";
 import { reach } from "@/lib/reach";
+import { niceScale, tickLabel } from "@/lib/chart-scale";
 
 const money = (n) => `$${Math.round(n).toLocaleString("en-US")}`;
 const short = (n) => (n >= 1e6 ? `$${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}K` : money(n));
@@ -40,7 +41,9 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
   const points = months.map((m) => ({ ...m, total: (run += m.written) }));
   const shown = points.filter((p) => p.month <= thisMonth);
   const pace = (m) => (sales.goal ? (sales.goal * m) / 12 : null);
-  const top = Math.max(1, ...points.map((p) => p.total), sales.goal ?? 0);
+  // A round top, its figures up the left (client, Nov 2026: "show the left side legends").
+  const scale = niceScale(Math.max(1, ...points.map((p) => p.total), sales.goal ?? 0));
+  const top = scale.top;
 
   // The chart in a 600 x 220 box, months across, money up.
   const W = 600, H = 220, PAD = 10;
@@ -74,8 +77,21 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
           </span>
         } />
       <div className="flex flex-1 flex-col gap-4 p-5">
-        <div className="relative min-h-48 flex-1" onMouseLeave={() => setHover(null)}>
-          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-full min-h-48 w-full overflow-visible" role="img"
+        <div className="flex min-h-48 flex-1 gap-1.5" onMouseLeave={() => setHover(null)}>
+          {/* The figures up the left, each on its gridline; bottom-5 leaves the months' row beneath. */}
+          <div aria-hidden className="relative w-11 shrink-0" data-chart-axis>
+            <div className="absolute inset-x-0 top-0 bottom-5">
+              {scale.ticks.map((t) => (
+                <span key={t} data-axis-tick={t} className="absolute right-0 translate-y-1/2 text-[10px] leading-none tabular-nums text-muted-foreground"
+                  style={{ bottom: `${((PAD + (t / top) * (H - PAD * 2)) / H) * 100}%` }}>
+                  {tickLabel(t, top, "$")}
+                </span>
+              ))}
+            </div>
+          </div>
+        <div className="relative flex min-w-0 flex-1 flex-col">
+          <div className="relative min-h-0 flex-1">
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible" role="img"
             aria-label={`Premium written in ${sales.year}: ${money(sales.written)}${sales.goal ? ` of a ${money(sales.goal)} goal` : ""}`}>
             <defs>
               <linearGradient id="sale-pipeline-fill" x1="0" y1="0" x2="0" y2="1">
@@ -83,8 +99,8 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
                 <stop offset="1" stopColor={color} stopOpacity="0" />
               </linearGradient>
             </defs>
-            {[0.25, 0.5, 0.75, 1].map((f) => (
-              <line key={f} x1={PAD} x2={W - PAD} y1={y(top * f)} y2={y(top * f)} stroke="var(--grid-line)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            {scale.ticks.map((t) => (
+              <line key={t} x1={PAD} x2={W - PAD} y1={y(t)} y2={y(t)} stroke="var(--panel-border)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
             ))}
             {sales.goal ? (
               <line x1={x(1)} y1={y(pace(1))} x2={x(12)} y2={y(pace(12))} stroke="var(--neon-amber)" strokeWidth="1.5" strokeDasharray="5 5"
@@ -98,6 +114,7 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
             ))}
             {at && at.month <= thisMonth ? <circle cx={x(at.month)} cy={y(at.total)} r="4" fill={color} vectorEffect="non-scaling-stroke" /> : null}
           </svg>
+          </div>
           {at ? (
             <div className="pointer-events-none absolute top-1 rounded-md border border-[var(--panel-border)] bg-popover px-2.5 py-1.5 text-xs shadow-md"
               style={{ left: `clamp(0px, calc(${((at.month - 1) / 11) * 100}% - 4rem), calc(100% - 9rem))` }} data-sale-tip>
@@ -106,7 +123,7 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
               {sales.goal ? <div className="tabular-nums text-muted-foreground">Goal pace {money(pace(at.month))}</div> : null}
             </div>
           ) : null}
-          <div className="mt-1 flex justify-between text-[0.66rem] text-muted-foreground">
+          <div className="mt-1 flex h-4 justify-between text-[0.66rem] leading-4 text-muted-foreground">
             {points.map((p) => <span key={p.month} className={p.month === thisMonth ? "font-semibold text-foreground" : ""}>{p.label}</span>)}
           </div>
           {sales.written === 0 ? (
@@ -114,6 +131,7 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
               Premium written from our appointments shows here as you record your sales.
             </p>
           ) : null}
+        </div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {stats.map(([label, value, note, accent, key]) => (

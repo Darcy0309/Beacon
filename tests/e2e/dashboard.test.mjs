@@ -120,6 +120,23 @@ try {
     const sameRow = await wide.ev(`(() => { const card = document.querySelector('[data-months-chart]').closest('[data-panel]');
       return Math.round(card.getBoundingClientRect().height) === Math.round(card.parentElement.getBoundingClientRect().height); })()`);
     check("…and the card is as tall as its row", sameRow);
+    // The call results beside it (client, Nov 2026): one stage at a time, scrolling within the chart's height, never stretching it.
+    const res = await wide.ev(`(() => { const r = document.querySelector('[data-results-by-stage]'); const c = document.querySelector('[data-months-chart]').closest('[data-panel]');
+      const shown = r.querySelector('[role=tabpanel]:not([hidden])');
+      return { results: Math.round(r.getBoundingClientRect().height), chart: Math.round(c.getBoundingClientRect().height),
+        tabs: [...r.querySelectorAll('[role=tab]')].map((t) => t.dataset.tab), rows: shown?.querySelectorAll('[data-list-row]').length ?? 0,
+        scrolls: shown ? getComputedStyle(shown).overflowY : null, title: r.querySelector('[data-section-label]').textContent }; })()`);
+    check("the call results are titled Results by Call Result, by stage, Appts first",
+      res.title === "Results by Call Result" && res.tabs.length >= 1 && res.tabs.every((t) => t === "APPT" || t === "DBDV")
+      && (res.tabs.length === 1 || res.tabs.join() === "APPT,DBDV") && res.rows > 0, JSON.stringify(res));
+    check("…the card as tall as the chart beside it, its list scrolling inside", res.results === res.chart && res.scrolls === "auto", JSON.stringify(res));
+    if (res.tabs.length === 2) {
+      const names = (stage) => wide.ev(`[...document.querySelectorAll('[data-results-by-stage] [data-tab-panel="${stage}"] [data-list-row] span:first-child')].map((s) => s.textContent).join('|')`);
+      await wide.ev(`document.querySelector('[data-results-by-stage] [data-tab="DBDV"]').click()`);
+      await sleep(150);
+      const shownNow = await wide.ev(`document.querySelector('[data-results-by-stage] [role=tabpanel]:not([hidden])')?.dataset.tabPanel`);
+      check("…and DB Dev shows its own results, apart from the appointment stage's", shownNow === "DBDV" && (await names("DBDV")) !== (await names("APPT")), shownNow);
+    }
     await shot(wide, "reports-months");
   }
 

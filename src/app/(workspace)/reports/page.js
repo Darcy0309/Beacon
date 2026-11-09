@@ -7,7 +7,8 @@ import SectionHeader from "@/components/shared/section-header";
 import MetricBar from "@/components/shared/metric-bar";
 import CountUp from "@/components/shared/count-up";
 import { Card } from "@/components/ui/card";
-import TipLayer from "@/components/shared/tip-layer";
+import ReportChart from "@/components/shared/report-chart";
+import Tabs from "@/components/shared/tabs";
 import { monthBarTips } from "@/lib/chart-tips";
 import { reportsView } from "@/features/dashboard/role-views";
 import { getReports } from "@/features/dashboard/queries";
@@ -20,6 +21,12 @@ export const dynamic = "force-dynamic";
 
 // The call results, most first, each a colour of its own.
 const RESULT_COLORS = ["var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-violet)", "var(--neon-amber)", "var(--neon-rose)", "var(--neon-blue)"];
+
+// The six-month chart's bars, in the order of its legend.
+const MONTH_SERIES = [
+  { key: "leads", label: "Leads", color: "var(--neon-cyan)" },
+  { key: "appts", label: "Appointments", color: "var(--neon-emerald)" },
+];
 
 const BAR_COLORS = [
   "var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-amber)",
@@ -57,22 +64,28 @@ export default async function ReportsPage({ searchParams }) {
     view.myPerformance ? getMyWorkload() : null,
   ]);
 
-  const maxMonth = Math.max(1, ...r.months.map((m) => Math.max(m.leads, m.appts)));
   const maxState = Math.max(1, ...r.byState.map(([, n]) => n));
   const repRows = reps ?? [];
+  // The call results by stage, appointments first; a stage with no leads is left out.
+  const stages = [["APPT", "Appts"], ["DBDV", "DB Dev"]].map(([code, label]) => {
+    const rows = Object.entries(r.byResult[code] ?? {}).sort((x, y) => y[1] - x[1]);
+    return { code, label, rows, total: rows.reduce((n, [, c]) => n + c, 0) };
+  }).filter((s) => s.total > 0);
   // An agent's own bar is highlighted rather than singled out into its own chart.
   const myShare = (n, total) => (total ? Math.round((n / total) * 100) : 0);
 
+  // The tiles' charts are the same six months: their tooltips name them.
+  const monthNames = r.months.map((m) => m.label);
   const tiles = [
     { label: "Leads Delivered", value: r.leads.toLocaleString(), note: `${r.projects} campaigns`,
-      icon: Target, accent: "var(--neon-cyan)", series: r.months.map((m) => m.leads) },
+      icon: Target, accent: "var(--neon-cyan)", series: r.months.map((m) => m.leads), seriesLabels: monthNames },
     { label: "Appointments Set", value: r.appts.toLocaleString(), note: `${r.conversion}% of leads`,
-      icon: CalendarCheck, accent: "var(--neon-emerald)", series: r.months.map((m) => m.appts) },
+      icon: CalendarCheck, accent: "var(--neon-emerald)", series: r.months.map((m) => m.appts), seriesLabels: monthNames },
     { label: "Avg. Client Rating", value: r.avgRating ? `${r.avgRating}/5` : "—", note: "client feedback",
       // Each month's average rating; a month with none draws as zero.
-      icon: Star, accent: "var(--neon-amber)", series: r.months.map((m) => Number(m.rating) || 0), bars: true },
+      icon: Star, accent: "var(--neon-amber)", series: r.months.map((m) => Number(m.rating) || 0), seriesLabels: monthNames, bars: true },
     { label: "Show Rate", value: `${r.showRate}%`, note: "appointments held",
-      icon: CheckCheck, accent: "var(--neon-violet)", series: r.months.map((m) => m.appts), bars: true },
+      icon: CheckCheck, accent: "var(--neon-violet)", series: r.months.map((m) => m.appts), seriesLabels: monthNames, bars: true },
   ];
 
   return (
@@ -116,67 +129,38 @@ export default async function ReportsPage({ searchParams }) {
         ) : null}
 
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* The chart fills its card: beside a long status list the card grows, and so do the bars. */}
+          {/* The chart sets this row's height; the call results beside it scroll within it. */}
           <Card className="flex flex-col lg:col-span-2">
             <SectionHeader label="Leads vs Appointments — 6 Months" icon={BarChart3} />
             <div className="flex flex-1 flex-col p-5">
-              <div className="mb-4 flex items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full" style={{ background: "var(--neon-cyan)" }} /> Leads
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
-                </span>
-              </div>
-              {/* Hovering a month shows its figures above its taller bar, in the app's own tooltip. */}
-              <TipLayer tips={monthBarTips(r.months)} className="flex min-h-56 flex-1 items-stretch gap-3" data-months-chart>
-                {r.months.map((m, i) => (
-                  <div key={m.key} data-tip={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
-                    className="flex min-h-0 flex-1 flex-col items-center gap-2">
-                    <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
-                      <div
-                        data-tip-row="leads"
-                        data-tip-anchor={m.leads >= m.appts ? "" : undefined}
-                        className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
-                        style={{
-                          height: `${(m.leads / maxMonth) * 100}%`,
-                          background: "var(--neon-cyan)",
-                          boxShadow: "0 0 12px -3px var(--neon-cyan)",
-                          animationDelay: `${i * 70}ms`,
-                        }}
-                      />
-                      <div
-                        data-tip-row="appts"
-                        data-tip-anchor={m.leads < m.appts ? "" : undefined}
-                        className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
-                        style={{
-                          height: `${(m.appts / maxMonth) * 100}%`,
-                          background: "var(--neon-emerald)",
-                          boxShadow: "0 0 12px -3px var(--neon-emerald)",
-                          animationDelay: `${i * 70 + 35}ms`,
-                        }}
-                      />
-                    </div>
-                    <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-                      {m.label}
-                    </span>
-                  </div>
-                ))}
-              </TipLayer>
+              {/* Figures up the left and a bar/line/area menu (client, Nov 2026); hovering a month shows its figures. */}
+              <ReportChart id="reports-months" className="flex-1" height="min-h-56 flex-1 lg:min-h-72"
+                series={MONTH_SERIES} tips={monthBarTips(r.months)} data-months-chart=""
+                points={r.months.map((m) => ({
+                  key: m.key, label: m.label, values: { leads: m.leads, appts: m.appts },
+                  attrs: { role: "img", "aria-label": `${m.label}: ${m.leads} leads, ${m.appts} appointments` },
+                }))} />
             </div>
           </Card>
 
-          <Card>
-            <SectionHeader label="Leads by Call Result" icon={PieChart} />
-            <div className="space-y-2.5 p-4">
-              {Object.entries(r.byStatus).sort((x, y) => y[1] - x[1]).map(([name, count], i) => (
-                <MetricBar key={name} label={name} value={count} max={r.leads || 1}
-                  color={RESULT_COLORS[i % RESULT_COLORS.length]} />
-              ))}
-              {Object.keys(r.byStatus).length === 0 && (
-                <p className="text-sm text-muted-foreground">No leads yet.</p>
-              )}
-            </div>
+          {/* One stage's results at a time (client, Nov 2026): all of them together ran ~25 rows and
+              stretched the chart down the page. Beside the chart the card takes the chart's height
+              (contain: size keeps the list out of the row's height) and the list scrolls within it. */}
+          <Card data-results-by-stage className="flex flex-col max-lg:max-h-[28rem] lg:[contain:size]">
+            <SectionHeader label="Results by Call Result" icon={PieChart} />
+            {stages.length ? (
+              <Tabs label="Stage" className="flex min-h-0 flex-1 flex-col"
+                panelClassName="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4"
+                tabs={stages.map((s) => ({
+                  id: s.code, label: s.label, count: s.total.toLocaleString(),
+                  content: s.rows.map(([name, count], i) => (
+                    <MetricBar key={name} label={name} value={count} max={s.total}
+                      color={RESULT_COLORS[i % RESULT_COLORS.length]} />
+                  )),
+                }))} />
+            ) : (
+              <p className="p-4 text-sm text-muted-foreground">No leads yet.</p>
+            )}
           </Card>
         </div>
 

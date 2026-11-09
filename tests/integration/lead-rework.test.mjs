@@ -110,6 +110,15 @@ try {
   const report = (await admin.sb.rpc("report_stats")).data;
   check("leads are counted by call result, not by the old statuses", report && Object.keys(report.by_status).some((k) => /^Lead-|^Viable-/.test(k))
     && !Object.keys(report.by_status).some((k) => /^X-date|^Phone appointment|^New$/.test(k)), JSON.stringify(report?.by_status));
+  // The Reports tile shows one stage at a time: each stage's results apart, every name of the stage it is filed under.
+  const stageOf = (code) => new Set(sql(`select name from public.call_results where project_type = '${code}'`).split("\n").filter(Boolean));
+  const [apptNames, dbdvNames] = [stageOf("APPT"), stageOf("DBDV")];
+  const sum = (o) => Object.values(o ?? {}).reduce((n, c) => n + c, 0);
+  check("the call results are also counted by stage, each under its own stage, the two adding up to the whole",
+    report && Object.keys(report.by_result).every((k) => k === "APPT" || k === "DBDV")
+    && Object.keys(report.by_result.APPT ?? {}).every((k) => apptNames.has(k))
+    && Object.keys(report.by_result.DBDV ?? {}).every((k) => dbdvNames.has(k))
+    && sum(report.by_result.APPT) + sum(report.by_result.DBDV) === sum(report.by_status), JSON.stringify(report?.by_result));
 
   section("Policy files");
   const F = lead("Files Co", APPT, sean.me.id);

@@ -1647,10 +1647,11 @@ html[data-style][data-executive] [data-tile-value] {
   font-weight: 700;
   letter-spacing: -0.03em;
 }
-html[data-style][data-executive] .tile-spark { opacity: 0.5; }
-html[data-style][data-executive] .tile-spark :is(path, line, polyline, rect) { stroke: var(--primary); }
-html[data-style][data-executive] .tile-spark rect { fill: var(--primary); }
-html[data-style][data-executive] .tile-spark stop { stop-color: var(--primary); }
+/* The tiles' charts in the one accent, quietly; their figures up the left as they are. */
+html[data-style][data-executive] .tile-spark :is([data-seg], [data-chart-lines]) { opacity: 0.5; }
+html[data-style][data-executive] .tile-spark [data-seg] { background: var(--primary) !important; }
+html[data-style][data-executive] .tile-spark [data-chart-lines] path[fill="none"] { stroke: var(--primary); }
+html[data-style][data-executive] .tile-spark [data-chart-lines] path:not([fill="none"]) { fill: var(--primary); }
 
 /* Buttons: the accent solid with a fine highlight; outline ones plain until hovered. */
 html[data-style][data-executive] [data-button] { border-radius: 0.625rem; }
