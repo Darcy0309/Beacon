@@ -14,7 +14,7 @@
  *   - the number's voice calls, sent to that app (calls to it ring the phone)
  *   - the number's texts, sent to <url>/api/twilio/sms (replies land on the lead's Conversation)
  *   - a Conversational Intelligence Service, "lighthouse-calls", that transcribes recorded calls and
- *     tells <url>/api/twilio/intelligence when one is ready (Claude then summarizes it: ANTHROPIC_API_KEY)
+ *     tells <url>/api/twilio/intelligence when one is ready
  *   - an API key, "Lighthouse phone", that signs the browsers' calling tokens
  *     (kept when TWILIO_API_KEY and TWILIO_API_SECRET are already set: Twilio shows a secret only once)
  * Safe to run again, for a new address or another number.
@@ -161,4 +161,3 @@ if (envFile) {
   console.log(`\n✓ Written to ${envFile}. Restart the app to pick them up.`);
 }
 console.log(`\nThe server's environment (Vercel: Project → Settings → Environment Variables), server only:\n\n${lines.join("\n")}\n`);
-console.log("For call summaries, also ANTHROPIC_API_KEY (console.anthropic.com → API keys), server only.\n");

@@ -4,7 +4,7 @@ import { callClock, formatDial, searchDigits } from "@/lib/phone";
 import { CALLS_ROLES, twilioConfig } from "@/lib/server/twilio";
 import { callableNumber, identityOf, twiml, userIdOf, validTwilioSignature, xml } from "@/lib/twilio-voice";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { startCallTranscript } from "@/lib/server/call-ai";
+import { startCallTranscript } from "@/lib/server/call-transcripts";
 import { fullName } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -181,7 +181,7 @@ async function tellOfRecording(admin, params, query, origin) {
     p_title: `Recorded call with ${other}`, p_body: body, p_link: lead ? `/leads/${lead.id}` : null,
   });
   if (error) return console.error("[twilio/voice] call recording", error.message);
-  // New: transcribed, then summarized (Nov 2026), after Twilio has its answer.
+  // New: transcribed (Nov 2026), after Twilio has its answer.
   if (fresh) {
     after(async () => {
       const { data: who } = await admin.from("users").select("first_name, last_name").eq("id", user).maybeSingle();

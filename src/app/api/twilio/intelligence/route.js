@@ -1,10 +1,10 @@
 import { after, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { finishCallTranscript } from "@/lib/server/call-ai";
+import { finishCallTranscript } from "@/lib/server/call-transcripts";
 
 export const dynamic = "force-dynamic";
-// The transcript is read and summarized after the answer: room for Claude to write.
-export const maxDuration = 60;
+// The transcript is read after the answer.
+export const maxDuration = 30;
 
 /**
  * Twilio's Conversational Intelligence saying a transcript is ready (the Intelligence Service's
@@ -12,7 +12,7 @@ export const maxDuration = 60;
  *
  * Twilio does not sign these, so it is taken only as a nudge: nothing in it is believed. The
  * transcript must be one Lighthouse asked for (phone_recordings.transcript_sid), and what it says is
- * read from Twilio with the account's own login (lib/server/call-ai.js).
+ * read from Twilio with the account's own login (lib/server/call-transcripts.js).
  */
 export async function POST(request) {
   let body = {};

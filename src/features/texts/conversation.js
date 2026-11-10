@@ -11,15 +11,15 @@ import { getCurrentUser } from "@/lib/server/session";
 import { twilioConfig } from "@/lib/server/twilio";
 import { fullName } from "@/lib/format";
 import { e164, leadTextNumbers } from "@/lib/texts";
-import { catchUpCallAi } from "@/lib/server/call-ai";
+import { catchUpCallTranscripts } from "@/lib/server/call-transcripts";
 
 const NUMBERS = "id, phone, contact_name, contact_phone, contact_mobile, decision_maker, dm_phone, dm_mobile, contact2_name, contact2_phone, contact2_mobile";
 
 /**
  * { items, numbers, ourNumber } for a lead its viewer can see, or null (not staff, or not theirs to see).
  * items: { key, kind: "call" | "text", dir: "out" | "in", at, ... }:
- *   a call: { seconds, answered, by, them, from, to, recording: { sid, seconds, canPlay, ai } | null }
- *     ai (only for whoever may play it): { status, summary, transcript, error } | null, its transcript and summary (Nov 2026)
+ *   a call: { seconds, answered, by, them, from, to, recording: { sid, seconds, canPlay, transcript } | null }
+ *     transcript (only for whoever may play it): { status, lines, error } | null (Nov 2026)
  *   a text: { body, media, status, error, by, from, to }
  */
 export async function getLeadConversation(leadId) {
@@ -53,12 +53,12 @@ export async function getLeadConversation(leadId) {
   }
   const recordedOn = calls.map((c) => c.recordedOn).filter(Boolean);
   const { data: recordings } = recordedOn.length
-    ? await admin.from("phone_recordings").select("recording_sid, call_sid, user_id, seconds, created_at, ai_status, ai_error, ai_updated_at, transcript_sid, transcript, summary").in("call_sid", recordedOn).order("created_at")
+    ? await admin.from("phone_recordings").select("recording_sid, call_sid, user_id, seconds, created_at, transcript_status, transcript_error, transcript_updated_at, transcript_sid, transcript").in("call_sid", recordedOn).order("created_at")
     : { data: [] };
 
-  // Transcripts or summaries left waiting: looked at again once this is answered.
-  const waiting = (recordings ?? []).filter((r) => ["transcribing", "summarizing"].includes(r.ai_status));
-  if (waiting.length) after(() => catchUpCallAi(admin, waiting).catch((err) => console.error("[conversation] catch-up", err?.message ?? err)));
+  // Transcripts left waiting: looked at again once this is answered.
+  const waiting = (recordings ?? []).filter((r) => r.transcript_status === "transcribing");
+  if (waiting.length) after(() => catchUpCallTranscripts(admin, waiting).catch((err) => console.error("[conversation] catch-up", err?.message ?? err)));
 
   const people = [...new Set([...calls.map((c) => c.userId), ...(texts ?? []).map((t) => t.user_id)].filter(Boolean))];
   const { data: users } = people.length ? await admin.from("users").select("id, first_name, last_name").in("id", people) : { data: [] };
@@ -76,7 +76,7 @@ export async function getLeadConversation(leadId) {
         to: c.dir === "out" ? c.number : ourNumber,
         recording: rec ? {
           sid: rec.recording_sid, seconds: rec.seconds, canPlay,
-          ai: canPlay && rec.ai_status ? { status: rec.ai_status, summary: rec.summary, transcript: rec.transcript ?? [], error: rec.ai_error } : null,
+          transcript: canPlay && rec.transcript_status ? { status: rec.transcript_status, lines: rec.transcript ?? [], error: rec.transcript_error } : null,
         } : null,
       };
     }),

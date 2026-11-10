@@ -11,7 +11,7 @@ import { RecordingPlayer } from "@/features/notifications/components/call-record
 import { sendLeadText } from "@/features/texts/actions";
 import { formatDial } from "@/lib/phone";
 import { TEXT_LIMIT, TEXT_STATUS, textParts } from "@/lib/texts";
-import { atClock } from "@/lib/call-summary";
+import { atClock } from "@/lib/call-transcript";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -206,7 +206,7 @@ function CallCard({ c, when }) {
         c.recording.canPlay ? (
           <div data-conversation-recording>
             <RecordingPlayer src={`/api/phone/recordings/${c.recording.sid}`} seconds={c.recording.seconds} />
-            {c.recording.ai ? <CallNotes ai={c.recording.ai} ours={c.by} theirs={c.them} /> : null}
+            {c.recording.transcript ? <CallTranscript transcript={c.recording.transcript} ours={c.by} theirs={c.them} /> : null}
           </div>
         ) : (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-conversation-recording="private">
@@ -218,52 +218,43 @@ function CallCard({ c, when }) {
   );
 }
 
-/**
- * A recorded call's summary (Claude's) and its transcript, opened on request (Nov 2026); while
- * either is on its way, says so (the Conversation asks again every so often).
- */
-function CallNotes({ ai, ours, theirs }) {
+/** A recorded call's transcript, opened on request (Nov 2026); while it is on its way, says so (the Conversation asks again every so often). */
+function CallTranscript({ transcript: t, ours, theirs }) {
   const [open, setOpen] = useState(false);
-  if (ai.status === "transcribing" || ai.status === "summarizing") {
+  if (t.status === "transcribing") {
     return (
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-call-ai={ai.status}>
-        <Loader2 className="size-3.5 animate-spin" /> {ai.status === "transcribing" ? "Transcribing the call…" : "Writing the summary…"}
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-call-transcript-status="transcribing">
+        <Loader2 className="size-3.5 animate-spin" /> Transcribing the call…
       </p>
     );
   }
-  if (ai.status === "failed") {
-    return <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-call-ai="failed"><AlertCircle className="size-3.5" /> {ai.error || "This call couldn't be transcribed."}</p>;
+  const lines = t.lines ?? [];
+  if (t.status === "failed" || !lines.length) {
+    return (
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-call-transcript-status={t.status}>
+        <AlertCircle className="size-3.5" /> {t.error || "This call couldn't be transcribed."}
+      </p>
+    );
   }
-  const lines = ai.transcript ?? [];
   return (
-    <div className="mt-2.5 space-y-1.5" data-call-ai="done">
-      {ai.summary ? (
-        <div data-call-summary>
-          <div className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">Summary</div>
-          <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed">{ai.summary}</p>
-        </div>
-      ) : ai.error ? <p className="text-xs text-muted-foreground">{ai.error}</p> : null}
-      {lines.length ? (
-        <>
-          <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} data-call-transcript-toggle
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
-            <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-            {open ? "Hide transcript" : "Show transcript"}
-          </button>
-          {open ? (
-            <ol className="max-h-72 space-y-1.5 overflow-y-auto rounded-lg border border-[var(--panel-border)] bg-background/60 p-2.5 text-xs" data-call-transcript>
-              {lines.map((l, i) => (
-                <li key={i} className="grid grid-cols-[2.5rem_1fr] gap-2">
-                  <span className="tabular-nums text-muted-foreground">{atClock(l.at)}</span>
-                  <span>
-                    <span className={cn("font-semibold", l.side === 2 ? "text-foreground" : "text-primary")}>{l.side === 2 ? theirs || "Contact" : ours || "Caller"}: </span>
-                    {l.text}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-        </>
+    <div className="mt-2" data-call-transcript-status="done">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} data-call-transcript-toggle
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
+        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+        {open ? "Hide transcript" : "Show transcript"}
+      </button>
+      {open ? (
+        <ol className="mt-1.5 max-h-72 space-y-1.5 overflow-y-auto rounded-lg border border-[var(--panel-border)] bg-background/60 p-2.5 text-xs" data-call-transcript>
+          {lines.map((l, i) => (
+            <li key={i} className="grid grid-cols-[2.5rem_1fr] gap-2">
+              <span className="tabular-nums text-muted-foreground">{atClock(l.at)}</span>
+              <span>
+                <span className={cn("font-semibold", l.side === 2 ? "text-foreground" : "text-primary")}>{l.side === 2 ? theirs || "Contact" : ours || "Caller"}: </span>
+                {l.text}
+              </span>
+            </li>
+          ))}
+        </ol>
       ) : null}
     </div>
   );
