@@ -145,20 +145,27 @@ try {
   await admin.go(`/projects/${P}`, 6000);
   check("…the card: billed on the 1st & 15th", /billed on the 1st & 15th/.test((await when(admin, "document.querySelector('[data-funding-plan-name]')?.innerText")) ?? ""));
 
-  section("An administrator who is a Sales Rep too: their own clients first");
+  section("An administrator who is a Sales Rep too: funding at the Sales Rep's level (client, Nov 2026)");
   const ADMIN = Number(sql("select id from public.users where email='admin@beacon.test'"));
+  sql(`update public.project_payments set removed_at = null where project_id = ${P} and seq = 5`);
+  await admin.go("/payments", 6000);
+  check("nobody's Sales Rep: every client's payments, Sean's among them",
+    Boolean(await when(admin, `(document.querySelector('[data-payments-page]')?.innerText ?? '').includes(${JSON.stringify(`${TAG} Insurance`)})`)));
   const own = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Own Co`)}, ${ADMIN}) returning id`));
   const O = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Own project`)}, ${own}, (select id from public.project_types where code = 'DBDV'), 1) returning id`));
   sql(`insert into public.project_payments (project_id, kind, seq, label, due_date, amount) values (${O}, 'installment', 1, 'Payment 1 of 1', current_date + 10, 500)`);
-  sql(`update public.project_payments set removed_at = null where project_id = ${P} and seq = 5`);
   try {
     await admin.go("/payments", 6000);
     const page = (await when(admin, `(() => { const t = document.querySelector('[data-payments-page]')?.innerText; return t && t.includes(${JSON.stringify(`${TAG} Own Co`)}) ? t : null; })()`)) ?? "";
-    check("My clients: theirs, not Sean's", (await admin.ev("document.querySelector('[data-payments-scope]')?.dataset.paymentsScope")) === "mine"
-      && !page.includes(`${TAG} Insurance`), page.slice(0, 300));
-    await admin.ev("document.querySelector('[data-payments-scope-pick=\"all\"]').click(), true");
-    check("All clients: everyone's", Boolean(await when(admin, `(() => { const t = document.querySelector('[data-payments-page]')?.innerText ?? ''; return t.includes(${JSON.stringify(`${TAG} Insurance`)}) && t.includes(${JSON.stringify(`${TAG} Own Co`)}); })()`)));
-    if (SHOTS) { await sleep(2500); await admin.screenshot(`${SHOTS}/payments-all.png`); }
+    check("a Sales Rep too: their own client's payments only, not Sean's", page.includes(`${TAG} Own Co`) && !page.includes(`${TAG} Insurance`), page.slice(0, 300));
+    check("…no switch to all clients", !(await admin.ev("!!document.querySelector('[data-payments-scope]')")));
+    if (SHOTS) { await sleep(2500); await admin.screenshot(`${SHOTS}/payments-rep.png`); }
+    await admin.go(`/projects/${P}`, 6000);
+    await when(admin, "!!document.querySelector('[data-project-header], h1, main')");
+    await sleep(1500);
+    check("…Sean's client's project: no Program Funding", !(await admin.ev("!!document.querySelector('[data-program-funding]')")));
+    await admin.go(`/projects/${O}`, 6000);
+    check("…their own client's: Program Funding", Boolean(await when(admin, "!!document.querySelector('[data-program-funding]')")));
   } finally {
     sql(`delete from public.projects where id = ${O}`);
     sql(`delete from public.companies where id = ${own}`);

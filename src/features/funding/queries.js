@@ -10,9 +10,15 @@ const payment = (r) => ({
   leads: r.leads, appts: r.appts, fees: Number(r.fees), paidAt: r.paid_at, removedAt: r.removed_at ?? null, repRemindedAt: r.rep_reminded_at, clientRemindedAt: r.client_reminded_at,
 });
 
-/** A project's plan (null when none is set), its payments by due date, and its client's reminders switch. Null for someone who can't see them. */
+/**
+ * A project's plan (null when none is set), its payments by due date, and its client's reminders
+ * switch. Null for someone who can't see them: an administrator who is another client's Sales Rep
+ * (client, Nov 2026: funding at the Sales Rep's level).
+ */
 export async function getProjectFunding(projectId) {
   const supabase = await createClient();
+  const { data: sees } = await supabase.rpc("sees_project_funding", { p_project: projectId });
+  if (sees !== true) return null;
   const [{ data: plan }, { data: rows, error }, { data: project }] = await Promise.all([
     supabase.from("project_funding").select("*").eq("project_id", projectId).maybeSingle(),
     supabase.from("project_payments").select("*").eq("project_id", projectId).order("due_date", { ascending: true, nullsFirst: false }).order("seq"),

@@ -24,6 +24,8 @@ const project = (name, extra = "") => Number(sql(`insert into public.projects (n
 const P = project("Installments");
 const M = project("Monthly");
 const T = project("Twice monthly");
+let ownCompany = null;
+let ownProject = null;
 const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id = ${client.me.id}`);
 const rows = (who, table, col, id) => who.sb.from(table).select("*").eq(col, id).then((r) => r.data ?? []);
 const today = sql("select (now() at time zone public.business_tz())::date::text");
@@ -156,7 +158,30 @@ try {
   check("on the 15th: the 1st to the 14th, due the 15th", second15.startsWith(`${month0}|${day(month0, 15)}|1|15.00|`) && second15.endsWith(`1–14, ${month0.slice(0, 4)}`), bills());
   sql(`select public.bill_project_months(${lit(day(month0, 20))}::date)`);
   check("…each made once", bills().split(";").length === 2, bills());
+
+  section("An administrator who is a Sales Rep too: funding at the Sales Rep's level (client, Nov 2026)");
+  const sees = async (who, id) => (await rows(who, "project_payments", "project_id", id)).length > 0;
+  check("an administrator who is nobody's Sales Rep: every client's", await sees(admin, P));
+  // The administrator becomes the Sales Rep of a client of their own.
+  ownCompany = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Own Co`)}, ${admin.me.id}) returning id`));
+  const O = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id, bill_lead_rate, start_date)
+    values (${lit(`${TAG} Own`)}, ${ownCompany}, ${type("DBDV")}, 1, 15, current_date) returning id`));
+  ownProject = O;
+  check("…a Sales Rep: their own client's program they set and see", !(await save(admin, O, { ...example, payments: 2 })).error && (await sees(admin, O)));
+  check("…not another Sales Rep's client's (Sean's)", !(await sees(admin, P)) && (await rows(admin, "project_funding", "project_id", P)).length === 0);
+  check("…nor mark it paid, remove it, stop it or set its plan",
+    Boolean((await admin.sb.rpc("set_payment_paid", { p_payment: third, p_paid: true })).error)
+    && Boolean((await admin.sb.rpc("set_payment_removed", { p_payment: third, p_removed: true })).error)
+    && Boolean((await admin.sb.rpc("stop_project_funding", { p_project: P, p_stop: true })).error)
+    && Boolean((await save(admin, P, example)).error));
+  check("…while Sean, its Sales Rep, still sees it", await sees(sean, P));
+  sql(`update public.companies set sales_rep_id = null where id = ${company}`);
+  check("a client with no Sales Rep: every administrator sees it, so it is never out of sight", await sees(admin, P));
+  sql(`update public.companies set sales_rep_id = ${sean.me.id} where id = ${company}`);
+  check("…and the rest of the client is still theirs to see", (await admin.sb.from("projects").select("id").eq("id", P)).data?.length === 1);
 } finally {
+  if (ownProject) sql(`delete from public.projects where id = ${ownProject}`);
+  if (ownCompany) sql(`delete from public.companies where id = ${ownCompany}`);
   if (clientCompany !== "null") sql(`update public.users set company_id = ${clientCompany} where id = ${client.me.id}`);
   sql(`delete from public.notifications where link = '/payments' and title like ${lit(`%${TAG}%`)}`);
   sql(`delete from public.leads where project_id in (${P}, ${M}, ${T})`);
