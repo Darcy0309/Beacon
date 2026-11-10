@@ -1,7 +1,7 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Pencil, Phone, PhoneCall, Printer, Repeat } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, PhoneCall, Printer, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import Tabs from "@/components/shared/tabs";
@@ -855,6 +855,11 @@ export default async function LeadSheet({ params, searchParams }) {
                             </summary>
                             {e.error ? <p className="mt-1 pl-5 text-xs text-destructive">{e.error}</p> : null}
                             <p className="mt-1 whitespace-pre-line break-words pl-5 text-xs text-muted-foreground">{e.body}</p>
+                            {e.attachments?.length ? (
+                              <p className="mt-1 flex flex-wrap items-center gap-1.5 pl-5 text-xs text-muted-foreground" data-email-attachments>
+                                <Paperclip className="size-3 shrink-0" aria-hidden /> {e.attachments.join(" · ")}
+                              </p>
+                            ) : null}
                           </details>
                         ))}
                         {activity.emails.length === 0 && <Empty icon={Mail}>No emails yet.</Empty>}

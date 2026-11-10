@@ -51,7 +51,7 @@ export async function sendMail(message) {
   return m.kind === "resend" ? sendWithResend(m.key, message) : sendWithSmtp(m, message);
 }
 
-async function sendWithResend(key, { from, replyTo, to, subject, text, html }) {
+async function sendWithResend(key, { from, replyTo, to, subject, text, html, attachments }) {
   let res;
   try {
     res = await fetch(RESEND, {
@@ -64,6 +64,10 @@ async function sendWithResend(key, { from, replyTo, to, subject, text, html }) {
         subject,
         text,
         html,
+        // Files (an email template's): Resend takes them base64.
+        attachments: attachments?.length
+          ? attachments.map((a) => ({ filename: a.filename, content: Buffer.from(a.content).toString("base64"), content_type: a.contentType }))
+          : undefined,
       }),
       // A service that never answers must not hold the request open.
       signal: AbortSignal.timeout(20_000),

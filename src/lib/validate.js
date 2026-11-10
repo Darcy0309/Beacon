@@ -579,6 +579,8 @@ export const schemas = {
     to: [required("Enter the address to send it to"), mailbox, max(254)],
     subject: [required("Give the email a subject"), max(EMAIL_LIMITS.subject)],
     body: [required("Write the email first"), max(EMAIL_LIMITS.body)],
+    // An email template picked (Nov 2026); its files (`attach`, several) are checked against the template's own when sending.
+    template_id: [id],
   },
 
   // Set or change your own password. Matching is a cross-field rule below.

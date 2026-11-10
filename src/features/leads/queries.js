@@ -247,7 +247,7 @@ export async function getLeadActivity(leadId) {
       .limit(20),
     supabase
       .from("lead_emails")
-      .select("id, to_address, subject, body, status, error, created_at, user:users(first_name, last_name)")
+      .select("id, to_address, subject, body, status, error, created_at, attachments, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -322,6 +322,8 @@ export async function getLeadActivity(leadId) {
       when: timeAgo(e.created_at),
       at: e.created_at,
       by: fullName(one(e.user)) || "—",
+      // The files it carried (an email template's; Nov 2026).
+      attachments: e.attachments ?? [],
     })),
   };
 }

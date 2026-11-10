@@ -20,7 +20,8 @@ const FORMS = {
   "src/features/notifications/components/notification-composer.jsx": { schema: "notification", extra: ["roles", "user_ids", "project_ids"] },
   "src/features/notifications/components/notification-thread.jsx": { schema: "reply",   extra: ["id"] },
   "src/features/work/components/call-result-panel.jsx": { schema: "callResult", extra: [] },
-  "src/features/email/components/email-lead.jsx":       { schema: "leadEmail",  extra: [] },
+  // The template's files kept (several `attach`) are checked against the template's own in sendLeadEmail().
+  "src/features/email/components/email-lead.jsx":       { schema: "leadEmail",  extra: ["attach"] },
   // The policy lines' fields are named from POLICY_LINES (name={line.date}), so only these are literal.
   "src/features/leads/components/coverage-form.jsx":    { schema: "coverage",   extra: [] },
   "src/features/leads/components/reminder-card.jsx":    { schema: "reminder",   extra: [] },

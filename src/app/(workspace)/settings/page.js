@@ -12,6 +12,8 @@ import IdleSettings from "@/features/settings/components/idle-settings";
 import DeliverySettings from "@/features/settings/components/delivery-settings";
 import { getCargoTypes } from "@/features/cargo/queries";
 import DeletedRecordsCard from "@/features/trash/components/deleted-records-card";
+import EmailTemplatesCard from "@/features/email/components/email-templates-card";
+import { getAllEmailTemplates } from "@/features/email/templates";
 import { getDeletedRecords } from "@/features/trash/queries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -19,11 +21,12 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const [{ settings }, payRules, today, sic, deleted, cargo] = await Promise.all([
+  const [{ settings }, payRules, today, sic, deleted, cargo, templates] = await Promise.all([
     getSettings(), getPayRules(), getBusinessToday(),
     supabase.from("sic_codes").select("code", { count: "exact", head: true }),
     getDeletedRecords(),
     getCargoTypes(),
+    getAllEmailTemplates(),
   ]);
 
   return (
@@ -31,6 +34,8 @@ export default async function SettingsPage() {
       <Topbar title="Settings" sub="Branding, security, email, pay and time" />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <SettingsForm settings={settings} mailServer={mailServerInfo()} />
+        {/* What managers pick from in a lead's Email box (client, Nov 2026). */}
+        <EmailTemplatesCard templates={templates} />
         <DeliverySettings value={settings.delivery} />
         <IdleSettings minutes={settings.security?.idle_minutes} />
         <PayRulesForm rules={payRules} />
