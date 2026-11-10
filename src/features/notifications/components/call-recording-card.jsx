@@ -59,7 +59,7 @@ export default function CallRecordingCard({ voicemail: v, at, leadHref = null })
 }
 
 /** A recording: play or pause, how far along (pressed anywhere on the track to go there), and how long. */
-function RecordingPlayer({ src, seconds = 0 }) {
+export function RecordingPlayer({ src, seconds = 0 }) {
   const audio = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);

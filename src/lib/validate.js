@@ -9,6 +9,7 @@
 
 import { normalizeEin, normalizeState } from "./csv.js";
 import { EMAIL_LIMITS, isMailbox } from "./email.js";
+import { TEXT_LIMIT } from "./texts.js";
 import { PHONE_EXTENSION } from "./format.js";
 import { POLICY_LINES } from "./coverage.js";
 import { parseDeliveryAddresses } from "./delivery.js";
@@ -571,6 +572,13 @@ export const schemas = {
     remind_date: [required("Choose the day"), date],
     remind_time: [required("Choose the time"), time12],
     note: [max(300)],
+  },
+
+  // A text to a lead's contact (Nov 2026): `to`, one of the lead's numbers (checked against them in sendLeadText()).
+  leadText: {
+    lead_id: [required("Missing lead"), id],
+    to: [required("Choose the number to text"), phone],
+    body: [required("Write the text first"), max(TEXT_LIMIT)],
   },
 
   // An email to a name's contact, from its lead sheet.

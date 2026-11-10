@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { publicOrigin } from "@/lib/origin";
 import { callClock, formatDial, searchDigits } from "@/lib/phone";
 import { CALLS_ROLES, twilioConfig } from "@/lib/server/twilio";
 import { callableNumber, identityOf, twiml, userIdOf, validTwilioSignature, xml } from "@/lib/twilio-voice";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { startCallTranscript } from "@/lib/server/call-ai";
+import { fullName } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -174,11 +176,18 @@ async function tellOfRecording(admin, params, query, origin) {
     `${callClock(secs * 1000)} long`,
     `Listen: ${origin}/api/phone/recordings/${sid}`,
   ].filter(Boolean).join("\n");
-  const { error } = await admin.rpc("phone_recording_saved", {
+  const { data: fresh, error } = await admin.rpc("phone_recording_saved", {
     p_sid: sid, p_call: params.CallSid, p_user: user, p_number: digits || null, p_seconds: secs, p_lead: lead?.id ?? null,
     p_title: `Recorded call with ${other}`, p_body: body, p_link: lead ? `/leads/${lead.id}` : null,
   });
-  if (error) console.error("[twilio/voice] call recording", error.message);
+  if (error) return console.error("[twilio/voice] call recording", error.message);
+  // New: transcribed, then summarized (Nov 2026), after Twilio has its answer.
+  if (fresh) {
+    after(async () => {
+      const { data: who } = await admin.from("users").select("first_name, last_name").eq("id", user).maybeSingle();
+      await startCallTranscript(admin, { recordingSid: sid, callerName: fullName(who) || null });
+    });
+  }
 }
 
 /** A voicemail left: a notification to each administrator (pushed to their desktop too), naming the lead when the number is one's. */

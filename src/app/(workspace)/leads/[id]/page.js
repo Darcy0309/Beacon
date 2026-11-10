@@ -53,6 +53,9 @@ import TransferDialog from "@/features/leads/components/transfer-dialog";
 import CallBackLater from "@/features/leads/components/call-back-later";
 import { SECTION_LINE } from "@/features/leads/form-section";
 import { MarkLeadButton } from "@/features/removals/components/mark-names";
+import LeadConversation from "@/features/texts/components/lead-conversation";
+import { getLeadConversation } from "@/features/texts/conversation";
+import { twilioConfig } from "@/lib/server/twilio";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
 export const dynamic = "force-dynamic";
@@ -221,6 +224,8 @@ export default async function LeadSheet({ params, searchParams }) {
       client ? getLeadAppointments(lead.id) : [],
       // Every update made to them: administrators and managers, and the client's own people (Sean, Oct 2026).
       seesInternal || client ? getLeadAppointmentUpdates(lead.id) : [],
+      // Its calls on the Lighthouse phone and its texts (Nov 2026): the staff's Conversation tab.
+      staff ? getLeadConversation(lead.id) : null,
     ]);
   });
   const [lead, activity, me, results, openAppt, today, tz, rest] = await Promise.all([
@@ -237,7 +242,7 @@ export default async function LeadSheet({ params, searchParams }) {
   const seesInternal = ["admin", "manager"].includes(me?.role);
 
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates] = rest;
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates, conversation] = rest;
   const client = me?.role === "client";
   // A client's Call Result: the lead's latest appointment, as their Appointments list has it.
   const latestAppt = leadAppts[0] ?? null;
@@ -677,7 +682,7 @@ export default async function LeadSheet({ params, searchParams }) {
           <Tabs
             label="History"
             // From an update's notification (?tab=updates): its history open.
-            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : undefined}
+            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : sp?.tab === "conversation" && conversation ? "conversation" : undefined}
             panelClassName="min-h-44"
             tabs={[
               {
@@ -718,6 +723,18 @@ export default async function LeadSheet({ params, searchParams }) {
                   <Empty icon={PhoneCall}>No calls yet.</Empty>
                 ),
               },
+              // Calls on the Lighthouse phone and texts with the contact, as one thread, and a box to text them (Nov 2026).
+              ...(conversation
+                ? [{
+                    id: "conversation",
+                    label: "Conversation",
+                    count: conversation.items.length,
+                    content: (
+                      <LeadConversation leadId={lead.id} initial={conversation.items} numbers={conversation.numbers}
+                        canText={canRecord} ready={Boolean(twilioConfig())} tz={tz} />
+                    ),
+                  }]
+                : []),
               {
                 id: "appointments",
                 label: "Appointments",

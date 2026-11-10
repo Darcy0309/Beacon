@@ -12,6 +12,9 @@
  * It makes or updates, in the Twilio account:
  *   - a TwiML App, "Lighthouse phone", whose Voice URL is <url>/api/twilio/voice
  *   - the number's voice calls, sent to that app (calls to it ring the phone)
+ *   - the number's texts, sent to <url>/api/twilio/sms (replies land on the lead's Conversation)
+ *   - a Conversational Intelligence Service, "lighthouse-calls", that transcribes recorded calls and
+ *     tells <url>/api/twilio/intelligence when one is ready (Claude then summarizes it: ANTHROPIC_API_KEY)
  *   - an API key, "Lighthouse phone", that signs the browsers' calling tokens
  *     (kept when TWILIO_API_KEY and TWILIO_API_SECRET are already set: Twilio shows a secret only once)
  * Safe to run again, for a new address or another number.
@@ -84,6 +87,18 @@ if (number.voice_application_sid !== app.sid) {
   console.log(`✓ Calls to ${number.phone_number} already ring Lighthouse`);
 }
 
+// Texts to the number: replies come back to Lighthouse (Nov 2026).
+const smsUrl = `${site}/api/twilio/sms`;
+if (!number.capabilities?.sms) {
+  console.log(`! ${number.phone_number} can't take texts: texting from Lighthouse needs an SMS-capable number.`);
+} else if (number.sms_url !== smsUrl || number.sms_application_sid) {
+  await api(`/IncomingPhoneNumbers/${number.sid}.json`, { method: "POST", form: { SmsUrl: smsUrl, SmsMethod: "POST", SmsApplicationSid: "" } });
+  console.log(`✓ Texts to ${number.phone_number} now come to Lighthouse (${smsUrl})`);
+} else {
+  console.log(`✓ Texts to ${number.phone_number} already come to Lighthouse`);
+}
+console.log("  Texting US numbers also needs the number registered for A2P 10DLC in Twilio (Messaging › Regulatory Compliance), or Twilio holds the texts back.");
+
 // The API key that signs calling tokens.
 let apiKey = process.env.TWILIO_API_KEY?.trim();
 let apiSecret = process.env.TWILIO_API_SECRET?.trim();
@@ -96,6 +111,36 @@ if (apiKey && apiSecret) {
   console.log(`✓ API key: ${apiKey} (new; its secret is shown only now)`);
 }
 
+// Transcribing recorded calls (Nov 2026): the Intelligence Service, made once and kept pointed here.
+const INTEL = "https://intelligence.twilio.com/v2";
+async function intel(path, { method = "GET", form } = {}) {
+  const res = await fetch(`${INTEL}${path}`, {
+    method,
+    headers: {
+      authorization: `Basic ${Buffer.from(`${sid}:${authToken}`).toString("base64")}`,
+      ...(form ? { "content-type": "application/x-www-form-urlencoded" } : {}),
+    },
+    body: form ? new URLSearchParams(form) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.message ?? `Twilio answered ${res.status}`);
+  return data;
+}
+const intelUrl = `${site}/api/twilio/intelligence`;
+let intelligenceSid = process.env.TWILIO_INTELLIGENCE_SERVICE_SID?.trim() || null;
+try {
+  const { services = [] } = await intel("/Services?PageSize=100");
+  const found = services.find((x) => x.unique_name === "lighthouse-calls") ?? (intelligenceSid ? services.find((x) => x.sid === intelligenceSid) : null);
+  const form = { FriendlyName: "Lighthouse calls", WebhookUrl: intelUrl, WebhookHttpMethod: "POST", AutoTranscribe: "false", LanguageCode: "en-US" };
+  const service = found
+    ? await intel(`/Services/${found.sid}`, { method: "POST", form: { FriendlyName: form.FriendlyName, WebhookUrl: intelUrl, WebhookHttpMethod: "POST", AutoTranscribe: "false" } })
+    : await intel("/Services", { method: "POST", form: { UniqueName: "lighthouse-calls", ...form } });
+  intelligenceSid = service.sid;
+  console.log(`✓ Call transcripts: ${service.sid} → ${intelUrl}`);
+} catch (err) {
+  console.log(`! Call transcripts aren't set up: ${err.message}\n  (Twilio Console → Conversational Intelligence may need turning on for the account first; then run this again.)`);
+}
+
 const env = {
   TWILIO_ACCOUNT_SID: sid,
   TWILIO_AUTH_TOKEN: authToken,
@@ -103,6 +148,7 @@ const env = {
   TWILIO_API_SECRET: apiSecret,
   TWILIO_TWIML_APP_SID: app.sid,
   TWILIO_CALLER_ID: number.phone_number,
+  ...(intelligenceSid ? { TWILIO_INTELLIGENCE_SERVICE_SID: intelligenceSid } : {}),
 };
 const lines = Object.entries(env).map(([k, v]) => `${k}=${v}`);
 
@@ -115,3 +161,4 @@ if (envFile) {
   console.log(`\n✓ Written to ${envFile}. Restart the app to pick them up.`);
 }
 console.log(`\nThe server's environment (Vercel: Project → Settings → Environment Variables), server only:\n\n${lines.join("\n")}\n`);
+console.log("For call summaries, also ANTHROPIC_API_KEY (console.anthropic.com → API keys), server only.\n");

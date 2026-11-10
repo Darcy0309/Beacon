@@ -52,3 +52,14 @@ export async function twilioApi(config, path, { method = "GET", form } = {}) {
   if (!res.ok) throw Object.assign(new Error(data?.message || `Twilio answered ${res.status}`), { status: res.status, code: data?.code });
   return data;
 }
+
+/**
+ * Who a text goes out as (Nov 2026): the account's Messaging Service when TWILIO_MESSAGING_SERVICE_SID
+ * is set (the usual home of an A2P 10DLC registration), else TWILIO_SMS_FROM, else the number calls
+ * are made from. As Twilio's Messages API takes it, with the number replies come back to.
+ */
+export function textSender(config) {
+  const service = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
+  const from = process.env.TWILIO_SMS_FROM?.trim() || config.callerId;
+  return { form: service ? { MessagingServiceSid: service } : { From: from }, number: from };
+}
