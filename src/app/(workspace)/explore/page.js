@@ -13,6 +13,7 @@ import { TableCell, TableRow } from "@/components/ui/table";
 import { exploreLeads, getExploreOptions } from "@/features/explore/queries";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { readCriteria, criteriaToParams, describe, isEmpty, EXPORT_LIMIT } from "@/features/explore/criteria";
+import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,9 @@ export default async function ExplorePage({ searchParams }) {
   const here = listAddress("/explore", sp);
   const criteria = readCriteria(sp);
   const { page, perPage, q } = readListParams(sp);
-  const [options, firstTry] = await Promise.all([getExploreOptions(), exploreLeads(criteria, { page, perPage })]);
+  const [me, options, firstTry] = await Promise.all([getCurrentUser(), getExploreOptions(), exploreLeads(criteria, { page, perPage })]);
+  // An account manager sees only their own projects (the database scopes it) and can't export (client, Nov 2026).
+  const canExport = me?.role === "admin";
   let result = firstTry;
   // A page past the end (an old link, or criteria that now match fewer): show page 1.
   let shownPage = page;
@@ -100,7 +103,7 @@ export default async function ExplorePage({ searchParams }) {
             label="Ask the database"
             icon={Database}
             action={
-              total > 0 ? (
+              total > 0 && canExport ? (
                 <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
                   {total > EXPORT_LIMIT ? (
                     <span data-export-cap className="text-right text-[0.7rem] text-amber-600 dark:text-amber-400">

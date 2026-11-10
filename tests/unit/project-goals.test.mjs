@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { goalFromMonthly, goalProgress, monthlyPace, projectDays } from "../../src/lib/project-goals.js";
+import { goalFromMonthly, goalProgress, monthlyFromGoal, monthlyPace, projectDays } from "../../src/lib/project-goals.js";
 
 // A 30-day project, 10 days in.
 const days = projectDays({ start: "2026-10-01", end: "2026-10-30", today: "2026-10-10" });
@@ -29,4 +29,11 @@ assert.equal(monthlyPace({ perMonth: 5, done: 18, days: year }).status, "on pace
 // The first weeks count as a whole month: 3 done ten days in is 3 a month.
 assert.equal(monthlyPace({ perMonth: 5, done: 3, days: projectDays({ start: "2026-04-06", end: "2026-12-31", today: "2026-04-15" }) }).avg, 3);
 assert.equal(monthlyPace({ perMonth: 5, done: 3, days: projectDays({ today: "2026-04-15" }) }).status, null, "no start date: no pace");
+// The other way (client, Nov 2026): 200 leads from 1/1 to 4/30 is 50 a month; rounded up so the months reach the goal.
+const fourMonths = projectDays({ start: "2027-01-01", end: "2027-04-30", today: "2026-11-09" });
+assert.deepEqual(monthlyFromGoal(200, fourMonths), { perMonth: 50, months: 4 });
+assert.equal(monthlyFromGoal(50, projectDays({ start: "2027-01-01", end: "2027-03-31", today: "2026-11-09" })).perMonth, 17, "50 over three months: 17, not 16");
+assert.equal(monthlyFromGoal(200, projectDays({ today: "2026-11-09" })), null, "no dates: nothing to fill");
+assert.equal(monthlyFromGoal("", fourMonths), null, "no goal: nothing");
+assert.equal(goalFromMonthly(monthlyFromGoal(240, fourMonths).perMonth, fourMonths), 240, "and back again");
 console.log("project-goals: ok");

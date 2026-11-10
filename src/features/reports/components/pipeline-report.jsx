@@ -25,7 +25,7 @@ const mdy = (iso) => (iso ? `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10
  *   rows       getPipelineReport()
  *   months     the months counted, in the order they come up
  *   linkTo     where a project's name goes: "project" (its page) or "work" (a manager's call list on it)
- *   fileName   the export's name
+ *   fileName   the export's name; without one, no Export (a manager's own report)
  */
 export default function PipelineReport({ rows, months, today, linkTo = "project", fileName }) {
   const projectHref = (r) => (linkTo === "work" ? `/work/${r.projectId}` : `/projects/${r.projectId}`);
@@ -54,10 +54,13 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
           {rows.length.toLocaleString()} row{rows.length === 1 ? "" : "s"} · renewing in {months.map((m) => MONTH_SHORT[m - 1]).join(", ")}
           {" · "}<span className="text-rose-400">red</span>: no call on it in {STALE_DAYS}+ days
         </span>
-        <button type="button" onClick={download} disabled={!rows.length} data-export-pipeline
-          className="flex items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50">
-          <Download className="size-3.5" /> Export CSV
-        </button>
+        {/* Without a file name, no export: an account manager's own report (client, Nov 2026). */}
+        {fileName ? (
+          <button type="button" onClick={download} disabled={!rows.length} data-export-pipeline
+            className="flex items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-[0.12em] transition-colors hover:border-primary/40 hover:text-primary disabled:opacity-50">
+            <Download className="size-3.5" /> Export CSV
+          </button>
+        ) : null}
       </div>
       {rows.length ? (
         <TipLayer tips={tips} className="overflow-x-auto">

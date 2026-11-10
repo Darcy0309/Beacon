@@ -143,25 +143,8 @@ export default async function ClientProfile({ params, searchParams }) {
             <StatTile key={t.label} {...t} className="animate-pop-in" style={{ animationDelay: `${240 + i * 60}ms` }} />
           ))}
         </div>
-        {/* What the client records from our appointments, as they see it (Sean, Oct 2026). */}
-        <SalePipeline sales={sales} companyId={c.id} thisMonth={Number(today.slice(5, 7))} />
-
-        {/* Its branding, as the client sets it from their own Branding page. */}
-        <Card data-client-branding>
-          <SectionHeader label="Branding" icon={Palette} />
-          <div className="grid grid-cols-1 items-end gap-5 p-5 lg:grid-cols-2">
-            <PictureUpload kind="logo" folder={`company/${c.id}`} path={c.logoPath} name={c.name} save={setClientLogo.bind(null, c.id)}
-              label="Shown in the client's workspace. They can change it themselves from Branding." />
-            <WebsiteForm website={c.website} companyId={c.id} />
-          </div>
-        </Card>
-
-        <Card data-client-removals>
-          <SectionHeader label={`Removal List · ${removals.totals.all.toLocaleString()}`} icon={UserX} />
-          <RemovalList rows={removals.rows} totals={removals.totals} />
-        </Card>
-
-        <Card>
+        {/* Its projects near the top, before the Sale Pipeline (client, Nov 2026). */}
+        <Card data-client-projects>
           <SectionHeader label="Projects" icon={FolderKanban} href="/projects" action="All projects" />
           <div className="divide-y divide-[var(--panel-border)]">
             {clientProjects.length === 0 && <p className="p-6 text-sm text-muted-foreground">No projects on record.</p>}
@@ -188,6 +171,24 @@ export default async function ClientProfile({ params, searchParams }) {
               </Link>
             ))}
           </div>
+        </Card>
+
+        {/* What the client records from our appointments, as they see it (Sean, Oct 2026). */}
+        <SalePipeline sales={sales} companyId={c.id} thisMonth={Number(today.slice(5, 7))} />
+
+        {/* Its branding, as the client sets it from their own Branding page. */}
+        <Card data-client-branding>
+          <SectionHeader label="Branding" icon={Palette} />
+          <div className="grid grid-cols-1 items-end gap-5 p-5 lg:grid-cols-2">
+            <PictureUpload kind="logo" folder={`company/${c.id}`} path={c.logoPath} name={c.name} save={setClientLogo.bind(null, c.id)}
+              label="Shown in the client's workspace. They can change it themselves from Branding." />
+            <WebsiteForm website={c.website} companyId={c.id} />
+          </div>
+        </Card>
+
+        <Card data-client-removals>
+          <SectionHeader label={`Removal List · ${removals.totals.all.toLocaleString()}`} icon={UserX} />
+          <RemovalList rows={removals.rows} totals={removals.totals} />
         </Card>
       </div>
     </>

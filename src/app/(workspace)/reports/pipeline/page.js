@@ -46,7 +46,8 @@ export default async function PipelinePage({ searchParams }) {
         <Card>
           <SectionHeader label="Pipeline Report" icon={Gauge} />
           <XdateFilterBar filters={filters} options={{ companies, projects, reps, managers }} />
-          <PipelineReport rows={rows} months={months} today={today} linkTo="work" fileName={`PipelineReport_${today}.csv`} />
+          {/* No export for managers (client, Nov 2026). */}
+          <PipelineReport rows={rows} months={months} today={today} linkTo="work" />
         </Card>
       </div>
     </>

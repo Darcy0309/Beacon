@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { saveProject } from "@/features/projects/actions";
 import DatePicker from "@/components/shared/date-picker";
+import { monthlyFromGoal, projectDays } from "@/lib/project-goals";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -63,6 +64,33 @@ export default function ProjectForm({ project, options, trigger }) {
   const retyped = isEdit && typeId && String(record?.project_type_id ?? "") !== typeId;
   const newType = projectTypes.find((t) => String(t.id) === typeId);
   const apptProjects = projects.filter((p) => p.type === "APPT" && String(p.company_id ?? "") === companyId && p.id !== project?.id);
+
+  // The goals (client, Nov 2026): leads and appointments a month filled in from the overall goal over the
+  // project's dates (200 leads, 1/1 to 4/30: 50 a month), so the reports can say whether each month is on
+  // track. Still theirs to change: one typed by hand is left as typed.
+  const GOAL_KEYS = ["start_date", "end_date", "lead_goal", "appt_goal", "lead_goal_month", "appt_goal_month"];
+  const [goals, setGoals] = useState(() => Object.fromEntries(GOAL_KEYS.map((k) => [k, String(dv(k) ?? "")])));
+  const [typed, setTyped] = useState({ lead: false, appt: false });
+  const goalDays = (g) => projectDays({ start: g.start_date || null, end: g.end_date || null, today: g.start_date || "2000-01-01" });
+  const GOAL_PAIRS = [["lead", "lead_goal", "lead_goal_month"], ["appt", "appt_goal", "appt_goal_month"]];
+  const setGoal = (key, value) => {
+    const next = { ...goals, [key]: value };
+    for (const [kind, total, month] of GOAL_PAIRS) {
+      if (typed[kind] || ![total, "start_date", "end_date"].includes(key)) continue;
+      const filled = monthlyFromGoal(next[total], goalDays(next));
+      if (filled) next[month] = String(filled.perMonth);
+    }
+    setGoals(next);
+  };
+  const typeMonthly = (kind, key, value) => {
+    setTyped((t) => ({ ...t, [kind]: true }));
+    setGoals((g) => ({ ...g, [key]: value }));
+  };
+  // "200 over 4 months" under a monthly goal that is the one worked out.
+  const filledHint = (total, month) => {
+    const f = monthlyFromGoal(goals[total], goalDays(goals));
+    return f && String(f.perMonth) === goals[month] ? `${Number(goals[total]).toLocaleString()} over ${f.months} month${f.months === 1 ? "" : "s"}, from the dates` : null;
+  };
 
   // The project's office, held here so "use the client's details" can fill it in.
   const OFFICE = ["contact_name", "contact_title", "phone", "address", "city", "state", "zip", "timezone_id"];
@@ -186,22 +214,24 @@ export default function ProjectForm({ project, options, trigger }) {
             </Field>
 
             <Field label="Start date" error={fe("start_date")}>
-              <DatePicker name="start_date" defaultValue={dv("start_date")} invalid={invalid("start_date")} aria-label="Start date" presets={["today"]} />
+              <DatePicker name="start_date" value={goals.start_date} onChange={(v) => setGoal("start_date", v ?? "")} invalid={invalid("start_date")} aria-label="Start date" presets={["today"]} />
             </Field>
             <Field label="Due date" error={fe("end_date")}>
-              <DatePicker name="end_date" defaultValue={dv("end_date")} invalid={invalid("end_date")} aria-label="Due date" presets={["nextMonth", "nextYear"]} />
+              <DatePicker name="end_date" value={goals.end_date} onChange={(v) => setGoal("end_date", v ?? "")} invalid={invalid("end_date")} aria-label="Due date" presets={["nextMonth", "nextYear"]} />
             </Field>
-            <Field label="Leads per month" error={fe("lead_goal_month")} hint="The client's goal each month">
-              <Input name="lead_goal_month" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("lead_goal_month")} aria-invalid={invalid("lead_goal_month")} data-lead-goal-month />
+            <Field label="Leads per month" error={fe("lead_goal_month")} hint={filledHint("lead_goal", "lead_goal_month") ?? "The client's goal each month; filled in from the lead goal and the dates"}>
+              <Input name="lead_goal_month" type="number" inputMode="numeric" min="0" step="1" value={goals.lead_goal_month} onChange={(e) => typeMonthly("lead", "lead_goal_month", e.target.value)}
+                aria-invalid={invalid("lead_goal_month")} data-lead-goal-month />
             </Field>
-            <Field label="Appointments per month" error={fe("appt_goal_month")} hint="e.g. 5 a month is 60 a year">
-              <Input name="appt_goal_month" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("appt_goal_month")} aria-invalid={invalid("appt_goal_month")} data-appt-goal-month />
+            <Field label="Appointments per month" error={fe("appt_goal_month")} hint={filledHint("appt_goal", "appt_goal_month") ?? "e.g. 5 a month is 60 a year; filled in from the appointment goal and the dates"}>
+              <Input name="appt_goal_month" type="number" inputMode="numeric" min="0" step="1" value={goals.appt_goal_month} onChange={(e) => typeMonthly("appt", "appt_goal_month", e.target.value)}
+                aria-invalid={invalid("appt_goal_month")} data-appt-goal-month />
             </Field>
             <Field label="Lead goal (total)" error={fe("lead_goal")} hint="Leave empty: per month × the project's months">
-              <Input name="lead_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("lead_goal")} aria-invalid={invalid("lead_goal")} data-lead-goal />
+              <Input name="lead_goal" type="number" inputMode="numeric" min="0" step="1" value={goals.lead_goal} onChange={(e) => setGoal("lead_goal", e.target.value)} aria-invalid={invalid("lead_goal")} data-lead-goal />
             </Field>
             <Field label="Appointment goal (total)" error={fe("appt_goal")} hint="Leave empty: per month × the project's months">
-              <Input name="appt_goal" type="number" inputMode="numeric" min="0" step="1" defaultValue={dv("appt_goal")} aria-invalid={invalid("appt_goal")} data-appt-goal />
+              <Input name="appt_goal" type="number" inputMode="numeric" min="0" step="1" value={goals.appt_goal} onChange={(e) => setGoal("appt_goal", e.target.value)} aria-invalid={invalid("appt_goal")} data-appt-goal />
             </Field>
 
             {/* The Pipeline by Month's projected appointments (Sean, Nov 2026): this share of each month's leads. */}

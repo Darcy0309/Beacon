@@ -128,7 +128,7 @@ export async function setListRequestStatus(id, status) {
 export async function createListLink({ label, salesRepId, companyId, days } = {}) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
-  if (!me || !["admin", "manager"].includes(me.role)) return fail("Only staff make these links.");
+  if (me?.role !== "admin") return fail("Only an administrator makes these links.");
   const d = Math.min(365, Math.max(0, Math.round(Number(days) || 0)));
   const { data, error } = await supabase.from("list_request_links").insert({
     label: String(label ?? "").trim().slice(0, 120) || null,

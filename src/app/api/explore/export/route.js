@@ -59,10 +59,13 @@ const cell = (v) => {
  * X-Truncated marks a partial file.
  */
 export async function GET(request) {
-  // The same roles that can open the explorer page may export from it.
+  // Administrators alone (client, Nov 2026): an account manager uses the explorer on their own projects, but can't export it.
   const me = await getCurrentUser();
   if (!me || !rolesForPath("/explore")?.includes(me.role)) {
     return new Response("You don't have access to the lead explorer.", { status: 403 });
+  }
+  if (me.role !== "admin") {
+    return new Response("Only an administrator can export from the lead explorer.", { status: 403 });
   }
 
   const sp = Object.fromEntries(new URL(request.url).searchParams);

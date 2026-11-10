@@ -137,7 +137,12 @@ try {
     && r.criteria.include.states.join() === "AZ" && r.criteria.include.counties.join() === "Maricopa County, AZ" && r.criteria.include.cities.join() === "Mesa, AZ", JSON.stringify(r.criteria.include));
   check("…the radius's ZIPs and the county's, less those left out", r.criteria.zips.includes("85201") && r.criteria.zips.includes("85383")
     && !r.criteria.zips.includes("85203") && !r.criteria.zips.includes("85004") && r.criteria.exclude.zips.join() === "85004,85203", JSON.stringify(r.criteria.exclude));
-  check("the Sales Rep is told", sql(`select count(*) from public.notifications where user_id = ${MIKE} and link = '/list-builder/${id}'`) === "1");
+  // The administrators are told; a manager Sales Rep isn't, having no List Builder (client, Nov 2026).
+  // (Not whoever made it: this administrator.)
+  const told = sql(`select count(*) from public.notifications n join public.users u on u.id = n.user_id where n.link = '/list-builder/${id}' and u.role = 'admin'`);
+  const others = sql(`select count(*) from public.users where role = 'admin' and status = 'active' and deleted_at is null and id <> ${ADMIN}`);
+  check("the other administrators are told, not a manager Sales Rep", told === others
+    && sql(`select count(*) from public.notifications where user_id = ${MIKE} and link = '/list-builder/${id}'`) === "0", `${told} of ${others}`);
 
   section("Its page and its exports");
   await when(admin, "!!document.querySelector('[data-export-codes]')");

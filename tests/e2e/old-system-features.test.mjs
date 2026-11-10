@@ -117,6 +117,9 @@ try {
   await admin.go(link, 5000);
   await when(admin, "!!document.querySelector('[data-client-branding]')");
   check("its logo heads the page, with Branding to change it", Boolean(await when(admin, "!!document.querySelector('[data-client-branding] [data-picture]')")));
+  check("its Projects come before the Sale Pipeline (client, Nov 2026)", Boolean(await admin.ev("(() => { const p = document.querySelector('[data-client-projects]'), s = document.querySelector('[data-sale-pipeline]'); return !!p && !!s && !!(p.compareDocumentPosition(s) & Node.DOCUMENT_POSITION_FOLLOWING); })()")));
+  const pipe = await admin.ev("(() => { const s = document.querySelector('[data-sale-pipeline]'); return s ? { height: Math.round(s.getBoundingClientRect().height), ticks: s.querySelectorAll('[data-axis-tick]').length } : null; })()");
+  check("…the Sale Pipeline its own height, its dollars up the left", pipe && pipe.height < 520 && pipe.ticks >= 3, JSON.stringify(pipe));
   check("…and its subscription's end is flagged", /Subscription ended 3 days ago/i.test((await when(admin, "document.querySelector('[data-subscription-notice]')?.innerText")) ?? ""));
 
   section("Project goals");
@@ -127,6 +130,16 @@ try {
   check("…days passed and to go", /10 days passed/.test(goals) && /20 days to go/.test(goals), goals);
   await admin.click("button", "Edit");
   check("the project form takes the goals, as saved", Boolean(await when(admin, "document.querySelector('input[name=lead_goal]')?.value === '40' && document.querySelector('input[name=appt_goal]')?.value === '10'")));
+  // A month's goal filled in from the overall one over the dates (client, Nov 2026): a 30-day project is one month.
+  await admin.fill("input[name=lead_goal]", "60");
+  check("a lead goal fills in the leads a month, over the project's months", Boolean(await when(admin, "document.querySelector('input[name=lead_goal_month]')?.value === '60'"))
+    && /60 over 1 month, from the dates/.test(await admin.ev("document.querySelector('[role=dialog]')?.innerText ?? ''")),
+    await admin.ev("document.querySelector('input[name=lead_goal_month]')?.value"));
+  await admin.fill("input[name=appt_goal]", "12");
+  check("…an appointment goal the appointments a month", Boolean(await when(admin, "document.querySelector('input[name=appt_goal_month]')?.value === '12'")));
+  await admin.fill("input[name=lead_goal_month]", "20");
+  await admin.fill("input[name=lead_goal]", "90");
+  check("…and one typed by hand stays as typed", (await admin.ev("document.querySelector('input[name=lead_goal_month]').value")) === "20");
   await admin.ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), true");
   // A goal a month (Sean, Oct 2026): the average a month against it, and this month so far; and the
   // overall goal from it when none is set (a 30-day project: one month, so 5).

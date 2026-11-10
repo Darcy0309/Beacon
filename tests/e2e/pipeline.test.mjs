@@ -134,6 +134,7 @@ try {
     const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { bottom: Math.round(r.bottom), window: innerHeight, reachable: !!hit && o.contains(hit) }; })()`);
   check("the Renewal month list scrolls all the way to December, over the card's edge", dec.reachable && dec.bottom <= dec.window, JSON.stringify(dec));
   await mgr.key("Escape");
+  check("no Export for a manager (client, Nov 2026)", !(await mgr.ev("!!document.querySelector('[data-export-pipeline]')")));
   check("their projects' rows, each project opening its call list", (await mgr.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-pipeline-project]')?.getAttribute('href')`)) === `/work/${P}`);
   await mgr.go(`/reports/pipeline?months=${M2}&project=${P}`, 6000);
   await when(mgr, "!!document.querySelector('[data-pipeline-report]')");

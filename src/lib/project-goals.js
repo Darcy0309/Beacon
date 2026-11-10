@@ -46,6 +46,18 @@ export function goalFromMonthly(perMonth, days) {
 }
 
 /**
+ * The other way (client, Nov 2026): a monthly goal from the overall one over the project's months,
+ * rounded up so the months together reach it (200 leads, 1/1 to 4/30: 50 a month). The months
+ * counted as goalFromMonthly counts them. Null without a goal or without both dates.
+ */
+export function monthlyFromGoal(goal, days) {
+  const g = Number(goal);
+  if (goal == null || goal === "" || !Number.isFinite(g) || g <= 0 || !days?.totalDays) return null;
+  const months = Math.max(1, Math.round(days.totalDays / MONTH_DAYS));
+  return { perMonth: Math.ceil(g / months), months };
+}
+
+/**
  * A goal per month against how the project is doing: { perMonth, avg, months, thisMonth, status }
  * or null without one. `avg`: its average a month so far (what it has done over the months since it
  * started, a month at least, to one decimal); `status`: "on pace" when that average reaches the goal,

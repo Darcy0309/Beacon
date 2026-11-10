@@ -42,7 +42,8 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
   const shown = points.filter((p) => p.month <= thisMonth);
   const pace = (m) => (sales.goal ? (sales.goal * m) / 12 : null);
   // A round top, its figures up the left (client, Nov 2026: "show the left side legends").
-  const scale = niceScale(Math.max(1, ...points.map((p) => p.total), sales.goal ?? 0));
+  // Nothing written and no goal yet: $0 to $1,000, not $0 to $4.
+  const scale = niceScale(Math.max(1000, ...points.map((p) => p.total), sales.goal ?? 0));
   const top = scale.top;
 
   // The chart in a 600 x 220 box, months across, money up.
@@ -77,7 +78,8 @@ export default function SalePipeline({ sales, companyId = null, thisMonth: month
           </span>
         } />
       <div className="flex flex-1 flex-col gap-4 p-5">
-        <div className="flex min-h-48 flex-1 gap-1.5" onMouseLeave={() => setHover(null)}>
+        {/* Its own height (client, Nov 2026: on the client's page it took the whole screen); taller only where its row is. */}
+        <div className="flex min-h-56 flex-1 gap-1.5" onMouseLeave={() => setHover(null)}>
           {/* The figures up the left, each on its gridline; bottom-5 leaves the months' row beneath. */}
           <div aria-hidden className="relative w-11 shrink-0" data-chart-axis>
             <div className="absolute inset-x-0 top-0 bottom-5">

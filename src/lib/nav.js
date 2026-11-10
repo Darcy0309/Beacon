@@ -79,7 +79,8 @@ export const navGroups = [
       // Appointments waiting on QA (Sean, Nov 2026: with the data, under X-Dates by Month).
       { href: "/qa", label: "Quality QA", icon: ClipboardCheck, roles: ["admin", "agent"] },
       // The businesses a client (or prospect) wants to target: industries, size, territory (Sean, Oct 2026).
-      { href: "/list-builder", label: "List Builder", icon: ListFilter, roles: ["admin", "manager", "client"] },
+      // Administrators and clients only (client, Nov 2026: not account managers).
+      { href: "/list-builder", label: "List Builder", icon: ListFilter, roles: ["admin", "client"] },
       { href: "/imports", label: "Imports", icon: Upload, roles: ["admin"] },
       // A project list's names we already have elsewhere with a renewal date, to bring in (Sean, Nov 2026).
       { href: "/reports/matches", label: "Match Tool", icon: Combine, roles: ["admin"] },
