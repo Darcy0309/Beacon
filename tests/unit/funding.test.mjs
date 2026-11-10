@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for Program Funding (lib/funding.js). */
-import { readFunding, fundingSchedule, monthlyBill, fundingTotals, billsMonthly, monthDay } from "../../src/lib/funding.js";
+import { readFunding, fundingSchedule, monthlyBill, fundingTotals, billsMonthly, monthDay, billingWords } from "../../src/lib/funding.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -53,6 +53,11 @@ same("cents kept exact: $10.01 a lead, 3 leads over 2", fundingSchedule(readFund
 
 // --- Billed and paid ----------------------------------------------------------
 same("billed, paid and still owed", fundingTotals([{ amount: 1600, paidAt: "2027-01-02" }, { amount: 1200 }, { amount: 1200.5 }]), { billed: 4000.5, paid: 1600, owed: 2400.5 });
+same("…removed ones (the client stopped) left out", fundingTotals([{ amount: 1600, paidAt: "2027-01-02" }, { amount: 1200, removedAt: "2027-02-01" }, { amount: 1200 }]), { billed: 2800, paid: 1600, owed: 1200 });
+
+// --- Billed twice a month -----------------------------------------------------
+same("once a month unless twice is chosen", [readFunding({}).billing, readFunding({ billing: "weekly" }).billing, readFunding({ billing: "semimonthly" }).billing], ["monthly", "monthly", "semimonthly"]);
+same("…said so", [billingWords("monthly"), billingWords("semimonthly")], ["on the 1st", "on the 1st & 15th"]);
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
 console.log("\nAll funding checks passed.");

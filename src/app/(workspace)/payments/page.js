@@ -8,6 +8,7 @@ import { getPaymentsDue } from "@/features/funding/queries";
 import { fundingTotals, usd } from "@/lib/funding";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -18,11 +19,17 @@ const addDays = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864000
  * looks after (an administrator, every client's): overdue, due in the next 30 days, later, and
  * those paid in the last 60 days. Each marked paid here (QuickBooks keeps the money); a client
  * taking payment reminders can be emailed one. The Sales Rep is told 5 days before each is due.
+ * An administrator who is a Sales Rep too starts on their own clients' (client, Nov 2026: "Mike
+ * and I see our clients"), with All clients a click away.
  */
-export default async function PaymentsPage() {
+export default async function PaymentsPage({ searchParams }) {
+  const sp = await searchParams;
   const [me, today] = await Promise.all([getCurrentUser(), getBusinessToday()]);
-  const all = await getPaymentsDue(today);
+  const every = await getPaymentsDue(today);
   const admin = me?.role === "admin";
+  const rep = admin && every.some((p) => p.salesRepId === me.id);
+  const mine = rep && sp?.clients !== "all";
+  const all = mine ? every.filter((p) => p.salesRepId === me.id) : every;
   const soon = addDays(today, 30);
   const unpaid = all.filter((p) => !p.paidAt);
   const groups = [
@@ -44,8 +51,18 @@ export default async function PaymentsPage() {
 
   return (
     <>
-      <Topbar title="Payments Due" sub={`${usd(owed)} still owed${overdue ? ` · ${usd(overdue)} overdue` : ""}${admin ? "" : " · your clients"}`} />
+      <Topbar title="Payments Due" sub={`${usd(owed)} still owed${overdue ? ` · ${usd(overdue)} overdue` : ""}${!admin || mine ? " · your clients" : rep ? " · all clients" : ""}`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6" data-payments-page>
+        {rep ? (
+          <div className="flex w-fit gap-1 rounded-lg border border-[var(--panel-border)] bg-card p-1 text-sm" data-payments-scope={mine ? "mine" : "all"}>
+            {[["mine", "My clients", "/payments"], ["all", "All clients", "/payments?clients=all"]].map(([k, label, href]) => (
+              <Link key={k} href={href} aria-current={(k === "mine") === mine ? "page" : undefined} data-payments-scope-pick={k}
+                className={cn("rounded-md px-3 py-1 transition-colors", (k === "mine") === mine ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        ) : null}
         {all.length === 0 ? (
           <Card><p className="p-6 text-sm text-muted-foreground">
             No payments yet. They come from each project&apos;s Program Funding{admin ? ", set under Edit on the project's page" : ""}.

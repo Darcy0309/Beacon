@@ -7,7 +7,7 @@ import { one } from "@/lib/server/query-helpers";
 
 const payment = (r) => ({
   id: r.id, kind: r.kind, seq: r.seq, period: r.period, label: r.label, due: r.due_date, amount: Number(r.amount),
-  leads: r.leads, appts: r.appts, fees: Number(r.fees), paidAt: r.paid_at, repRemindedAt: r.rep_reminded_at, clientRemindedAt: r.client_reminded_at,
+  leads: r.leads, appts: r.appts, fees: Number(r.fees), paidAt: r.paid_at, removedAt: r.removed_at ?? null, repRemindedAt: r.rep_reminded_at, clientRemindedAt: r.client_reminded_at,
 });
 
 /** A project's plan (null when none is set), its payments by due date, and its client's reminders switch. Null for someone who can't see them. */
@@ -25,14 +25,16 @@ export async function getProjectFunding(projectId) {
 
 /**
  * The payments the signed-in person looks after (the database keeps a Sales Rep to their
- * clients'): unpaid, and those paid in the last 60 days, each with its project and client.
+ * clients'): unpaid, and those paid in the last 60 days, each with its project and client, and
+ * its client's Sales Rep (`salesRepId`). Removed ones (a stopped program) left out.
  */
 export async function getPaymentsDue(today) {
   const supabase = await createClient();
   const since = new Date(Date.parse(`${today}T00:00:00Z`) - 60 * 86400000).toISOString();
   const { data, error } = await supabase.from("project_payments")
-    .select("*, project:projects(id, name, deleted_at, company:companies(id, name, payment_reminders, sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name)))")
+    .select("*, project:projects(id, name, deleted_at, company:companies(id, name, payment_reminders, sales_rep_id, sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name)))")
     .or(`paid_at.is.null,paid_at.gte.${since}`)
+    .is("removed_at", null)
     .order("due_date", { ascending: true, nullsFirst: false })
     .limit(1000);
   if (error) throw error;
@@ -45,6 +47,7 @@ export async function getPaymentsDue(today) {
       projectId: project?.id, project: project?.name ?? "—", deleted: Boolean(project?.deleted_at),
       clientId: company?.id, client: company?.name ?? "—",
       reminders: Boolean(company?.payment_reminders),
+      salesRepId: company?.sales_rep_id ?? null,
       salesRep: rep ? [rep.first_name, rep.last_name].filter(Boolean).join(" ") : null,
     };
   }).filter((p) => !p.deleted);

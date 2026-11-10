@@ -5,7 +5,7 @@ import { Wallet } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Field, Select } from "@/components/ui/field";
 import DatePicker from "@/components/shared/date-picker";
-import { FUNDING_PLANS, MAX_PAYMENTS, billsMonthly, fundingSchedule, readFunding, usd } from "@/lib/funding";
+import { FUNDING_BILLING, FUNDING_PLANS, MAX_PAYMENTS, billsMonthly, fundingSchedule, readFunding, usd } from "@/lib/funding";
 import { formatIso } from "@/lib/dates";
 
 /**
@@ -30,12 +30,16 @@ export default function FundingFields({ plan, rates, goals }) {
     firstLeads: plan?.first_leads != null ? String(plan.first_leads) : goals.leadsMonth ? String(goals.leadsMonth) : "",
     firstDue: plan?.first_due ?? goals.start ?? "",
     dueDay: plan?.due_day != null ? String(plan.due_day) : "",
+    billing: plan?.billing ?? "monthly",
   }));
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e?.target ? (e.target.type === "checkbox" ? e.target.checked : e.target.value) : e ?? "" }));
   const read = readFunding(f);
   const s = fundingSchedule(read, rates);
   const monthly = billsMonthly(read);
   const fixed = f.plan !== "monthly";
+  // Something billed for what was produced: once a month, or on the 1st and the 15th (client, Nov 2026).
+  const produced = monthly.leads || monthly.appts;
+  const twice = produced && read.billing === "semimonthly";
 
   return (
     <fieldset className="rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-funding-form>
@@ -79,9 +83,18 @@ export default function FundingFields({ plan, rates, goals }) {
         <Field label={f.plan === "monthly" ? "First bill due" : "First payment due"}>
           <DatePicker name="funding_first_due" value={f.firstDue} onChange={(v) => setF((x) => ({ ...x, firstDue: v ?? "" }))} aria-label="First payment due" />
         </Field>
-        <Field label="Due each month on the" hint="Day 1 to 28; the first payment's day without one">
-          <Input name="funding_due_day" type="number" inputMode="numeric" min="1" max="28" step="1" value={f.dueDay} onChange={set("dueDay")} data-funding-due-day />
-        </Field>
+        {produced ? (
+          <Field label={f.plan === "monthly" ? "Billed" : "Appointments billed"} hint={twice ? "On the 15th for the 1st to the 14th, on the 1st for the rest of the month; due the day billed" : "On the 1st, for the month before"}>
+            <Select name="funding_billing" value={read.billing} onChange={set("billing")} data-funding-billing>
+              {FUNDING_BILLING.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </Select>
+          </Field>
+        ) : null}
+        {f.plan === "monthly" && twice ? null : (
+          <Field label="Due each month on the" hint="Day 1 to 28; the first payment's day without one">
+            <Input name="funding_due_day" type="number" inputMode="numeric" min="1" max="28" step="1" value={f.dueDay} onChange={set("dueDay")} data-funding-due-day />
+          </Field>
+        )}
       </div>
 
       {/* What it comes to, as filled in now. */}
@@ -106,9 +119,11 @@ export default function FundingFields({ plan, rates, goals }) {
             ) : null}
           </>
         ) : (
-          <p>Each month's {monthly.leads ? "leads and valid appointments" : "valid appointments"} billed at the rates above on the 1st, due on the day set{s.fees ? `; the fees, ${usd(s.fees)}, with the first` : ""}.</p>
+          <p>{twice
+            ? "The leads and valid appointments billed at the rates above on the 1st and the 15th, for the half month before, each due the day billed"
+            : `Each month's ${monthly.leads ? "leads and valid appointments" : "valid appointments"} billed at the rates above on the 1st, due on the day set`}{s.fees ? `; the fees, ${usd(s.fees)}, with the first` : ""}.</p>
         )}
-        {fixed && monthly.appts && rates.appt ? <p className="mt-1 text-muted-foreground">Appointments billed monthly, {usd(rates.appt)} each valid one.</p> : null}
+        {fixed && monthly.appts && rates.appt ? <p className="mt-1 text-muted-foreground">Appointments billed {twice ? "on the 1st & 15th" : "monthly"}, {usd(rates.appt)} each valid one.</p> : null}
       </div>
     </fieldset>
   );

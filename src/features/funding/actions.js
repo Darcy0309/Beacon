@@ -1,6 +1,9 @@
 "use server";
 
-/** Program Funding (client, Nov 2026): payments marked paid, reminders to the client, and the client's switch for them. */
+/**
+ * Program Funding (client, Nov 2026): payments marked paid or removed, a program stopped,
+ * reminders to the client, and the client's switch for them.
+ */
 
 import { revalidatePath } from "next/cache";
 import { isReservedAddress, mailFailure, oneLine } from "@/lib/email";
@@ -28,6 +31,33 @@ export async function setPaymentPaid(paymentId, paid) {
   return ok({ id, paid: Boolean(paid) });
 }
 
+/** Removed (not owed after all: the client stopped their program), or put back. An administrator or the client's Sales Rep. */
+export async function setPaymentRemoved(paymentId, removed) {
+  const id = idOf(paymentId);
+  if (!id) return fail("That payment couldn't be found.");
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_payment_removed", { p_payment: id, p_removed: Boolean(removed) });
+  if (error) return fail(error);
+  await logActivity(supabase, removed ? "payment.removed" : "payment.restored", { entity: "project_payment", entityId: id });
+  refresh();
+  return ok({ id, removed: Boolean(removed) });
+}
+
+/**
+ * The client stopped their program (client, Nov 2026): every payment not yet paid removed and
+ * nothing more billed. Or started again: billing goes on, the removed payments each put back by hand.
+ */
+export async function stopProgram(projectId, stop) {
+  const id = idOf(projectId);
+  if (!id) return fail("That project couldn't be found.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("stop_project_funding", { p_project: id, p_stop: Boolean(stop) });
+  if (error) return fail(error);
+  await logActivity(supabase, stop ? "program.stopped" : "program.restarted", { entity: "project", entityId: id, detail: stop ? `${data ?? 0} payment(s) removed` : null });
+  refresh();
+  return ok({ stopped: Boolean(stop), removed: Number(data ?? 0) });
+}
+
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /**
@@ -45,6 +75,7 @@ export async function sendPaymentReminder(paymentId) {
   if (error) return fail(error);
   if (!p?.on) return fail("Payment reminders are off for this client. Turn them on on the client's page.");
   if (p.paid) return fail("That payment is already paid.");
+  if (p.removed) return fail("That payment was removed: put it back first.");
   if (!p.to?.length) return fail("This client has no one in Lighthouse with an email address to remind.");
   if (!mailServer()) return fail(mailFailure({ code: "ENOCONFIG" }));
 

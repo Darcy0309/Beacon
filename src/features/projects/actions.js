@@ -179,7 +179,7 @@ async function saveFunding(supabase, projectId, formData) {
   const f = readFunding({
     plan: get("plan"), leads: get("leads"), appts: get("appts"), apptsIncluded: formData.getAll("funding_appts_included").includes("on"),
     setupFee: get("setup_fee"), listFee: get("list_fee"), payments: get("payments"), firstLeads: get("first_leads"),
-    firstDue: get("first_due"), dueDay: get("due_day"),
+    firstDue: get("first_due"), dueDay: get("due_day"), billing: get("billing"),
   });
   const { data: rates } = await supabase.from("projects").select("bill_lead_rate, bill_appointment_rate").eq("id", projectId).maybeSingle();
   const schedule = fundingSchedule(f, { lead: rates?.bill_lead_rate, appt: rates?.bill_appointment_rate });
@@ -188,6 +188,7 @@ async function saveFunding(supabase, projectId, formData) {
     p_funding: {
       plan: f.plan, leads: f.leads, appts: f.appts, appts_included: f.apptsIncluded, setup_fee: f.setupFee, list_fee: f.listFee,
       payments: f.payments, first_leads: f.firstLeads, first_due: f.firstDue, due_day: get("due_day") ? f.dueDay : null,
+      billing: f.billing,
     },
     p_payments: schedule.payments,
   });

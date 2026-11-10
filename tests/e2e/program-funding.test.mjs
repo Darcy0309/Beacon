@@ -95,6 +95,74 @@ try {
   await mike.go("/payments", 6000);
   await when(mike, "!!document.querySelector('[data-payments-page]')");
   check("another manager: none of them", !(await mike.ev(`document.querySelector('[data-payments-page]').innerText.includes(${JSON.stringify(TAG)})`)));
+
+  section("A payment removed: not owed after all (client, Nov 2026)");
+  const fourth = Number(sql(`select id from public.project_payments where project_id = ${P} and seq = 4`));
+  await sean.go("/payments", 6000);
+  await when(sean, `!!document.querySelector('[data-payment-remove="${fourth}"]')`);
+  await sean.ev(`document.querySelector('[data-payment-remove="${fourth}"]').click(), true`);
+  const asked = (await when(sean, "document.querySelector('[data-confirm-dialog]')?.innerText")) ?? "";
+  check("Remove asks first, saying what happens", /Remove Payment 4 of 6\?/.test(asked) && /\$1,200\.00/.test(asked), asked);
+  await sean.ev("document.querySelector('[data-confirm-dialog] [data-confirm]').click(), true");
+  check("…removed by the Sales Rep", Boolean(await until(() => sql(`select removed_by from public.project_payments where id = ${fourth}`) === String(SEAN) || null, { timeout: 8000 })));
+  check("…off Payments Due", Boolean(await when(sean, `!document.querySelector('[data-payment="${fourth}"]')`)));
+
+  await admin.go(`/projects/${P}`, 6000);
+  await when(admin, `!!document.querySelector('[data-payment="${fourth}"][data-payment-removed]')`);
+  const owed = (await admin.ev("document.querySelector('[data-funding-totals]').innerText.replace(/\\s+/g, ' ')")) ?? "";
+  check("on the project: struck through, out of what's still owed", /Still owed \$3,600\.00/.test(owed) && /1 removed/.test(owed), owed);
+  await admin.ev(`document.querySelector('[data-payment-restore="${fourth}"]').click(), true`);
+  check("…Put back: owed again", Boolean(await until(() => sql(`select removed_at is null from public.project_payments where id = ${fourth}`) === "t" || null, { timeout: 8000 })));
+
+  section("The client stopped their program");
+  await admin.go(`/projects/${P}`, 6000);
+  await when(admin, "!!document.querySelector('[data-program-stop]')");
+  await admin.ev("document.querySelector('[data-program-stop]').click(), true");
+  const stopAsk = (await when(admin, "document.querySelector('[data-confirm-dialog]')?.innerText")) ?? "";
+  check("Stop program asks first: the 4 unpaid to be removed", /4 payments not yet paid will be removed/.test(stopAsk), stopAsk);
+  await admin.ev("document.querySelector('[data-confirm-dialog] [data-confirm]').click(), true");
+  check("…stopped: every unpaid one removed, the paid kept", Boolean(await until(() => sql(`select count(*) filter (where removed_at is not null) || '/' || count(*) filter (where paid_at is not null) from public.project_payments where project_id = ${P}`) === "4/2" || null, { timeout: 8000 })));
+  await admin.go(`/projects/${P}`, 6000);
+  const stopped = (await when(admin, "document.querySelector('[data-program-stopped]')?.innerText")) ?? "";
+  check("…said so on the card, nothing owed", /Program stopped/.test(stopped) && /Still owed \$0\.00/.test(await admin.ev("document.querySelector('[data-funding-totals]').innerText.replace(/\\s+/g, ' ')")), stopped);
+  if (SHOTS) await admin.screenshot(`${SHOTS}/funding-stopped.png`);
+  await admin.ev("document.querySelector('[data-program-restart]').click(), true");
+  check("Start billing again", Boolean(await until(() => sql(`select stopped_at is null from public.project_funding where project_id = ${P}`) === "t" || null, { timeout: 8000 })));
+
+  section("Billed twice a month: the 1st and the 15th");
+  await admin.go(`/projects/${P}`, 6000);
+  await admin.click("button", "Edit");
+  await when(admin, "!!document.querySelector('[data-funding-form]')");
+  await admin.fill("[data-funding-plan]", "monthly");
+  await when(admin, "!!document.querySelector('[data-funding-billing]')");
+  check("billed once a month to begin with, with its due day", (await admin.ev("document.querySelector('[data-funding-billing]').value")) === "monthly" && (await admin.ev("!!document.querySelector('[data-funding-due-day]')")));
+  await admin.fill("[data-funding-billing]", "semimonthly");
+  const twice = (await when(admin, "(() => { const t = document.querySelector('[data-funding-preview]')?.innerText; return /1st and the 15th/.test(t ?? '') ? t : null; })()")) ?? "";
+  check("twice: said so, no due day (due the day billed)", /half month before/.test(twice) && !(await admin.ev("!!document.querySelector('[data-funding-due-day]')")), twice);
+  if (SHOTS) await admin.screenshot(`${SHOTS}/funding-twice.png`);
+  await admin.click("[role=dialog] button[type=submit]", "Save changes");
+  check("saved", Boolean(await until(() => sql(`select plan || '/' || billing from public.project_funding where project_id = ${P}`) === "monthly/semimonthly" || null, { timeout: 10000 })));
+  await admin.go(`/projects/${P}`, 6000);
+  check("…the card: billed on the 1st & 15th", /billed on the 1st & 15th/.test((await when(admin, "document.querySelector('[data-funding-plan-name]')?.innerText")) ?? ""));
+
+  section("An administrator who is a Sales Rep too: their own clients first");
+  const ADMIN = Number(sql("select id from public.users where email='admin@beacon.test'"));
+  const own = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Own Co`)}, ${ADMIN}) returning id`));
+  const O = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Own project`)}, ${own}, (select id from public.project_types where code = 'DBDV'), 1) returning id`));
+  sql(`insert into public.project_payments (project_id, kind, seq, label, due_date, amount) values (${O}, 'installment', 1, 'Payment 1 of 1', current_date + 10, 500)`);
+  sql(`update public.project_payments set removed_at = null where project_id = ${P} and seq = 5`);
+  try {
+    await admin.go("/payments", 6000);
+    const page = (await when(admin, `(() => { const t = document.querySelector('[data-payments-page]')?.innerText; return t && t.includes(${JSON.stringify(`${TAG} Own Co`)}) ? t : null; })()`)) ?? "";
+    check("My clients: theirs, not Sean's", (await admin.ev("document.querySelector('[data-payments-scope]')?.dataset.paymentsScope")) === "mine"
+      && !page.includes(`${TAG} Insurance`), page.slice(0, 300));
+    await admin.ev("document.querySelector('[data-payments-scope-pick=\"all\"]').click(), true");
+    check("All clients: everyone's", Boolean(await when(admin, `(() => { const t = document.querySelector('[data-payments-page]')?.innerText ?? ''; return t.includes(${JSON.stringify(`${TAG} Insurance`)}) && t.includes(${JSON.stringify(`${TAG} Own Co`)}); })()`)));
+    if (SHOTS) { await sleep(2500); await admin.screenshot(`${SHOTS}/payments-all.png`); }
+  } finally {
+    sql(`delete from public.projects where id = ${O}`);
+    sql(`delete from public.companies where id = ${own}`);
+  }
 } finally {
   browser.close();
   await mail.close?.();

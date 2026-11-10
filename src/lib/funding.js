@@ -12,15 +12,24 @@
  * Appointments are usually billed monthly, for the valid ones the client updates, apart from
  * the leads; `apptsIncluded` puts them in the installments instead.
  *
+ * What is billed for what was produced goes once a month (on the 1st, for the month before) or
+ * twice (`billing: "semimonthly"`: on the 15th for the 1st to the 14th, on the 1st for the rest of
+ * the month before, each due that day). A payment removed (the client stopped their program) is
+ * kept, out of the totals.
+ *
  * Money is worked in cents, so the payments always add up to the total to the cent.
  */
 
 export const FUNDING_PLANS = [
-  ["monthly", "Billed monthly for what we produce"],
+  ["monthly", "Billed for what we produce"],
   ["installments", "Installments"],
   ["advance", "Paid in advance"],
 ];
 const PLAN_KEYS = new Set(FUNDING_PLANS.map(([k]) => k));
+export const FUNDING_BILLING = [
+  ["monthly", "Once a month"],
+  ["semimonthly", "1st & 15th"],
+];
 export const MAX_PAYMENTS = 36;
 
 const cents = (v) => {
@@ -61,6 +70,7 @@ export function readFunding(f = {}) {
     firstLeads: f.firstLeads === "" || f.firstLeads == null ? null : count(f.firstLeads),
     firstDue,
     dueDay: Math.min(dueDay, 28),
+    billing: f.billing === "semimonthly" ? "semimonthly" : "monthly",
   };
 }
 
@@ -126,12 +136,16 @@ export function monthlyBill(f, produced, rates = {}) {
   return { leads, appts, amount: (leads * cents(rates.lead) + appts * cents(rates.appt)) / 100 };
 }
 
-/** Billed, paid and still owed over a project's payments ([{ amount, paidAt }]), in dollars. */
+/** Billed, paid and still owed over a project's payments ([{ amount, paidAt, removedAt }]), in dollars; removed ones left out. */
 export function fundingTotals(payments) {
   const sum = (list) => Math.round(list.reduce((n, p) => n + cents(p.amount), 0)) / 100;
+  payments = payments.filter((p) => !p.removedAt);
   const billed = sum(payments);
   const paid = sum(payments.filter((p) => p.paidAt));
   return { billed, paid, owed: Math.round((billed - paid) * 100) / 100 };
 }
+
+/** When the bills for what was produced go out, in words. */
+export const billingWords = (billing) => (billing === "semimonthly" ? "on the 1st & 15th" : "on the 1st");
 
 export const usd = (n) => Number(n ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD" });

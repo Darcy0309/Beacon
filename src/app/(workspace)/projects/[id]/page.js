@@ -232,7 +232,7 @@ export default async function ProjectDetail({ params, searchParams }) {
 
         {/* How the client pays for the program, and its payments (client, Nov 2026): administrators. */}
         {admin && funding ? (
-          <FundingCard funding={funding} today={today}
+          <FundingCard funding={funding} today={today} projectId={pid}
             rates={{ lead: p.raw?.bill_lead_rate ?? null, appt: p.raw?.bill_appointment_rate ?? null }} />
         ) : null}
 
