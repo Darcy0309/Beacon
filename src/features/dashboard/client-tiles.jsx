@@ -87,7 +87,7 @@ export function pipelineTile(months, action) {
   return {
     label: "Upcoming Pipeline", value: total.toLocaleString(), icon: TrendingUp, accent: "var(--neon-amber)", action,
     note: `viable leads, next ${months.length} months`,
-    series: months.map((m) => m.leads), bars: true,
+    series: months.map((m) => m.leads), seriesLabels: months.map((m) => m.label), bars: true,
     children: (
       <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs" data-client-pipeline>
         {months.map((m) => (

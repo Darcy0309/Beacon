@@ -5,6 +5,7 @@ import { campaignsOf } from "@/lib/campaigns";
 import { shapeReps } from "@/features/users/queries";
 import { addDays, todayIn } from "@/lib/dates";
 import { knownZone, zoneShort } from "@/lib/own-clock";
+import { dayAxis, hourAxis } from "@/lib/tile-axis";
 import { appointmentKind, cityState, shortDate, splitTime, timeRank } from "@/lib/format";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -125,12 +126,21 @@ const toProduction = (r) => ({
  * production with their goals.
  * `ranges`: { leads, appts }, each { from, to } (lib/pay tileRange()).
  */
-// A figure over a range from production_report() rows: its total, and a day-by-day series up to today for the sparkline.
-function tallyOf(rows, key, range, today) {
+// A figure over a range from production_report() rows: its total, and a bar for each day of the
+// range for the tile's chart, named along its foot (client, Nov 2026: the week's days, a month's or
+// pay period's dates); days still to come empty. A single day (`hours`, production_hours() rows)
+// by the hour instead.
+function tallyOf(rows, key, range, today, hours = null) {
   const byDay = new Map();
   for (const r of rows ?? []) byDay.set(r.day, (byDay.get(r.day) ?? 0) + Number(r[key] ?? 0));
-  const days = daysOf(range.from, range.to < today ? range.to : today);
-  return { total: [...byDay.values()].reduce((a, b) => a + b, 0), series: days.map((d) => byDay.get(d) ?? 0) };
+  const total = [...byDay.values()].reduce((a, b) => a + b, 0);
+  if (hours && range.from === range.to) {
+    const byHour = {};
+    for (const h of hours) byHour[h.hour] = (byHour[h.hour] ?? 0) + Number(h[key] ?? 0);
+    return { total, ...hourAxis(byHour) };
+  }
+  const days = daysOf(range.from, range.to);
+  return { total, series: days.map((d) => (d > today ? 0 : byDay.get(d) ?? 0)), ...dayAxis(days) };
 }
 
 /**
@@ -142,9 +152,14 @@ function tallyOf(rows, key, range, today) {
 export async function getTeamTiles({ today, ranges }) {
   const supabase = await createClient();
   const report = (r) => supabase.rpc("production_report", { p_from: r.from, p_to: r.to, p_project_id: null, p_user_id: null });
-  const [leads, appts] = await Promise.all([report(ranges.leads), report(ranges.appts)]);
-  for (const r of [leads, appts]) if (r.error) throw r.error;
-  return { leads: tallyOf(leads.data, "leads", ranges.leads, today), appts: tallyOf(appts.data, "appointments", ranges.appts, today) };
+  // A day by the hour (client, Nov 2026).
+  const hourly = (r) => (r.from === r.to ? supabase.rpc("production_hours", { p_day: r.from }) : Promise.resolve({ data: null }));
+  const [leads, appts, leadHours, apptHours] = await Promise.all([report(ranges.leads), report(ranges.appts), hourly(ranges.leads), hourly(ranges.appts)]);
+  for (const r of [leads, appts, leadHours, apptHours]) if (r.error) throw r.error;
+  return {
+    leads: tallyOf(leads.data, "leads", ranges.leads, today, leadHours.data),
+    appts: tallyOf(appts.data, "appointments", ranges.appts, today, apptHours.data),
+  };
 }
 
 export async function getManagerDashboard({ userId, today, ranges }) {

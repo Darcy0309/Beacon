@@ -33,14 +33,16 @@ const useChartPick = () => useSyncExternalStore(watch, () => document.documentEl
  *   stacked   the series split each point's whole (stacked bars, a stacked area)
  *   tips      TipLayer tips by point key (made from the values without)
  *   legendExtra  more beside the legend ("Total 1,541")
- *   variant   "full", or "tile": a stat tile's chart (no legend or month names, three figures up the axis)
+ *   variant   "full", or "tile": a stat tile's chart (no legend, three figures up the axis; the points'
+ *             labels along the foot when they have them, every few when there are many: client, Nov 2026)
+ *   caption   under a tile's chart, what its bars are ("Leads in each project")
  *   height    classes sizing the plot and its labels ("h-60", "min-h-56 flex-1")
  *   prefix    before the axis figures ("$")
  * Anything else (data-months-chart…) goes on the plot, the element the tooltips belong to.
  */
 export default function ReportChart({
   id, points, series, stacked = false, defaultType = "bar", tips, legendExtra, variant = "full",
-  height = "h-60", prefix = "", className, ...rest
+  height = "h-60", prefix = "", caption, className, ...rest
 }) {
   const tile = variant === "tile";
   const pick = useChartPick();
@@ -51,7 +53,9 @@ export default function ReportChart({
   const top = Math.max(0, ...points.map((p) => (sums ? total(p) : Math.max(0, ...series.map((s) => Number(p.values[s.key]) || 0)))));
   const scale = niceScale(top, tile ? 2 : 4);
   const pct = (v) => (Math.max(0, Number(v) || 0) / scale.top) * 100;
-  const labels = !tile;
+  const labels = !tile || points.some((p) => p.label);
+  // A tile names at most 8 points along its foot (a month's 30 days: every 4th), the tooltips all of them.
+  const every = tile ? Math.max(1, Math.ceil(points.length / 8)) : 1;
 
   const shownTips = tips ?? Object.fromEntries(points.map((p) => [p.key, {
     title: p.title ?? p.label,
@@ -96,22 +100,27 @@ export default function ReportChart({
           {type !== "bar" ? <Lines points={points} series={series} stacked={stacked && type === "area"} area={type === "area"} pct={pct} labels={labels} /> : null}
           {points.map((p, i) => (
             <div key={p.key} data-tip={p.key} {...p.attrs}
-              className={cn("relative flex min-w-0 flex-1 flex-col items-center gap-2 px-[3px] transition-opacity sm:px-1.5 group/col", p.faded && "opacity-25")}>
+              // A tile with many points (a month's days) packs them closer, so all of them fit its width.
+              className={cn("relative flex min-w-0 flex-1 flex-col items-center gap-2 transition-opacity group/col",
+                tile && points.length > 12 ? "px-px" : "px-[3px] sm:px-1.5", p.faded && "opacity-25")}>
               <div className="relative flex min-h-0 w-full flex-1 items-end justify-center gap-1 rounded-t transition-colors group-hover/col:bg-foreground/[0.04]">
                 {type === "bar"
                   ? (stacked ? <Stack p={p} i={i} series={series} total={total(p)} pct={pct} /> : <Bars p={p} i={i} series={series} pct={pct} tile={tile} />)
                   : <Dots p={p} series={series} stacked={stacked && type === "area"} pct={pct} />}
               </div>
               {labels ? (
-                <span className={cn("h-4 max-w-full truncate text-[0.62rem] font-semibold uppercase leading-4 tracking-[0.08em] sm:text-[0.66rem]",
+                <span data-axis-label={tile ? (i % every === 0 ? p.label : "") : undefined}
+                  className={cn("h-4 leading-4", tile ? "w-0 overflow-visible whitespace-nowrap text-center text-[0.58rem] font-semibold tracking-[0.04em] [&>span]:-translate-x-1/2 [&>span]:inline-block"
+                    : "max-w-full truncate text-[0.62rem] font-semibold uppercase tracking-[0.08em] sm:text-[0.66rem]",
                   p.current ? "text-primary" : "text-muted-foreground")}>
-                  {p.label}
+                  {tile ? (i % every === 0 ? <span>{p.label}</span> : null) : p.label}
                 </span>
               ) : null}
             </div>
           ))}
         </TipLayer>
       </div>
+      {caption ? <p className="h-4 truncate pl-8 text-[0.62rem] leading-4 text-muted-foreground" data-chart-caption>{caption}</p> : null}
     </div>
   );
 }
@@ -140,7 +149,7 @@ function Bars({ p, i, series, pct, tile }) {
     const v = Number(p.values[s.key]) || 0;
     return (
       <Mark key={s.key} p={p} s={s} anchor={s.key === tallest.key}
-        className={cn("animate-grow-height min-w-1 flex-1 rounded-t transition-[height] duration-500", tile ? "max-w-3.5" : "max-w-6")}
+        className={cn("animate-grow-height flex-1 rounded-t transition-[height] duration-500", tile ? "min-w-0.5 max-w-3.5" : "min-w-1 max-w-6")}
         style={{ height: `${pct(v)}%`, minHeight: v ? 2 : 0, background: s.color, animationDelay: `${i * 60 + j * 35}ms` }} />
     );
   });

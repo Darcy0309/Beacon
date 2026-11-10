@@ -56,17 +56,34 @@ export default async function ProjectsPage({ searchParams }) {
   const totalLeads = stats.total.leads;
   const contract = projects.reduce((s, p) => s + Number(p.amount ?? 0), 0);
 
+  // What each tile's bars are, named along their foot (client, Nov 2026: "I don't know what the bars represent").
+  const short = (name) => (name.length > 8 ? `${name.slice(0, 7)}…` : name);
+  const top = (key) => projects.filter((p) => p[key] > 0).sort((a, b) => b[key] - a[key]).slice(0, 8);
+  const byLeads = top("leads");
+  const byAmount = top("amount");
+  const statuses = [...projects.reduce((m, p) => m.set(p.status, (m.get(p.status) ?? 0) + 1), new Map())]
+    .sort((a, b) => (a[0] === "Active" ? -1 : b[0] === "Active" ? 1 : b[1] - a[1]));
+  const kinds = [["Appts", projects.filter((p) => p.type === "APPT").length], ["DB Dev", projects.filter((p) => p.type === "DBDV").length]];
+
   const tiles = [
     { label: "Active Campaigns", value: String(active), note: `${projects.length} total${whose ? ` · ${whose}` : ""}`,
-      icon: FolderKanban, accent: "var(--neon-cyan)", series: projects.map((p) => p.leads), bars: true },
+      icon: FolderKanban, accent: "var(--neon-cyan)", bars: true,
+      series: statuses.map(([, n]) => n), seriesLabels: statuses.map(([k]) => short(k)), seriesTitles: statuses.map(([k]) => k),
+      seriesCaption: "Projects by status" },
     { label: "Leads Across Campaigns", value: totalLeads.toLocaleString(), note: whose ? `in the pipeline · ${whose}` : "in the pipeline",
-      icon: Target, accent: "var(--neon-emerald)", series: projects.map((p) => p.leads) },
+      icon: Target, accent: "var(--neon-emerald)", bars: true,
+      series: byLeads.map((p) => p.leads), seriesLabels: byLeads.map((p) => short(p.name)), seriesTitles: byLeads.map((p) => p.name),
+      seriesCaption: projects.filter((p) => p.leads > 0).length > byLeads.length ? `Leads by project · top ${byLeads.length}` : "Leads by project" },
     { label: "Appointment Setting", value: String(projects.filter((p) => p.type === "APPT").length),
       // As the tile's own heading reads.
       note: <span className="stat-label" data-dbdev-count>{projects.filter((p) => p.type === "DBDV").length} database development</span>,
-      icon: Activity, accent: "var(--neon-violet)", series: projects.map((p) => (p.type === "APPT" ? 1 : 0)), bars: true },
+      icon: Activity, accent: "var(--neon-violet)", bars: true,
+      series: kinds.map(([, n]) => n), seriesLabels: kinds.map(([k]) => k), seriesTitles: ["Appointment setting", "Database development"],
+      seriesCaption: "Projects by kind" },
     ...(client ? [] : [{ label: "Contract Value", value: contract ? `$${Math.round(contract / 1000)}k` : "—", note: "across active work",
-      icon: DollarSign, accent: "var(--neon-amber)", series: projects.map((p) => Number(p.amount ?? 0)), bars: true }]),
+      icon: DollarSign, accent: "var(--neon-amber)", bars: true,
+      series: byAmount.map((p) => p.amount), seriesLabels: byAmount.map((p) => short(p.name)), seriesTitles: byAmount.map((p) => p.name),
+      seriesCaption: projects.filter((p) => p.amount > 0).length > byAmount.length ? `By project · top ${byAmount.length}` : "By project" }]),
   ];
 
   return (

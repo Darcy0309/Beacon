@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 /**
  * Metric tile: accent edge, icon chip, wide-tracked label, large figure, and a
  * small chart at the foot in the tile's accent hue, its figures up the left.
- * `seriesLabels` name the series' points for its tooltips ("Sep"). The figure
+ * `seriesLabels` name the series' points along the chart's foot ("Mon", "9", "8a"; client, Nov
+ * 2026), `seriesTitles` in full for its tooltips ("Mon, Nov 9"), and `seriesCaption` says under
+ * it what the bars are when the labels can't ("Leads in each project"). The figure
  * counts up and the chart rises from zero as the tile appears.
  * Pass `trace` to add the animated streak that laps the border. `action`
  * shares the note's line (a period switch); `children` after it.
@@ -19,6 +21,8 @@ export default function StatTile({
   accent = "var(--neon-cyan)",
   series,
   seriesLabels,
+  seriesTitles,
+  seriesCaption,
   bars = false,
   trace = false,
   action,
@@ -97,10 +101,11 @@ export default function StatTile({
           points={series.map((v, i) => ({
             key: String(i),
             label: seriesLabels?.[i] ?? "",
-            title: seriesLabels?.[i],
+            title: seriesTitles?.[i] ?? seriesLabels?.[i],
             values: { v: Number(v) || 0 },
           }))}
-          height="h-20"
+          caption={seriesCaption}
+          height={seriesLabels?.length ? "h-24" : "h-20"}
           className="tile-spark mt-auto w-full shrink-0 px-3 pb-3"
           data-tile-chart=""
         />

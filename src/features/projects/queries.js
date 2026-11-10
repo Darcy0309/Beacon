@@ -94,7 +94,7 @@ export async function listProjects(params) {
 export async function getProjectStats(companies = null) {
   const supabase = await createClient();
   // `companies`: only these clients' projects (Oct 2026: the Sales Rep, client or Agency Group picked on the list).
-  let list = supabase.from("projects").select("id, amount_paid, type:project_types(code), status:project_statuses(name)");
+  let list = supabase.from("projects").select("id, name, amount_paid, type:project_types(code), status:project_statuses(name)");
   if (companies) list = list.in("company_id", companies.length ? companies : [0]);
   const [{ data, error }, stats] = await Promise.all([
     list,
@@ -109,6 +109,7 @@ export async function getProjectStats(companies = null) {
     const s = byId.get(p.id);
     return {
       id: p.id,
+      name: p.name ?? "—",
       type,
       status: one(p.status)?.name ?? "—",
       leads: Number(s?.leads ?? 0),
