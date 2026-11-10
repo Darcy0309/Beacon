@@ -55,26 +55,23 @@ try {
   check("picked: behind the whole workspace", (await html(page, "dataset.wallpaper")) === "nebula" && (await bodyImage(page)).includes("gradient"),
     await bodyImage(page));
 
-  section("A photo behind the workspace");
-  check("twelve photos to pick from", (await page.ev("document.querySelectorAll('[data-desktop-wallpaper^=\"photo-\"]').length")) === 12);
-  await page.click('[data-desktop-wallpaper="photo-fjord"]');
-  check("picked: the photo covers the screen", (await html(page, "dataset.wallpaper")) === "photo-fjord" && (await bodyImage(page)).includes("/wallpapers/fjord.webp"), await bodyImage(page));
-  check("…and it is there to load", (await page.ev("fetch('/wallpapers/fjord.webp').then((r) => r.ok && r.headers.get('content-type'))")) === "image/webp");
-  const lineColour = () => page.ev("getComputedStyle(document.documentElement).getPropertyValue('--progress-a').trim()");
-  check("the loading line takes the photo's colours", (await lineColour()) === "#2da1ed", await lineColour());
-  if (SHOTS) await page.screenshot(`${SHOTS}/appearance-photo.png`);
+  section("No photos (Nov 2026: taken out)");
+  check("no Photos to pick from", (await page.ev("document.querySelectorAll('[data-desktop-wallpaper^=\"photo-\"]').length")) === 0
+    && !/\bPhotos\b/.test(await page.ev("document.querySelector('[data-appearance-dialog]').innerText")));
+  // A path the app doesn't have opens its own not-found page, never a picture.
+  check("…nor their pictures", !/^image\//.test(await page.ev("fetch('/wallpapers/fjord.webp').then((r) => r.headers.get('content-type') ?? '')")));
+
   section("The wallpaper blurred, not the page");
   await page.fill("[data-wallpaper-blur-slider]", "12");
-  check("Wallpaper blur: the photo behind the pages blurs", (await page.ev("getComputedStyle(document.body, '::before').filter")) === "blur(12px)"
+  check("Wallpaper blur: the wallpaper behind the pages blurs", (await page.ev("getComputedStyle(document.body, '::before').filter")) === "blur(12px)"
     && (await page.ev("getComputedStyle(document.querySelector('main, [data-panel]') ?? document.body).filter")) === "none",
     await page.ev("getComputedStyle(document.body, '::before').filter"));
-  if (SHOTS) await page.screenshot(`${SHOTS}/appearance-photo-blurred.png`);
+  if (SHOTS) await page.screenshot(`${SHOTS}/appearance-blurred.png`);
   await page.fill("[data-veil-slider]", "100");
   check("Blur behind this window goes well past a hint (12 px at the top)", (await page.ev("getComputedStyle(document.querySelector('[data-dialog-veil]')).backdropFilter")) === "blur(12px)",
     await page.ev("getComputedStyle(document.querySelector('[data-dialog-veil]')).backdropFilter"));
   await page.fill("[data-veil-slider]", "0");
   await page.fill("[data-wallpaper-blur-slider]", "0");
-  await page.click('[data-desktop-wallpaper="nebula"]');
 
   section("Brightness, for the theme on show");
   await page.click('[data-theme-pick="dark"]');
@@ -92,10 +89,27 @@ try {
   if (SHOTS) await page.screenshot(`${SHOTS}/appearance-light.png`);
   await page.click("[data-appearance-dialog] button", "Done");
 
+  section("Charts: bar, line or area for every chart at once (Nov 2026, in place of a menu on each card)");
+  check("Default, Bar, Line and Area", (await page.ev("[...document.querySelectorAll('[data-chart-type-pick]')].map((b) => b.dataset.chartTypePick).join()")) === "default,bar,line,area"
+    && (await page.ev("document.querySelector('[data-chart-type-pick=default]').getAttribute('aria-checked')")) === "true");
+  await page.click('[data-chart-type-pick="line"]');
+  check("Line: on the page at once", (await html(page, "dataset.chartType")) === "line");
+
   section("Kept for next time, on before the page draws");
   await page.go("/work", 3000);
   check("the wallpaper and brightness come back with the page", (await html(page, "dataset.wallpaper")) === "nebula"
     && (await html(page, "hasAttribute('data-brightness')")) && (await bodyImage(page)).includes("gradient"));
+  // The dashboard's tiles (an account manager has no Reports page).
+  await page.go("/", 4000);
+  check("the charts drawn as lines, no type menu on the cards", (await html(page, "dataset.chartType")) === "line"
+    && Boolean(await until(() => page.ev("document.querySelectorAll('[data-report-chart]').length > 0 && [...document.querySelectorAll('[data-report-chart]')].every((c) => c.dataset.chartShown === 'line')")))
+    && !(await page.ev("!!document.querySelector('[data-chart-type-menu]')")));
+  // A photo kept from before they were taken out: the plain workspace, before the page draws.
+  await page.ev("localStorage.setItem('lighthouse.appearance', JSON.stringify({ ...JSON.parse(localStorage.getItem('lighthouse.appearance')), wallpaper: 'photo-fjord' })); true");
+  await page.go("/work", 3000);
+  check("a photo kept from before: the plain workspace", !(await html(page, "dataset.wallpaper")), await html(page, "dataset.wallpaper"));
+  await page.ev("localStorage.setItem('lighthouse.appearance', JSON.stringify({ ...JSON.parse(localStorage.getItem('lighthouse.appearance')), wallpaper: 'nebula', chartType: 'default' })); true");
+  await page.go("/work", 3000);
   if (SHOTS) await page.screenshot(`${SHOTS}/appearance-workspace.png`);
 
   section("Live wallpapers, drawn behind the workspace");

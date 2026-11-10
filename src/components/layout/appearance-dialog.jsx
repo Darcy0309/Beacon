@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Image as ImageIcon, ImageUp, Monitor, Moon, MousePointer2, Palette, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
+import { ChartArea, ChartColumn, ChartLine, ChartNoAxesCombined, Check, ImageUp, Monitor, Moon, MousePointer2, Palette, RotateCcw, Sparkles, Sun, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CURSOR_SIZES, CURSOR_STYLES, cursorSrc } from "@/lib/cursor-styles";
-import { DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, PHOTO_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
+import { CHART_STYLES, DEFAULT_APPEARANCE, MAX_BLUR, STYLES, DESKTOP_WALLPAPERS, LIVE_WALLPAPERS, MAX_SHIFT, TONES, applyAppearance, fitImage, keepImage, keepTint, pictureTint, readAppearance, readImage, toneFromColor } from "@/lib/appearance";
 import { cn } from "@/lib/utils";
 
 const VEIL_KEY = "lighthouse.appearance.veil";
+// The report charts' type (Nov 2026: here, in place of a menu on every card).
+const CHART_ICONS = { default: ChartNoAxesCombined, bar: ChartColumn, line: ChartLine, area: ChartArea };
 const THEMES = [["light", "Light", Sun], ["dark", "Dark", Moon], ["system", "System", Monitor]];
 // What "Default" looks like in each style (its own page, menu and accent), for its swatch.
 const STYLE_DEFAULT_COLORS = {
@@ -162,6 +164,24 @@ export default function AppearanceDialog({ open, onOpenChange }) {
           <p className="text-xs text-muted-foreground">The page, a deeper shade for the menu and a matching accent. In the dark theme only the accent changes.</p>
         </section>
 
+        <section className="space-y-2" data-chart-choice>
+          <h3 className="eyebrow text-muted-foreground">Charts</h3>
+          <div role="radiogroup" aria-label="Charts" className="grid grid-cols-4 gap-2">
+            {CHART_STYLES.map(([k, label]) => {
+              const on = (a.chartType ?? "default") === k;
+              const Icon = CHART_ICONS[k];
+              return (
+                <button key={k} type="button" role="radio" aria-checked={on} onClick={() => change({ chartType: k })} data-chart-type-pick={k}
+                  className={cn("flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-xs font-medium transition-colors",
+                    on ? "border-primary bg-primary/10 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:border-primary/40")}>
+                  <Icon className="size-5" /> {label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">How every report chart shows its figures. Default lets each chart use its own.</p>
+        </section>
+
         <section className="space-y-2">
           <h3 className="eyebrow text-muted-foreground">Wallpaper</h3>
           <div role="radiogroup" aria-label="Wallpaper" className="grid grid-cols-3 gap-3 sm:grid-cols-5">
@@ -172,21 +192,6 @@ export default function AppearanceDialog({ open, onOpenChange }) {
                   className={cn("wallpaper-swatch h-14 w-full rounded-xl border transition-transform group-hover:scale-[1.04] group-active:scale-95",
                     a.wallpaper === k ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")} />
                 <span className={a.wallpaper === k ? "text-primary" : "text-muted-foreground"}>{label}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-2">
-          <h3 className="eyebrow flex items-center gap-1.5 text-muted-foreground"><ImageIcon className="size-3.5 text-primary" /> Photos</h3>
-          <div role="radiogroup" aria-label="Photo wallpaper" className="grid grid-cols-3 gap-3 sm:grid-cols-5">
-            {PHOTO_WALLPAPERS.map(([k, label]) => (
-              <button key={k} type="button" role="radio" aria-checked={a.wallpaper === k} onClick={() => change({ wallpaper: k })} data-desktop-wallpaper={k}
-                className="group flex flex-col items-center gap-1.5 text-[0.7rem] font-medium">
-                <span data-wallpaper={k}
-                  className={cn("wallpaper-swatch h-14 w-full rounded-xl border transition-transform group-hover:scale-[1.04] group-active:scale-95",
-                    a.wallpaper === k ? "border-primary ring-2 ring-primary/50" : "border-[var(--panel-border)]")} />
-                <span className={cn("truncate", a.wallpaper === k ? "text-primary" : "text-muted-foreground")}>{label}</span>
               </button>
             ))}
           </div>
@@ -300,7 +305,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         </section>
 
         <DialogFooter className="sm:justify-between">
-          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur && (a.cursor ?? "standard") === "standard" && (a.cursorSize ?? "normal") === "normal"}
+          <Button type="button" variant="ghost" onClick={() => change({ ...DEFAULT_APPEARANCE })} disabled={a.style === DEFAULT_APPEARANCE.style && a.wallpaper === "classic" && !a.tone && !a.light && !a.dark && !a.blur && (a.cursor ?? "standard") === "standard" && (a.cursorSize ?? "normal") === "normal" && (a.chartType ?? "default") === "default"}
             data-appearance-reset>
             <RotateCcw /> Back to the original
           </Button>

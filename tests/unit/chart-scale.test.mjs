@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the report charts' value axis (lib/chart-scale.js). */
-import { niceScale, tickLabel, chartTypes } from "../../src/lib/chart-scale.js";
+import { niceScale, tickLabel } from "../../src/lib/chart-scale.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -29,9 +29,7 @@ same("in full under 10,000", tickLabel(7500, 10000 - 1), "7,500");
 same("compact on an axis that reaches 10,000", [tickLabel(2500, 10000), tickLabel(10000, 10000)], ["2.5K", "10K"]);
 same("millions", tickLabel(1500000, 2e6, "$"), "$1.5M");
 same("money in full", tickLabel(250, 1000, "$"), "$250");
-
-// --- the types --------------------------------------------------------------
-same("a pie only for a chart that splits a whole", [chartTypes(true), chartTypes(false)], [["bar", "line", "area", "pie"], ["bar", "line", "area"]]);
+same("zero is 0 on a compact axis, never 0K", [tickLabel(0, 10000), tickLabel(0, 150000, "$"), tickLabel(0, 600)], ["0", "$0", "0"]);
 
 if (failures) { console.error(`\n${failures} check(s) failed`); process.exit(1); }
 console.log("\nAll chart-scale checks passed.");

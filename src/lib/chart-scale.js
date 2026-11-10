@@ -27,23 +27,15 @@ export function niceScale(max, ticks = 4) {
 
 /**
  * A tick's figure: in full under 10,000 (1,500), compact from there (25K,
- * 1.2M), one style for the whole axis (decided by its top). `prefix`: "$".
+ * 1.2M), one style for the whole axis (decided by its top); 0 plain. `prefix`: "$".
  */
 export function tickLabel(value, top = value, prefix = "") {
   const v = Number(value) || 0;
+  // Zero is zero on any axis, never "0K".
+  if (!v) return `${prefix}0`;
   if (top < 10000) return `${prefix}${v.toLocaleString("en-US")}`;
   if (top < 1e6) return `${prefix}${trim(v / 1e3)}K`;
   return `${prefix}${trim(v / 1e6)}M`;
 }
 
 const trim = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(1).replace(/\.0$/, ""));
-
-/** The chart types a viewer can pick, in the menu's order. A pie only splits a whole: stacked charts. */
-export const CHART_TYPES = [
-  { key: "bar", label: "Bar" },
-  { key: "line", label: "Line" },
-  { key: "area", label: "Area" },
-  { key: "pie", label: "Pie" },
-];
-
-export const chartTypes = (stacked) => CHART_TYPES.filter((t) => t.key !== "pie" || stacked).map((t) => t.key);

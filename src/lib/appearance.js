@@ -15,6 +15,9 @@
  *   cursor     the cursor style (lib/cursor-styles.js, Oct 2026: chosen from the
  *              client's twenty) or "standard", the computer's own (the default)
  *   cursorSize "small", "normal" or "large": a chosen style's size
+ *   chartType  how the report charts draw their figures (Nov 2026, in place of a
+ *              menu on every card): "default" (each chart its own), "bar", "line"
+ *              or "area"; on <html data-chart-type>, which ReportChart follows
  */
 import { CURSOR_SIZES, CURSOR_STYLES, isCursorStyle } from "./cursor-styles.js";
 
@@ -26,23 +29,20 @@ export const DESKTOP_WALLPAPERS = [
   ["classic", "Classic"], ["mist", "Mist"], ["dawn", "Dawn"], ["lagoon", "Lagoon"], ["orchid", "Orchid"],
   ["meadow", "Meadow"], ["ember", "Ember"], ["nebula", "Nebula"], ["signature", "Signature"],
 ];
-/** Photographs behind the workspace (public/wallpapers, free to use: Unsplash, by way of Picsum). */
-export const PHOTO_WALLPAPERS = [
-  ["photo-fjord", "Fjord"], ["photo-canyon", "Canyon"], ["photo-highlands", "Highlands"], ["photo-northern-lights", "Northern lights"],
-  ["photo-alpine", "Alpine"], ["photo-valley", "Valley"], ["photo-coast", "Coast"], ["photo-city", "City"],
-  ["photo-sunset", "Sunset"], ["photo-dunes", "Dunes"], ["photo-lake", "Lake"], ["photo-golden-field", "Golden field"],
-];
 export const LIVE_WALLPAPERS = [
   ["live-constellation", "Constellation"], ["live-waves", "Waves"], ["live-glow", "Glow"], ["live-starfield", "Starfield"],
 ];
 export const APPEARANCE_IMAGE_KEY = "lighthouse.appearance.image";
-const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...PHOTO_WALLPAPERS, ...LIVE_WALLPAPERS].map(([k]) => k).concat("custom"));
+const KNOWN = new Set([...DESKTOP_WALLPAPERS, ...LIVE_WALLPAPERS].map(([k]) => k).concat("custom"));
 export const MAX_SHIFT = 0.3;
 export const MAX_BLUR = 24;
 const clampBlur = (v) => Math.min(MAX_BLUR, Math.max(0, Math.round(Number(v) || 0)));
+export const CHART_STYLES = [["default", "Default"], ["bar", "Bar"], ["line", "Line"], ["area", "Area"]];
+const CHART_KEYS = new Set(CHART_STYLES.map(([k]) => k));
+const chartOf = (v) => (CHART_KEYS.has(v) ? v : "default");
 export const STYLES = [["executive", "Executive"], ["modern", "Modern"], ["classic", "Classic"]];
 const STYLE_KEYS = new Set(STYLES.map(([k]) => k));
-export const DEFAULT_APPEARANCE = { style: "executive", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null, cursor: "standard", cursorSize: "normal" };
+export const DEFAULT_APPEARANCE = { style: "executive", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null, cursor: "standard", cursorSize: "normal", chartType: "default" };
 // Saved before Executive was the default (Sean, Oct 2026): a saved "modern" was then simply the default, so it moves to Executive once.
 const APPEARANCE_VERSION = 2;
 
@@ -114,6 +114,7 @@ export function readAppearance() {
       toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor.toLowerCase() : null,
       cursor: cursorOf(a.cursor),
       cursorSize: SIZE_KEYS.has(a.cursorSize) ? a.cursorSize : "normal",
+      chartType: chartOf(a.chartType),
     };
   } catch {
     return { ...DEFAULT_APPEARANCE };
@@ -284,12 +285,16 @@ export function applyAppearance(a, { keep = true } = {}) {
   // The cursor they chose: CursorFollower watches this.
   d.dataset.cursor = cursorOf(a.cursor);
   d.dataset.cursorSize = SIZE_KEYS.has(a.cursorSize) ? a.cursorSize : "normal";
+  // The charts' type: ReportChart redraws as this changes.
+  if (chartOf(a.chartType) !== "default") d.dataset.chartType = chartOf(a.chartType);
+  else delete d.dataset.chartType;
   if (!keep) return true;
   try {
     localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : "executive", wallpaper: a.wallpaper,
       blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark), tone: tone ? a.tone : null, toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor : null,
       cursor: cursorOf(a.cursor),
       cursorSize: SIZE_KEYS.has(a.cursorSize) ? a.cursorSize : "normal",
+      chartType: chartOf(a.chartType),
       // A colour of their own, worked out, for the script that puts it on before the page draws.
       toneVars: tone && a.tone === "custom" ? [tone.page, tone.menu, tone.accent, tone.accentDark, tone.contrast, tone.contrastDark] : undefined }));
     return true;
@@ -304,10 +309,10 @@ export function applyAppearance(a, { keep = true } = {}) {
 const TONE_SCRIPT_TABLE = JSON.stringify(Object.fromEntries(TONES.map(([k, , ...colors]) => [k, colors])));
 export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";d.dataset.executive="";d.dataset.cursor="standard";d.dataset.cursorSize="normal";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
   + `if(a.style==="classic"){d.dataset.style="classic";delete d.dataset.executive;}else if(a.style==="modern"&&a.v===${APPEARANCE_VERSION})delete d.dataset.executive;`
-  + `if(${JSON.stringify(CURSOR_STYLES.map(([k]) => k))}.indexOf(a.cursor)>=0)d.dataset.cursor=a.cursor;if(a.cursorSize==="small"||a.cursorSize==="large")d.dataset.cursorSize=a.cursorSize;`
+  + `if(${JSON.stringify(CURSOR_STYLES.map(([k]) => k))}.indexOf(a.cursor)>=0)d.dataset.cursor=a.cursor;if(a.cursorSize==="small"||a.cursorSize==="large")d.dataset.cursorSize=a.cursorSize;if(a.chartType==="bar"||a.chartType==="line"||a.chartType==="area")d.dataset.chartType=a.chartType;`
   + `var T=${TONE_SCRIPT_TABLE},k=a.tone,tc=null;if(k==="custom"&&a.toneVars&&/^#[0-9a-f]{6}$/i.test(a.toneVars[0]))tc=a.toneVars;else if(typeof k==="string"&&T[k])tc=T[k];`
   + `if(tc){d.dataset.tone=k;["--tone-page","--tone-menu","--tone-accent","--tone-accent-dark","--tone-contrast","--tone-contrast-dark"].forEach(function(p,j){if(/^#[0-9a-f]{6}$/i.test(tc[j]))d.style.setProperty(p,tc[j]);});}`
-  + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
+  + `if(typeof a.wallpaper==="string"&&/^[a-z-]+$/.test(a.wallpaper)&&a.wallpaper!=="classic"&&a.wallpaper.indexOf("photo-")!==0){var i=a.wallpaper==="custom"?localStorage.getItem(${JSON.stringify("lighthouse.appearance.image")}):"";`
   + `if(a.wallpaper!=="custom"||i){d.dataset.wallpaper=a.wallpaper;if(i){d.style.setProperty("--wp-image",'url("'+i+'")');`
   + `var t=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_TINT_KEY)})||"null");if(t&&/^#[0-9a-f]{6}$/.test(t[0])&&/^#[0-9a-f]{6}$/.test(t[1])){d.style.setProperty("--progress-a",t[0]);d.style.setProperty("--progress-b",t[1]);}}}}`
   + `var b=Math.min(${MAX_BLUR},Math.max(0,Math.round(Number(a.blur)||0)));d.style.setProperty("--wp-blur",b+"px");d.style.setProperty("--wp-blur-scale",String(1+b/160));`

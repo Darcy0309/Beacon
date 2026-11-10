@@ -862,18 +862,6 @@ html[data-wallpaper="meadow"] { --progress-a: #84cc16; --progress-b: #14b89a; }
 html[data-wallpaper="ember"] { --progress-a: #f97316; --progress-b: #f5b024; }
 html[data-wallpaper="nebula"] { --progress-a: #5b6cff; --progress-b: #b45cf0; }
 html[data-wallpaper="signature"] { --progress-a: #3b82f6; --progress-b: #b45ccf; }
-html[data-wallpaper="photo-fjord"] { --progress-a: #2da1ed; --progress-b: #4447e4; }
-html[data-wallpaper="photo-canyon"] { --progress-a: #d96b26; --progress-b: #e4b444; }
-html[data-wallpaper="photo-highlands"] { --progress-a: #a7d926; --progress-b: #3fbf6a; }
-html[data-wallpaper="photo-northern-lights"] { --progress-a: #08f75d; --progress-b: #44e4db; }
-html[data-wallpaper="photo-alpine"] { --progress-a: #5a87e2; --progress-b: #6d44e4; }
-html[data-wallpaper="photo-valley"] { --progress-a: #d9b326; --progress-b: #5a8be2; }
-html[data-wallpaper="photo-coast"] { --progress-a: #26bbd9; --progress-b: #446ce4; }
-html[data-wallpaper="photo-city"] { --progress-a: #e9ac54; --progress-b: #e46b44; }
-html[data-wallpaper="photo-sunset"] { --progress-a: #f08a24; --progress-b: #e4447a; }
-html[data-wallpaper="photo-dunes"] { --progress-a: #e15c1e; --progress-b: #e4b444; }
-html[data-wallpaper="photo-lake"] { --progress-a: #2bbcda; --progress-b: #446ce4; }
-html[data-wallpaper="photo-golden-field"] { --progress-a: #d9a926; --progress-b: #e47a2c; }
 html[data-wallpaper="live-waves"] { --progress-a: #06b6d4; --progress-b: #8b5cf6; }
 html[data-wallpaper="live-glow"] { --progress-a: #06b6d4; --progress-b: #8b5cf6; }
 html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4b5fd; }
@@ -1181,34 +1169,6 @@ html[data-wallpaper="live-starfield"] { --progress-a: #60a5fa; --progress-b: #c4
 .phone-screen[data-wallpaper="ember"], .wallpaper-swatch[data-wallpaper="ember"], html[data-wallpaper="ember"] body::before { background: var(--wp-ember); }
 .phone-screen[data-wallpaper="nebula"], .wallpaper-swatch[data-wallpaper="nebula"], html[data-wallpaper="nebula"] body::before { background: var(--wp-nebula); }
 .phone-screen[data-wallpaper="signature"], .wallpaper-swatch[data-wallpaper="signature"], html[data-wallpaper="signature"] body::before { background: var(--wp-signature); }
-/* The photographs (public/wallpapers): covering the screen behind the workspace, softened a
-   touch by the theme so text and cards read on them; each swatch its own small copy. */
-:root { --wp-photo-veil: rgb(255 255 255 / 0.18); }
-.dark { --wp-photo-veil: rgb(5 8 16 / 0.42); }
-html[data-wallpaper="photo-fjord"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/fjord.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-fjord"] { background: url("/wallpapers/fjord-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-canyon"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/canyon.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-canyon"] { background: url("/wallpapers/canyon-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-highlands"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/highlands.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-highlands"] { background: url("/wallpapers/highlands-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-northern-lights"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/northern-lights.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-northern-lights"] { background: url("/wallpapers/northern-lights-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-alpine"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/alpine.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-alpine"] { background: url("/wallpapers/alpine-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-valley"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/valley.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-valley"] { background: url("/wallpapers/valley-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-coast"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/coast.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-coast"] { background: url("/wallpapers/coast-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-city"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/city.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-city"] { background: url("/wallpapers/city-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-sunset"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/sunset.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-sunset"] { background: url("/wallpapers/sunset-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-dunes"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/dunes.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-dunes"] { background: url("/wallpapers/dunes-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-lake"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/lake.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-lake"] { background: url("/wallpapers/lake-thumb.webp") center / cover no-repeat; }
-html[data-wallpaper="photo-golden-field"] body::before { background: linear-gradient(var(--wp-photo-veil), var(--wp-photo-veil)), url("/wallpapers/golden-field.webp") center / cover no-repeat; }
-.wallpaper-swatch[data-wallpaper="photo-golden-field"] { background: url("/wallpapers/golden-field-thumb.webp") center / cover no-repeat; }
 .wallpaper-swatch[data-wallpaper="plain"], .wallpaper-swatch[data-wallpaper="classic"] { background: var(--background); }
 /* An uploaded picture (Appearance): covering the screen, softened by the theme a little so
    text and cards read on any photo. */
