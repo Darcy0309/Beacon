@@ -108,6 +108,7 @@ export default async function NotificationsPage({ searchParams }) {
               key={`${unreadOnly}-${info.page}`}
               rows={inbox.rows}
               unread={inbox.unread}
+              read={inbox.read}
               empty={unreadOnly ? "Nothing unread." : "No notifications yet. They'll appear here and in the bell."}
             />
             {info.pages > 1 ? (

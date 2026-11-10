@@ -4,6 +4,7 @@ import "server-only";
 import { campaignsOf } from "@/lib/campaigns";
 import { shapeReps } from "@/features/users/queries";
 import { addDays, todayIn } from "@/lib/dates";
+import { knownZone, zoneShort } from "@/lib/own-clock";
 import { appointmentKind, cityState, shortDate, splitTime, timeRank } from "@/lib/format";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -350,7 +351,7 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
     supabase
       .from("reminders")
       // With the name's last call result: why the call back (a viable name, an X-date to follow up…).
-      .select("id, remind_at, note, sent_at, lead:leads(id, company_name, contact_name, result:call_results(name))")
+      .select("id, remind_at, time_zone, note, sent_at, lead:leads(id, company_name, contact_name, result:call_results(name))")
       .eq("user_id", userId)
       .gte("remind_at", lo)
       .lt("remind_at", hi)
@@ -398,11 +399,14 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
   }
   for (const r of reminders.data ?? []) {
     const lead = one(r.lead);
-    const day = dayOf(r.remind_at, timeZone);
+    // On the clock it was set on (Nov 2026), its zone named when not the business's.
+    const zone = knownZone(r.time_zone, timeZone);
+    const day = dayOf(r.remind_at, zone);
     if (day < from || day > to) continue;
-    const time = clock(r.remind_at, timeZone);
+    const time = clock(r.remind_at, zone);
+    const other = zone !== timeZone && zoneShort(zone, new Date(r.remind_at)) !== zoneShort(timeZone, new Date(r.remind_at));
     items.push({
-      key: `r${r.id}`, kind: "reminder", id: r.id, day, time, clock: time, minutes: timeRank(time),
+      key: `r${r.id}`, kind: "reminder", id: r.id, day, time: other ? `${time} ${zoneShort(zone, new Date(r.remind_at))}` : time, clock: time, minutes: timeRank(time),
       title: `Call back: ${lead?.company_name ?? "a lead"}`,
       detail: [r.note, lead?.contact_name].filter(Boolean).join(" · ") || "Call-back reminder",
       badge: r.sent_at ? "Reminded" : null, tone: "muted",

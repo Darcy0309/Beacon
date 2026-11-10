@@ -254,7 +254,7 @@ export async function getLeadActivity(leadId) {
     // Row Level Security: my own reminders (an administrator's: everyone's).
     supabase
       .from("reminders")
-      .select("id, user_id, remind_at, note, created_at, sent_at, user:users(first_name, last_name)")
+      .select("id, user_id, remind_at, time_zone, note, created_at, sent_at, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -295,6 +295,7 @@ export async function getLeadActivity(leadId) {
       id: m.id,
       userId: m.user_id,
       remindAt: m.remind_at,
+      timeZone: m.time_zone ?? null,
       note: m.note,
       at: m.created_at,
       sent: Boolean(m.sent_at),

@@ -59,6 +59,30 @@ try {
   check("…“Call back: <company>”, with the time and the note, linking to the lead",
     note?.title === `Call back: ${TAG} Sine Wave` && /Reminder for \d{1,2}:\d{2} [AP]M · Ask for Henry/.test(note?.body) && note?.link === `/leads/${lead}`, JSON.stringify(note));
   check("…once", Number(sql("select public.deliver_reminders()")) === 0 && sql(`select count(*) from public.notifications where link = '/leads/${lead}' and kind = 'reminder'`) === "1");
+  section("On the person's own clock (client, Nov 2026)");
+  // Honolulu: hours behind the business's clock, no daylight saving. Half an hour from now there,
+  // which on a clock further east has already gone by (a California manager on Arizona's, the client's case).
+  const HNL = "Pacific/Honolulu";
+  const ahead = sql(`select to_char(t, 'YYYY-MM-DD') || '|' || to_char(t, 'FMHH12:MI AM') from (select date_trunc('minute', now() at time zone '${HNL}') + interval '30 minutes' as t) x`).split("|");
+  const own = await sean.rpc("set_reminder", { p_lead_id: lead, p_date: ahead[0], p_time: ahead[1], p_note: "Call Mike", p_tz: HNL });
+  check("a time still ahead on my clock is taken", !own.error && Boolean(own.data?.id), own.error?.message);
+  check("…read on my clock, and the zone kept", sql(`select to_char(remind_at at time zone '${HNL}', 'YYYY-MM-DD FMHH12:MI AM') || '|' || time_zone from public.reminders where id = ${own.data?.id}`) === `${ahead[0]} ${ahead[1]}|${HNL}`);
+  const businessGone = sql(`select ((${lit(ahead[0])}::date + to_timestamp(${lit(ahead[1])}, 'HH12:MI AM')::time) at time zone public.business_tz()) < now()`) === "t";
+  if (businessGone) {
+    const old = await sean.rpc("set_reminder", { p_lead_id: lead, p_date: ahead[0], p_time: ahead[1] });
+    check("…which on the business's clock had already passed", /already passed/.test(old.error?.message ?? ""), old.error?.message);
+  }
+  const junk = await sean.rpc("set_reminder", { p_lead_id: lead, p_date: tomorrow, p_time: "2:00 PM", p_tz: "Nowhere/Atlantis" });
+  check("an unknown zone: the business's clock", !junk.error && sql(`select coalesce(time_zone, 'none') || '|' || to_char(remind_at at time zone public.business_tz(), 'HH24:MI') from public.reminders where id = ${junk.data?.id}`) === "none|14:00");
+  const later = sql(`select ((now() at time zone '${HNL}')::date + 2)::text`);
+  check("moved: the new time on its own clock", !(await sean.rpc("move_reminder", { p_id: own.data?.id, p_date: later, p_time: "9:15 AM" })).error
+    && sql(`select to_char(remind_at at time zone '${HNL}', 'YYYY-MM-DD HH24:MI') from public.reminders where id = ${own.data?.id}`) === `${later} 09:15`);
+  sql(`update public.reminders set remind_at = date_trunc('minute', now()) - interval '1 minute' where id = ${own.data?.id}`);
+  sql("select public.deliver_reminders()");
+  const said = sql(`select n.body from public.notifications n join public.reminders m on m.notification_id = n.id where m.id = ${own.data?.id}`);
+  const hnlClock = sql(`select to_char(remind_at at time zone '${HNL}', 'FMHH12:MI AM') from public.reminders where id = ${own.data?.id}`);
+  check("…its notification says the time on that clock", said.startsWith(`Reminder for ${hnlClock} · Call Mike`), `${said} / ${hnlClock}`);
+
   check("pg_cron runs it every minute", sql("select schedule || ' ' || active::text from cron.job where jobname = 'deliver-reminders'") === "* * * * * true");
 } finally {
   sql(`delete from public.notifications where kind = 'reminder' and link = '/leads/${lead}'`);

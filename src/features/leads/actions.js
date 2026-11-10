@@ -233,8 +233,8 @@ export async function saveCoverage(prevState, formData) {
 }
 
 /**
- * Remind me to call this name back, at a day and time on the business's
- * clock: set_reminder() checks I may work the name and that the time is
+ * Remind me to call this name back, at a day and time on my own clock (the
+ * browser's time zone, Nov 2026; the business's without one): set_reminder() checks I may work the name and that the time is
  * still ahead; at that time a notification links me to the lead.
  */
 export async function setReminder(prevState, formData) {
@@ -242,8 +242,10 @@ export async function setReminder(prevState, formData) {
   if (failed) return failed;
   const leadId = Number(values.lead_id);
   const supabase = await createClient();
+  // On the person's own clock (the browser's zone); the business's without one.
   const { data, error } = await supabase.rpc("set_reminder", {
     p_lead_id: leadId, p_date: values.remind_date, p_time: values.remind_time, p_note: values.note || null,
+    p_tz: String(formData.get("tz") ?? "").slice(0, 64) || null,
   });
   if (error) {
     const field = /time|passed/i.test(error.message) ? "remind_time" : /day/i.test(error.message) ? "remind_date" : null;
@@ -307,6 +309,7 @@ export async function sendLead(prevState, formData) {
   const { data, error } = await supabase.rpc("send_lead", {
     p_lead: leadId, p_to: Number(values.to), p_note: values.note || null,
     p_date: values.remind_date || null, p_time: values.remind_time || null, p_assign: formData.get("assign") === "on",
+    p_tz: String(formData.get("tz") ?? "").slice(0, 64) || null,
   });
   if (error) {
     const field = /time|passed/i.test(error.message) ? "remind_time" : /day/i.test(error.message) ? "remind_date" : /send it to|yourself/i.test(error.message) ? "to" : null;

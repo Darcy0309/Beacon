@@ -19,6 +19,7 @@ import SendLead from "@/features/leads/components/send-lead";
 import { getAssignableStaff } from "@/features/users/queries";
 import { calendarLinks } from "@/lib/appointment-links";
 import { reminderEvent } from "@/lib/reminder-event";
+import { stampIn } from "@/lib/own-clock";
 import { publicOrigin } from "@/lib/origin";
 import ProjectCalendar from "@/features/calendar/components/project-calendar";
 import UpdateStatus from "@/features/appointments/components/update-status";
@@ -595,7 +596,8 @@ export default async function LeadSheet({ params, searchParams }) {
                 company={lead.co}
                 client={client}
                 upcoming={activity.reminders.filter((m) => !m.sent && m.userId === me?.id).map((m) => ({
-                  id: m.id, when: stamp(m.remindAt), note: m.note,
+                  // On the clock it was set on (Nov 2026), its zone named when not the business's.
+                  id: m.id, when: stampIn(m.remindAt, m.timeZone, tz), note: m.note,
                   // To put on my own calendar, with the lead to open from it.
                   links: calendarLinks(reminderEvent({ remindAt: m.remindAt, note: m.note, lead: { id: lead.id, company_name: lead.co, ...r }, origin }), `${origin}/api/reminders/${m.id}/ics`),
                 }))}
@@ -696,7 +698,7 @@ export default async function LeadSheet({ params, searchParams }) {
                             <td className={cn(TD, "whitespace-nowrap")}>{c.by}</td>
                             <td className={cn(TD, "whitespace-nowrap text-muted-foreground")}>{c.sent ? "Sent" : "Set"}</td>
                             <td className={cn(TD, "text-muted-foreground")}>
-                              <span className="font-medium text-foreground">For {stamp(c.remindAt)}</span>
+                              <span className="font-medium text-foreground">For {stampIn(c.remindAt, c.timeZone, tz)}</span>
                               {c.note ? <span className="block whitespace-pre-line">{c.note}</span> : null}
                             </td>
                           </tr>

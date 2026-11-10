@@ -75,8 +75,10 @@ try {
   await sean.click("[role=dialog] button[type=submit]");
   check("saving says so", /Reminder set/.test((await sean.waitToast(/Reminder set/, 8000)) ?? ""));
   const id = Number(await until(() => sql(`select id from public.reminders where lead_id = ${lead}`) || null));
-  const local = sql(`select to_char(remind_at at time zone public.business_tz(), 'HH24:MI') || ' ' || ((remind_at at time zone public.business_tz())::date - (now() at time zone public.business_tz())::date) from public.reminders where id = ${id}`);
-  check("…for 2:00 PM tomorrow on the business's clock", local === "14:00 1", local);
+  // On the person's own clock, the browser's (client, Nov 2026), kept with it.
+  const own = await sean.ev("Intl.DateTimeFormat().resolvedOptions().timeZone");
+  const local = sql(`select to_char(remind_at at time zone ${lit(own)}, 'HH24:MI') || ' ' || ((remind_at at time zone ${lit(own)})::date - (now() at time zone ${lit(own)})::date) || ' ' || time_zone from public.reminders where id = ${id}`);
+  check("…for 2:00 PM tomorrow on my own clock", local === `14:00 1 ${own}`, local);
   const listed = await until(() => sean.ev(`document.querySelector('[data-reminder="${id}"]')?.innerText ?? null`));
   check("it is listed above the results, with its note", /2:00 PM/.test(listed ?? "") && /Ask for Henry/.test(listed ?? ""), listed);
   const row = await sean.ev(`document.querySelector('[data-reminder-row]')?.innerText ?? ''`);

@@ -88,6 +88,11 @@ try {
     && sql(`select count(*) from public.reminders where lead_id = ${H} and user_id = ${admin.me.id}`) === "0", kept.error?.message);
   check("an agent may not send one", Boolean((await agent.sb.rpc("send_lead", { p_lead: H, p_to: sean.me.id })).error));
   check("nor to a client, nor to themselves", Boolean((await sean.sb.rpc("send_lead", { p_lead: H, p_to: client.me.id })).error) && Boolean((await sean.sb.rpc("send_lead", { p_lead: H, p_to: sean.me.id })).error));
+  // The time to call on the sender's clock (Nov 2026): Honolulu's, hours behind the business's.
+  const hnl = sql("select to_char(t, 'YYYY-MM-DD') || '|' || to_char(t, 'FMHH12:MI AM') from (select date_trunc('minute', now() at time zone 'Pacific/Honolulu') + interval '30 minutes' as t) x").split("|");
+  const own = await sean.sb.rpc("send_lead", { p_lead: H, p_to: mike.me.id, p_date: hnl[0], p_time: hnl[1], p_assign: false, p_tz: "Pacific/Honolulu" });
+  check("a time to call on the sender's own clock, kept with the reminder", !own.error
+    && sql(`select to_char(remind_at at time zone 'Pacific/Honolulu', 'YYYY-MM-DD FMHH12:MI AM') || '|' || time_zone from public.reminders where lead_id = ${H} and user_id = ${mike.me.id} order by id desc limit 1`) === `${hnl[0]} ${hnl[1]}|Pacific/Honolulu`, own.error?.message);
   check("a day without a time is refused", /both the day and the time/.test((await sean.sb.rpc("send_lead", { p_lead: H, p_to: mike.me.id, p_date: tomorrow })).error?.message ?? ""));
 
   section("A hot lead with nobody to take it");

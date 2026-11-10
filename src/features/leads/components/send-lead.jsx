@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import DatePicker from "@/components/shared/date-picker";
 import { sendLead } from "@/features/leads/actions";
 import { REMINDER_TIMES } from "@/lib/validate";
+import { OwnTimeZoneInput, useOwnTimeZone } from "@/components/shared/own-time-zone";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -27,6 +28,8 @@ export default function SendLead({ leadId, company, people }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(sendLead, EMPTY);
   const { fe, invalid, dv } = formHelpers(state, null);
+  // The time to call on the sender's own clock (Nov 2026).
+  const zone = useOwnTimeZone();
   useEffect(() => {
     if (state?.ok) {
       toast.success(`Sent: ${people.find((p) => String(p.id) === String(state.data?.to))?.name ?? "they"} will be told`);
@@ -47,6 +50,7 @@ export default function SendLead({ leadId, company, people }) {
         </DialogHeader>
         <form action={action} noValidate className="flex flex-col gap-3" data-send-lead-form>
           <input type="hidden" name="lead_id" value={leadId} />
+          <OwnTimeZoneInput tz={zone.tz} />
           <Field label="Send to" required error={fe("to")}>
             <Select name="to" defaultValue={dv("to", "")} aria-invalid={invalid("to")}>
               <option value="">Choose who</option>
@@ -61,7 +65,7 @@ export default function SendLead({ leadId, company, people }) {
             <Field label="Call on" error={fe("remind_date")} hint="Optional: sets a call-back reminder for them">
               <DatePicker name="remind_date" defaultValue={dv("remind_date")} invalid={invalid("remind_date")} aria-label="Day to call" min="today" presets={["today", "tomorrow", "nextMonday"]} future />
             </Field>
-            <Field label="At" error={fe("remind_time")}>
+            <Field label="At" error={fe("remind_time")} hint={zone.short ? `Your time (${zone.short})` : null}>
               <Select name="remind_time" defaultValue={dv("remind_time", "")} aria-invalid={invalid("remind_time")}>
                 <option value="">—</option>
                 {REMINDER_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}

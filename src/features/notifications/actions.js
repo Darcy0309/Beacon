@@ -55,6 +55,34 @@ export async function markNotificationRead(formData) {
   return ok({ id });
 }
 
+/** Mark one of your notifications unread again, to keep it for later (client, Nov 2026). RLS: your own inbox. */
+export async function markNotificationUnread(formData) {
+  const id = idFrom(formData);
+  if (!id) return fail("Missing id.");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("You are signed out.");
+  const { data, error } = await supabase
+    .from("notifications")
+    .update({ read_at: null })
+    .eq("id", id)
+    .eq("user_id", me.id)
+    .select("id");
+  if (error) return fail(error);
+  if (!data?.length) return fail("That notification is not in your inbox.");
+  revalidatePath("/notifications");
+  return ok({ id });
+}
+
+/** Clear history (client, Nov 2026): the notifications you have read taken out of your inbox; unread ones stay. */
+export async function clearNotificationHistory() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("clear_read_notifications");
+  if (error) return fail(error);
+  revalidatePath("/notifications");
+  return ok({ cleared: Number(data ?? 0) });
+}
+
 /**
  * Reply to a notification in your inbox. It goes to the person who sent it
  * and lands in their bell; reply_to_notification() checks it is yours and

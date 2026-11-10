@@ -20,7 +20,7 @@ const toNotificationView = (n) => ({
   at: n.created_at,
 });
 
-/** One page of the signed-in user's inbox, newest first, plus the unread total. */
+/** One page of the signed-in user's inbox (not cleared), newest first, plus the unread and read totals. */
 export async function getInbox({ page = 1, perPage = PAGE_SIZE, unreadOnly = false } = {}) {
   const supabase = await createClient();
   const me = await getCurrentUser();
@@ -31,6 +31,7 @@ export async function getInbox({ page = 1, perPage = PAGE_SIZE, unreadOnly = fal
       .from("notifications")
       .select("id, kind, title, body, link, sender_name, read_at, created_at", { count: "exact" })
       .eq("user_id", me.id)
+      .is("cleared_at", null)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false });
     if (unreadOnly) q = q.is("read_at", null);
@@ -38,11 +39,13 @@ export async function getInbox({ page = 1, perPage = PAGE_SIZE, unreadOnly = fal
     return q.range(from, from + p.perPage - 1);
   };
 
-  const [{ rows, total }, unread] = await Promise.all([
+  const [{ rows, total }, unread, read] = await Promise.all([
     runPaged(build, { page, perPage }),
     supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", me.id).is("read_at", null),
+    // What Clear history would take out.
+    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", me.id).not("read_at", "is", null).is("cleared_at", null),
   ]);
-  return { rows: rows.map(toNotificationView), total, unread: unread.count ?? 0 };
+  return { rows: rows.map(toNotificationView), total, unread: unread.count ?? 0, read: read.count ?? 0 };
 }
 
 /**

@@ -16,13 +16,14 @@ import ConfirmDialog from "@/components/shared/confirm-dialog";
 import { cancelReminder, setReminder } from "@/features/leads/actions";
 import { REMINDER_TIMES } from "@/lib/validate";
 import { reach } from "@/lib/reach";
+import { OwnTimeZoneInput, useOwnTimeZone } from "@/components/shared/own-time-zone";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
 /**
  * "Remind me to call back", above the call result buttons, so it is set
- * before saving the result and moving on. At the chosen day and time (the
- * business's clock) a notification links back to this lead. Lists my
+ * before saving the result and moving on. At the chosen day and time (on the
+ * person's own clock, their browser's time zone: Nov 2026) a notification links back to this lead. Lists my
  * reminders on this name that have not gone off yet, each with Cancel.
  * `upcoming`: [{ id, when, note, links }], `when` already in words, `links`
  * ([{ label, href }]) adding it to one's own calendar: Google, Outlook, or
@@ -36,6 +37,7 @@ export default function ReminderCard({ leadId, company, upcoming, client = false
   const [asking, setAsking] = useState(null); // the reminder about to be cancelled
   const { fe, invalid, dv } = formHelpers(state, null);
   const problem = state?.error && !state?.fieldErrors ? state.error : null;
+  const zone = useOwnTimeZone();
 
   useEffect(() => {
     if (state?.ok) {
@@ -79,6 +81,7 @@ export default function ReminderCard({ leadId, company, upcoming, client = false
             </DialogHeader>
             <form action={formAction} noValidate className="flex flex-col gap-4">
               <input type="hidden" name="lead_id" value={leadId} />
+              <OwnTimeZoneInput tz={zone.tz} />
               {problem ? (
                 <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">{problem}</p>
               ) : null}
@@ -87,7 +90,7 @@ export default function ReminderCard({ leadId, company, upcoming, client = false
                   <DatePicker name="remind_date" required defaultValue={dv("remind_date")} invalid={invalid("remind_date")} aria-label="Reminder day"
                     min="today" presets={["today", "tomorrow", "nextMonday"]} future />
                 </Field>
-                <Field label="Time" required error={fe("remind_time")}>
+                <Field label="Time" required error={fe("remind_time")} hint={zone.short ? `Your time (${zone.short})` : null}>
                   <Select name="remind_time" defaultValue={dv("remind_time", "")} aria-invalid={invalid("remind_time")}>
                     <option value="" disabled>Choose a time</option>
                     {REMINDER_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}

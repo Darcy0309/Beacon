@@ -5,6 +5,7 @@ import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import LocalTime from "@/components/shared/local-time";
 import MarkThreadRead from "@/features/notifications/components/mark-thread-read";
+import KeepUnread from "@/features/notifications/components/keep-unread";
 import NotificationThread from "@/features/notifications/components/notification-thread";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -87,13 +88,17 @@ export default async function NotificationPage({ params }) {
               </>
               )}
 
-              {n.link ? (
-                <Button asChild>
-                  <Link href={n.link}>
-                    {linkLabel(n.link)} <ArrowUpRight />
-                  </Link>
-                </Button>
-              ) : null}
+              <div className="flex flex-wrap gap-2">
+                {n.link ? (
+                  <Button asChild>
+                    <Link href={n.link}>
+                      {linkLabel(n.link)} <ArrowUpRight />
+                    </Link>
+                  </Button>
+                ) : null}
+                {/* Keep it for later (client, Nov 2026). */}
+                <KeepUnread id={n.id} />
+              </div>
             </div>
           </Card>
 
