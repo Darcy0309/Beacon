@@ -10,6 +10,11 @@ assert.deepEqual(readXdateFilters({}), { projectIds: [], userIds: [], months: []
 // The months, as they come up: the next three by default (Nov, Dec, Jan in October).
 assert.deepEqual(pipelineMonths([], "2026-10-22"), [11, 12, 1]);
 assert.deepEqual(pipelineMonths([1, 10, 12], "2026-10-22"), [10, 12, 1]);
+// "All" is all twelve, not the default three (client, Nov 2026), from this month on.
+const all = readXdateFilters({ months: "all" });
+assert.deepEqual(all.months, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+assert.deepEqual(pipelineMonths(all.months, "2026-11-10"), [11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+assert.equal(filterParams(all).toString(), "months=all", "kept as all in the address");
 
 assert.equal(personShort("Jen", "Bell"), "Jen B");
 assert.equal(stale("2026-10-12", "2026-10-22"), false, "ten days back: not yet");

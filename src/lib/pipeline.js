@@ -10,15 +10,20 @@ export const PROJECT_TYPES = [["DBDV", "DB Dev"], ["APPT", "Appts"]];
 /** A manager whose last call on a project is longer ago than this (or never) is behind on it. */
 export const STALE_DAYS = 10;
 
+/** ?months=all: every month, apart from none chosen (the next three). */
+export const ALL_MONTHS = "all";
+
 const id = (v) => (/^[1-9]\d{0,17}$/.test(String(v ?? "")) ? Number(v) : null);
 const ids = (v) => [...new Set(String(v ?? "").split(",").map(id).filter(Boolean))];
 
 /**
  * The filters in the address: ?project=1,2 ?managers=5,9 ?months=11,12,1 ?client=3 ?rep=4 ?type=APPT.
- * Lists empty or absent mean all of them.
+ * Lists empty or absent mean all of them, but for the months: none is the next three
+ * (pipelineMonths()), and ?months=all all twelve (client, Nov 2026).
  */
 export function readXdateFilters(sp) {
-  const months = [...new Set(String(sp?.months ?? "").split(",").map(Number).filter((m) => Number.isInteger(m) && m >= 1 && m <= 12))];
+  const months = sp?.months === ALL_MONTHS ? Array.from({ length: 12 }, (_, i) => i + 1)
+    : [...new Set(String(sp?.months ?? "").split(",").map(Number).filter((m) => Number.isInteger(m) && m >= 1 && m <= 12))];
   return {
     projectIds: ids(sp?.project),
     userIds: ids(sp?.managers),
@@ -35,7 +40,7 @@ export function filterParams(f) {
   if (f.companyId) p.set("client", String(f.companyId));
   if (f.projectIds?.length) p.set("project", f.projectIds.join(","));
   if (f.userIds?.length) p.set("managers", f.userIds.join(","));
-  if (f.months?.length) p.set("months", f.months.join(","));
+  if (f.months?.length) p.set("months", f.months.length === 12 ? ALL_MONTHS : f.months.join(","));
   if (f.repId) p.set("rep", String(f.repId));
   if (f.type) p.set("type", f.type);
   return p;

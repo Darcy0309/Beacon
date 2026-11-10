@@ -134,6 +134,28 @@ try {
     const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return { bottom: Math.round(r.bottom), window: innerHeight, reachable: !!hit && o.contains(hit) }; })()`);
   check("the Renewal month list scrolls all the way to December, over the card's edge", dec.reachable && dec.bottom <= dec.window, JSON.stringify(dec));
   await mgr.key("Escape");
+
+  // "All" means all twelve months, not back to the default three (client, Nov 2026).
+  const SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const monthCols = () => mgr.ev(`[...document.querySelectorAll('[data-pipeline-report] thead th')].map((t) => t.textContent.trim()).filter((t) => ${JSON.stringify(SHORT)}.includes(t))`);
+  const summary = () => mgr.ev(`document.querySelector('[data-param-multi="months"] > button').textContent.trim()`);
+  check("none picked: the next three, said so", (await monthCols()).length === 3 && (await summary()) === "Next 3 months", JSON.stringify([await monthCols(), await summary()]));
+  await mgr.go("/reports/pipeline?months=2,3,4,5", 6000);
+  await when(mgr, "!!document.querySelector('[data-pipeline-report]')");
+  check("Feb to May picked: those four", (await monthCols()).join() === "Feb,Mar,Apr,May", JSON.stringify(await monthCols()));
+  await mgr.mouseClick('[data-param-multi="months"] > button');
+  await when(mgr, `!!document.querySelector('${months} [data-option=""]')`);
+  await mgr.mouseClick(`${months} [data-option=""]`);
+  await until(async () => /months=all/.test(await mgr.ev("location.search")) || null, { timeout: 15000 });
+  const twelve = await until(async () => ((await monthCols()).length === 12 ? await monthCols() : null), { timeout: 15000 });
+  check("then All: all twelve months, from this one on", twelve?.length === 12 && twelve[0] === SHORT[Number(today.slice(5, 7)) - 1], JSON.stringify(twelve));
+  check("…the picker saying All, ticked", (await summary()) === "All"
+    && (await mgr.ev(`document.querySelector('${months} [data-option=""]').getAttribute('aria-selected')`)) === "true");
+  await mgr.mouseClick(`${months} [data-option="${M2}"]`);
+  await until(async () => new RegExp(`months=${M2}(&|$)`).test(await mgr.ev("location.search")) || null, { timeout: 15000 });
+  check("…and a month ticked after: that one alone", (await until(async () => ((await monthCols()).length === 1 ? await monthCols() : null), { timeout: 15000 }))?.[0] === SHORT[M2 - 1]);
+  await mgr.key("Escape");
+
   check("no Export for a manager (client, Nov 2026)", !(await mgr.ev("!!document.querySelector('[data-export-pipeline]')")));
   check("their projects' rows, each project opening its call list", (await mgr.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-pipeline-project]')?.getAttribute('href')`)) === `/work/${P}`);
   await mgr.go(`/reports/pipeline?months=${M2}&project=${P}`, 6000);

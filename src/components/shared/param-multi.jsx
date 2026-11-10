@@ -17,9 +17,11 @@ import { cn } from "@/lib/utils";
  * off, and scrolls inside the room there is; a click outside or Escape
  * closes it.
  *
- *   values   the values picked now (strings); none: all
+ *   values    the values picked now (strings); none: all
+ *   allValue  when none picked means something else (the Pipeline Report's months: the next
+ *             three), "All" is kept in the URL as this (?months=all), and none reads `noneLabel`
  */
-export default function ParamMulti({ name, label, values = [], options, clears = ["page"], className }) {
+export default function ParamMulti({ name, label, values = [], options, clears = ["page"], className, allValue, noneLabel }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -27,13 +29,17 @@ export default function ParamMulti({ name, label, values = [], options, clears =
   useReportPending(pending);
   const [open, setOpen] = useState(false);
   const [find, setFind] = useState("");
-  const picked = new Set(values.map(String));
+  const allOn = allValue ? searchParams.get(name) === allValue || values.length === options.length : values.length === 0;
+  // "All" on: nothing ticked, so a tick picks just that one.
+  const picked = new Set(allValue && allOn ? [] : values.map(String));
 
-  const go = (next) => {
+  const go = (next, all = false) => {
     const params = new URLSearchParams(searchParams.toString());
     // In the list's own order, so the address reads the same however they were ticked.
     const list = options.map((o) => String(o.value)).filter((v) => next.has(v));
-    if (list.length) params.set(name, list.join(","));
+    if (all && allValue) params.set(name, allValue);
+    else if (allValue && list.length === options.length) params.set(name, allValue);
+    else if (list.length) params.set(name, list.join(","));
     else params.delete(name);
     for (const c of clears) params.delete(c);
     const qs = params.toString();
@@ -47,7 +53,8 @@ export default function ParamMulti({ name, label, values = [], options, clears =
   };
 
   const shown = find ? options.filter((o) => String(o.label).toLowerCase().includes(find.toLowerCase())) : options;
-  const summary = picked.size === 0 ? "All"
+  const summary = allOn ? "All"
+    : picked.size === 0 ? noneLabel ?? "All"
     : picked.size === 1 ? options.find((o) => picked.has(String(o.value)))?.label ?? "1 selected"
     : `${picked.size} selected`;
   const row = "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-muted/60";
@@ -64,7 +71,7 @@ export default function ParamMulti({ name, label, values = [], options, clears =
         <PopoverTrigger asChild>
           <button type="button" aria-haspopup="listbox" aria-label={`${label}: ${summary}`}
             className={cn("flex h-8 min-w-32 max-w-60 items-center gap-2 rounded-md border px-2.5 text-xs transition-colors",
-              picked.size ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
+              picked.size || (allValue && allOn) ? "border-primary/50 bg-primary/10 text-primary" : "border-input bg-background/60 hover:border-primary/40")}>
             <span className="flex-1 truncate text-left">{summary}</span>
             <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
           </button>
@@ -78,8 +85,8 @@ export default function ParamMulti({ name, label, values = [], options, clears =
           ) : null}
           <div role="listbox" aria-multiselectable aria-label={label} className="max-h-72 min-h-0 flex-1 overflow-y-auto overscroll-contain p-1">
             {/* All: every one (none picked). */}
-            <button type="button" role="option" aria-selected={picked.size === 0} onClick={() => go(new Set())} className={cn(row, "font-semibold")} data-option="">
-              {tick(picked.size === 0)} All
+            <button type="button" role="option" aria-selected={allOn} onClick={() => go(new Set(), true)} className={cn(row, "font-semibold")} data-option="">
+              {tick(allOn)} All
             </button>
             {shown.map((o) => {
               const on = picked.has(String(o.value));

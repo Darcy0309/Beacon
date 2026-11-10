@@ -1,6 +1,6 @@
 import ParamMulti from "@/components/shared/param-multi";
 import ParamSelect from "@/components/shared/param-select";
-import { MONTH_SHORT, PROJECT_TYPES } from "@/lib/pipeline";
+import { ALL_MONTHS, MONTH_SHORT, PROJECT_TYPES } from "@/lib/pipeline";
 
 const MONTH_OPTIONS = MONTH_SHORT.map((m, i) => ({ value: String(i + 1), label: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][i] }));
 
@@ -37,7 +37,9 @@ export default function XdateFilterBar({ filters, options, showClient = true, sh
       {showManagers ? (
         <ParamMulti name="managers" label="Manager" values={filters.userIds.map(String)} clears={clears} options={options.managers ?? []} />
       ) : null}
-      <ParamMulti name="months" label="Renewal month" values={filters.months.map(String)} clears={clears} options={MONTH_OPTIONS} />
+      {/* None picked: the next three; "All": all twelve (client, Nov 2026). */}
+      <ParamMulti name="months" label="Renewal month" values={filters.months.map(String)} clears={clears} options={MONTH_OPTIONS}
+        allValue={ALL_MONTHS} noneLabel="Next 3 months" />
     </div>
   );
 }
