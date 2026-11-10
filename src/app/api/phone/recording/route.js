@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/session";
 import { canCall, twilioApi, twilioConfig } from "@/lib/server/twilio";
 import { identityOf } from "@/lib/twilio-voice";
+import { publicOrigin } from "@/lib/origin";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +10,9 @@ export const dynamic = "force-dynamic";
  * Record, the phone's button during a call on the Twilio line: starts
  * recording the call (both sides, each on its own channel) or stops it.
  * { callSid, on }. Only one's own call: Twilio must say the call is to or
- * from this person's browser. Recordings are kept in the Twilio account.
+ * from this person's browser. Recordings are kept in the Twilio account; when
+ * one is done Twilio says so (twilio/voice?step=recorded), and Lighthouse keeps
+ * it and tells this person, with a player (Nov 2026).
  */
 export async function POST(request) {
   const me = await getCurrentUser();
@@ -26,7 +29,17 @@ export async function POST(request) {
     if (call.from !== mine && call.to !== mine) return NextResponse.json({ error: "Not your call" }, { status: 403 });
     if (call.status !== "in-progress") return NextResponse.json({ error: "The call is not connected yet" }, { status: 409 });
 
-    if (on) await twilioApi(config, `/Calls/${callSid}/Recordings.json`, { method: "POST", form: { RecordingChannels: "dual" } });
+    if (on) {
+      await twilioApi(config, `/Calls/${callSid}/Recordings.json`, {
+        method: "POST",
+        form: {
+          RecordingChannels: "dual",
+          RecordingStatusCallback: `${publicOrigin(request.headers)}/api/twilio/voice?step=recorded&user=${me.id}`,
+          RecordingStatusCallbackEvent: "completed",
+          RecordingStatusCallbackMethod: "POST",
+        },
+      });
+    }
     else await twilioApi(config, `/Calls/${callSid}/Recordings/Twilio.CURRENT.json`, { method: "POST", form: { Status: "stopped" } });
     return NextResponse.json({ recording: Boolean(on) });
   } catch (err) {

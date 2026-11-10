@@ -14,7 +14,7 @@ import { KIND_ICONS, KIND_LABELS, ROLE_LABELS, linkLabel } from "@/features/noti
 import { colorFor } from "@/lib/format";
 import LinkedText from "@/components/shared/linked-text";
 import CallRecordingCard from "@/features/notifications/components/call-recording-card";
-import { notificationText, voicemailOf } from "@/features/notifications/voicemail";
+import { notificationText, recordingOf } from "@/features/notifications/voicemail";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +31,8 @@ export default async function NotificationPage({ params }) {
 
   const { notification: n, person, messages } = thread;
   const Icon = KIND_ICONS[n.kind] ?? Bell;
-  // A voicemail on the Lighthouse phone: its recording to play, rather than a link to it (Nov 2026).
-  const voicemail = n.kind === "system" && !person ? voicemailOf(n) : null;
+  // A voicemail on the Lighthouse phone, or a call recorded on it: its recording to play, rather than a link to it (Nov 2026).
+  const voicemail = n.kind === "system" && !person ? recordingOf(n) : null;
 
   return (
     <>

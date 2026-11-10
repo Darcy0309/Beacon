@@ -2,34 +2,37 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, Loader2, Pause, PhoneIncoming, Play } from "lucide-react";
+import { ChevronDown, CircleDot, Loader2, Pause, PhoneIncoming, Play } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import LocalTime from "@/components/shared/local-time";
 import { callClock } from "@/lib/phone";
 import { cn } from "@/lib/utils";
 
 /**
- * A voicemail on the phone's Twilio number, as its notification shows it
- * (Nov 2026): who left it and how long, when, a player for the recording
+ * A voicemail on the phone's Twilio number, or a call recorded with the
+ * phone's Record button, as its notification shows it (Nov 2026): who left it
+ * (or who the call was with) and how long, when, a player for the recording
  * (fetched through the server only when played: app/api/phone/recordings),
  * the lead whose number it is, and Twilio's transcript, opened on request.
- * `voicemail`: voicemailOf(); `at`: when it was left; `leadHref`: the lead's page.
+ * `voicemail`: recordingOf() (its `kind`, "voicemail" or "recording"); `at`: when; `leadHref`: the lead's page.
  */
 export default function CallRecordingCard({ voicemail: v, at, leadHref = null }) {
   const [open, setOpen] = useState(false);
+  const recorded = v.kind === "recording";
+  const Icon = recorded ? CircleDot : PhoneIncoming;
   return (
-    <div className="rounded-xl border border-[var(--panel-border)] bg-background/40 p-4" data-call-recording={v.recordingSid}>
+    <div className="rounded-xl border border-[var(--panel-border)] bg-background/40 p-4" data-call-recording={v.recordingSid} data-recording-kind={recorded ? "recording" : "voicemail"}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <div className="flex items-center gap-2 text-sm">
-          <PhoneIncoming className="size-4 text-primary" aria-hidden />
-          <span className="font-semibold">Voicemail</span>
+          <Icon className={cn("size-4", recorded ? "text-rose-500" : "text-primary")} aria-hidden />
+          <span className="font-semibold">{recorded ? "Call recording" : "Voicemail"}</span>
           {v.seconds ? <span className="text-muted-foreground">· {callClock(v.seconds * 1000)}</span> : null}
-          <span className="text-muted-foreground">· Left</span>
+          <span className="text-muted-foreground">· {recorded ? "Recorded" : "Left"}</span>
         </div>
         {at ? <span className="text-xs text-muted-foreground"><LocalTime iso={at} /></span> : null}
       </div>
       <div className="mt-1 text-xs tabular-nums text-muted-foreground">
-        {v.from} → Lighthouse
+        {recorded ? `With ${v.from}` : `${v.from} → Lighthouse`}
         {v.lead ? (
           <>
             {" · "}

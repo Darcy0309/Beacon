@@ -831,9 +831,14 @@ export function PhoneProvider({ children, tracked = false }) {
                               setControls((c) => ({ ...c, [key]: !c[key] }));
                               if (cap === "mute") line.setMuted(!on);
                               if (cap === "hold") line.setHeld(!on);
-                              // Recording is asked of the server: when it cannot, the button goes back, saying why.
+                              // Recording is asked of the server: when it cannot, the button goes back, saying why;
+                              // when it can, it says so and where the recording will be (Nov 2026: it said nothing).
                               if (cap === "record") {
-                                Promise.resolve(line.setRecording(!on)).catch((err) => {
+                                Promise.resolve(line.setRecording(!on)).then(() => {
+                                  if (call?.test) return;
+                                  if (!on) toast.success("Recording this call", { description: "When the call ends, it's in your notifications to play." });
+                                  else toast("Recording stopped", { description: "It's in your notifications to play in a moment." });
+                                }, (err) => {
                                   setControls((c) => ({ ...c, recording: on }));
                                   toast.error(err?.message || "Recording could not be changed.");
                                 });

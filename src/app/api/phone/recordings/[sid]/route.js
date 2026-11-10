@@ -1,21 +1,28 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/session";
-import { twilioConfig } from "@/lib/server/twilio";
+import { canCall, twilioConfig } from "@/lib/server/twilio";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
 /**
- * A recording kept in the Twilio account (a voicemail, linked from its
- * notification), played here for an administrator: Twilio asks for the
+ * A recording kept in the Twilio account (a voicemail or a recorded call,
+ * linked from its notification), played here for an administrator, or for the
+ * person who recorded the call (phone_recordings): Twilio asks for the
  * account's own login to fetch one, which never leaves the server.
  */
 export async function GET(request, { params }) {
   const me = await getCurrentUser();
-  if (me?.role !== "admin" || me.status !== "active") return NextResponse.json({ error: "Not allowed" }, { status: 403 });
-  const config = twilioConfig();
-  if (!config) return NextResponse.json({ error: "Twilio is not set up on the server" }, { status: 503 });
+  if (!canCall(me)) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   const { sid } = await params;
   if (!/^RE[0-9a-f]{32}$/i.test(sid)) return NextResponse.json({ error: "No such recording" }, { status: 404 });
+  if (me.role !== "admin") {
+    const admin = createAdminClient();
+    const { data } = admin ? await admin.from("phone_recordings").select("user_id").eq("recording_sid", sid).maybeSingle() : { data: null };
+    if (data?.user_id !== me.id) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+  }
+  const config = twilioConfig();
+  if (!config) return NextResponse.json({ error: "Twilio is not set up on the server" }, { status: 503 });
 
   const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Recordings/${sid}.mp3`, {
     headers: { authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}` },

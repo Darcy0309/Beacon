@@ -29,6 +29,8 @@ const answer = (inner) => new NextResponse(twiml(inner), { headers: { "content-t
  *   ?step=left    a voicemail was left: the administrators are told, with a link to hear it
  *   ?step=status  how a call's leg to one person went (rang, answered, ended, for how long): Call Activity
  *   ?step=transcribed  Twilio's transcript of a voicemail, added to its notification
+ *   ?step=recorded     a call recorded with the phone's Record button is ready (&user=, who pressed it):
+ *                      kept, and they are told, with a player (app/api/phone/recording asks for this)
  *
  * Only Twilio can ask: every request carries its signature, made with the account's Auth Token.
  */
@@ -64,6 +66,10 @@ export async function POST(request) {
       const { error } = await admin.rpc("phone_voicemail_transcript", { p_recording: params.RecordingSid, p_text: text.slice(0, 4000) });
       if (error) console.error("[twilio/voice] transcript", error.message);
     }
+    return new NextResponse(null, { status: 204 });
+  }
+  if (step === "recorded") {
+    await tellOfRecording(admin, params, here.searchParams, publicOrigin(request.headers));
     return new NextResponse(null, { status: 204 });
   }
   if (step === "status") {
@@ -138,6 +144,41 @@ async function presentStaff(admin) {
     .limit(MAX_RINGS);
   if (error) console.error("[twilio/voice] presence", error.message);
   return (data ?? []).map((p) => p.user_id);
+}
+
+/**
+ * A call recorded and done (Twilio's recording status, completed): kept on phone_recordings, and the
+ * person who recorded it told, with the other number, the lead when it is one's, and how long.
+ */
+async function tellOfRecording(admin, params, query, origin) {
+  const sid = params.RecordingSid;
+  const secs = Number(params.RecordingDuration) || 0;
+  const user = /^[1-9]\d{0,17}$/.test(query.get("user") ?? "") ? Number(query.get("user")) : null;
+  if (!admin || params.RecordingStatus !== "completed" || !/^RE[0-9a-f]{32}$/i.test(sid ?? "") || !/^CA[0-9a-f]{32}$/i.test(params.CallSid ?? "") || !user || secs < 1) return;
+
+  // The other end: Call Activity's leg of this call (a call out's leg is the browser's call's child; a call in's, the browser's own).
+  const { data: legs } = await admin
+    .from("phone_calls")
+    .select("number")
+    .or(`call_sid.eq.${params.CallSid},parent_sid.eq.${params.CallSid}`)
+    .not("number", "is", null)
+    .not("number", "like", "client:%")
+    .limit(1);
+  const digits = searchDigits(legs?.[0]?.number);
+  const { data: lead } = digits
+    ? await admin.from("leads").select("id, company_name, contact_name").is("deleted_at", null).ilike("search_text", `%${digits}%`).limit(1).maybeSingle()
+    : { data: null };
+  const other = digits ? formatDial(digits) : "a caller";
+  const body = [
+    lead ? `${lead.company_name}${lead.contact_name ? ` · ${lead.contact_name}` : ""}` : null,
+    `${callClock(secs * 1000)} long`,
+    `Listen: ${origin}/api/phone/recordings/${sid}`,
+  ].filter(Boolean).join("\n");
+  const { error } = await admin.rpc("phone_recording_saved", {
+    p_sid: sid, p_call: params.CallSid, p_user: user, p_number: digits || null, p_seconds: secs, p_lead: lead?.id ?? null,
+    p_title: `Recorded call with ${other}`, p_body: body, p_link: lead ? `/leads/${lead.id}` : null,
+  });
+  if (error) console.error("[twilio/voice] call recording", error.message);
 }
 
 /** A voicemail left: a notification to each administrator (pushed to their desktop too), naming the lead when the number is one's. */
