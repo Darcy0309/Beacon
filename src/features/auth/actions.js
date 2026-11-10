@@ -13,6 +13,20 @@ import { cross, rules, safeInternalPath, schemas } from "@/lib/validate";
 import { birthdayOf } from "@/lib/team";
 
 const DISABLED_MESSAGE = "This account has been disabled. Contact an administrator.";
+// Said apart from a wrong password (Nov 2026): the form shows it as a notice of its own.
+const disabledAccount = () => ({ ...fail(DISABLED_MESSAGE), disabled: true });
+
+/**
+ * A disabled account's right password: Supabase refuses a disabled (banned) sign-in before it
+ * checks the password, so check it here, on the server, before saying the account is disabled.
+ * Anyone without the password still hears "don't match", so it never tells which emails have accounts.
+ */
+async function disabledWithRightPassword(email, password) {
+  const admin = createAdminClient();
+  if (!admin) return false;
+  const { data, error } = await admin.rpc("disabled_account_password", { p_email: email, p_password: password });
+  return !error && data === true;
+}
 
 export async function signIn(prevState, formData) {
   const { values, failed } = check(formData, schemas.login);
@@ -26,7 +40,9 @@ export async function signIn(prevState, formData) {
   if (error) {
     // Supabase reports a disabled (banned) account before it checks the
     // password, which would tell anyone which emails have accounts here.
-    if (error.code === "user_banned" || error.code === "invalid_credentials" || /banned|invalid login/i.test(error.message)) {
+    const banned = error.code === "user_banned" || /banned/i.test(error.message);
+    if (banned && (await disabledWithRightPassword(email, password))) return disabledAccount();
+    if (banned || error.code === "invalid_credentials" || /invalid login/i.test(error.message)) {
       return fail("That email and password don't match an active account.");
     }
     return fail(error);
@@ -41,7 +57,7 @@ export async function signIn(prevState, formData) {
   }
 
   const { disabled } = await finishSignIn(supabase);
-  if (disabled) return fail(DISABLED_MESSAGE);
+  if (disabled) return disabledAccount();
   redirect(next);
 }
 
@@ -62,7 +78,7 @@ export async function verifyTwoFactor(prevState, formData) {
   if (error) return fail(error.message === "Invalid TOTP code entered" ? "That code is not right. Try the current one." : error);
 
   const { disabled } = await finishSignIn(supabase);
-  if (disabled) return fail(DISABLED_MESSAGE);
+  if (disabled) return disabledAccount();
   redirect(next);
 }
 

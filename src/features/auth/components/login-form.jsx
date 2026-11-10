@@ -1,11 +1,27 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { requestPasswordReset, signIn, verifyTwoFactor } from "@/features/auth/actions";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
+
+/**
+ * A disabled account (Nov 2026): a notice of its own, not the wrong-password alert. Only shown
+ * once the password was right.
+ */
+function DisabledNotice() {
+  return (
+    <div role="alert" data-account-disabled className="flex gap-3 rounded-md border border-amber-300/40 bg-amber-400/10 px-3 py-2.5 text-amber-100">
+      <Lock className="mt-0.5 size-4 shrink-0 text-amber-300" />
+      <div className="text-xs leading-relaxed">
+        <p className="text-sm font-semibold text-amber-200">Your account is disabled</p>
+        <p>An administrator has turned off your sign-in. Ask them to turn it back on, then sign in again.</p>
+      </div>
+    </div>
+  );
+}
 
 const field =
   "h-9 w-full rounded-md border border-white/15 bg-white/5 px-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-white/30 focus:ring-2 focus:ring-white/20";
@@ -58,7 +74,7 @@ export default function LoginForm({ next = "/" }) {
         {state?.fieldErrors?.password ? <p role="alert" className="text-xs text-rose-300">{state.fieldErrors.password}</p> : null}
       </div>
 
-      {state?.error && !state?.fieldErrors ? (
+      {state?.disabled ? <DisabledNotice /> : state?.error && !state?.fieldErrors ? (
         <p role="alert" className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
           {state.error}
         </p>
@@ -168,7 +184,7 @@ function TwoFactorStep({ next }) {
         />
       </div>
 
-      {state?.error ? (
+      {state?.disabled ? <DisabledNotice /> : state?.error ? (
         <p role="alert" className="rounded-md border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
           {state.error}
         </p>
