@@ -36,6 +36,7 @@ const DESC = {
   bulletin_posted: "When an announcement or alert is posted to the bulletin board: all staff.",
   xdate_30d: "Each morning at 7: every rep, of the names they hold whose renewal is 30 days out.",
   appt_reminder: "Each morning at 7: whoever set them, of the day's appointments and tomorrow's still to confirm.",
+  payment_due: "Each morning at 7: the client's Sales Rep (administrators when it has none), 5 days before a Program Funding payment is due, with the project's leads and appointments so far.",
 };
 
 // Rules with no job behind them yet (none now: the two morning ones run

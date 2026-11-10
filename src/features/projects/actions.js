@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { carryInfoOnTie } from "@/features/project-info/server";
 import { cross, formValues, schemas } from "@/lib/validate";
+import { fundingSchedule, readFunding } from "@/lib/funding";
 
 export async function saveProject(prevState, formData) {
   const { failed } = check(formData, schemas.project, cross.project);
@@ -58,6 +59,12 @@ export async function saveProject(prevState, formData) {
   // when that one has none yet (Sean, Oct 2026).
   const admin = payload.appt_project_id && saved?.id ? createAdminClient() : null;
   if (admin) await carryInfoOnTie(admin, saved.id, payload.appt_project_id);
+
+  // Program Funding (client, Nov 2026), on an administrator's form: the plan, and its installments worked out here.
+  if (formData.has("funding_plan") && saved?.id) {
+    const funding = await saveFunding(supabase, saved.id, formData);
+    if (funding) return fail(`The project was saved, but not its Program Funding: ${funding}`, null, formValues(formData, Object.keys(schemas.project)));
+  }
 
   await logActivity(supabase, id ? "project.update" : "project.create", { entity: "project", entityId: id ?? null });
   // A project's office shows on its page, its call lists and its lead sheets.
@@ -164,4 +171,25 @@ export async function saveProjectRates(prevState, formData) {
   revalidatePath("/reports/production");
   revalidatePath(`/projects/${projectId}`);
   return ok({ ...data, ...(special ?? {}) });
+}
+
+/** A project's Program Funding from its form; an error's text, or null when saved. */
+async function saveFunding(supabase, projectId, formData) {
+  const get = (k) => formData.get(`funding_${k}`) ?? "";
+  const f = readFunding({
+    plan: get("plan"), leads: get("leads"), appts: get("appts"), apptsIncluded: formData.getAll("funding_appts_included").includes("on"),
+    setupFee: get("setup_fee"), listFee: get("list_fee"), payments: get("payments"), firstLeads: get("first_leads"),
+    firstDue: get("first_due"), dueDay: get("due_day"),
+  });
+  const { data: rates } = await supabase.from("projects").select("bill_lead_rate, bill_appointment_rate").eq("id", projectId).maybeSingle();
+  const schedule = fundingSchedule(f, { lead: rates?.bill_lead_rate, appt: rates?.bill_appointment_rate });
+  const { error } = await supabase.rpc("save_project_funding", {
+    p_project: projectId,
+    p_funding: {
+      plan: f.plan, leads: f.leads, appts: f.appts, appts_included: f.apptsIncluded, setup_fee: f.setupFee, list_fee: f.listFee,
+      payments: f.payments, first_leads: f.firstLeads, first_due: f.firstDue, due_day: get("due_day") ? f.dueDay : null,
+    },
+    p_payments: schedule.payments,
+  });
+  return error ? error.message : null;
 }

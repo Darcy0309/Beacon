@@ -15,10 +15,11 @@ import { saveProject } from "@/features/projects/actions";
 import DatePicker from "@/components/shared/date-picker";
 import { monthlyFromGoal, projectDays } from "@/lib/project-goals";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
+import FundingFields from "@/features/funding/components/funding-fields";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
-export default function ProjectForm({ project, options, trigger }) {
+export default function ProjectForm({ project, options, trigger, funding = null, canFund = false }) {
   const isEdit = Boolean(project?.id);
   // Inside a row's action menu the menu owns the open state and there is no trigger.
   const [open, setOpen, inRowMenu, onCloseAutoFocus] = useDialogOpen();
@@ -91,6 +92,9 @@ export default function ProjectForm({ project, options, trigger }) {
     const f = monthlyFromGoal(goals[total], goalDays(goals));
     return f && String(f.perMonth) === goals[month] ? `${Number(goals[total]).toLocaleString()} over ${f.months} month${f.months === 1 ? "" : "s"}, from the dates` : null;
   };
+
+  // The billing rates, as typed: Program Funding works its payments out from them.
+  const [rates, setRates] = useState(() => ({ lead: dv("bill_lead_rate") ?? "", appt: dv("bill_appointment_rate") ?? "" }));
 
   // The project's office, held here so "use the client's details" can fill it in.
   const OFFICE = ["contact_name", "contact_title", "phone", "address", "city", "state", "zip", "timezone_id"];
@@ -241,11 +245,17 @@ export default function ProjectForm({ project, options, trigger }) {
 
             {/* What the client is billed (Sean, Nov 2026): Reports' billing listing; a manager's pay is under Pay rates. */}
             <Field label="Billing per lead ($)" error={fe("bill_lead_rate")} hint="What the client is billed for each lead">
-              <Input name="bill_lead_rate" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={dv("bill_lead_rate")} aria-invalid={invalid("bill_lead_rate")} data-bill-lead-rate />
+              <Input name="bill_lead_rate" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={dv("bill_lead_rate")} onChange={(e) => setRates((r) => ({ ...r, lead: e.target.value }))} aria-invalid={invalid("bill_lead_rate")} data-bill-lead-rate />
             </Field>
             <Field label="Billing per appointment ($)" error={fe("bill_appointment_rate")} hint="…and for each appointment">
-              <Input name="bill_appointment_rate" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={dv("bill_appointment_rate")} aria-invalid={invalid("bill_appointment_rate")} data-bill-appointment-rate />
+              <Input name="bill_appointment_rate" type="number" inputMode="decimal" min="0" step="0.01" defaultValue={dv("bill_appointment_rate")} onChange={(e) => setRates((r) => ({ ...r, appt: e.target.value }))} aria-invalid={invalid("bill_appointment_rate")} data-bill-appointment-rate />
             </Field>
+
+            {/* How the client pays for the program (client, Nov 2026): administrators, on a project's own page. */}
+            {canFund ? (
+              <FundingFields plan={funding} rates={rates}
+                goals={{ leads: goals.lead_goal, appts: goals.appt_goal, leadsMonth: goals.lead_goal_month, start: goals.start_date }} />
+            ) : null}
 
             <Field label="Description" error={fe("description")} className="sm:col-span-2">
               <Textarea name="description" rows={3} maxLength={500} defaultValue={dv("description")} aria-invalid={invalid("description")} />

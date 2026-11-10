@@ -13,6 +13,8 @@ import { MarkBar } from "@/features/removals/components/mark-names";
 import RenewProject from "@/features/projects/components/renew-project";
 import NameFilters from "@/features/leads/components/name-filters";
 import ProjectForm from "@/features/projects/components/project-form";
+import FundingCard from "@/features/funding/components/funding-card";
+import { getProjectFunding } from "@/features/funding/queries";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
 import ProjectTeam from "@/features/projects/components/project-team";
 import ProjectGoals from "@/features/projects/components/project-goals";
@@ -83,7 +85,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getBlockedDays({ projectIds: scope?.ids ?? [pid], from: span(today).first, to: span(today).last }),
   ]));
 
-  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked], monthCounts] = await Promise.all([
+  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked], monthCounts, funding] = await Promise.all([
     meP,
     getProject(id),
     getProjectOverview(id),
@@ -103,6 +105,8 @@ export default async function ProjectDetail({ params, searchParams }) {
     daysP,
     // This month's, for a goal a month (managers and administrators read it).
     meP.then((me) => (role(me).canManage ? getProjectMonthCounts([pid]) : {})),
+    // Program Funding (client, Nov 2026): the administrators'.
+    meP.then((me) => (role(me).admin ? getProjectFunding(pid) : null)),
   ]);
   if (!p) notFound();
   // A client's people (Sean, Oct 2026): their own project (Row Level Security), without its description (our billing
@@ -190,7 +194,8 @@ export default async function ProjectDetail({ params, searchParams }) {
                 {/* The program's next term (Oct 2026): a new lead project carrying the viable names on. */}
                 {admin && dbdev ? <RenewProject project={{ id: p.id, name: p.name }} team={team} staff={staff}
                   filters={{ q: list.q, ...list.filters, ...names }} filterLabel={filterLabel} /> : null}
-                {client ? null : <ProjectForm project={p.raw ? { ...p.raw, company: p.raw.company?.[0] ?? p.raw.company, type: p.raw.type?.[0] ?? p.raw.type, status: p.raw.status?.[0] ?? p.raw.status } : p} options={options} />}
+                {client ? null : <ProjectForm project={p.raw ? { ...p.raw, company: p.raw.company?.[0] ?? p.raw.company, type: p.raw.type?.[0] ?? p.raw.type, status: p.raw.status?.[0] ?? p.raw.status } : p} options={options}
+                  funding={funding?.plan ?? null} canFund={admin && Boolean(funding)} />}
               </div>
             </div>
             {p.description && !client ? <p className="mt-4 text-sm text-muted-foreground">{p.description}</p> : null}
@@ -224,6 +229,12 @@ export default async function ProjectDetail({ params, searchParams }) {
         </Card>
 
         <ProjectGoals leads={leadGoal} appts={apptGoal} days={goalDays} hint={admin ? "No goals set. Edit the project to give it a lead or appointment goal." : null} />
+
+        {/* How the client pays for the program, and its payments (client, Nov 2026): administrators. */}
+        {admin && funding ? (
+          <FundingCard funding={funding} today={today}
+            rates={{ lead: p.raw?.bill_lead_rate ?? null, appt: p.raw?.bill_appointment_rate ?? null }} />
+        ) : null}
 
         {/* The figures in one even row; then the call results beside the calendar, each as tall as the other. */}
         <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:flex" data-from="xl">

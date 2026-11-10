@@ -19,6 +19,7 @@ import { pctLabel, shapeStats, statsLine } from "@/lib/lead-stats";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getClientDashboard, getClientPipeline, getClientSales } from "@/features/dashboard/queries";
 import SalePipeline from "@/features/dashboard/components/sale-pipeline";
+import PaymentRemindersSwitch from "@/features/funding/components/payment-reminders-switch";
 import { PIPELINE_PERIODS, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
 import PeriodSwitch from "@/features/dashboard/components/period-switch";
 import PictureUpload from "@/components/shared/picture-upload";
@@ -117,6 +118,8 @@ export default async function ClientProfile({ params, searchParams }) {
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 pt-5 sm:grid-cols-3">
               <Field label="Sales Rep">{c.salesRep ? <span data-client-sales-rep>{c.salesRep}</span> : null}</Field>
+              {/* Program Funding's reminders (client, Nov 2026): per client, for all its projects. */}
+              <Field label="Payment reminders"><PaymentRemindersSwitch companyId={c.id} on={c.raw?.payment_reminders} /></Field>
               <Field label="Account manager">{c.manager}</Field>
               <Field label="Primary contact">{c.contact}</Field>
               <Field label="Agency group"><span data-agency-group>{c.group}</span></Field>

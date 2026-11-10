@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, Combine, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
-  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet,
 } from "lucide-react";
 
 export const ROLES = {
@@ -65,6 +65,8 @@ export const navGroups = [
       // A client's people see their own projects (Sean, Oct 2026), without what is ours to see or change.
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "client"] },
       { href: "/account-managers", label: "Account Managers", icon: UserCog, roles: ["admin"] },
+      // Program Funding's payments (client, Nov 2026): an administrator's every client's, a Sales Rep's their own.
+      { href: "/payments", label: "Payments Due", icon: Wallet, roles: ["admin", "manager"] },
     ],
   },
   {
