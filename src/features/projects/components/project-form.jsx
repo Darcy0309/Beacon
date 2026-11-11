@@ -271,6 +271,12 @@ export default function ProjectForm({ project, options, trigger, funding = null,
               <input type="checkbox" name="delivery_link_only" value="on" defaultChecked={Boolean(record?.delivery_link_only)} className="mt-0.5 size-4 accent-[var(--primary)]" />
               <span>Send a link to the lead sheet instead of the sheet itself<span className="block text-xs text-muted-foreground">The link opens the sheet without signing in, for 90 days.</span></span>
             </label>
+            {/* Appointment reminder texts (client, Nov 2026): off for clients who confirm their own. */}
+            <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
+              <input type="hidden" name="appt_texts" value="off" />
+              <input type="checkbox" name="appt_texts" value="on" defaultChecked={Boolean(record?.appt_texts)} className="mt-0.5 size-4 accent-[var(--primary)]" data-project-appt-texts />
+              <span>Text appointment reminders<span className="block text-xs text-muted-foreground">The prospect is texted a reminder the day before, as set in Settings › Appointment Reminder Texts. Leave it off for clients who confirm their own appointments.</span></span>
+            </label>
           </div>
 
           <DialogFooter>

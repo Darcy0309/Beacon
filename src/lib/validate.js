@@ -290,6 +290,7 @@ export const schemas = {
       return bad.length ? `Not an email address: ${bad.slice(0, 3).join(", ")}` : null;
     })],
     delivery_link_only: [oneOf(["off", "on"])],
+    appt_texts: [oneOf(["off", "on"])],
     // The project's office (an agent and office of the client's, in its own state).
     contact_name: [max(80)],
     contact_title: [max(60)],

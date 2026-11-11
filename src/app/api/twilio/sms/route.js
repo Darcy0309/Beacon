@@ -5,6 +5,8 @@ import { twiml, validTwilioSignature } from "@/lib/twilio-voice";
 import { publicOrigin } from "@/lib/origin";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { e164, textDigits, textFailure } from "@/lib/texts";
+import { APPT_REPLY_MEANS, apptReply } from "@/lib/appointment-texts";
+import { apptWhen } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,9 @@ const FINAL = ["delivered", "undelivered", "failed"];
  * webhook, which scripts/twilio-setup.mjs sets, and each text's StatusCallback):
  *
  *   (no step)      a text received: kept on the Conversation of the lead whose number it came from,
- *                  and whoever last texted that number is told (else the lead's rep, else the administrators)
+ *                  and whoever last texted that number is told (else the lead's rep, else the administrators);
+ *                  a Y, N or R answering an appointment reminder (Nov 2026) is kept on the reminder and
+ *                  its appointment's manager told, to mark it confirmed or call the prospect
  *   ?step=status   how a text sent is going: sent, delivered, or not, and why
  *
  * Only Twilio can ask: every request carries its signature, made with the account's Auth Token.
@@ -87,6 +91,9 @@ async function keepReply(admin, params, sid) {
   if (error) return console.error("[twilio/sms] keeping a reply", error.message);
   if (!kept?.length) return; // already kept
 
+  // An answer to an appointment reminder: its manager is told what it means.
+  if (lead && (await tellOfApptReply(admin, lead, body))) return;
+
   // Who is told: whoever last texted the number, else the lead's rep, else the administrators.
   const to = [last?.lead_id === lead?.id ? last?.user_id : null, lead?.assigned_user_id].find(Boolean);
   const { data: person } = to ? await admin.from("users").select("id").eq("id", to).eq("status", "active").maybeSingle() : { data: null };
@@ -101,4 +108,48 @@ async function keepReply(admin, params, sid) {
     ? await admin.rpc("lead_text_notice", { p_users: ids, p_title: `Text from ${who}`, p_body: said, p_link: lead ? `/leads/${lead.id}?tab=conversation` : null })
     : { error: null };
   if (noticeError) console.error("[twilio/sms] reply notice", noticeError.message);
+}
+
+// A reply this long after its reminder is taken as about something else.
+const REPLY_WITHIN_MS = 4 * 24 * 60 * 60 * 1000;
+
+/**
+ * A Y, N or R answering the lead's latest appointment reminder (Nov 2026): kept on the reminder, and
+ * the appointment's manager (whoever follows it up, else who set it; else the administrators) told,
+ * to mark it confirmed or call the prospect. True when it was one.
+ */
+async function tellOfApptReply(admin, lead, body) {
+  const answer = apptReply(body);
+  if (!answer) return false;
+  const since = new Date(Date.now() - REPLY_WITHIN_MS).toISOString();
+  const { data: reminder } = await admin.from("appointment_texts")
+    .select("appointment_id, appointment:appointments(id, appt_date, appt_time, user_id, follow_up_user_id)")
+    .eq("lead_id", lead.id).not("sent_at", "is", null).gte("sent_at", since)
+    .order("sent_at", { ascending: false }).limit(1).maybeSingle();
+  const appt = Array.isArray(reminder?.appointment) ? reminder.appointment[0] : reminder?.appointment;
+  if (!appt) return false;
+
+  const { error } = await admin.from("appointment_texts").update({ reply: answer, replied_at: new Date().toISOString() }).eq("appointment_id", appt.id);
+  if (error) console.error("[twilio/sms] appointment reply", error.message);
+
+  const managers = [appt.follow_up_user_id, appt.user_id].filter(Boolean);
+  const { data: active } = managers.length ? await admin.from("users").select("id").in("id", managers).eq("status", "active") : { data: [] };
+  const manager = managers.find((id) => (active ?? []).some((u) => u.id === id));
+  let ids = manager ? [manager] : [];
+  if (!ids.length) {
+    const { data: admins } = await admin.from("users").select("id").eq("role", "admin").eq("status", "active");
+    ids = (admins ?? []).map((u) => u.id);
+  }
+  const who = lead.contact_name || lead.company_name;
+  const { error: noticeError } = ids.length
+    ? await admin.rpc("lead_text_notice", {
+        p_users: ids,
+        p_title: `${who} replied ${answer}: ${APPT_REPLY_MEANS[answer]}`,
+        p_body: `${lead.company_name} · appointment ${apptWhen(appt.appt_date, appt.appt_time)}. They texted: "${String(body).trim().slice(0, 200)}"`
+          + (answer === "Y" ? " Mark it Confirmed in Lighthouse." : ""),
+        p_link: `/leads/${lead.id}?tab=conversation`,
+      })
+    : { error: null };
+  if (noticeError) console.error("[twilio/sms] appointment reply notice", noticeError.message);
+  return true;
 }

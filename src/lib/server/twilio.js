@@ -39,7 +39,9 @@ export const canCall = (user) => Boolean(user) && CALLS_ROLES.includes(user.role
  * answer; throws with Twilio's message on an error.
  */
 export async function twilioApi(config, path, { method = "GET", form } = {}) {
-  const res = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}${path}`, {
+  // TWILIO_API_URL only for the tests' stand-in.
+  const base = (process.env.TWILIO_API_URL?.trim() || "https://api.twilio.com").replace(/\/+$/, "");
+  const res = await fetch(`${base}/2010-04-01/Accounts/${config.accountSid}${path}`, {
     method,
     headers: {
       authorization: `Basic ${Buffer.from(`${config.accountSid}:${config.authToken}`).toString("base64")}`,

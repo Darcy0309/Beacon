@@ -39,6 +39,7 @@ export async function saveProject(prevState, formData) {
     email: s(formData, "email"),
     // A checkbox sends nothing when unticked; the hidden "off" before it always does.
     delivery_link_only: formData.getAll("delivery_link_only").includes("on"),
+    appt_texts: formData.getAll("appt_texts").includes("on"),
     // Its office: the agent (producer), phone, address and time zone.
     contact_name: s(formData, "contact_name"),
     contact_title: s(formData, "contact_title"),
