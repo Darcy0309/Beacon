@@ -55,8 +55,10 @@ import CallBackLater from "@/features/leads/components/call-back-later";
 import { SECTION_LINE } from "@/features/leads/form-section";
 import { MarkLeadButton } from "@/features/removals/components/mark-names";
 import LeadConversation from "@/features/texts/components/lead-conversation";
+import TextButton from "@/features/texts/components/text-button";
 import { getLeadConversation } from "@/features/texts/conversation";
 import { conversationThread } from "@/lib/conversation-thread";
+import { textDigits } from "@/lib/texts";
 import { twilioConfig } from "@/lib/server/twilio";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
@@ -70,6 +72,22 @@ function CallButton({ tel, leadId, company, label }) {
     <a href={tel} data-lead-id={leadId} data-lead-name={company || undefined} aria-label={label} className={cn(ROUND, "bg-emerald-500 shadow-[0_0_14px_-6px_var(--neon-emerald)]")}>
       <Phone className="size-4" />
     </a>
+  );
+}
+
+/**
+ * A number's buttons: Call, and beside it Text (client, Nov 2026), when this person may text the lead
+ * from its Conversation (`texting`) and the number is one a text can go to.
+ */
+function Dial({ number, leadId, company, label, texting }) {
+  const tel = telHref(number);
+  if (!tel) return null;
+  const digits = texting ? textDigits(number) : null;
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {digits ? <TextButton digits={digits} label={`Text ${label}: ${number}`} /> : null}
+      <CallButton tel={tel} leadId={leadId} company={company} label={`Call ${label}: ${number}`} />
+    </div>
   );
 }
 
@@ -93,7 +111,7 @@ function Line({ kind, label = kind, children, action }) {
  * `called` the name. The contact always has an Email line, so an address the
  * contact gives on the phone can be typed in and used at once.
  */
-function Person({ who, called = who, phone, mobile, email: address, leadId, company, emailButton, alwaysEmail = false, allLines = false, children }) {
+function Person({ who, called = who, phone, mobile, email: address, leadId, company, emailButton, alwaysEmail = false, allLines = false, texting = false, children }) {
   const label = who.toLowerCase();
   const none = <span className="text-muted-foreground">None on file</span>;
   return (
@@ -105,12 +123,12 @@ function Person({ who, called = who, phone, mobile, email: address, leadId, comp
         </Line>
       ) : null}
       {phone || allLines ? (
-        <Line kind="Business" label={`${called} Phone`} action={telHref(phone) ? <CallButton tel={telHref(phone)} leadId={leadId} company={company} label={`Call ${label}, business: ${phone}`} /> : null}>
+        <Line kind="Business" label={`${called} Phone`} action={<Dial number={phone} leadId={leadId} company={company} label={`${label}, business`} texting={texting} />}>
           {phone || none}
         </Line>
       ) : null}
       {mobile || allLines ? (
-        <Line kind="Mobile" label={`${called} Mobile`} action={telHref(mobile) ? <CallButton tel={telHref(mobile)} leadId={leadId} company={company} label={`Call ${label}, mobile: ${mobile}`} /> : null}>
+        <Line kind="Mobile" label={`${called} Mobile`} action={<Dial number={mobile} leadId={leadId} company={company} label={`${label}, mobile`} texting={texting} />}>
           {mobile || none}
         </Line>
       ) : null}
@@ -263,6 +281,8 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  // A Text button by each number (Nov 2026): when the Conversation's box can text from here.
+  const texting = Boolean(conversation) && canRecord && Boolean(twilioConfig());
   // An appointment found invalid, its lead not since given another (Sean, Oct 2026: "call next year"):
   // put back on the call list on a later day. And, until that day, when it comes back.
   const callBackLater = staff && canRecord && r.stage === "appt" && !["appointment", "confirm"].includes(r.result?.effect)
@@ -428,14 +448,14 @@ export default async function LeadSheet({ params, searchParams }) {
                 <div key={who} className={`mt-3 px-3 pb-1 pt-2.5 ${SECTION_LINE}`} data-person-box={who}>
                   {who === "Decision maker" ? (
                     <div className="mb-3 [&>[data-contact-line]:first-child]:border-t-0 [&>[data-contact-line]:first-child]:pt-0">
-                      <Line kind="Business phone" action={telHref(r.phone) ? <CallButton tel={telHref(r.phone)} leadId={lead.id} company={lead.co} label={`Call the business: ${r.phone}`} /> : null}>
+                      <Line kind="Business phone" action={<Dial number={r.phone} leadId={lead.id} company={lead.co} label="the business" texting={texting} />}>
                         {r.phone || <span className="text-muted-foreground">None on file</span>}
                       </Line>
                       {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}
                     </div>
                   ) : null}
                   <Person who={who} called={called} phone={ways.phone} mobile={ways.mobile} email={ways.email} leadId={lead.id} company={lead.co}
-                    alwaysEmail={ways.alwaysEmail} allLines={ways.allLines} emailButton={emailButton(name, ways.primary)}>
+                    alwaysEmail={ways.alwaysEmail} allLines={ways.allLines} emailButton={emailButton(name, ways.primary)} texting={texting}>
                     <div className="eyebrow">{who}</div>
                     <div className="mb-2 mt-1 text-sm">
                       {name ? <span className="font-semibold">{name}</span> : <span className="text-muted-foreground">Not on file</span>}

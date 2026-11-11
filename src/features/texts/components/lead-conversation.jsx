@@ -14,6 +14,7 @@ import { TEXT_LIMIT, TEXT_STATUS, textParts } from "@/lib/texts";
 import { atClock } from "@/lib/call-transcript";
 import { conversationThread } from "@/lib/conversation-thread";
 import { cn } from "@/lib/utils";
+import { LEAD_TEXT_EVENT } from "@/features/texts/components/text-button";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 // How often an open Conversation asks for replies.
@@ -51,7 +52,24 @@ export default function LeadConversation({ leadId, initial = [], log = [], numbe
   const box = useRef(null);
   const list = useRef(null);
   const form = useRef(null);
+  const area = useRef(null);
   const atEnd = useRef(true);
+  const [toNumber, setToNumber] = useState(numbers[0]?.digits ?? "");
+
+  // A Text button by a number on the lead sheet: that number chosen, the box in view and ready to type in.
+  useEffect(() => {
+    const onText = (e) => {
+      const digits = e.detail?.digits;
+      if (digits && numbers.some((n) => n.digits === digits)) setToNumber(digits);
+      // After the tab has opened.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        form.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        area.current?.focus({ preventScroll: true });
+      }));
+    };
+    window.addEventListener(LEAD_TEXT_EVENT, onText);
+    return () => window.removeEventListener(LEAD_TEXT_EVENT, onText);
+  }, [numbers]);
 
   const refresh = useCallback(async () => {
     try {
@@ -159,13 +177,14 @@ export default function LeadConversation({ leadId, initial = [], log = [], numbe
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 {numbers.length > 1 ? (
-                  <Select name="to" defaultValue={numbers[0].digits} aria-label="Text to" className="h-8 text-xs sm:max-w-80" data-conversation-to-number>
+                  <Select name="to" value={numbers.some((n) => n.digits === toNumber) ? toNumber : numbers[0].digits} onChange={(e) => setToNumber(e.target.value)} aria-label="Text to" className="h-8 text-xs sm:max-w-80" data-conversation-to-number>
                     {numbers.map((n) => <option key={n.digits} value={n.digits}>{formatDial(n.digits)} · {n.label}</option>)}
                   </Select>
                 ) : (
                   <input type="hidden" name="to" value={numbers[0].digits} />
                 )}
                 <Textarea
+                  ref={area}
                   name="body"
                   rows={2}
                   maxLength={TEXT_LIMIT}

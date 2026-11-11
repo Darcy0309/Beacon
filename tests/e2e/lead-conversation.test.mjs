@@ -114,6 +114,22 @@ try {
   await sleep(300);
   check("cleared: all of it", (await thread(sean)).length === 3);
 
+  section("A Text button by each number on the contact card");
+  await sean.ev(`document.querySelector('[role=tab][data-tab=appointments]').click(); window.scrollTo(0, 0)`);
+  await sleep(300);
+  check("beside the business phone's Call button", (await sean.ev(`!!document.querySelector('[data-contact-line="Business phone"] [data-text-number="6025550100"]')`)));
+  await sean.ev(`document.querySelector('[data-contact-line="Business phone"] [data-text-number]').click()`);
+  const focused = await when(sean, `document.activeElement?.matches('[data-conversation-body]') || null`, 5000);
+  check("pressed: the Conversation tab open", (await sean.ev(`document.querySelector('[role=tab][data-tab=conversation]').getAttribute('aria-selected')`)) === "true");
+  check("…that number chosen to text", (await sean.ev("document.querySelector('[data-conversation-to-number]')?.value")) === "6025550100");
+  check("…and the cursor in the message box", focused === true);
+  await sleep(800);
+  check("…in view", await sean.ev(`(() => { const r = document.querySelector('[data-conversation-reply]').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight + 1; })()`));
+  if (SHOTS) await sean.screenshot(`${SHOTS}/conversation-text-button.png`);
+  await sean.ev(`document.querySelector('[data-person="Contact"] [data-contact-line="Mobile"] [data-text-number]').click()`);
+  await sleep(300);
+  check("the mobile's Text button picks the mobile", (await sean.ev("document.querySelector('[data-conversation-to-number]')?.value")) === MOBILE);
+
   section("Texting from the box");
   check("to the mobile, the lead's first", (await sean.ev("document.querySelector('[data-conversation-to-number]')?.value")) === MOBILE);
   await sean.fill("[data-conversation-body]", "Friday at 10 works. See you then!");
