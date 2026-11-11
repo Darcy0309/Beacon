@@ -14,7 +14,7 @@ import { IDLE_COOKIE, idleExpired, idleLimitOf, sessionIdOf } from "@/lib/idle";
 // link a client fills in their Project Info from (app/client-profile/[token]),
 // and Twilio asking what to do with a call, signed with the account's Auth
 // Token (app/api/twilio/voice).
-const PUBLIC_PATHS = ["/login", "/auth", "/setup", "/sw.js", "/api/push/deliver", "/api/delivery/flush", "/api/appointments/nudge", "/api/appointments/texts", "/sheet", "/client-profile", "/request", "/api/twilio"];
+const PUBLIC_PATHS = ["/login", "/auth", "/setup", "/sw.js", "/api/push/deliver", "/api/delivery/flush", "/api/appointments/nudge", "/api/appointments/texts", "/sheet", "/client-profile", "/request", "/api/twilio", "/privacy", "/terms"];
 
 /**
  * True when the session has cleared two-factor. The assurance level is a
