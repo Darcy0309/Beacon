@@ -241,7 +241,7 @@ export async function getLeadActivity(leadId) {
       .order("appt_date", { ascending: false }),
     supabase
       .from("call_records")
-      .select("id, call_date, call_result, stage, user:users(first_name, last_name)")
+      .select("id, user_id, call_date, call_result, stage, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("call_date", { ascending: false })
       .limit(20),
@@ -288,6 +288,7 @@ export async function getLeadActivity(leadId) {
       notes: notesOf.get(c.id) ?? null,
       when: timeAgo(c.call_date),
       at: c.call_date,
+      userId: c.user_id,
       by: fullName(one(c.user)) || "—",
       stage: c.stage === "dbdev" ? "DBDev" : c.stage === "appt" ? "Appt" : null,
     })),

@@ -44,6 +44,11 @@ sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, n
 sql(`insert into public.phone_recordings (recording_sid, call_sid, user_id, number, seconds, lead_id) values (${lit(REC)}, ${lit(PARENT)}, ${SEAN}, ${lit(MOBILE)}, 252, ${lead})`);
 sql(`insert into public.lead_texts (lead_id, user_id, direction, from_number, to_number, body, status, twilio_sid, created_at)
   values (${lead}, ${SEAN}, 'out', '+15555550100', '+1${MOBILE}', 'Hi Marco, here is the pricing we discussed.', 'sent', ${lit(SENT)}, now() - interval '1 day' + interval '7 minutes')`);
+// The result Sean logged for that call (the old Call History, now on the Conversation), and one logged
+// three days ago with no call on the Lighthouse phone to go on (called from another phone).
+sql(`insert into public.call_records (lead_id, project_id, user_id, call_date, call_result, notes) values
+  (${lead}, ${project}, ${SEAN}, now() - interval '1 day' + interval '5 minutes', 'Viable-CallBack', 'Wants the pricing by text'),
+  (${lead}, ${project}, ${SEAN}, now() - interval '3 days', 'No Answer', null)`);
 
 const hook = async (fields, step = "") => {
   const url = `${APP_URL}/api/twilio/sms${step ? `?step=${step}` : ""}`;
@@ -69,6 +74,10 @@ try {
   check("the call out: how long, how it went, the numbers, who", seen[0]?.kind === "call:out" && /Outgoing call/.test(seen[0].text) && /4m 12s/.test(seen[0].text) && /Completed/.test(seen[0].text)
     && seen[0].text.includes(`(480) 555-${tail}`) && /Sean/.test(seen[0].text), JSON.stringify(seen[0]));
   check("…its recording to play, for the person who recorded it", Boolean(await sean.ev("!!document.querySelector('[data-conversation-call] [data-recording-play]')")));
+  check("…with the result logged for it, and what was said", /Viable-CallBack/.test(seen[0]?.text ?? "") && /Wants the pricing by text/.test(seen[0]?.text ?? ""), JSON.stringify(seen[0]));
+  const alone = await sean.ev(`[...document.querySelectorAll('[data-conversation-thread] > *')].map((e) => e.matches('[data-conversation-result]') ? 'result:' + e.innerText : e.dataset.conversationCall ? 'call' : 'other')`);
+  check("a result with no call on the Lighthouse phone stands by itself, first (oldest)", /^result:[\s\S]*Call logged[\s\S]*No Answer/.test(alone?.[0] ?? "") && alone[1] === "call", JSON.stringify(alone));
+  check("no Call History tab: it is all on the Conversation", !(await sean.ev(`[...document.querySelectorAll('[role=tab]')].some((t) => /Call History/.test(t.textContent))`)));
   check("then the text sent, oldest first", seen[1]?.kind === "text:out" && /here is the pricing/.test(seen[1].text) && /Sent/.test(seen[1].text), JSON.stringify(seen[1]));
 
   section("Twilio's word on a text sent");

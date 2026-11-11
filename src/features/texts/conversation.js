@@ -18,7 +18,7 @@ const NUMBERS = "id, phone, contact_name, contact_phone, contact_mobile, decisio
 /**
  * { items, numbers, ourNumber } for a lead its viewer can see, or null (not staff, or not theirs to see).
  * items: { key, kind: "call" | "text", dir: "out" | "in", at, ... }:
- *   a call: { seconds, answered, by, them, from, to, recording: { sid, seconds, canPlay, transcript } | null }
+ *   a call: { seconds, answered, userId, by, them, from, to, recording: { sid, seconds, canPlay, transcript } | null }
  *     transcript (only for whoever may play it): { status, lines, error } | null (Nov 2026)
  *   a text: { body, media, status, error, by, from, to }
  */
@@ -70,6 +70,7 @@ export async function getLeadConversation(leadId) {
       const canPlay = Boolean(rec) && (me.role === "admin" || rec.user_id === me.id);
       return {
         key: c.key, kind: "call", dir: c.dir, at: c.at, seconds: c.seconds, answered: c.answered, ended: c.ended,
+        userId: c.userId,
         by: c.userId ? nameOf(c.userId) : null,
         them: lead.contact_name || null,
         from: c.dir === "out" ? ourNumber : c.number,

@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { AlertCircle, ChevronDown, CircleDot, Loader2, MessageSquare, PhoneIncoming, PhoneOutgoing, Send, X } from "lucide-react";
+import { AlarmClock, AlertCircle, ChevronDown, CircleDot, ClipboardCheck, Loader2, MessageSquare, PhoneCall, PhoneIncoming, PhoneOutgoing, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { sendLeadText } from "@/features/texts/actions";
 import { formatDial } from "@/lib/phone";
 import { TEXT_LIMIT, TEXT_STATUS, textParts } from "@/lib/texts";
 import { atClock } from "@/lib/call-transcript";
+import { conversationThread } from "@/lib/conversation-thread";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -29,14 +30,17 @@ const callStatus = (c) =>
     : c.answered ? "Answered" : c.ended ? "Missed" : "Ringing";
 
 /**
- * A lead's Conversation (Nov 2026): its calls on the phone's Twilio line, with their recordings, and
- * the texts sent and received, oldest first, as one thread; a date filter above it, and a box to text
+ * A lead's Conversation (Nov 2026): its calls on the phone's Twilio line, with their recordings and
+ * the results logged for them, the texts sent and received, and the call-back reminders, oldest
+ * first, as one thread (the old Call History folded in); a date filter above it, and a box to text
  * the contact below it (Cmd/Ctrl+Enter sends). Asks for replies every so often while it is open.
  *
- * `initial`: getLeadConversation()'s items; `numbers`: the lead's numbers a text can go to;
- * `canText`: may work the name; `ready`: Twilio is connected; `tz`: the business's clock.
+ * `initial`: getLeadConversation()'s items; `log`: the logged call results and reminders
+ * (lib/conversation-thread.js); `numbers`: the lead's numbers a text can go to; `live`: the viewer
+ * is staff (calls, texts, the reply box), else only the log; `canText`: may work the name;
+ * `ready`: Twilio is connected; `tz`: the business's clock.
  */
-export default function LeadConversation({ leadId, initial = [], numbers = [], canText = false, ready = false, tz }) {
+export default function LeadConversation({ leadId, initial = [], log = [], numbers = [], live = true, canText = false, ready = false, tz }) {
   const [items, setItems] = useState(initial);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -60,11 +64,12 @@ export default function LeadConversation({ leadId, initial = [], numbers = [], c
 
   // New replies while it is open (on screen, the tab chosen).
   useEffect(() => {
+    if (!live) return;
     const t = setInterval(() => {
       if (document.visibilityState === "visible" && box.current?.offsetParent) refresh();
     }, POLL_MS);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [refresh, live]);
 
   // A text sent, or not: said so, and the thread as it now is.
   useEffect(() => {
@@ -88,7 +93,8 @@ export default function LeadConversation({ leadId, initial = [], numbers = [], c
       ...(day.format(d).slice(0, 4) !== thisYear ? { year: "numeric" } : {}),
     }).format(d);
   };
-  const shown = items.filter((i) => {
+  const all = useMemo(() => conversationThread(items, log), [items, log]);
+  const shown = all.filter((i) => {
     const d = day.format(new Date(i.at));
     return (!from || d >= from) && (!to || d <= to);
   });
@@ -123,20 +129,25 @@ export default function LeadConversation({ leadId, initial = [], numbers = [], c
             <X className="size-3.5" /> Clear
           </button>
         ) : null}
-        <span className="ml-auto tabular-nums">{shown.length} of {items.length}</span>
+        <span className="ml-auto tabular-nums">{shown.length} of {all.length}</span>
       </div>
 
       <div ref={list} onScroll={(e) => { const el = e.currentTarget; atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; }}
         className="flex max-h-[34rem] min-h-44 flex-col gap-3 overflow-y-auto px-4 py-4" data-conversation-thread aria-live="polite">
-        {shown.length ? shown.map((i) => (i.kind === "call" ? <CallCard key={i.key} c={i} when={when} /> : <TextBubble key={i.key} t={i} when={when} />)) : (
+        {shown.length ? shown.map((i) => (
+          i.kind === "call" ? <CallCard key={i.key} c={i} when={when} />
+            : i.kind === "result" ? <ResultCard key={i.key} r={i} when={when} />
+              : i.kind === "reminder" ? <ReminderCard key={i.key} m={i} when={when} />
+                : <TextBubble key={i.key} t={i} when={when} />
+        )) : (
           <div className="m-auto flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground">
             <MessageSquare className="size-6 opacity-60" />
-            {items.length ? "Nothing between those dates." : "No calls or texts with this lead on the Lighthouse phone yet."}
+            {all.length ? "Nothing between those dates." : live ? "No calls or texts with this lead yet." : "No calls with this lead yet."}
           </div>
         )}
       </div>
 
-      <form ref={form} action={formAction} className="border-t border-[var(--panel-border)] p-3" data-conversation-reply>
+      {live ? <form ref={form} action={formAction} className="border-t border-[var(--panel-border)] p-3" data-conversation-reply>
         <input type="hidden" name="lead_id" value={leadId} />
         {why ? (
           <p className="flex items-center gap-2 rounded-md border border-[var(--panel-border)] bg-muted/40 px-3 py-2 text-xs text-muted-foreground" data-conversation-off>
@@ -180,7 +191,7 @@ export default function LeadConversation({ leadId, initial = [], numbers = [], c
             </p>
           </>
         )}
-      </form>
+      </form> : null}
     </div>
   );
 }
@@ -202,6 +213,7 @@ function CallCard({ c, when }) {
       <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
         {dial(c.from)} → {dial(c.to)}{c.by ? ` · ${c.by}` : ""}
       </p>
+      {c.result ? <CallResult r={c.result} /> : null}
       {c.recording ? (
         c.recording.canPlay ? (
           <div data-conversation-recording>
@@ -214,6 +226,55 @@ function CallCard({ c, when }) {
           </p>
         )
       ) : null}
+    </div>
+  );
+}
+
+/** The result a caller logged for a call, its stage and what was said (managers and administrators see the notes). */
+function CallResult({ r }) {
+  return (
+    <div className="mt-2 rounded-lg border border-[var(--panel-border)] bg-muted/30 px-2.5 py-1.5 text-xs" data-call-result={r.id}>
+      <p className="flex flex-wrap items-center gap-x-1.5">
+        <ClipboardCheck className="size-3.5 shrink-0 text-primary" aria-hidden />
+        <span className="font-semibold text-foreground">{r.result}</span>
+        {r.stage ? <span className="text-muted-foreground">· {r.stage}</span> : null}
+      </p>
+      {r.notes ? <p className="mt-1 whitespace-pre-line text-muted-foreground">{r.notes}</p> : null}
+    </div>
+  );
+}
+
+/** A result logged with no call on the Lighthouse phone to go on (called from another phone). */
+function ResultCard({ r, when }) {
+  return (
+    <div className="w-full max-w-xl rounded-xl border border-[var(--panel-border)] bg-background/40 p-3" data-conversation-result data-call-row>
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+          <PhoneCall className="size-3.5 shrink-0 self-center text-muted-foreground" aria-hidden />
+          <span className="font-medium">Call logged</span>
+          {r.by ? <span className="text-muted-foreground">· {r.by}</span> : null}
+        </span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{when(r.at)}</span>
+      </div>
+      <CallResult r={r} />
+    </div>
+  );
+}
+
+/** A call-back reminder set on the name: when for, by whom, and its note. */
+function ReminderCard({ m, when }) {
+  return (
+    <div className="w-full max-w-xl rounded-xl border border-dashed border-[var(--panel-border)] p-3" data-conversation-reminder data-reminder-row>
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+          <AlarmClock className="size-3.5 shrink-0 self-center text-primary" aria-hidden />
+          <span className="font-medium text-primary">Call-back reminder</span>
+          <span className="text-muted-foreground">· {m.sent ? "Sent" : "Set"}{m.by ? ` by ${m.by}` : ""}</span>
+        </span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{when(m.at)}</span>
+      </div>
+      <p className="mt-0.5 text-xs font-medium">For {m.forWhen}</p>
+      {m.note ? <p className="mt-0.5 whitespace-pre-line text-xs text-muted-foreground">{m.note}</p> : null}
     </div>
   );
 }

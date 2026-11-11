@@ -1,7 +1,7 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { AlarmClock, ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, PhoneCall, Printer, Repeat } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, Printer, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import Tabs from "@/components/shared/tabs";
@@ -55,6 +55,7 @@ import { SECTION_LINE } from "@/features/leads/form-section";
 import { MarkLeadButton } from "@/features/removals/components/mark-names";
 import LeadConversation from "@/features/texts/components/lead-conversation";
 import { getLeadConversation } from "@/features/texts/conversation";
+import { conversationThread } from "@/lib/conversation-thread";
 import { twilioConfig } from "@/lib/server/twilio";
 import { getLeadHold } from "@/features/delivery/hold-queries";
 
@@ -308,9 +309,12 @@ export default async function LeadSheet({ params, searchParams }) {
     ...POLICY_LINES.flatMap((l) => [[l.date, ins?.[l.date] ?? ""], [l.carrier, ins?.[l.carrier] ?? ""]]),
   ]);
 
-  // The call history with the reminders set on the name among the calls, newest first.
-  const history = [...activity.calls, ...activity.reminders.map((m) => ({ ...m, reminder: true }))]
-    .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  // The logged call results and the reminders set on the name: in the Conversation with its calls and texts.
+  const log = [
+    ...activity.calls,
+    ...activity.reminders.map((m) => ({ id: m.id, reminder: true, at: m.at, by: m.by, sent: m.sent, note: m.note, forWhen: stampIn(m.remindAt, m.timeZone, tz) })),
+  ];
+  const thread = conversationThread(conversation?.items, log);
 
   // Dates and times in the history, on the business's clock.
   const stamp = (iso) =>
@@ -682,59 +686,20 @@ export default async function LeadSheet({ params, searchParams }) {
           <Tabs
             label="History"
             // From an update's notification (?tab=updates): its history open.
-            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : sp?.tab === "conversation" && conversation ? "conversation" : undefined}
+            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : undefined}
             panelClassName="min-h-44"
             tabs={[
+              // The calls (on the Lighthouse phone or logged with a result), the texts, and the call-back
+              // reminders, as one thread, and a box to text the contact (Nov 2026; Call History folded in).
               {
-                id: "calls",
-                label: "Call History",
-                count: history.length,
-                content: history.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[40rem] text-sm">
-                      <thead><tr><th className={TH}>Call date &amp; time</th><th className={TH}>Result</th><th className={TH}>Caller</th><th className={TH}>Stage</th><th className={TH}>Comments</th></tr></thead>
-                      <tbody className="divide-y divide-[var(--panel-border)]">
-                        {history.map((c) => c.reminder ? (
-                          <tr key={`r${c.id}`} data-list-row data-reminder-row>
-                            <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(c.at)}</td>
-                            <td className={cn(TD, "whitespace-nowrap font-medium text-primary")}>
-                              <span className="inline-flex items-center gap-1.5"><AlarmClock className="size-3.5" /> Call-back reminder</span>
-                            </td>
-                            <td className={cn(TD, "whitespace-nowrap")}>{c.by}</td>
-                            <td className={cn(TD, "whitespace-nowrap text-muted-foreground")}>{c.sent ? "Sent" : "Set"}</td>
-                            <td className={cn(TD, "text-muted-foreground")}>
-                              <span className="font-medium text-foreground">For {stampIn(c.remindAt, c.timeZone, tz)}</span>
-                              {c.note ? <span className="block whitespace-pre-line">{c.note}</span> : null}
-                            </td>
-                          </tr>
-                        ) : (
-                          <tr key={c.id} data-list-row data-call-row>
-                            <td className={cn(TD, "whitespace-nowrap tabular-nums")}>{stamp(c.at)}</td>
-                            <td className={cn(TD, "whitespace-nowrap font-medium")}>{c.result}</td>
-                            <td className={cn(TD, "whitespace-nowrap")}>{c.by}</td>
-                            <td className={cn(TD, "whitespace-nowrap text-muted-foreground")}>{c.stage ?? "—"}</td>
-                            <td className={cn(TD, "whitespace-pre-line text-muted-foreground")}>{c.notes || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <Empty icon={PhoneCall}>No calls yet.</Empty>
+                id: "conversation",
+                label: "Conversation",
+                count: thread.length,
+                content: (
+                  <LeadConversation leadId={lead.id} initial={conversation?.items ?? []} log={log} numbers={conversation?.numbers ?? []}
+                    live={Boolean(conversation)} canText={canRecord} ready={Boolean(twilioConfig())} tz={tz} />
                 ),
               },
-              // Calls on the Lighthouse phone and texts with the contact, as one thread, and a box to text them (Nov 2026).
-              ...(conversation
-                ? [{
-                    id: "conversation",
-                    label: "Conversation",
-                    count: conversation.items.length,
-                    content: (
-                      <LeadConversation leadId={lead.id} initial={conversation.items} numbers={conversation.numbers}
-                        canText={canRecord} ready={Boolean(twilioConfig())} tz={tz} />
-                    ),
-                  }]
-                : []),
               {
                 id: "appointments",
                 label: "Appointments",
