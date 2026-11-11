@@ -29,7 +29,25 @@ export default function RouteError({ error, retry, reset }) {
 
   useEffect(() => {
     console.error(error);
-  }, [error]);
+    // Told to the server (client_errors), so a failure on one person's screen can be read and fixed.
+    // A failure to reach it is the error itself: nothing to tell.
+    if (network) return;
+    try {
+      fetch("/api/client-errors", {
+        method: "POST",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          path: location.pathname + location.search,
+          message: String(error?.message ?? error),
+          stack: error?.stack ?? null,
+          digest: error?.digest ?? null,
+        }),
+      }).catch(() => {});
+    } catch {
+      // Never let the report break the error screen.
+    }
+  }, [error, network]);
 
   useEffect(() => {
     const now = Date.now();
