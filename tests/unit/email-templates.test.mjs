@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Unit tests for email templates (lib/email-templates.js; client, Nov 2026). */
 import assert from "node:assert/strict";
-import { fileSize, fillTemplate, templateDraft } from "../../src/lib/email-templates.js";
+import { apptDateText, fileSize, fillTemplate, templateDraft } from "../../src/lib/email-templates.js";
 
 const values = { first_name: "John", company: "Alpine Mechanical", my_name: "Sean Fipps", signature: "Regards,\nSean Fipps\nCapital Insurance Services" };
 
@@ -19,6 +19,15 @@ const placed = templateDraft({ subject: "Hi", body: "Hi {first_name},\n\n{signat
 assert.equal(placed.body, "Hi John,\n\nRegards,\nSean Fipps\nCapital Insurance Services\n\nP.S. Sean Fipps", "…or where it does, once");
 assert.equal(templateDraft({ subject: "  A   {company} ", body: "Body" }, { company: "X" }).subject, "A X");
 assert.equal(templateDraft({ subject: "S", body: "Body" }, {}).body, "Body", "no signature to add");
+
+// The appointment and the client's agent (Nov 2026).
+const appt = { ...values, appt_date: apptDateText("2026-11-12", "2026"), appt_time: "10:00 AM", agent_name: "Jen Carter" };
+assert.equal(fillTemplate("See you {appt_date} at {appt_time} with {agent_name}.", appt), "See you Thursday, November 12 at 10:00 AM with Jen Carter.");
+assert.equal(fillTemplate("Thanks for speaking with { Agent_Name }!", appt), "Thanks for speaking with Jen Carter!");
+assert.equal(fillTemplate("Your appointment {appt_date}.", { appt_date: "" }), "Your appointment.", "no appointment: the field goes");
+assert.equal(apptDateText("2027-01-04", "2026"), "Monday, January 4, 2027", "another year: said");
+assert.equal(apptDateText("", "2026"), "");
+assert.equal(apptDateText(null), "");
 
 assert.equal(fileSize(2.4 * 1024 * 1024), "2.4 MB");
 assert.equal(fileSize(830 * 1024), "830 KB");

@@ -29,6 +29,9 @@ const project = Number(sql(`insert into public.projects (name, company_id, proje
   values (${lit(`${TAG} DBDev`)}, ${company}, (select id from public.project_types where code='DBDV'), 1) returning id`));
 const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, email, project_id, assigned_user_id)
   values (${lit(`${TAG} Alpine Mechanical`)}, 'John Alpine', '602-555-0142', ${lit(JOHN)}, ${project}, ${SEAN}) returning id`));
+// Its appointment (Nov 2026): the template's {appt_date}, {appt_time} and {agent_name} come from it.
+sql(`insert into public.appointments (lead_id, user_id, project_id, set_stage, appt_date, appt_time, duration_min, rep_name, status_id, qa_status)
+  values (${lead}, ${SEAN}, ${project}, 'dbdev', '2027-01-04', '10:00 AM', 30, 'Jen Carter', (select id from public.appointment_statuses where name = 'Scheduled'), 'pending')`);
 const mailSetting = sql("select value::text from public.app_settings where key = 'mail'");
 sql(`update public.app_settings set value = value || '{"from": "alerts@signaturemktg.net"}'::jsonb where key = 'mail'`);
 
@@ -52,7 +55,7 @@ try {
   await when(admin, "!!document.querySelector('[data-template-dialog] [data-template-name]')");
   await admin.fill("[data-template-name]", NAME);
   await admin.fill("[data-template-subject]", "Your renewal, {company}");
-  await admin.fill("[data-template-body]", "Hi {first_name},\n\nThanks for your time today. Our price sheet is attached.");
+  await admin.fill("[data-template-body]", "Hi {first_name},\n\nThanks for your time today. Our price sheet is attached.\nSee you {appt_date} at {appt_time} with {agent_name}.");
   const { root } = await admin.send("DOM.getDocument", { depth: -1 });
   const { nodeId } = await admin.send("DOM.querySelector", { nodeId: root.nodeId, selector: "[data-template-file-input]" });
   await admin.send("DOM.setFileInputFiles", { nodeId, files: [PDF] });
@@ -85,7 +88,7 @@ try {
   const filled = await until(() => manager.ev(`(() => { const d = document.querySelector('[role=dialog]'); const s = d.querySelector('input[name="subject"]').value;
     return s ? { subject: s, body: d.querySelector('textarea[name="body"]').value, files: [...d.querySelectorAll('[data-email-attachment]')].map((f) => f.dataset.emailAttachment) } : null; })()`));
   check("it fills in the subject for this lead", filled?.subject === `Your renewal, ${TAG} Alpine Mechanical`, JSON.stringify(filled));
-  check("…and the message: the contact's name, then their signature", /^Hi John,\n\nThanks for your time today\. Our price sheet is attached\.\n\n/.test(filled?.body ?? "") && /Sean Fitzgerald/.test(filled?.body ?? ""), filled?.body);
+  check("…and the message: the contact's name, the appointment and its agent, then their signature", /^Hi John,\n\nThanks for your time today\. Our price sheet is attached\.\nSee you Monday, January 4, 2027 at 10:00 AM with Jen Carter\.\n\n/.test(filled?.body ?? "") && /Sean Fitzgerald/.test(filled?.body ?? ""), filled?.body);
   check("…with its file", JSON.stringify(filled?.files) === JSON.stringify(["price-sheet.pdf"]));
   const speech = await manager.ev("!!(window.SpeechRecognition || window.webkitSpeechRecognition)");
   check("talk to type in the message box (where the browser has it)", speech ? Boolean(await manager.ev("!!document.querySelector('[role=dialog] [data-dictation]')")) : !(await manager.ev("!!document.querySelector('[role=dialog] [data-dictation]')")), String(speech));

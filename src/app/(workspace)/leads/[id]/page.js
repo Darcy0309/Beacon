@@ -43,6 +43,7 @@ import { autosLine, employeesLine, locationsLine, subcontractorsLine, xmodText, 
 import { getCargoTypes } from "@/features/cargo/queries";
 import { backFrom } from "@/lib/back-link";
 import { emailSignature } from "@/lib/email";
+import { apptDateText } from "@/lib/email-templates";
 import { one } from "@/lib/server/query-helpers";
 import ProjectInfoView from "@/features/project-info/components/project-info-view";
 import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
@@ -324,9 +325,15 @@ export default async function LeadSheet({ params, searchParams }) {
       : "—";
   // Signed as the sender: their name, the client this lead is for, and their work phone and extension.
   const signature = emailSignature({ name: fullName(me), client: one(r.project?.company)?.name, phone: me?.phone, ext: me?.phone_ext });
+  // A template's appointment and agent fields (Nov 2026): the lead's latest appointment, and its rep or else the lead's producer.
+  const emailFields = {
+    appt_date: openAppt ? apptDateText(openAppt.appt_date, today.slice(0, 4)) : "",
+    appt_time: openAppt?.appt_time ?? "",
+    agent_name: openAppt?.rep_name || r.producer_name || r.project?.contact_name || "",
+  };
   const emailButton = (name, primary = false) =>
     canRecord && sender
-      ? (to) => <EmailLead compact primary={primary} leadId={lead.id} company={lead.co} to={to} contact={name} sender={sender} admin={admin} signature={signature} />
+      ? (to) => <EmailLead compact primary={primary} leadId={lead.id} company={lead.co} to={to} contact={name} sender={sender} admin={admin} signature={signature} fields={emailFields} />
       : null;
   const address = [r.address, [r.city, r.state, r.zip].filter(Boolean).join(" ")].filter(Boolean);
   const website = r.website ? <a href={/^https?:/.test(r.website) ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">{r.website}</a> : null;

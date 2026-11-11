@@ -40,7 +40,7 @@ const NOT_READY = {
  * `compact`: a round icon button, for beside an address on the sheet;
  * `primary`: the contact's own, the sheet's main Email button.
  */
-export default function EmailLead({ leadId, company, to, contact, sender, admin, signature = "", compact = false, primary = false }) {
+export default function EmailLead({ leadId, company, to, contact, sender, admin, signature = "", fields = {}, compact = false, primary = false }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(sendLeadEmail, EMPTY);
@@ -92,7 +92,7 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin,
       setFiles([]);
       return;
     }
-    const draft = templateDraft(t, { first_name: first, company, my_name: sender.name, signature });
+    const draft = templateDraft(t, { ...fields, first_name: first, company, my_name: sender.name, signature });
     if (subjectRef.current) subjectRef.current.value = draft.subject;
     if (bodyRef.current) {
       bodyRef.current.value = draft.body.slice(0, EMAIL_LIMITS.body);
