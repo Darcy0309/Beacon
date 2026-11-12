@@ -106,27 +106,6 @@ export async function setProjectRep(formData) {
   await logActivity(supabase, on ? "project.rep_add" : "project.rep_remove", {
     entity: "project", entityId: projectId, detail: `user ${userId} · ${data?.moved ?? 0} names moved`,
   });
-  revalidatePath(`/projects/${projectId}`);
-  return ok({ message: sharedOut(data) });
-}
-
-/**
- * Change a project's manager (client, Nov 2026: from the Projects list's Manager column, after
- * confirming): that account manager in place of the ones on it now; its agents stay. Its names still
- * to call are shared out again in the same transaction (set_project_manager()).
- */
-export async function setProjectManager(formData) {
-  const projectId = idFrom(formData, "project_id");
-  const userId = idFrom(formData, "user_id");
-  if (!projectId || !userId) return fail("Choose who manages it");
-
-  const supabase = await createClient();
-  const { data, error } = await supabase.rpc("set_project_manager", { p_project_id: projectId, p_user_id: userId });
-  if (error) return fail(error);
-
-  await logActivity(supabase, "project.manager", {
-    entity: "project", entityId: projectId, detail: `user ${userId} · ${data?.moved ?? 0} names moved`,
-  });
   revalidatePath("/projects");
   revalidatePath(`/projects/${projectId}`);
   return ok({ message: sharedOut(data) });

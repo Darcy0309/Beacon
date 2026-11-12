@@ -64,6 +64,27 @@ function DropdownMenuRadioItem({ className, children, ...props }) {
   );
 }
 
+/** Several of many in a menu (each chosen or not), styled like the radio items: a check on each chosen one. */
+function DropdownMenuCheckboxItem({ className, children, ...props }) {
+  return (
+    <DropdownMenuPrimitive.CheckboxItem
+      className={cn(
+        "relative flex cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none transition-colors",
+        "focus:bg-primary/15 data-[state=checked]:font-semibold data-[state=checked]:text-primary data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <DropdownMenuPrimitive.ItemIndicator className="absolute right-2 flex items-center">
+        <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      </DropdownMenuPrimitive.ItemIndicator>
+    </DropdownMenuPrimitive.CheckboxItem>
+  );
+}
+
 function DropdownMenuLabel({ className, ...props }) {
   return <DropdownMenuPrimitive.Label className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)} {...props} />;
 }
@@ -73,5 +94,5 @@ function DropdownMenuSeparator({ className, ...props }) {
 
 export {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  DropdownMenuRadioGroup, DropdownMenuRadioItem,
+  DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuCheckboxItem,
 };

@@ -1,4 +1,4 @@
-import { Plus, FolderKanban, Target, Activity, DollarSign } from "lucide-react";
+import { FolderKanban, Target, Activity, DollarSign } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import Link from "@/components/shared/intent-link";
 import ToneBadge from "@/components/shared/tone-badge";
@@ -6,7 +6,6 @@ import RowActions from "@/components/shared/row-actions";
 import ProjectForm from "@/features/projects/components/project-form";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
@@ -107,7 +106,7 @@ export default async function ProjectsPage({ searchParams }) {
           <SectionHeader
             label="All Projects"
             icon={FolderKanban}
-            action={client ? null : <ProjectForm options={options} trigger={<Button size="sm"><Plus /> New project</Button>} />}
+            action={client ? null : <ProjectForm options={options} />}
           />
           <FilterTable
             columns={["Project", "Client", "Type", "Leads", "To call", "Status", ...(client ? [] : ["Manager"]), { label: "Action", className: "text-right" }]}

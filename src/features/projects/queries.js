@@ -34,8 +34,8 @@ function toProjectView(p) {
     type: one(p.type)?.code ?? "—",
     leads: p.leads?.[0]?.count ?? 0,
     status: one(p.status)?.name ?? "—",
-    // Its manager, else whoever is on it (an agent alone), else "Unassigned".
-    manager: shortName(managers[0] ?? team[0]),
+    // Its managers (Sean, Nov 2026: often two or three), else whoever is on it (an agent alone), else "Unassigned".
+    manager: managers.length ? managers.map(shortName).join(", ") : shortName(team[0]),
     managers: managers.map((u) => ({ id: u.id, name: shortName(u) })),
     color: colorFor(p.name),
     description: p.description,
