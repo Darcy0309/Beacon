@@ -21,6 +21,9 @@ import { transcriptLines } from "@/lib/call-transcript";
 const intelligenceUrl = () => (process.env.TWILIO_INTELLIGENCE_URL?.trim() || "https://intelligence.twilio.com").replace(/\/+$/, "");
 const serviceSid = () => process.env.TWILIO_INTELLIGENCE_SERVICE_SID?.trim() || null;
 
+/** Whether calls can be transcribed here: Twilio's keys and the Intelligence Service are set. */
+export const transcriptsReady = () => Boolean(twilioConfig() && serviceSid());
+
 async function intelligence(config, path, { method = "GET", form } = {}) {
   const res = await fetch(`${intelligenceUrl()}${path}`, {
     method,

@@ -153,7 +153,7 @@ export default function LeadConversation({ leadId, initial = [], log = [], numbe
       <div ref={list} onScroll={(e) => { const el = e.currentTarget; atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40; }}
         className="flex max-h-[34rem] min-h-44 flex-col gap-3 overflow-y-auto px-4 py-4" data-conversation-thread aria-live="polite">
         {shown.length ? shown.map((i) => (
-          i.kind === "call" ? <CallCard key={i.key} c={i} when={when} />
+          i.kind === "call" ? <CallCard key={i.key} c={i} when={when} onChanged={refresh} />
             : i.kind === "result" ? <ResultCard key={i.key} r={i} when={when} />
               : i.kind === "reminder" ? <ReminderCard key={i.key} m={i} when={when} />
                 : <TextBubble key={i.key} t={i} when={when} />
@@ -216,7 +216,7 @@ export default function LeadConversation({ leadId, initial = [], log = [], numbe
 }
 
 /** A call on the Lighthouse phone: which way, how long, how it went, the numbers, and its recording. */
-function CallCard({ c, when }) {
+function CallCard({ c, when, onChanged }) {
   const Icon = c.dir === "out" ? PhoneOutgoing : PhoneIncoming;
   return (
     <div className="w-full max-w-xl rounded-xl border border-[var(--panel-border)] bg-background/40 p-3" data-conversation-call={c.dir}>
@@ -237,7 +237,7 @@ function CallCard({ c, when }) {
         c.recording.canPlay ? (
           <div data-conversation-recording>
             <RecordingPlayer src={`/api/phone/recordings/${c.recording.sid}`} seconds={c.recording.seconds} />
-            {c.recording.transcript ? <CallTranscript transcript={c.recording.transcript} ours={c.by} theirs={c.them} /> : null}
+            {c.recording.transcript ? <CallTranscript sid={c.recording.sid} transcript={c.recording.transcript} ours={c.by} theirs={c.them} onChanged={onChanged} /> : null}
           </div>
         ) : (
           <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-conversation-recording="private">
@@ -298,31 +298,65 @@ function ReminderCard({ m, when }) {
   );
 }
 
-/** A recorded call's transcript, opened on request (Nov 2026); while it is on its way, says so (the Conversation asks again every so often). */
-function CallTranscript({ transcript: t, ours, theirs }) {
+/**
+ * A recorded call's transcript, hidden until "Show transcript" (Nov 2026). One never transcribed (recorded
+ * before transcripts were set up) is asked for on that click, and one that failed can be tried again;
+ * while it is on its way it says so, and the Conversation asks again every so often (`onChanged` at once).
+ */
+function CallTranscript({ sid, transcript, ours, theirs, onChanged }) {
   const [open, setOpen] = useState(false);
+  const [asking, setAsking] = useState(false);
+  // What asking said, until the Conversation itself has moved on from where it was then.
+  const [asked, setAsked] = useState(null);
+  const t = asked && asked.from === transcript.status ? asked : transcript;
+
+  const ask = async () => {
+    setAsking(true);
+    try {
+      const res = await fetch(`/api/phone/recordings/${sid}/transcript`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      setAsked({ from: transcript.status, status: res.ok ? data.status : "failed", lines: [], error: res.ok ? data.error : data.error || "The transcript couldn't be asked for." });
+      if (res.ok) {
+        setOpen(true);
+        onChanged?.();
+      }
+    } catch {
+      setAsked({ from: transcript.status, status: "failed", lines: [], error: "Couldn't reach Lighthouse. Try again in a moment." });
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  const toggle = (label, onClick, extra) => (
+    <button type="button" onClick={onClick} disabled={asking} aria-expanded={extra?.expanded} data-call-transcript-toggle
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-60">
+      {asking ? <Loader2 className="size-3.5 animate-spin" /> : <ChevronDown className={cn("size-3.5 transition-transform", extra?.expanded && "rotate-180")} />}
+      {label}
+    </button>
+  );
+
+  if (t.status === "none") {
+    return <div className="mt-2" data-call-transcript-status="none">{toggle("Show transcript", ask)}</div>;
+  }
   if (t.status === "transcribing") {
     return (
       <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-call-transcript-status="transcribing">
-        <Loader2 className="size-3.5 animate-spin" /> Transcribing the call…
+        <Loader2 className="size-3.5 animate-spin" /> Transcribing the call… usually a minute or two.
       </p>
     );
   }
   const lines = t.lines ?? [];
   if (t.status === "failed" || !lines.length) {
     return (
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground" data-call-transcript-status={t.status}>
-        <AlertCircle className="size-3.5" /> {t.error || "This call couldn't be transcribed."}
-      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" data-call-transcript-status={t.status}>
+        <span className="flex items-center gap-1.5"><AlertCircle className="size-3.5 shrink-0" /> {t.error || "This call couldn't be transcribed."}</span>
+        {t.status === "failed" ? toggle("Try again", ask) : null}
+      </div>
     );
   }
   return (
     <div className="mt-2" data-call-transcript-status="done">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} data-call-transcript-toggle
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
-        <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-        {open ? "Hide transcript" : "Show transcript"}
-      </button>
+      {toggle(open ? "Hide transcript" : "Show transcript", () => setOpen((o) => !o), { expanded: open })}
       {open ? (
         <ol className="mt-1.5 max-h-72 space-y-1.5 overflow-y-auto rounded-lg border border-[var(--panel-border)] bg-background/60 p-2.5 text-xs" data-call-transcript>
           {lines.map((l, i) => (

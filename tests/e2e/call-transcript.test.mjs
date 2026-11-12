@@ -74,8 +74,8 @@ const call = () => {
     values (${lit(`CA${hex(32)}`)}, ${lit(parent)}, ${SEAN}, 'out', '+1${MOBILE}', 'completed', now() - interval '2 minutes', now(), 95)`);
   return parent;
 };
-const PARENTS = [call(), call()];
-const RECS = [`RE${hex(32)}`, `RE${hex(32)}`];
+const PARENTS = [call(), call(), call()];
+const RECS = [`RE${hex(32)}`, `RE${hex(32)}`, `RE${hex(32)}`];
 
 const recorded = async (parent, rec) => {
   const url = `${APP_URL}/api/twilio/voice?step=recorded&user=${SEAN}`;
@@ -137,6 +137,22 @@ try {
   await sean.go(`/leads/${lead}?tab=conversation`, 5000);
   const caught = await until(() => (row(RECS[1])?.transcript_status === "done" ? row(RECS[1]) : null), { timeout: 20000 });
   check("caught up on when the lead is looked at", caught?.transcript?.length === 4, JSON.stringify(caught));
+
+  section("One never transcribed: asked for on request (client, Nov 2026)");
+  // Recorded before transcripts were set up: kept, never sent.
+  sql(`insert into public.phone_recordings (recording_sid, call_sid, user_id, number, seconds, lead_id)
+    values (${lit(RECS[2])}, ${lit(PARENTS[2])}, ${SEAN}, ${lit(MOBILE)}, 30, ${lead})`);
+  await sean.go(`/leads/${lead}?tab=conversation`, 5000);
+  const card = `[data-conversation-recording]:has([data-call-transcript-status="none"])`;
+  check("it offers Show transcript, hidden until asked", Boolean(await when(sean, `document.querySelector('${card} [data-call-transcript-toggle]')?.innerText.trim() === 'Show transcript'`))
+    && !(await sean.ev(`!!document.querySelector('${card} [data-call-transcript]')`)));
+  await sean.ev(`document.querySelector('${card} [data-call-transcript-toggle]').click()`);
+  const third = await until(() => asked.transcripts.find((t) => t.form.CustomerKey === RECS[2]) ?? null, { timeout: 15000 });
+  check("asking sends it to be transcribed", Boolean(third) && JSON.parse(third.form.Channel).participants?.[0]?.full_name === "Sean Fitzgerald", JSON.stringify(third?.form));
+  check("…kept as transcribing", Boolean(await until(() => row(RECS[2])?.transcript_status === "transcribing", { timeout: 10000 })));
+  check("…and the Conversation says so", Boolean(await when(sean, `document.querySelectorAll('[data-call-transcript-status="transcribing"]').length >= 1 && !document.querySelector('[data-call-transcript-status="none"]')`)));
+  const again = await sean.ev(`fetch('/api/phone/recordings/${RECS[2]}/transcript', { method: 'POST' }).then((r) => r.json())`);
+  check("…asked again while under way: says so, and Twilio isn't asked twice", again?.status === "transcribing" && asked.transcripts.filter((t) => t.form.CustomerKey === RECS[2]).length === 1, JSON.stringify(again));
 } finally {
   browser.close();
   stand.close();

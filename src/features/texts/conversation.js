@@ -19,7 +19,7 @@ const NUMBERS = "id, phone, contact_name, contact_phone, contact_mobile, decisio
  * { items, numbers, ourNumber } for a lead its viewer can see, or null (not staff, or not theirs to see).
  * items: { key, kind: "call" | "text", dir: "out" | "in", at, ... }:
  *   a call: { seconds, answered, userId, by, them, from, to, recording: { sid, seconds, canPlay, transcript } | null }
- *     transcript (only for whoever may play it): { status, lines, error } | null (Nov 2026)
+ *     transcript (only for whoever may play it): { status: none|transcribing|done|failed, lines, error } | null (Nov 2026)
  *   a text: { body, media, status, error, by, from, to }
  */
 export async function getLeadConversation(leadId) {
@@ -77,7 +77,8 @@ export async function getLeadConversation(leadId) {
         to: c.dir === "out" ? c.number : ourNumber,
         recording: rec ? {
           sid: rec.recording_sid, seconds: rec.seconds, canPlay,
-          transcript: canPlay && rec.transcript_status ? { status: rec.transcript_status, lines: rec.transcript ?? [], error: rec.transcript_error } : null,
+          // Every one that can be played has its transcript, or a way to ask for it ("none": never sent).
+          transcript: canPlay ? { status: rec.transcript_status ?? "none", lines: rec.transcript ?? [], error: rec.transcript_error } : null,
         } : null,
       };
     }),
