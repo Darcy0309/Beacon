@@ -11,6 +11,16 @@
 
 const ICON = "/notification-icon.png";
 
+// What the person chose in this browser (src/features/notifications/popups.js keeps it here): { stay }.
+async function readPrefs() {
+  try {
+    const res = await caches.match("/__lighthouse-prefs", { cacheName: "lighthouse-prefs" });
+    return res ? await res.json() : {};
+  } catch {
+    return {};
+  }
+}
+
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
@@ -26,13 +36,16 @@ self.addEventListener("push", (event) => {
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       if (windows.some((w) => w.focused && w.visibilityState === "visible")) return;
+      const prefs = await readPrefs();
       await self.registration.showNotification(data.title || "Lighthouse", {
         body: data.body || "",
         tag: data.id ? `lighthouse-notification-${data.id}` : "lighthouse",
         icon: ICON,
         badge: ICON,
-        // A call-back reminder stays on the desktop until it is clicked or closed.
-        requireInteraction: data.kind === "reminder",
+        // A call-back reminder stays on the desktop until it is clicked or closed; every one does
+        // for someone who asked for that on the Notifications page. With the computer's sound.
+        requireInteraction: data.kind === "reminder" || prefs.stay === true,
+        silent: false,
         data: { url: data.url || "/notifications" },
       });
     })()

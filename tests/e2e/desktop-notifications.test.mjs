@@ -37,12 +37,15 @@ async function notify() {
 
 // Every Notification the page creates, kept in window.__desktop (and still shown for real).
 const SPY = `(() => { const Real = window.Notification; if (!Real) return; window.__desktop = []; window.__desktopObjs = [];
-  class Spy { constructor(title, options = {}) { this.i = window.__desktop.length; window.__desktop.push({ title, body: options.body, tag: options.tag, icon: options.icon, closed: false });
+  class Spy { constructor(title, options = {}) { this.i = window.__desktop.length; window.__desktop.push({ title, body: options.body, tag: options.tag, icon: options.icon, stays: Boolean(options.requireInteraction), silent: options.silent, closed: false });
       window.__desktopObjs.push(this); try { this.real = new Real(title, options); } catch {} }
     close() { window.__desktop[this.i].closed = true; this.real?.close(); }
     static get permission() { return Real.permission; }
     static requestPermission(...a) { return Real.requestPermission(...a); } }
-  window.Notification = Spy; })()`;
+  window.Notification = Spy;
+  // And each sound player the page makes (the chime's), to see it readied by a click.
+  const RealAudio = window.AudioContext; window.__audio = [];
+  if (RealAudio) window.AudioContext = class extends RealAudio { constructor(...a) { super(...a); window.__audio.push(this); } }; })()`;
 
 const browser = await launchBrowser({ mouse: true });
 const ctx = await browser.newContext({ as: "agent@beacon.test" });
@@ -108,6 +111,9 @@ try {
   let m = await notify();
   check("the in-app pop-up shows", Boolean(await a.waitToast(new RegExp(m.title), 8000)));
   check("…and no desktop pop-up", (await shown(a)).length === before, JSON.stringify(await shown(a)));
+  check("…with a close button", await a.ev(`[...document.querySelectorAll('[data-sonner-toast]')].some((t) => t.innerText.includes(${JSON.stringify(m.title)}) && t.querySelector('[data-close-button]'))`));
+  await sleep(10_000);
+  check("…still up after ten seconds, long enough to read it (Sean, Nov 2026: it went in 8)", ((await a.toasts()) ?? "").includes(m.title));
 
   section("While they are in another tab or app");
   await front(elsewhere);
@@ -116,6 +122,7 @@ try {
   check("a desktop pop-up shows", Boolean(popped));
   check("…with who sent it and what it says", popped?.body === "From Sean Fitzgerald\nPlease work the Capital list today", popped?.body);
   check("…tagged with the notification, and the Lighthouse icon", popped?.tag === `lighthouse-notification-${m.id}` && popped?.icon === "/notification-icon.png", JSON.stringify(popped));
+  check("…with the computer's sound, closing on its own as the computer keeps them", popped?.silent === false && popped?.stays === false, JSON.stringify(popped));
   // Clicking it brings Lighthouse back and opens the notification.
   await a.ev(`window.__desktopObjs.find((o) => window.__desktop[o.i].title === ${JSON.stringify(m.title)}).onclick()`);
   check("clicking it opens the notification", Boolean(await until(async () => (await a.path()) === `/notifications/${m.id}`, { timeout: 8000 })), await a.path());
@@ -145,6 +152,39 @@ try {
   check("with one in front, it has the in-app pop-up", Boolean(await b.waitToast(new RegExp(m.title), 8000)));
   await sleep(1500);
   check("…and no tab shows a desktop one", !(await shown(a)).some((x) => x.title === m.title) && !(await shown(b)).some((x) => x.title === m.title));
+
+  section("Kept up until closed (Sean, Nov 2026)");
+  await front(a);
+  await openBell(a);
+  const stayState = (p) => p.ev(`document.querySelector('[data-stay-switch]')?.dataset.staySwitch ?? null`);
+  const workerSays = (p) => p.ev(`caches.match('/__lighthouse-prefs', { cacheName: 'lighthouse-prefs' }).then((r) => r ? r.json() : null)`);
+  check("the switch says pop-ups close on their own", (await stayState(a)) === "off", await a.ev(`document.querySelector('[data-stay-switch]')?.innerText`));
+  await a.click("[data-stay-switch] button", "Keep them up");
+  check("Keep them up: on", Boolean(await until(async () => (await stayState(a)) === "on")));
+  check("…and told to the push worker, for pop-ups with Lighthouse closed", Boolean(await until(async () => (await workerSays(a))?.stay === true)));
+  check("…in the other tab too", Boolean(await until(async () => (await openBell(b)) && (await stayState(b)) === "on")));
+  await front(elsewhere);
+  m = await notify();
+  const kept = await until(async () => (await shown(a)).find((x) => x.title === m.title) ?? (await shown(b)).find((x) => x.title === m.title), { timeout: 10000 });
+  check("the desktop pop-up stays until it is closed", kept?.stays === true, JSON.stringify(kept));
+  await front(a);
+  m = await notify();
+  await a.waitToast(new RegExp(m.title), 8000);
+  await sleep(22_000);
+  check("the in-app pop-up is still up past the usual twenty seconds", ((await a.toasts()) ?? "").includes(m.title));
+  await a.ev(`[...document.querySelectorAll('[data-sonner-toast]')].find((t) => t.innerText.includes(${JSON.stringify(m.title)}))?.querySelector('[data-close-button]')?.click()`);
+  check("…until its close button takes it down", Boolean(await until(async () => !((await a.toasts()) ?? "").includes(m.title))));
+  await a.click("[data-stay-switch] button", "Let them close");
+  check("Let them close: off, and the worker told", Boolean(await until(async () => (await stayState(a)) === "off" && (await workerSays(a))?.stay === false)));
+
+  section("The sound, readied by a click");
+  await front(a);
+  await a.go("/leads", 4000); // a page freshly loaded: nobody has used it yet
+  check("before anyone clicks the page, no sound can play yet (a browser keeps it silent)", !(await a.ev("window.__audio.some((x) => x.state === 'running')")));
+  // A real click on the page's title (CDP input counts as the person's own).
+  await until(async () => (await a.mouseClick("[data-topbar-title]")) && a.ev("navigator.userActivation?.hasBeenActive"), { timeout: 10000 });
+  check("a click readies it, so a chime can play from the background later", Boolean(await until(() => a.ev("window.__audio.some((x) => x.state === 'running')"))),
+    JSON.stringify(await a.ev("({ states: window.__audio.map((x) => x.state), clicked: navigator.userActivation?.hasBeenActive })")));
 
   section("Turned off");
   await front(a);

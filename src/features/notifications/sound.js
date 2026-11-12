@@ -60,6 +60,28 @@ export function playChime(kind) {
 }
 
 /**
+ * Ready the chime on the first click or key press on the page (Sean, Nov 2026: no sound with
+ * sound on). A browser keeps a page silent until someone has used it: a chime first asked for
+ * while the tab sits in the background, never clicked since it loaded, plays nothing. Allowed
+ * once, it plays from the background too. Returns a cleanup function.
+ */
+export function primeChime() {
+  const events = ["pointerdown", "keydown", "touchstart"];
+  const stop = () => events.forEach((e) => window.removeEventListener(e, unlock, true));
+  function unlock() {
+    try {
+      audio ??= new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") audio.resume().then(() => audio.state === "running" && stop(), () => {});
+      else if (audio.state === "running") stop();
+    } catch {
+      stop(); // No Web Audio here: nothing to ready.
+    }
+  }
+  events.forEach((e) => window.addEventListener(e, unlock, true));
+  return stop;
+}
+
+/**
  * Chime once for a notification across every open tab: the first tab to
  * claim it plays. A tab someone is looking at claims at once, the others a
  * moment later, so the one in front is the one heard.

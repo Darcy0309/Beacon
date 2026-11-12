@@ -27,6 +27,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { pushPublicKey } from "@/features/notifications/push-actions";
 import { notificationText } from "@/features/notifications/voicemail";
+import { popupsStay } from "@/features/notifications/popups";
 
 const OFF_KEY = "lighthouse:desktop-notifications-off";
 const FRONT_KEY = "lighthouse:front-tab"; // "<tab id> <time>" while a tab is in front
@@ -111,8 +112,10 @@ export function showDesktop(n, onOpen) {
       tag: `lighthouse-notification-${n.id}`,
       icon: ICON,
       badge: ICON,
-      // A call-back reminder stays on the desktop until it is clicked or closed.
-      requireInteraction: n.kind === "reminder",
+      // A call-back reminder stays on the desktop until it is clicked or closed; every one does
+      // for someone who asked for that (popups.js). With the computer's notification sound.
+      requireInteraction: n.kind === "reminder" || popupsStay(),
+      silent: false,
     });
     shown.onclick = () => {
       window.focus();

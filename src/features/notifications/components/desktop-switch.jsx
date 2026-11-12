@@ -1,7 +1,8 @@
 "use client";
 
-import { Monitor, Volume2, VolumeX } from "lucide-react";
+import { Monitor, Pin, PinOff, Volume2, VolumeX } from "lucide-react";
 import { useNotificationSound } from "@/features/notifications/sound";
+import { usePopupsStay } from "@/features/notifications/popups";
 import { toast } from "sonner";
 import { testDesktop, useDesktopNotifications } from "@/features/notifications/desktop";
 import { cn } from "@/lib/utils";
@@ -28,7 +29,16 @@ export default function DesktopSwitch({ className }) {
       <button type="button" onClick={() => sound.set(!sound.on)} className={link}>{sound.on ? "Turn off" : "Turn on"}</button>
     </div>
   );
-  if (status === "unsupported") return <div className={className}>{soundRow}</div>;
+  // Pop-ups kept up until closed (Sean, Nov 2026: they were gone before he had read them).
+  const stay = usePopupsStay();
+  const stayRow = (
+    <div data-stay-switch={stay.on ? "on" : "off"} className="flex items-start gap-2.5 text-xs text-muted-foreground">
+      {stay.on ? <Pin className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden /> : <PinOff className="mt-0.5 size-3.5 shrink-0" aria-hidden />}
+      <span className="min-w-0 flex-1">{stay.on ? "Pop-ups stay on screen until you close them." : "Pop-ups close on their own after a few seconds."}</span>
+      <button type="button" onClick={() => stay.set(!stay.on)} className={link}>{stay.on ? "Let them close" : "Keep them up"}</button>
+    </div>
+  );
+  if (status === "unsupported") return <div className={cn("space-y-2", className)}>{stayRow}{soundRow}</div>;
   const says = status === "on"
     ? pushing ? "Desktop notifications are on, even when Lighthouse is closed." : "Desktop notifications are on while Lighthouse is open."
     : SAYS[status];
@@ -56,6 +66,7 @@ export default function DesktopSwitch({ className }) {
         <button type="button" onClick={turnOff} className={link}>Turn off</button>
       ) : null}
     </div>
+    {stayRow}
     {soundRow}
     </div>
   );

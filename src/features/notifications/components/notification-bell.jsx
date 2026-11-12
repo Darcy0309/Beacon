@@ -12,7 +12,8 @@ import { markNotificationRead, markAllNotificationsRead } from "@/features/notif
 import { KIND_ICONS } from "@/features/notifications/kinds";
 import { isActiveChat, NOTIFICATIONS_CHANGED } from "@/features/notifications/active-chat";
 import { closePushed, offerDesktopOnce, pushSupported, showDesktop, syncPush, tabInFront, trackFrontTab } from "@/features/notifications/desktop";
-import { chimeOnce } from "@/features/notifications/sound";
+import { chimeOnce, primeChime } from "@/features/notifications/sound";
+import { POPUP_MS, popupsStay, syncPopupsStay } from "@/features/notifications/popups";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 import { notificationText } from "@/features/notifications/voicemail";
@@ -101,6 +102,13 @@ export default function NotificationBell() {
 
   // Which Lighthouse tab is in front, so only nobody-looking shows a desktop pop-up.
   useEffect(() => trackFrontTab(), []);
+
+  // The chime readied by the first click on the page, so it can play from a tab in the background;
+  // and the push worker told whether pop-ups stay up (popups.js).
+  useEffect(() => primeChime(), []);
+  useEffect(() => {
+    syncPopupsStay();
+  }, []);
 
   // Once a session, offer desktop pop-ups to someone who has not been asked:
   // a reminder in the corner of the screen is easy to miss.
@@ -246,8 +254,10 @@ export default function NotificationBell() {
                 return <Icon className="size-4 text-primary" />;
               })(),
               action: { label: n.kind === "message" ? "Reply" : n.kind === "reminder" ? "Open lead" : "View", onClick: () => openItem(n) },
-              // A call-back reminder stays until it is dealt with; the rest fade after a while.
-              duration: n.kind === "reminder" ? Infinity : 8000,
+              // A call-back reminder stays until it is dealt with, and every one does for someone who
+              // asked for that (Sean, Nov 2026); the rest fade after long enough to read them.
+              duration: n.kind === "reminder" || popupsStay() ? Infinity : POPUP_MS,
+              closeButton: true,
               onDismiss: () => popups.current.delete(n.id),
               onAutoClose: () => popups.current.delete(n.id),
             });
