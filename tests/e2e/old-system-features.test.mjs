@@ -175,7 +175,7 @@ try {
   await admin.go(`/reports/hourly?user=${AGENT}&day=${sql(`select '${today}'::date - 1`)}`, 4000);
   check("…on any day before", Boolean(await until(async () => (await bar(admin, 9)) === "0", { timeout: 20000 })));
   // The title and the day field always say the same day, however it was reached.
-  const shown = () => admin.ev(`({ title: document.querySelector('[data-topbar-title]')?.parentElement?.parentElement?.querySelector('p')?.textContent ?? '',
+  const shown = () => admin.ev(`({ title: document.querySelector('[data-topbar-sub]')?.textContent ?? '',
     field: document.querySelector('[data-hourly-day] input[name=day]')?.value ?? '', url: new URLSearchParams(location.search).get('day') })`);
   const agree = (s, iso) => s.field === iso && s.title.endsWith(formatIso(iso, "long")) && (s.url ?? today) === iso;
   const yesterday = sql(`select '${today}'::date - 1`);
