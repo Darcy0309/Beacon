@@ -17,6 +17,7 @@ import { getAllEmailTemplates } from "@/features/email/templates";
 import { getDeletedRecords } from "@/features/trash/queries";
 import { createClient } from "@/lib/supabase/server";
 import ApptTextSettings from "@/features/settings/components/appt-text-settings";
+import CallRecordingSettings from "@/features/settings/components/call-recording-settings";
 import { apptTextSettings } from "@/lib/appointment-texts";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +43,8 @@ export default async function SettingsPage() {
         <EmailTemplatesCard templates={templates} />
         {/* The text a prospect gets the day before their appointment, on the projects that have it on (client, Nov 2026). */}
         <ApptTextSettings value={apptTextSettings(settings.appt_texts, tz)} projects={texting.count ?? 0} />
+        {/* Every call on the Lighthouse phone recorded, without pressing Record (Sean, Nov 2026). */}
+        <CallRecordingSettings value={settings.phone} />
         <DeliverySettings value={settings.delivery} />
         <IdleSettings minutes={settings.security?.idle_minutes} />
         <PayRulesForm rules={payRules} />

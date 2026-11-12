@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/server/session";
-import { canCall, twilioConfig } from "@/lib/server/twilio";
+import { canCall, phoneSettings, twilioConfig } from "@/lib/server/twilio";
 import { identityOf, voiceToken } from "@/lib/twilio-voice";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -12,7 +12,8 @@ const TTL = 600;
 /**
  * The phone's calling token, for the Twilio line in this browser: who it is
  * on Twilio, good for TTL seconds. 404 while Twilio is not set up: the phone
- * keeps the computer's calling app.
+ * keeps the computer's calling app. `recordAll`: every call is recorded once
+ * answered (Settings → Call Recording), read again with each token.
  */
 export async function GET() {
   const me = await getCurrentUser();
@@ -22,7 +23,8 @@ export async function GET() {
 
   const identity = identityOf(me.id);
   const token = voiceToken({ ...config, identity, ttl: TTL });
-  return NextResponse.json({ token, identity, ttl: TTL }, { headers: { "cache-control": "no-store" } });
+  const { recordAll } = await phoneSettings(createAdminClient()).catch(() => ({ recordAll: false }));
+  return NextResponse.json({ token, identity, ttl: TTL, recordAll }, { headers: { "cache-control": "no-store" } });
 }
 
 /**

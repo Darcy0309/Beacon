@@ -9,10 +9,12 @@ export const dynamic = "force-dynamic";
 /**
  * Record, the phone's button during a call on the Twilio line: starts
  * recording the call (both sides, each on its own channel) or stops it.
- * { callSid, on }. Only one's own call: Twilio must say the call is to or
+ * { callSid, on, auto }. Only one's own call: Twilio must say the call is to or
  * from this person's browser. Recordings are kept in the Twilio account; when
  * one is done Twilio says so (twilio/voice?step=recorded), and Lighthouse keeps
- * it and tells this person, with a player (Nov 2026).
+ * it and tells this person, with a player (Nov 2026). `auto`: started by
+ * "Record every call" (Settings): kept the same, on the lead's Conversation,
+ * without a notification for every call.
  */
 export async function POST(request) {
   const me = await getCurrentUser();
@@ -20,7 +22,7 @@ export async function POST(request) {
   const config = twilioConfig();
   if (!config) return NextResponse.json({ error: "Twilio is not set up on the server" }, { status: 503 });
 
-  const { callSid, on } = await request.json().catch(() => ({}));
+  const { callSid, on, auto } = await request.json().catch(() => ({}));
   if (!/^CA[0-9a-f]{32}$/i.test(callSid ?? "")) return NextResponse.json({ error: "No such call" }, { status: 400 });
 
   try {
@@ -34,7 +36,7 @@ export async function POST(request) {
         method: "POST",
         form: {
           RecordingChannels: "dual",
-          RecordingStatusCallback: `${publicOrigin(request.headers)}/api/twilio/voice?step=recorded&user=${me.id}`,
+          RecordingStatusCallback: `${publicOrigin(request.headers)}/api/twilio/voice?step=recorded&user=${me.id}${auto === true ? "&auto=1" : ""}`,
           RecordingStatusCallbackEvent: "completed",
           RecordingStatusCallbackMethod: "POST",
         },

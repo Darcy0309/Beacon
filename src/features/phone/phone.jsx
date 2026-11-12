@@ -486,6 +486,23 @@ export function PhoneProvider({ children, tracked = false }) {
     [line]
   );
 
+  // The call's recording, as the line has it: started (by Record, or by "Record every call"), waiting
+  // for the answer, stopped, or refused, saying why (the button goes back).
+  useEffect(
+    () =>
+      line.onRecording?.(({ id, on, pending, auto, error }) => {
+        if (!id || callRef.current?.lineId !== id) return;
+        setControls((c) => ({ ...c, recording: on }));
+        if (error) toast.error(error);
+        else if (pending) toast(on ? "Recording starts when they answer" : "This call won't be recorded");
+        else if (on) toast.success("Recording this call", {
+          description: auto ? "Every call is recorded. Press Record to stop." : "When the call ends, it's in your notifications to play.",
+        });
+        else toast("Recording stopped");
+      }),
+    [line]
+  );
+
   // A call ended on the line: hung up at the other end (kept under Recent, as End does), or the caller gone while it rang.
   const endCallRef = useRef(endCall);
   useEffect(() => {
@@ -831,14 +848,10 @@ export function PhoneProvider({ children, tracked = false }) {
                               setControls((c) => ({ ...c, [key]: !c[key] }));
                               if (cap === "mute") line.setMuted(!on);
                               if (cap === "hold") line.setHeld(!on);
-                              // Recording is asked of the server: when it cannot, the button goes back, saying why;
-                              // when it can, it says so and where the recording will be (Nov 2026: it said nothing).
+                              // Recording is asked of the line, which says how it went (onRecording, below): pressed
+                              // while the call still rings, it starts when they answer (Sean, Nov 2026).
                               if (cap === "record") {
-                                Promise.resolve(line.setRecording(!on)).then(() => {
-                                  if (call?.test) return;
-                                  if (!on) toast.success("Recording this call", { description: "When the call ends, it's in your notifications to play." });
-                                  else toast("Recording stopped", { description: "It's in your notifications to play in a moment." });
-                                }, (err) => {
+                                Promise.resolve(line.setRecording(!on)).catch((err) => {
                                   setControls((c) => ({ ...c, recording: on }));
                                   toast.error(err?.message || "Recording could not be changed.");
                                 });

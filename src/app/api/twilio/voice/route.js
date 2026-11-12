@@ -1,7 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { publicOrigin } from "@/lib/origin";
 import { callClock, formatDial, searchDigits } from "@/lib/phone";
-import { CALLS_ROLES, twilioConfig } from "@/lib/server/twilio";
+import { CALLS_ROLES, phoneSettings, twilioConfig } from "@/lib/server/twilio";
 import { callableNumber, identityOf, twiml, userIdOf, validTwilioSignature, xml } from "@/lib/twilio-voice";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startCallTranscript } from "@/lib/server/call-transcripts";
@@ -16,6 +16,8 @@ const RING_SECONDS = 45;
 const PRESENT_MS = 12 * 60 * 1000;
 // Twilio rings at most ten browsers at once.
 const MAX_RINGS = 10;
+// Said first on every call while "Record every call" is on, with its notice (Settings → Call Recording).
+const RECORDING_NOTICE = "This call may be recorded.";
 const VOICEMAIL_GREETING = "Sorry, no one can take your call right now. Please leave a message after the tone, and we will call you back.";
 
 const say = (text) => `<Say voice="Polly.Joanna">${xml(text)}</Say>`;
@@ -32,7 +34,10 @@ const answer = (inner) => new NextResponse(twiml(inner), { headers: { "content-t
  *   ?step=status  how a call's leg to one person went (rang, answered, ended, for how long): Call Activity
  *   ?step=transcribed  Twilio's transcript of a voicemail, added to its notification
  *   ?step=recorded     a call recorded with the phone's Record button is ready (&user=, who pressed it):
- *                      kept, and they are told, with a player (app/api/phone/recording asks for this)
+ *                      kept, and they are told, with a player (app/api/phone/recording asks for this);
+ *                      &auto=1, recorded by "Record every call": kept without telling them
+ *   ?step=notice       said to the person called as they answer, before the call is put through:
+ *                      "This call may be recorded" (Record every call, with its notice)
  *
  * Only Twilio can ask: every request carries its signature, made with the account's Auth Token.
  */
@@ -62,6 +67,7 @@ export async function POST(request) {
     ` statusCallback="${xml(`${publicOrigin(request.headers)}${self("status")}&dir=${dir}&user=${userId}`)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST"`;
 
   // A voicemail's words, once Twilio has transcribed them (it can for one up to two minutes long).
+  if (step === "notice") return answer(say(RECORDING_NOTICE));
   if (step === "transcribed") {
     const text = String(params.TranscriptionText ?? "").trim();
     if (admin && params.TranscriptionStatus === "completed" && text && /^RE[0-9a-f]{32}$/i.test(params.RecordingSid ?? "")) {
@@ -98,7 +104,10 @@ export async function POST(request) {
     const to = callableNumber(params.To);
     if (!to) return answer(`${say("This number cannot be called from Lighthouse.")}<Hangup/>`);
     const tones = to.tones ? ` sendDigits="${xml(to.tones)}"` : "";
-    return answer(`<Dial callerId="${xml(config.callerId)}" answerOnBridge="true"><Number${tones}${statusOf("out", userId)}>${xml(to.number)}</Number></Dial>`);
+    // Every call recorded, with its notice: said to them as they answer, before they are put through.
+    const { notice } = await phoneSettings(admin);
+    const told = notice ? ` url="${xml(`${publicOrigin(request.headers)}${self("notice")}`)}" method="POST"` : "";
+    return answer(`<Dial callerId="${xml(config.callerId)}" answerOnBridge="true"><Number${tones}${told}${statusOf("out", userId)}>${xml(to.number)}</Number></Dial>`);
   }
 
   // A call to the Twilio number: everyone with the phone open rings (the first to answer takes it), else voicemail.
@@ -106,7 +115,9 @@ export async function POST(request) {
   await logLeg(admin, { ...params, CallStatus: ring.length ? "initiated" : "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
   if (!ring.length) return answer(voicemail(self("left"), `${publicOrigin(request.headers)}${self("transcribed")}`));
   const clients = ring.map((id) => `<Client${statusOf("in", id)}>${xml(identityOf(id))}</Client>`).join("");
-  return answer(`<Dial timeout="${RING_SECONDS}" answerOnBridge="true" action="${xml(self("after"))}" method="POST">${clients}</Dial>`);
+  // Every call recorded, with its notice: the caller hears it before it rings.
+  const { notice } = await phoneSettings(admin);
+  return answer(`${notice ? say(RECORDING_NOTICE) : ""}<Dial timeout="${RING_SECONDS}" answerOnBridge="true" action="${xml(self("after"))}" method="POST">${clients}</Dial>`);
 }
 
 /**
@@ -176,9 +187,11 @@ async function tellOfRecording(admin, params, query, origin) {
     `${callClock(secs * 1000)} long`,
     `Listen: ${origin}/api/phone/recordings/${sid}`,
   ].filter(Boolean).join("\n");
+  // Recorded by "Record every call" (&auto=1): kept without a notification (there would be one for every call).
+  const quiet = query.get("auto") === "1";
   const { data: fresh, error } = await admin.rpc("phone_recording_saved", {
     p_sid: sid, p_call: params.CallSid, p_user: user, p_number: digits || null, p_seconds: secs, p_lead: lead?.id ?? null,
-    p_title: `Recorded call with ${other}`, p_body: body, p_link: lead ? `/leads/${lead.id}` : null,
+    p_title: quiet ? null : `Recorded call with ${other}`, p_body: body, p_link: lead ? `/leads/${lead.id}` : null,
   });
   if (error) return console.error("[twilio/voice] call recording", error.message);
   // New: transcribed (Nov 2026), after Twilio has its answer.

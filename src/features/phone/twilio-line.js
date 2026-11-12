@@ -9,12 +9,31 @@
 // createTwilioLine() gives null and the phone keeps the device line.
 
 import { toast } from "sonner";
+import { callRecorder } from "@/features/phone/call-recorder";
+
+// What the server says with each token: whether every call is recorded (Settings, Nov 2026).
+const settings = { recordAll: false };
 
 /** This browser's calling token from the server, or null when Twilio is not set up (or not for this person). */
 async function fetchToken() {
   const res = await fetch("/api/phone/token", { cache: "no-store" });
   if (!res.ok) return null;
-  return (await res.json())?.token ?? null;
+  const data = await res.json();
+  settings.recordAll = data?.recordAll === true;
+  return data?.token ?? null;
+}
+
+/** Start or stop recording a call (app/api/phone/recording); rejects with why it could not, and the HTTP status. */
+async function postRecording(callSid, on, { auto = false } = {}) {
+  const res = await fetch("/api/phone/recording", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ callSid, on: Boolean(on), auto: Boolean(auto) }),
+  });
+  if (res.ok) return;
+  const err = new Error((await res.json().catch(() => null))?.error || "Recording could not be changed.");
+  err.status = res.status;
+  throw err;
 }
 
 // What a failed call says, by Twilio's error code; anything else, Twilio's own words.
@@ -57,12 +76,19 @@ export async function createTwilioLine() {
   // The phone rings with its own tone (incoming.js).
   device.audio?.incoming(false);
 
-  let current = null; // the call on: { id, call, hungUp }; call is null while it is still being placed
+  let current = null; // the call on: { id, call, hungUp, rec }; call is null while it is still being placed
   const ringing = new Map(); // calls coming in, not yet answered: id (Twilio's CallSid) → Call
   const onRing = new Set();
   const onEnd = new Set();
   const onAnswer = new Set();
   const onStatus = new Set();
+  const onRec = new Set();
+  // Each call's recording (call-recorder.js): from Record, or by itself with "Record every call" on.
+  const recorder = (id) => callRecorder({
+    post: postRecording,
+    auto: settings.recordAll,
+    tell: (state) => onRec.forEach((h) => h({ id, ...state })),
+  });
 
   // Whether calls coming in can ring this browser: { receiving, problem }. Only a browser registered with
   // Twilio is rung; once it is, the server counts this person in (phone_presence), and again with each new token.
@@ -82,7 +108,10 @@ export async function createTwilioLine() {
   // A call over, hung up at the other end, cancelled while ringing, or failed: the phone is told once.
   const ended = (id) => {
     const known = current?.id === id || ringing.has(id);
-    if (current?.id === id) current = null;
+    if (current?.id === id) {
+      current.rec.end();
+      current = null;
+    }
     ringing.delete(id);
     if (known) onEnd.forEach((h) => h({ id }));
   };
@@ -92,6 +121,8 @@ export async function createTwilioLine() {
     call.on("accept", () => {
       answered = true;
       onAnswer.forEach((h) => h({ id }));
+      // Connected: a recording asked for while it rang (or every call's) starts now.
+      if (current?.id === id) current.rec.answered(call.parameters?.CallSid);
     });
     for (const e of ["disconnect", "cancel", "reject"]) call.on(e, () => ended(id));
     call.on("error", (err) => {
@@ -143,7 +174,7 @@ export async function createTwilioLine() {
     /** Call a tel: link's number; returns the call's id, which onEnded names when it ends. */
     call(tel) {
       const id = `out-${Date.now().toString(36)}`;
-      const entry = { id, call: null, hungUp: false };
+      const entry = { id, call: null, hungUp: false, rec: recorder(id) };
       current = entry;
       device.connect({ params: { To: tel } }).then(
         (call) => {
@@ -163,6 +194,7 @@ export async function createTwilioLine() {
       const entry = current;
       current = null; // ended here: the phone has already put it under Recent
       if (!entry) return;
+      entry.rec.end();
       entry.hungUp = true;
       entry.call?.disconnect();
     },
@@ -173,16 +205,18 @@ export async function createTwilioLine() {
     tone(key) {
       current?.call?.sendDigits(String(key));
     },
-    /** Start or stop recording the call (app/api/phone/recording); rejects with why it could not. */
+    /**
+     * Start or stop recording the call. Pressed while it still rings, kept until it is answered.
+     * How it goes is told to onRecording; rejects only when there is no call.
+     */
     async setRecording(on) {
-      const callSid = current?.call?.parameters?.CallSid;
-      if (!callSid) throw new Error("The call is not connected yet.");
-      const res = await fetch("/api/phone/recording", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ callSid, on: Boolean(on) }),
-      });
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || "Recording could not be changed.");
+      if (!current) throw new Error("There is no call to record.");
+      return current.rec.set(on);
+    },
+    /** The call's recording as it changes: handler({ id, on, pending, auto, error }). */
+    onRecording(handler) {
+      onRec.add(handler);
+      return () => onRec.delete(handler);
     },
     onIncoming(handler) {
       onRing.add(handler);
@@ -206,7 +240,7 @@ export async function createTwilioLine() {
       const call = ringing.get(id);
       if (!call) return;
       ringing.delete(id);
-      current = { id, call, hungUp: false };
+      current = { id, call, hungUp: false, rec: recorder(id) };
       call.accept();
     },
     decline(id) {
@@ -219,6 +253,7 @@ export async function createTwilioLine() {
       onEnd.clear();
       onAnswer.clear();
       onStatus.clear();
+      onRec.clear();
       device.destroy();
     },
   };

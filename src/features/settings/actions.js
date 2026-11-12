@@ -91,3 +91,27 @@ export async function saveIdleSettings(prevState, formData) {
   revalidatePath("/settings");
   return ok(minutes);
 }
+
+/**
+ * Call Recording (Sean, Nov 2026): record every call on the Lighthouse phone from the moment it is
+ * answered, without pressing Record; and, with it, "This call may be recorded" said to the other
+ * person first. Administrators only. Phones pick it up with their next calling token (minutes).
+ */
+export async function savePhoneSettings(prevState, formData) {
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only an administrator sets this.");
+  const recordAll = formData.get("record_all") === "on";
+  const notice = formData.get("record_notice") === "on";
+  const { data: current } = await supabase.from("app_settings").select("value").eq("key", "phone").maybeSingle();
+  // Off, the notice box is greyed and not sent: its choice is kept for when it is turned on again.
+  const value = { ...(current?.value ?? {}), record_all: recordAll, record_notice: recordAll ? notice : current?.value?.record_notice !== false };
+  const { error } = await supabase.from("app_settings").upsert({ key: "phone", value, updated_at: new Date().toISOString() });
+  if (error) return fail(error);
+  await logActivity(supabase, "settings.phone", {
+    detail: recordAll ? `every call recorded${notice ? ", with the notice" : ", no notice"}` : "calls recorded only with Record",
+    userId: me.id,
+  });
+  revalidatePath("/settings");
+  return ok(value);
+}

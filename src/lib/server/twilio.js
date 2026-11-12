@@ -34,6 +34,19 @@ export const CALLS_ROLES = ["admin", "manager", "agent"];
 export const canCall = (user) => Boolean(user) && CALLS_ROLES.includes(user.role) && user.status === "active";
 
 /**
+ * The phone's settings (app_settings 'phone'; Settings → Call Recording, Nov 2026), read with `db` (the
+ * admin client: the voice webhook has no one signed in):
+ *   recordAll  every call recorded from the moment it is answered, without pressing Record
+ *   notice     with it, "this call may be recorded" said to the other person first
+ */
+export async function phoneSettings(db) {
+  if (!db) return { recordAll: false, notice: false };
+  const { data } = await db.from("app_settings").select("value").eq("key", "phone").maybeSingle();
+  const recordAll = data?.value?.record_all === true;
+  return { recordAll, notice: recordAll && data?.value?.record_notice !== false };
+}
+
+/**
  * Twilio's REST API, as the account: `path` under /2010-04-01/Accounts/{sid}
  * ("/Calls/CA….json"); `form`, the fields posted. Resolves with the JSON
  * answer; throws with Twilio's message on an error.

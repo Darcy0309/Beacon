@@ -12,7 +12,7 @@ import { check, finish, section } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { cookieHeader, sessionCookies } from "../support/auth.mjs";
 import { APP_URL } from "../support/env.mjs";
-import { twilioSignature } from "../../src/lib/twilio-voice.js";
+import { identityOf, twilioSignature } from "../../src/lib/twilio-voice.js";
 
 const ACCOUNT = process.env.TEST_TWILIO_ACCOUNT_SID;
 const TOKEN = process.env.TEST_TWILIO_AUTH_TOKEN;
@@ -39,8 +39,8 @@ const REC = `RE${hex(32)}`;
 sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, answered_at, ended_at, talk_seconds)
   values (${lit(CHILD)}, ${lit(PARENT)}, ${SEAN}, 'out', ${lit(`+1${DIGITS}`)}, 'completed', now() - interval '1 minute', now(), 50)`);
 
-const hook = async (fields, { user = SEAN, sign = true } = {}) => {
-  const url = `${APP_URL}/api/twilio/voice?step=recorded&user=${user}`;
+const hook = async (fields, { user = SEAN, sign = true, auto = false } = {}) => {
+  const url = `${APP_URL}/api/twilio/voice?step=recorded&user=${user}${auto ? "&auto=1" : ""}`;
   const params = { AccountSid: ACCOUNT, ...fields };
   const res = await fetch(url, {
     method: "POST",
@@ -80,6 +80,46 @@ try {
   const anAdmin = await play("admin@beacon.test");
   check("an administrator", anAdmin !== 403 && anAdmin !== 401, String(anAdmin));
   check("not someone else", (await play("agent@beacon.test")) === 403);
+
+  section("Recorded by “Record every call” (Sean, Nov 2026)");
+  const AUTO = `RE${hex(32)}`;
+  check("Twilio says it is done: taken", (await hook({ ...done, RecordingSid: AUTO }, { auto: true })) === 204);
+  check("…kept like any other, on the call", sql(`select call_sid from public.phone_recordings where recording_sid = ${lit(AUTO)}`) === PARENT);
+  check("…without a notification for every call", Number(sql(`select count(*) from public.notifications where user_id = ${SEAN} and body like ${lit(`%${AUTO}%`)}`)) === 0);
+
+  section("Record every call: what Twilio is told to do");
+  const twiml = async (step, fields) => {
+    const url = `${APP_URL}/api/twilio/voice${step ? `?step=${step}` : ""}`;
+    const params = { AccountSid: ACCOUNT, CallSid: `CA${hex(32)}`, ...fields };
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-twilio-signature": twilioSignature(TOKEN, url, params) }, body: new URLSearchParams(params) });
+    return res.text();
+  };
+  const out = () => twiml(null, { From: `client:${identityOf(SEAN)}`, To: `+1${DIGITS}` });
+  const callIn = () => twiml(null, { From: `+1${DIGITS}`, To: process.env.TWILIO_CALLER_ID ?? "+15555550100", Direction: "inbound" });
+  const setting = (value) => sql(value === null ? "delete from public.app_settings where key = 'phone'"
+    : `insert into public.app_settings (key, value) values ('phone', ${lit(JSON.stringify(value))}::jsonb) on conflict (key) do update set value = excluded.value`);
+  const before = sql("select value::text from public.app_settings where key = 'phone'") || null;
+  const present = sql(`select count(*) from public.phone_presence where user_id = ${SEAN}`) !== "0";
+  sql(`insert into public.phone_presence (user_id, seen_at) values (${SEAN}, now()) on conflict (user_id) do update set seen_at = now()`);
+  try {
+    setting({ record_all: false });
+    check("off: a call out is put straight through, nothing said", !/step=notice/.test(await out()) && /<Dial/.test(await out()));
+    check("…a call in rings, nothing said", !/may be recorded/.test(await callIn()));
+    setting({ record_all: true, record_notice: true });
+    const o = await out();
+    check("on, with the notice: the person called hears it as they answer", /<Number[^>]* url="[^"]*step=notice"/.test(o), o);
+    check("…and a caller before it rings", /<Say[^>]*>This call may be recorded\.<\/Say><Dial/.test(await callIn()), await callIn());
+    check("the notice itself", /<Say[^>]*>This call may be recorded\.<\/Say>/.test(await twiml("notice", { From: `+1${DIGITS}`, To: `+1${DIGITS}` })));
+    const jar = cookieHeader(await sessionCookies("sean@beacon.test"));
+    check("the phone is told, with its calling token", (await (await fetch(`${APP_URL}/api/phone/token`, { headers: { cookie: jar } })).json())?.recordAll === true);
+    setting({ record_all: true, record_notice: false });
+    check("on, without the notice: nothing said", !/step=notice/.test(await out()) && !/may be recorded/.test(await callIn()));
+    setting({ record_all: false });
+    check("off: the phone is told so", (await (await fetch(`${APP_URL}/api/phone/token`, { headers: { cookie: jar } })).json())?.recordAll === false);
+  } finally {
+    setting(before ? JSON.parse(before) : null);
+    if (!present) sql(`delete from public.phone_presence where user_id = ${SEAN}`);
+  }
 } finally {
   sql(`delete from public.notifications where user_id = ${SEAN} and body like ${lit(`%${REC}%`)}`);
   sql(`delete from public.phone_recordings where call_sid = ${lit(PARENT)}`);
