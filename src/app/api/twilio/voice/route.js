@@ -63,8 +63,8 @@ export async function POST(request) {
   const step = here.searchParams.get("step");
   const self = (s) => `${here.pathname}?step=${s}`;
   // Where Twilio tells how each person's leg of a call went (it asks for the whole address): who, which way.
-  const statusOf = (dir, userId) =>
-    ` statusCallback="${xml(`${publicOrigin(request.headers)}${self("status")}&dir=${dir}&user=${userId}`)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST"`;
+  const statusOf = (dir, userId, leadId = null) =>
+    ` statusCallback="${xml(`${publicOrigin(request.headers)}${self("status")}&dir=${dir}&user=${userId}${leadId ? `&lead=${leadId}` : ""}`)}" statusCallbackEvent="initiated ringing answered completed" statusCallbackMethod="POST"`;
 
   // A voicemail's words, once Twilio has transcribed them (it can for one up to two minutes long).
   if (step === "notice") return answer(say(RECORDING_NOTICE));
@@ -107,7 +107,9 @@ export async function POST(request) {
     // Every call recorded, with its notice: said to them as they answer, before they are put through.
     const { notice } = await phoneSettings(admin);
     const told = notice ? ` url="${xml(`${publicOrigin(request.headers)}${self("notice")}`)}" method="POST"` : "";
-    return answer(`<Dial callerId="${xml(config.callerId)}" answerOnBridge="true"><Number${tones}${told}${statusOf("out", userId)}>${xml(to.number)}</Number></Dial>`);
+    // The lead it is made from (the phone sends it): the call, and its recording, are on that lead alone.
+    const leadId = /^[1-9]\d{0,17}$/.test(params.Lead ?? "") ? Number(params.Lead) : null;
+    return answer(`<Dial callerId="${xml(config.callerId)}" answerOnBridge="true"><Number${tones}${told}${statusOf("out", userId, leadId)}>${xml(to.number)}</Number></Dial>`);
   }
 
   // A call to the Twilio number: everyone with the phone open rings (the first to answer takes it), else voicemail.
@@ -136,6 +138,7 @@ async function logLeg(admin, params, query, { whole = false } = {}) {
     p_number: (dir === "out" ? params.To : params.From) || null,
     p_status: String(params.CallStatus ?? "").slice(0, 20) || "initiated",
     p_duration: Number.parseInt(params.CallDuration, 10) || 0,
+    p_lead: /^[1-9]\d{0,17}$/.test(query.get("lead") ?? "") ? Number(query.get("lead")) : null,
   });
   if (error) console.error("[twilio/voice] call activity", error.message);
 }
@@ -172,14 +175,17 @@ async function tellOfRecording(admin, params, query, origin) {
   // The other end: Call Activity's leg of this call (a call out's leg is the browser's call's child; a call in's, the browser's own).
   const { data: legs } = await admin
     .from("phone_calls")
-    .select("number")
+    .select("number, lead_id")
     .or(`call_sid.eq.${params.CallSid},parent_sid.eq.${params.CallSid}`)
     .not("number", "is", null)
     .not("number", "like", "client:%")
+    .order("lead_id", { ascending: true, nullsFirst: false })
     .limit(1);
   const digits = searchDigits(legs?.[0]?.number);
-  const { data: lead } = digits
-    ? await admin.from("leads").select("id, company_name, contact_name").is("deleted_at", null).ilike("search_text", `%${digits}%`).limit(1).maybeSingle()
+  // The lead the call is on (Sean, Nov 2026: never another lead with the same number); none, nobody's.
+  const leadId = legs?.[0]?.lead_id ?? null;
+  const { data: lead } = leadId
+    ? await admin.from("leads").select("id, company_name, contact_name").is("deleted_at", null).eq("id", leadId).maybeSingle()
     : { data: null };
   const other = digits ? formatDial(digits) : "a caller";
   const body = [

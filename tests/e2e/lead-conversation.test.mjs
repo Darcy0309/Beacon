@@ -35,12 +35,16 @@ const project = Number(sql(`insert into public.projects (name, company_id, proje
 const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, contact_mobile, project_id, assigned_user_id)
   values (${lit(`${TAG} Coastline Auto`)}, 'Marco Ruiz', '602-555-0100', ${lit(`(480) 555-${tail}`)}, ${project}, ${SEAN}) returning id`));
 
+// The same business on another client's project, with the same mobile (Sean, Nov 2026): the call is not to show on it.
+const twin = Number(sql(`insert into public.leads (company_name, contact_name, phone, contact_mobile, project_id, assigned_user_id)
+  values (${lit(`${TAG} Coastline Auto (other client)`)}, 'Marco Ruiz', '602-555-0100', ${lit(`(480) 555-${tail}`)}, ${project}, ${SEAN}) returning id`));
+
 // A call out to the mobile yesterday, answered, 4m 12s, recorded by Sean; and a text sent then, delivered later.
 const PARENT = `CA${hex(32)}`;
 const REC = `RE${hex(32)}`;
 const SENT = `SM${hex(32)}`;
-sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, started_at, answered_at, ended_at, talk_seconds)
-  values (${lit(`CA${hex(32)}`)}, ${lit(PARENT)}, ${SEAN}, 'out', '+1${MOBILE}', 'completed', now() - interval '1 day', now() - interval '1 day', now() - interval '1 day' + interval '252 seconds', 252)`);
+sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, started_at, answered_at, ended_at, talk_seconds, lead_id)
+  values (${lit(`CA${hex(32)}`)}, ${lit(PARENT)}, ${SEAN}, 'out', '+1${MOBILE}', 'completed', now() - interval '1 day', now() - interval '1 day', now() - interval '1 day' + interval '252 seconds', 252, ${lead})`);
 sql(`insert into public.phone_recordings (recording_sid, call_sid, user_id, number, seconds, lead_id) values (${lit(REC)}, ${lit(PARENT)}, ${SEAN}, ${lit(MOBILE)}, 252, ${lead})`);
 sql(`insert into public.lead_texts (lead_id, user_id, direction, from_number, to_number, body, status, twilio_sid, created_at)
   values (${lead}, ${SEAN}, 'out', '+15555550100', '+1${MOBILE}', 'Hi Marco, here is the pricing we discussed.', 'sent', ${lit(SENT)}, now() - interval '1 day' + interval '7 minutes')`);
@@ -77,6 +81,11 @@ try {
   check("…with the result logged for it, and what was said", /Viable-CallBack/.test(seen[0]?.text ?? "") && /Wants the pricing by text/.test(seen[0]?.text ?? ""), JSON.stringify(seen[0]));
   const alone = await sean.ev(`[...document.querySelectorAll('[data-conversation-thread] > *')].map((e) => e.matches('[data-conversation-result]') ? 'result:' + e.innerText : e.dataset.conversationCall ? 'call' : 'other')`);
   check("a result with no call on the Lighthouse phone stands by itself, first (oldest)", /^result:[\s\S]*Call logged[\s\S]*No Answer/.test(alone?.[0] ?? "") && alone[1] === "call", JSON.stringify(alone));
+  // The other lead with the same mobile: the call, and its recording, are not on it.
+  const other = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 1000 });
+  await other.go(`/leads/${twin}?tab=conversation`, 7000);
+  await when(other, "!!document.querySelector('[data-lead-conversation]')?.offsetParent");
+  check("the same number on another lead: none of this lead's calls or recordings there", Boolean(await until(() => other.ev(`!document.querySelector('[data-conversation-call]') && !document.querySelector('[data-recording-play]')`))));
   check("no Call History tab: it is all on the Conversation", !(await sean.ev(`[...document.querySelectorAll('[role=tab]')].some((t) => /Call History/.test(t.textContent))`)));
   check("then the text sent, oldest first", seen[1]?.kind === "text:out" && /here is the pricing/.test(seen[1].text) && /Sent/.test(seen[1].text), JSON.stringify(seen[1]));
 
@@ -151,7 +160,7 @@ try {
   sql(`delete from public.phone_recordings where recording_sid = ${lit(REC)}`);
   sql(`delete from public.phone_calls where parent_sid = ${lit(PARENT)}`);
   sql(`delete from public.activity_log where entity = 'lead' and entity_id = ${lead}`);
-  sql(`delete from public.leads where id = ${lead}`);
+  sql(`delete from public.leads where id in (${lead}, ${twin})`);
   sql(`delete from public.projects where id = ${project}`);
   sql(`delete from public.companies where id = ${company}`);
 }

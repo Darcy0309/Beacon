@@ -30,14 +30,17 @@ const SHOWN = `+1 (602) 555-${tail}`;
 const company = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Insurance`)}) returning id`));
 const project = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id)
   values (${lit(`${TAG} DBDev`)}, ${company}, (select id from public.project_types where code='DBDV'), 1) returning id`));
+// The same business, called for another client first (Sean, Nov 2026): nothing of this call is to be on it.
+const twin = Number(sql(`insert into public.leads (company_name, contact_name, phone, project_id, assigned_user_id)
+  values (${lit(`${TAG} Delta Door (other client)`)}, 'Dana Reyes', ${lit(`602-555-${tail}`)}, ${project}, ${SEAN}) returning id`));
 const lead = Number(sql(`insert into public.leads (company_name, contact_name, phone, project_id, assigned_user_id)
   values (${lit(`${TAG} Delta Door`)}, 'Dana Reyes', ${lit(`602-555-${tail}`)}, ${project}, ${SEAN}) returning id`));
 // The call out as Call Activity has it: the browser's call (the parent) and its leg to the number.
 const PARENT = `CA${hex(32)}`;
 const CHILD = `CA${hex(32)}`;
 const REC = `RE${hex(32)}`;
-sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, answered_at, ended_at, talk_seconds)
-  values (${lit(CHILD)}, ${lit(PARENT)}, ${SEAN}, 'out', ${lit(`+1${DIGITS}`)}, 'completed', now() - interval '1 minute', now(), 50)`);
+sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, answered_at, ended_at, talk_seconds, lead_id)
+  values (${lit(CHILD)}, ${lit(PARENT)}, ${SEAN}, 'out', ${lit(`+1${DIGITS}`)}, 'completed', now() - interval '1 minute', now(), 50, ${lead})`);
 
 const hook = async (fields, { user = SEAN, sign = true, auto = false } = {}) => {
   const url = `${APP_URL}/api/twilio/voice?step=recorded&user=${user}${auto ? "&auto=1" : ""}`;
@@ -58,7 +61,7 @@ try {
   check("…and nothing is kept", Number(sql(`select count(*) from public.phone_recordings where recording_sid = ${lit(REC)}`)) === 0);
   check("a signed one is taken", (await hook(done)) === 204);
   const row = JSON.parse(sql(`select row_to_json(t)::text from (select call_sid, user_id, number, seconds, lead_id from public.phone_recordings where recording_sid = ${lit(REC)}) t`) || "null");
-  check("kept: the call, whose, the number, how long, the lead", row?.call_sid === PARENT && row.user_id === SEAN && row.number === DIGITS && row.seconds === 42 && row.lead_id === lead, JSON.stringify(row));
+  check("kept: the call, whose, the number, how long, the lead it was called on (not the other with the number)", row?.call_sid === PARENT && row.user_id === SEAN && row.number === DIGITS && row.seconds === 42 && row.lead_id === lead, JSON.stringify(row));
   const [n] = notices();
   check("the person who recorded it is told, naming the number", n?.title === `Recorded call with ${SHOWN}`, JSON.stringify(n));
   check("…the lead, how long, where to listen", n?.body.startsWith(`${TAG} Delta Door · Dana Reyes\n0:42 long\nListen: `) && n.body.endsWith(`/api/phone/recordings/${REC}`) && n.link === `/leads/${lead}`, n?.body);
@@ -120,12 +123,25 @@ try {
     setting(before ? JSON.parse(before) : null);
     if (!present) sql(`delete from public.phone_presence where user_id = ${SEAN}`);
   }
+
+  section("Each call on the lead it was made from (Sean, Nov 2026)");
+  {
+    const LEG = `CA${hex(32)}`;
+    const url = `${APP_URL}/api/twilio/voice?step=status&dir=out&user=${SEAN}&lead=${lead}`;
+    const params = { AccountSid: ACCOUNT, CallSid: LEG, ParentCallSid: `CA${hex(32)}`, To: `+1${DIGITS}`, CallStatus: "ringing" };
+    const res = await fetch(url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-twilio-signature": twilioSignature(TOKEN, url, params) }, body: new URLSearchParams(params) });
+    check("a call out keeps the lead the phone sent with it", res.status === 204 && Number(sql(`select lead_id from public.phone_calls where call_sid = ${lit(LEG)}`)) === lead, res.status);
+    const IN = `CA${hex(32)}`;
+    sql(`select public.phone_call_event(${lit(IN)}, ${lit(IN)}, null, 'in', ${lit(`+1${DIGITS}`)}, 'no-answer', 0)`);
+    check("a call in from that number: on the lead last called on it, not the other", Number(sql(`select lead_id from public.phone_calls where call_sid = ${lit(IN)}`)) === lead);
+    sql(`delete from public.phone_calls where call_sid in (${lit(LEG)}, ${lit(IN)})`);
+  }
 } finally {
   sql(`delete from public.notifications where user_id = ${SEAN} and body like ${lit(`%${REC}%`)}`);
   sql(`delete from public.phone_recordings where call_sid = ${lit(PARENT)}`);
   sql(`delete from public.phone_calls where call_sid = ${lit(CHILD)}`);
   sql(`delete from public.activity_log where entity = 'lead' and entity_id = ${lead}`);
-  sql(`delete from public.leads where id = ${lead}`);
+  sql(`delete from public.leads where id in (${lead}, ${twin})`);
   sql(`delete from public.projects where id = ${project}`);
   sql(`delete from public.companies where id = ${company}`);
 }

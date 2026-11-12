@@ -171,12 +171,15 @@ export async function createTwilioLine() {
     lacks: "not on this line",
     can: { mute: true, hold: false, tones: true, record: true, receive: true, hangUp: true, answered: true },
 
-    /** Call a tel: link's number; returns the call's id, which onEnded names when it ends. */
-    call(tel) {
+    /**
+     * Call a tel: link's number; returns the call's id, which onEnded names when it ends. `leadId`: the
+     * lead it is made from, kept with the call so its recording is on that lead alone (Sean, Nov 2026).
+     */
+    call(tel, { leadId = null } = {}) {
       const id = `out-${Date.now().toString(36)}`;
       const entry = { id, call: null, hungUp: false, rec: recorder(id) };
       current = entry;
-      device.connect({ params: { To: tel } }).then(
+      device.connect({ params: { To: tel, ...(leadId ? { Lead: String(leadId) } : {}) } }).then(
         (call) => {
           // Ended here before it had connected: hang it up now.
           if (entry.hungUp) return call.disconnect();

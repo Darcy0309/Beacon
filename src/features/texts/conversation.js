@@ -34,20 +34,23 @@ export async function getLeadConversation(leadId) {
   if (!admin) return { items: [], numbers, ourNumber };
 
   const tels = numbers.map((n) => e164(n.digits));
-  const [{ data: texts }, { data: legs }] = await Promise.all([
+  const LEG = "call_sid, parent_sid, user_id, direction, number, started_at, answered_at, ended_at, talk_seconds";
+  const [{ data: texts }, { data: own }, older] = await Promise.all([
     admin.from("lead_texts").select("id, user_id, direction, from_number, to_number, body, media, status, error, created_at").eq("lead_id", lead.id).order("created_at").limit(500),
-    tels.length
-      ? admin.from("phone_calls").select("call_sid, parent_sid, user_id, direction, number, started_at, answered_at, ended_at, talk_seconds").in("number", tels).order("started_at").limit(500)
-      : Promise.resolve({ data: [] }),
+    // Its calls: the ones made from it (Sean, Nov 2026: a recording on the lead and project it was called
+    // for, never on another lead with the same number), and calls in on them.
+    admin.from("phone_calls").select(LEG).eq("lead_id", lead.id).order("started_at").limit(500),
+    olderCalls(admin, lead.id, tels, LEG),
   ]);
+  const legs = [...(own ?? []), ...older].sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)));
 
   // The calls: one out per leg dialed; one in per call (its legs, one for each browser it rang, under it).
   const calls = [];
-  for (const c of legs ?? []) {
+  for (const c of legs) {
     if (c.direction === "out" && c.user_id) {
       calls.push({ key: `c${c.call_sid}`, dir: "out", at: c.started_at, number: c.number, answered: Boolean(c.answered_at), ended: Boolean(c.ended_at), seconds: c.talk_seconds, userId: c.user_id, recordedOn: c.parent_sid });
     } else if (c.direction === "in" && !c.user_id && c.call_sid === c.parent_sid) {
-      const taken = (legs ?? []).find((l) => l.parent_sid === c.call_sid && l.user_id && l.answered_at);
+      const taken = legs.find((l) => l.parent_sid === c.call_sid && l.user_id && l.answered_at);
       calls.push({ key: `c${c.call_sid}`, dir: "in", at: c.started_at, number: c.number, answered: Boolean(taken), ended: Boolean(c.ended_at), seconds: taken?.talk_seconds ?? 0, userId: taken?.user_id ?? null, recordedOn: taken?.call_sid ?? null });
     }
   }
@@ -89,4 +92,22 @@ export async function getLeadConversation(leadId) {
   ].sort((a, b) => String(a.at).localeCompare(String(b.at)));
 
   return { items, numbers, ourNumber };
+}
+
+/**
+ * Calls from before each kept its lead (phone_calls.lead_id, Nov 2026) that none could be found for:
+ * on this lead only where the number is on no other lead.
+ */
+async function olderCalls(admin, leadId, tels, columns) {
+  if (!tels.length) return [];
+  const { data: legs } = await admin.from("phone_calls").select(columns).is("lead_id", null).in("number", tels).order("started_at").limit(500);
+  if (!legs?.length) return [];
+  const mine = [];
+  for (const tel of new Set(legs.map((l) => l.number))) {
+    const digits = String(tel).replace(/\D/g, "").slice(-10);
+    if (digits.length < 10) continue;
+    const { data: others } = await admin.from("leads").select("id").is("deleted_at", null).neq("id", leadId).ilike("search_text", `%${digits}%`).limit(1);
+    if (!others?.length) mine.push(tel);
+  }
+  return legs.filter((l) => mine.includes(l.number));
 }

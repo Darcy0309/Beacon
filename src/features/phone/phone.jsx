@@ -380,7 +380,7 @@ export function PhoneProvider({ children, tracked = false }) {
     (number, who, { fromLink = false } = {}) => {
       const tel = telOf(number);
       if (!tel || ringingRef.current) return;
-      const lineId = line.call(tel);
+      const lineId = line.call(tel, { leadId: who?.id ?? null });
       // A phone link pressed is already reported by the activity tracker; one dialed here is reported now.
       if (!fromLink) report(who?.id);
       setControls({ muted: false, held: false, recording: false, keys: false });
