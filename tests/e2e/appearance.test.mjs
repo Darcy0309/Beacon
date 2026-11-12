@@ -109,7 +109,15 @@ try {
   await page.go("/work", 3000);
   check("a photo kept from before: the plain workspace", !(await html(page, "dataset.wallpaper")), await html(page, "dataset.wallpaper"));
   await page.ev("localStorage.setItem('lighthouse.appearance', JSON.stringify({ ...JSON.parse(localStorage.getItem('lighthouse.appearance')), wallpaper: 'nebula', chartType: 'default' })); true");
+  // Default: every card's chart drawn the same way, bars, on one page as on the next (client, Nov 2026:
+  // the Dashboard's trend card was an area beside My Projects' bars).
+  const tileTypes = () => page.ev("[...document.querySelectorAll('[data-report-chart^=\"tile:\"]')].map((c) => c.dataset.chartShown)");
+  await page.go("/", 4000);
+  const onDashboard = await until(async () => ((await tileTypes()) ?? []).length ? tileTypes() : null);
+  check("Default: every card on the dashboard drawn as bars", onDashboard?.length > 0 && onDashboard.every((t) => t === "bar"), JSON.stringify(onDashboard));
   await page.go("/work", 3000);
+  const onWork = await until(async () => ((await tileTypes()) ?? []).length ? tileTypes() : null);
+  check("…and on My Projects", onWork?.length > 0 && onWork.every((t) => t === "bar"), JSON.stringify(onWork));
   if (SHOTS) await page.screenshot(`${SHOTS}/appearance-workspace.png`);
 
   section("Live wallpapers, drawn behind the workspace");

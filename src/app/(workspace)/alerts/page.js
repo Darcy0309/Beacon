@@ -17,11 +17,11 @@ export default async function AlertsPage() {
 
   const tiles = [
     { label: "Alert Rules", value: String(alertRules.length), note: "configured",
-      icon: BellRing, accent: "var(--neon-cyan)", series: alertRules.map((r) => (r.on ? 1 : 0.4)), bars: true },
+      icon: BellRing, accent: "var(--neon-cyan)", series: alertRules.map((r) => (r.on ? 1 : 0.4)) },
     { label: "Active", value: String(enabled), note: `${alertRules.length - enabled} paused`,
-      icon: ToggleRight, accent: "var(--neon-emerald)", series: alertRules.map((r) => (r.on ? 1 : 0)), bars: true },
+      icon: ToggleRight, accent: "var(--neon-emerald)", series: alertRules.map((r) => (r.on ? 1 : 0)) },
     { label: "Sent, Last 7 Days", value: sentLastWeek.toLocaleString(), note: "alerts dispatched, per day",
-      icon: Send, accent: "var(--neon-amber)", series: sentPerDay, bars: true },
+      icon: Send, accent: "var(--neon-amber)", series: sentPerDay },
     { label: "Sent Today", value: String(sentPerDay.at(-1) ?? 0), note: "morning reminders included",
       icon: Clock, accent: "var(--neon-violet)" },
   ];

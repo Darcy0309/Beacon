@@ -28,13 +28,13 @@ export default async function FeedbackPage() {
 
   const tiles = [
     { label: "Average Rating", value: summary.avg ? String(summary.avg) : "—", note: "out of 5",
-      icon: Star, accent: "var(--neon-amber)", series: ratings.slice().reverse(), bars: true },
+      icon: Star, accent: "var(--neon-amber)", series: ratings.slice().reverse() },
     { label: "Responses", value: String(summary.total), note: "from client contacts",
       icon: MessageSquareText, accent: "var(--neon-cyan)", series: ratings.map((_, i) => i + 1) },
     { label: "Promoters", value: `${summary.promoters}%`, note: "rated 4 or 5",
-      icon: ThumbsUp, accent: "var(--neon-emerald)", series: ratings.slice().reverse().map((r) => (r >= 4 ? 1 : 0)), bars: true },
+      icon: ThumbsUp, accent: "var(--neon-emerald)", series: ratings.slice().reverse().map((r) => (r >= 4 ? 1 : 0)) },
     { label: "Awaiting Action", value: String(open), note: "open or in review",
-      icon: Inbox, accent: "var(--neon-violet)", series: feedback.map((f) => (f.status === "Resolved" ? 0 : 1)).reverse(), bars: true },
+      icon: Inbox, accent: "var(--neon-violet)", series: feedback.map((f) => (f.status === "Resolved" ? 0 : 1)).reverse() },
   ];
 
   return (

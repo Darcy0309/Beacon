@@ -86,11 +86,11 @@ export default async function ProductionReport({ searchParams }) {
   const unratedProjects = rates.filter((p) => !p.lead && !p.appointment && !p.confirmation).length;
 
   const tiles = [
-    { label: "Calls", value: totals.calls.toLocaleString(), note: `${reps.length} rep${reps.length === 1 ? "" : "s"} calling`, icon: PhoneCall, accent: "var(--neon-cyan)", series: perDay("calls"), bars: true },
+    { label: "Calls", value: totals.calls.toLocaleString(), note: `${reps.length} rep${reps.length === 1 ? "" : "s"} calling`, icon: PhoneCall, accent: "var(--neon-cyan)", series: perDay("calls") },
     { label: "Leads", value: totals.leads.toLocaleString(), note: "promoted to appointment setting", icon: Target, accent: "var(--neon-blue)", series: perDay("leads") },
-    { label: "Appointments", value: totals.appointments.toLocaleString(), note: "set from a call", icon: CalendarCheck, accent: "var(--neon-violet)", series: perDay("appointments"), bars: true },
+    { label: "Appointments", value: totals.appointments.toLocaleString(), note: "set from a call", icon: CalendarCheck, accent: "var(--neon-violet)", series: perDay("appointments") },
     { label: "Confirmations", value: totals.confirmations.toLocaleString(), note: "appointments confirmed", icon: CheckCheck, accent: "var(--neon-emerald)", series: perDay("confirmations") },
-    { label: "Chargebacks", value: totals.chargebacks.toLocaleString(), note: "invalid leads and appointments", icon: Undo2, accent: "var(--neon-rose)", series: perDay("chargebacks"), bars: true },
+    { label: "Chargebacks", value: totals.chargebacks.toLocaleString(), note: "invalid leads and appointments", icon: Undo2, accent: "var(--neon-rose)", series: perDay("chargebacks") },
     { label: admin ? "Pay" : "My pay", value: usd(totals.amount), note: "at each project's rates", icon: Banknote, accent: "var(--neon-amber)", series: perDay("amount") },
   ];
 

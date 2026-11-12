@@ -28,13 +28,13 @@ export default async function WorkPage() {
 
   const tiles = [
     { label: admin ? "Projects" : "My Projects", value: String(projects.length), note: admin ? "every project" : "assigned to you",
-      icon: FolderKanban, accent: "var(--neon-cyan)", series: projects.map((p) => p.namesLeft), bars: true },
+      icon: FolderKanban, accent: "var(--neon-cyan)", series: projects.map((p) => p.namesLeft) },
     { label: "Names Left", value: namesLeft.toLocaleString(), note: admin ? "still to call, all reps" : "still to call on your lists",
-      icon: ListChecks, accent: "var(--neon-emerald)", series: projects.map((p) => (admin ? p.namesLeftAll : p.namesLeft)), bars: true },
+      icon: ListChecks, accent: "var(--neon-emerald)", series: projects.map((p) => (admin ? p.namesLeftAll : p.namesLeft)) },
     { label: "To Confirm", value: String(followUps.length), note: "appointments you set",
       icon: CalendarCheck, accent: "var(--neon-amber)", series: followUps.map((_, i) => i + 1) },
     { label: "Worked Today", value: String(workedToday), note: `of ${projects.length} projects`,
-      icon: PhoneCall, accent: "var(--neon-violet)", series: projects.map((p) => (p.worked === "Today" ? 1 : 0)), bars: true },
+      icon: PhoneCall, accent: "var(--neon-violet)", series: projects.map((p) => (p.worked === "Today" ? 1 : 0)) },
   ];
 
   // Projects with names to call first; within those, the one worked longest ago.

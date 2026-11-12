@@ -135,10 +135,10 @@ export default async function ProjectDetail({ params, searchParams }) {
       icon: ListChecks, accent: "var(--neon-cyan)", series: byMonth("viable") }] : []),
     { label: "Leads", value: s.leads.toLocaleString(),
       note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved${dbdev || !waiting ? "" : ` · ${waiting}`}`,
-      icon: Target, accent: "var(--neon-emerald)", series: byMonth("total"), bars: true },
+      icon: Target, accent: "var(--neon-emerald)", series: byMonth("total") },
     { label: "Appointments", value: s.appointments.toLocaleString(),
       note: `${s.invalid.toLocaleString()} invalid · ${overview.apptsMonth} this month${client ? "" : ` · ${overview.qaPending} in QA`}`,
-      icon: CalendarCheck, accent: "var(--neon-violet)", series: byMonth("appointment"), bars: true },
+      icon: CalendarCheck, accent: "var(--neon-violet)", series: byMonth("appointment") },
     dbdev
       ? { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
           icon: Percent, accent: "var(--neon-magenta)", children: <ConversionLines s={s} /> }
@@ -150,7 +150,7 @@ export default async function ProjectDetail({ params, searchParams }) {
             </div>
           ) },
     { label: "Calls This Month", value: overview.callsMonth.toLocaleString(), note: `${overview.callsToday} today · last ${overview.lastWorked.toLowerCase()}`,
-      icon: PhoneCall, accent: "var(--neon-amber)", series: overview.calls14d, bars: true },
+      icon: PhoneCall, accent: "var(--neon-amber)", series: overview.calls14d },
   ];
 
   // Its goals for its dates: leads developed and appointments set, against what it has done (lead_stats()).

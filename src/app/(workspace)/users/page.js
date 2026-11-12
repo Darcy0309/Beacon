@@ -47,13 +47,13 @@ export default async function UsersPage({ searchParams }) {
 
   const tiles = [
     { label: "Accounts", value: String(users.length), note: `${byRole.admin ?? 0} admin · ${byRole.manager ?? 0} managers`,
-      icon: Users, accent: "var(--neon-cyan)", series: Object.values(byRole), bars: true },
+      icon: Users, accent: "var(--neon-cyan)", series: Object.values(byRole) },
     { label: "Active", value: String(active), note: "can sign in",
-      icon: ShieldCheck, accent: "var(--neon-emerald)", series: users.map((u) => (u.status === "active" ? 1 : 0)), bars: true },
+      icon: ShieldCheck, accent: "var(--neon-emerald)", series: users.map((u) => (u.status === "active" ? 1 : 0)) },
     { label: "Pending Invites", value: String(invited), note: "awaiting first sign-in",
-      icon: Mail, accent: "var(--neon-amber)", series: users.map((u) => (u.status === "invited" ? 1 : 0)), bars: true },
+      icon: Mail, accent: "var(--neon-amber)", series: users.map((u) => (u.status === "invited" ? 1 : 0)) },
     { label: "Two-Factor On", value: String(secured), note: `${users.length - secured} still password-only`,
-      icon: KeyRound, accent: "var(--neon-violet)", series: users.map((u) => (u.mfa ? 1 : 0)), bars: true },
+      icon: KeyRound, accent: "var(--neon-violet)", series: users.map((u) => (u.mfa ? 1 : 0)) },
   ];
 
   return (

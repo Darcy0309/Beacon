@@ -264,10 +264,10 @@ export default async function Dashboard({ searchParams }) {
     tiles = [
       // The switch beside the note shows the period, so the note stays short and the switch stays put.
       { label: "Appointments", value: String(manager.appts.total), note: "Developed",
-        icon: CalendarCheck, accent: "var(--neon-emerald)", series: manager.appts.series, seriesLabels: manager.appts.labels, seriesTitles: manager.appts.titles, bars: true,
+        icon: CalendarCheck, accent: "var(--neon-emerald)", series: manager.appts.series, seriesLabels: manager.appts.labels, seriesTitles: manager.appts.titles,
         action: <PeriodSwitch param="ap" current={periods.ap} params={otherParams(sp, "ap")} /> },
       { label: "Leads", value: String(manager.leads.total), note: "Developed",
-        icon: Target, accent: "var(--neon-cyan)", series: manager.leads.series, seriesLabels: manager.leads.labels, seriesTitles: manager.leads.titles, bars: true,
+        icon: Target, accent: "var(--neon-cyan)", series: manager.leads.series, seriesLabels: manager.leads.labels, seriesTitles: manager.leads.titles,
         action: <PeriodSwitch param="ld" current={periods.ld} params={otherParams(sp, "ld")} /> },
       { label: "Active Projects", value: String(p.total),
         note: `${p.lead} Lead · ${p.appt} Appointment`,
@@ -284,7 +284,7 @@ export default async function Dashboard({ searchParams }) {
       // Daily Production has the second row to itself.
       { label: "Calls Today", value: String(t.calls),
         note: started ? `Started ${started} · ${hoursLabel(t.workedMinutes)} worked` : "Not started yet today",
-        icon: PhoneCall, accent: "var(--neon-amber)", series: manager.calls.series, seriesLabels: manager.calls.labels, seriesTitles: manager.calls.titles, bars: true },
+        icon: PhoneCall, accent: "var(--neon-amber)", series: manager.calls.series, seriesLabels: manager.calls.labels, seriesTitles: manager.calls.titles },
     ];
   } else if (view.audience === "client") {
     // Sean, Oct 2026: what was developed and set over the period chosen, how the appointments
@@ -303,10 +303,10 @@ export default async function Dashboard({ searchParams }) {
       // An administrator: what the managers developed, over the period chosen on each (not the names imported).
       ...(team ? [
         { label: "Leads", value: team.leads.total.toLocaleString(), note: "By managers",
-          icon: Target, accent: "var(--neon-cyan)", series: team.leads.series, seriesLabels: team.leads.labels, seriesTitles: team.leads.titles, bars: true,
+          icon: Target, accent: "var(--neon-cyan)", series: team.leads.series, seriesLabels: team.leads.labels, seriesTitles: team.leads.titles,
           action: <PeriodSwitch param="tl" current={team.periods.tl} params={otherParams(sp, "tl")} options={VIEW_PERIODS} /> },
         { label: "Appointments", value: team.appts.total.toLocaleString(), note: "By managers",
-          icon: CalendarCheck, accent: "var(--neon-emerald)", series: team.appts.series, seriesLabels: team.appts.labels, seriesTitles: team.appts.titles, bars: true,
+          icon: CalendarCheck, accent: "var(--neon-emerald)", series: team.appts.series, seriesLabels: team.appts.labels, seriesTitles: team.appts.titles,
           action: <PeriodSwitch param="ta" current={team.periods.ta} params={otherParams(sp, "ta")} options={VIEW_PERIODS} /> },
       ] : []),
       ...(team ? [] : [
@@ -321,9 +321,9 @@ export default async function Dashboard({ searchParams }) {
       view.myPerformance
         ? { label: "My Appointments", value: String(mine?.appts ?? 0),
             note: `${mine?.leads ?? 0} leads assigned to me`,
-            icon: UserCheck, accent: "var(--neon-violet)", series: s.series.appts, seriesLabels: weekLabels, bars: true }
+            icon: UserCheck, accent: "var(--neon-violet)", series: s.series.appts, seriesLabels: weekLabels }
         : { label: "Active Clients", value: String(s.activeClients), note: "Leads per campaign",
-            icon: Users, accent: "var(--neon-violet)", series: s.series.clients, seriesCaption: "Each bar: a campaign's leads", bars: true },
+            icon: Users, accent: "var(--neon-violet)", series: s.series.clients, seriesCaption: "Each bar: a campaign's leads" },
       { label: "Conversion Rate", value: `${s.conversion}%`,
         note: `${s.apptToday} booked today`,
         icon: Percent, accent: "var(--neon-amber)", series: s.series.conversion, seriesLabels: weekLabels },

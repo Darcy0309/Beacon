@@ -45,13 +45,13 @@ export default async function ActivityPage({ searchParams }) {
 
   const tiles = [
     { label: "Sign-Ins This Month", value: String(loginsMonth), note: "across every account",
-      icon: LogIn, accent: "var(--neon-cyan)", series: summary.map((u) => u.loginsMonth), bars: true },
+      icon: LogIn, accent: "var(--neon-cyan)", series: summary.map((u) => u.loginsMonth) },
     { label: "Active Accounts", value: String(activeUsers), note: `of ${summary.length} in the last 30 days`,
-      icon: Users, accent: "var(--neon-emerald)", series: summary.map((u) => u.logins30d), bars: true },
+      icon: Users, accent: "var(--neon-emerald)", series: summary.map((u) => u.logins30d) },
     { label: "Recorded Actions", value: String(actions30d), note: "changes in the last 30 days",
-      icon: ActivityIcon, accent: "var(--neon-violet)", series: summary.map((u) => u.actions30d), bars: true },
+      icon: ActivityIcon, accent: "var(--neon-violet)", series: summary.map((u) => u.actions30d) },
     { label: "Never Signed In", value: String(quietest), note: "no activity in 30 days",
-      icon: History, accent: "var(--neon-amber)", series: summary.map((u) => (u.logins30d === 0 ? 1 : 0)), bars: true },
+      icon: History, accent: "var(--neon-amber)", series: summary.map((u) => (u.logins30d === 0 ? 1 : 0)) },
   ];
 
   return (

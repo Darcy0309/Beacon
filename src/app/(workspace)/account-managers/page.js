@@ -63,9 +63,9 @@ export default async function AccountManagersPage({ searchParams }) {
 
   const tiles = [
     { label: "Account Managers", value: String(managers.length), note: "on the team",
-      icon: UserCog, accent: "var(--neon-cyan)", series: managers.map((m) => m.leads), bars: true },
+      icon: UserCog, accent: "var(--neon-cyan)", series: managers.map((m) => m.leads) },
     { label: "Clients Covered", value: String(totalClients), note: "assignments",
-      icon: Building2, accent: "var(--neon-emerald)", series: managers.map((m) => m.clients), bars: true },
+      icon: Building2, accent: "var(--neon-emerald)", series: managers.map((m) => m.clients) },
     { label: "Appointments Set", value: sum("appts").toLocaleString(), note: `by the team ${span}`,
       icon: CalendarCheck, accent: "var(--neon-amber)", series: period.series.appts },
     // Leads they hold now, and the leads at appointment setting they called over the days (each once).

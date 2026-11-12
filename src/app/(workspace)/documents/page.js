@@ -37,13 +37,13 @@ export default async function DocumentsPage({ searchParams }) {
 
   const tiles = [
     { label: "Documents", value: String(documents.length), note: "in the library",
-      icon: Files, accent: "var(--neon-cyan)", series: Object.values(byType), bars: true },
+      icon: Files, accent: "var(--neon-cyan)", series: Object.values(byType) },
     { label: "File Types", value: String(Object.keys(byType).length), note: Object.keys(byType).join(" · ") || "—",
-      icon: FileText, accent: "var(--neon-violet)", series: Object.values(byType), bars: true },
+      icon: FileText, accent: "var(--neon-violet)", series: Object.values(byType) },
     { label: "Clients Covered", value: String(clients), note: "with documents on file",
       icon: Building2, accent: "var(--neon-emerald)", series: documents.map((_, i) => i + 1) },
     { label: "Most Common", value: Object.entries(byType).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—",
-      note: "file type", icon: HardDrive, accent: "var(--neon-amber)", series: Object.values(byType), bars: true },
+      note: "file type", icon: HardDrive, accent: "var(--neon-amber)", series: Object.values(byType) },
   ];
 
   return (

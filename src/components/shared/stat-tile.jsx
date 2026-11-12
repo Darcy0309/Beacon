@@ -23,7 +23,6 @@ export default function StatTile({
   seriesLabels,
   seriesTitles,
   seriesCaption,
-  bars = false,
   trace = false,
   action,
   children,
@@ -96,7 +95,9 @@ export default function StatTile({
         <ReportChart
           id={`tile:${label}`}
           variant="tile"
-          defaultType={bars ? "bar" : "area"}
+          // Bars on every tile, unless someone picks Line or Area under Appearance (client, Nov 2026: a
+          // trend tile drawn as an area beside bar tiles read as the pages not matching).
+          defaultType="bar"
           series={[{ key: "v", label, color: accent }]}
           points={series.map((v, i) => ({
             key: String(i),

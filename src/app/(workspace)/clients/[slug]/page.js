@@ -77,9 +77,9 @@ export default async function ClientProfile({ params, searchParams }) {
   // Counted by call result (lead_stats()): where each name stands, not how many were loaded.
   const tiles = [
     { label: "Leads", value: s.leads.toLocaleString(), note: `${s.leadsActive.toLocaleString()} active · ${s.leadsResolved.toLocaleString()} resolved`,
-      icon: Target, accent: "var(--neon-cyan)", series: clientProjects.map((p) => of(p).leads), bars: true, ...named("Leads by project") },
+      icon: Target, accent: "var(--neon-cyan)", series: clientProjects.map((p) => of(p).leads), ...named("Leads by project") },
     { label: "Appointments", value: s.appointments.toLocaleString(), note: `${s.invalid.toLocaleString()} invalid`,
-      icon: CalendarCheck, accent: "var(--neon-emerald)", series: clientProjects.map((p) => of(p).appointments), bars: true, ...named("Appointments by project") },
+      icon: CalendarCheck, accent: "var(--neon-emerald)", series: clientProjects.map((p) => of(p).appointments), ...named("Appointments by project") },
     { label: "Conversions", value: pctLabel(s.leadRate), note: "of names became leads",
       icon: Percent, accent: "var(--neon-violet)", children: <ConversionLines s={s} /> },
   ];

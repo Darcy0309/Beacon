@@ -28,13 +28,13 @@ export default async function ImportsPage({ searchParams }) {
 
   const tiles = [
     { label: "Import Batches", value: String(recentImports.length), note: "files processed",
-      icon: Upload, accent: "var(--neon-cyan)", series, bars: true },
+      icon: Upload, accent: "var(--neon-cyan)", series },
     { label: "Rows Received", value: rows.toLocaleString(), note: "across all files",
       icon: Rows3, accent: "var(--neon-violet)", series: recentImports.map((r) => r.rows).reverse() },
     { label: "Leads Imported", value: imported.toLocaleString(), note: `${rows ? Math.round((imported / rows) * 100) : 0}% of rows`,
       icon: CheckCheck, accent: "var(--neon-emerald)", series },
     { label: "Rows Skipped", value: errors.toLocaleString(), note: "failed validation",
-      icon: AlertTriangle, accent: "var(--neon-amber)", series: recentImports.map((r) => r.errors).reverse(), bars: true },
+      icon: AlertTriangle, accent: "var(--neon-amber)", series: recentImports.map((r) => r.errors).reverse() },
   ];
 
   return (

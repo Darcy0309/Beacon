@@ -83,9 +83,9 @@ export default async function ReportsPage({ searchParams }) {
       icon: CalendarCheck, accent: "var(--neon-emerald)", series: r.months.map((m) => m.appts), seriesLabels: monthNames },
     { label: "Avg. Client Rating", value: r.avgRating ? `${r.avgRating}/5` : "—", note: "client feedback",
       // Each month's average rating; a month with none draws as zero.
-      icon: Star, accent: "var(--neon-amber)", series: r.months.map((m) => Number(m.rating) || 0), seriesLabels: monthNames, bars: true },
+      icon: Star, accent: "var(--neon-amber)", series: r.months.map((m) => Number(m.rating) || 0), seriesLabels: monthNames },
     { label: "Show Rate", value: `${r.showRate}%`, note: "appointments held",
-      icon: CheckCheck, accent: "var(--neon-violet)", series: r.months.map((m) => m.appts), seriesLabels: monthNames, bars: true },
+      icon: CheckCheck, accent: "var(--neon-violet)", series: r.months.map((m) => m.appts), seriesLabels: monthNames },
   ];
 
   return (

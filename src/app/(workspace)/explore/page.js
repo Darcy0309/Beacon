@@ -82,15 +82,15 @@ export default async function ExplorePage({ searchParams }) {
 
   const tiles = [
     { label: "Matching Leads", value: total.toLocaleString(), note: isEmpty(criteria) ? "every lead promoted to appts" : "match these criteria",
-      icon: Database, accent: "var(--neon-cyan)", series: byMonth.map((m) => Number(m.count)), bars: true },
+      icon: Database, accent: "var(--neon-cyan)", series: byMonth.map((m) => Number(m.count)) },
     { label: "Client Accounts", value: String(clientsTouched), note: "hold these leads",
-      icon: Users, accent: "var(--neon-emerald)", series: byClient.map((c) => Number(c.count)), bars: true },
+      icon: Users, accent: "var(--neon-emerald)", series: byClient.map((c) => Number(c.count)) },
     // Still to call for an appointment: a call result that leaves the lead viable.
     { label: "Viable Leads", value: viable.toLocaleString(),
       note: total ? `${Math.round((viable / total) * 100)}% of matches still to call` : "no matches",
-      icon: CalendarClock, accent: "var(--neon-amber)", series: byResult.map((r) => Number(r.count)), bars: true },
+      icon: CalendarClock, accent: "var(--neon-amber)", series: byResult.map((r) => Number(r.count)) },
     { label: "Industries", value: String(byIndustry.length), note: [...byIndustry].filter((i) => i.code).sort((a, b) => Number(b.count) - Number(a.count))[0]?.label ?? "—",
-      icon: Building2, accent: "var(--neon-violet)", series: byIndustry.map((i) => Number(i.count)), bars: true },
+      icon: Building2, accent: "var(--neon-violet)", series: byIndustry.map((i) => Number(i.count)) },
   ];
 
   return (

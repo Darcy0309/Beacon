@@ -153,13 +153,13 @@ export default async function AppointmentsPage({ searchParams }) {
 
   const tiles = [
     { label: "Next 7 Days", value: String(rows.length), note: narrowed ? `scheduled · ${narrowed}` : "appointments scheduled",
-      icon: CalendarClock, accent: "var(--neon-cyan)", series: perDay, bars: true },
+      icon: CalendarClock, accent: "var(--neon-cyan)", series: perDay },
     { label: "Today", value: String(todayCount), note: "on the calendar",
       icon: Clock, accent: "var(--neon-amber)", series: perDay },
     { label: "Confirmed", value: String(confirmed), note: "ready to run",
       icon: CheckCheck, accent: "var(--neon-emerald)", series: perDay },
     { label: "Awaiting Confirmation", value: String(awaiting), note: "need a follow-up call",
-      icon: CalendarCheck, accent: "var(--neon-violet)", series: perDay, bars: true },
+      icon: CalendarCheck, accent: "var(--neon-violet)", series: perDay },
   ];
 
   // "Today" and "Tomorrow" where the business is, not on the server's UTC clock.
