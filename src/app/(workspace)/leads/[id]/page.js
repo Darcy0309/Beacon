@@ -8,6 +8,7 @@ import Tabs from "@/components/shared/tabs";
 import ProspectForm from "@/features/leads/components/prospect-form";
 import BusinessForm from "@/features/leads/components/business-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
+import PartBoundary from "@/components/shared/part-boundary";
 import EmailLead from "@/features/email/components/email-lead";
 import CoverageForm from "@/features/leads/components/coverage-form";
 import LeadNotes from "@/features/leads/components/lead-notes";
@@ -660,19 +661,22 @@ export default async function LeadSheet({ params, searchParams }) {
               </Card>
             ) : null}
             {canRecord ? (
-              <CallResultPanel
-                leadId={lead.id}
-                listId={listId}
-                projectType={r.projectType}
-                results={results}
-                followUp={followUp}
-                ultimateXdate={ins?.ultimate_xdate ?? null}
-                renewalHint={renewalHint}
-                clientNote={r.client_note ?? ""}
-                currentAppt={movable}
-                timeZone={tz}
-                calendarProjectId={calendar?.projectId ?? null}
-              />
+              // Its own boundary (Sean, Nov 2026): a failure in it leaves the rest of the sheet, and says where it was.
+              <PartBoundary name="Call Result">
+                <CallResultPanel
+                  leadId={lead.id}
+                  listId={listId}
+                  projectType={r.projectType}
+                  results={results}
+                  followUp={followUp}
+                  ultimateXdate={ins?.ultimate_xdate ?? null}
+                  renewalHint={renewalHint}
+                  clientNote={r.client_note ?? ""}
+                  currentAppt={movable}
+                  timeZone={tz}
+                  calendarProjectId={calendar?.projectId ?? null}
+                />
+              </PartBoundary>
             ) : staff ? (
               <Card className="p-5 text-sm text-muted-foreground">
                 Results on this name are recorded by {lead.rep === "Unassigned" ? "the reps on its project." : /\.$/.test(lead.rep) ? lead.rep : `${lead.rep}.`}
