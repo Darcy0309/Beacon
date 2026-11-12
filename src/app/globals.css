@@ -1842,3 +1842,34 @@ html[data-cursor-live][data-cursor-live] :is(:disabled, [aria-disabled="true"], 
   .cursor-bolt { animation: none; }
   .cursor-bit { transition: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   The top bar's edge (components/layout/topbar-frame.jsx; client, Nov 2026: "so that I
+   can see clearly topbar and main page"): tinted toward the accent, and a soft
+   oval of light leaving the title's tab for each side (topbar-edge.jsx).
+   --------------------------------------------------------------------------- */
+[data-topbar-frame] {
+  --topbar-edge: color-mix(in srgb, var(--primary) 32%, var(--panel-border));
+}
+.topbar-edge-glow {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  /* A short oval of light (pathLength 1000), starting just before the middle of the tab. */
+  stroke-dasharray: 55 1100;
+  stroke-dashoffset: 55;
+  opacity: 0;
+  animation: topbar-edge 5.5s ease-in-out infinite;
+}
+/* Out from the middle to the end, fading in and away; then a rest before the next. */
+@keyframes topbar-edge {
+  0%   { stroke-dashoffset: 55; opacity: 0; }
+  12%  { opacity: 0.45; }
+  60%  { opacity: 0.35; }
+  78%  { stroke-dashoffset: -1000; opacity: 0; }
+  100% { stroke-dashoffset: -1000; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .topbar-edge-glow { display: none; }
+}
