@@ -10,7 +10,7 @@ const projectSelect = ({ company = false, type = false, status = false } = {}) =
   company:companies${inner(company)}(id, name, sales_rep_id, group:agencies(id, name), sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name)),
   type:project_types${inner(type)}(id, code, description),
   status:project_statuses${inner(status)}(id, name),
-  assignments:project_assignments(ae:users!project_assignments_ae_user_id_fkey(id, first_name, last_name, email)),
+  assignments:project_assignments(ae:users!project_assignments_ae_user_id_fkey(id, first_name, last_name, email, role)),
   leads!leads_project_id_fkey(count)
 `;
 
@@ -18,6 +18,9 @@ const PROJECT_SELECT = projectSelect();
 
 function toProjectView(p) {
   const company = one(p.company);
+  // Who is on it; its managers, the account managers (and administrators) among them (Nov 2026).
+  const team = (p.assignments ?? []).map((a) => one(a.ae)).filter(Boolean);
+  const managers = team.filter((u) => u.role === "admin" || u.role === "manager");
   return {
     id: p.id,
     name: p.name,
@@ -31,7 +34,9 @@ function toProjectView(p) {
     type: one(p.type)?.code ?? "—",
     leads: p.leads?.[0]?.count ?? 0,
     status: one(p.status)?.name ?? "—",
-    manager: shortName(one((p.assignments ?? [])[0]?.ae)),
+    // Its manager, else whoever is on it (an agent alone), else "Unassigned".
+    manager: shortName(managers[0] ?? team[0]),
+    managers: managers.map((u) => ({ id: u.id, name: shortName(u) })),
     color: colorFor(p.name),
     description: p.description,
     startDate: shortDate(p.start_date),

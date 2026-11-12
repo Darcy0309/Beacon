@@ -16,7 +16,8 @@ import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
 import { getCurrentUser } from "@/lib/server/session";
-import { getSalesReps } from "@/features/users/queries";
+import { getAssignableStaff, getSalesReps } from "@/features/users/queries";
+import ProjectManagerCell from "@/features/projects/components/project-manager-cell";
 
 export const dynamic = "force-dynamic";
 
@@ -38,10 +39,16 @@ export default async function ProjectsPage({ searchParams }) {
     delete params.filters.group;
     delete params.filters.rep;
   }
-  const [{ rows, total }, stats, lookups, offices, clientGroups, reps] = await Promise.all([
+  // Administrators and account managers change a project's manager from the list (client, Nov 2026).
+  const canManage = ["admin", "manager"].includes(me?.role);
+  const [{ rows, total }, stats, lookups, offices, clientGroups, reps, staff] = await Promise.all([
     // The tiles follow the list's client filters (Oct 2026: a Sales Rep's clients, as on the Clients page).
     listProjects(params), (client ? Promise.resolve(null) : getFilteredClients(params.filters)).then(getProjectStats), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(), client ? [] : getSalesReps(),
+    canManage ? getAssignableStaff() : [],
   ]);
+  // Who can manage a project: its account managers and administrators.
+  const managerChoices = staff.filter((u) => u.role === "Manager" || u.role === "Administrator")
+    .map((u) => ({ id: u.id, name: u.name, role: u.role === "Administrator" ? "admin" : "manager" }));
   const { projects } = stats;
   const statsOf = new Map(projects.map((p) => [p.id, p]));
   const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
@@ -140,7 +147,13 @@ export default async function ProjectsPage({ searchParams }) {
                   <TableCell className="tabular-nums text-muted-foreground" data-project-to-call
                     title={p.type === "DBDV" ? "Names still to call" : "Leads still to call for an appointment"}>{(statsOf.get(p.id)?.toCall ?? 0).toLocaleString()}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge></TableCell>
-                  {client ? null : <TableCell>{p.manager}</TableCell>}
+                  {client ? null : (
+                    <TableCell>
+                      {canManage
+                        ? <ProjectManagerCell projectId={p.id} projectName={p.name} label={p.manager} current={p.managers} people={managerChoices} />
+                        : p.manager}
+                    </TableCell>
+                  )}
                   <TableCell className="text-right">
                     {client ? (
                       <Link href={`/projects/${p.id}`} className="text-xs font-semibold uppercase tracking-[0.1em] text-primary hover:underline">Open</Link>
