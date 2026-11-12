@@ -105,7 +105,7 @@ export async function savePhoneSettings(prevState, formData) {
   const notice = formData.get("record_notice") === "on";
   const { data: current } = await supabase.from("app_settings").select("value").eq("key", "phone").maybeSingle();
   // Off, the notice box is greyed and not sent: its choice is kept for when it is turned on again.
-  const value = { ...(current?.value ?? {}), record_all: recordAll, record_notice: recordAll ? notice : current?.value?.record_notice !== false };
+  const value = { ...(current?.value ?? {}), record_all: recordAll, record_notice: recordAll ? notice : current?.value?.record_notice === true };
   const { error } = await supabase.from("app_settings").upsert({ key: "phone", value, updated_at: new Date().toISOString() });
   if (error) return fail(error);
   await logActivity(supabase, "settings.phone", {

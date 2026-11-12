@@ -43,7 +43,7 @@ export async function phoneSettings(db) {
   if (!db) return { recordAll: false, notice: false };
   const { data } = await db.from("app_settings").select("value").eq("key", "phone").maybeSingle();
   const recordAll = data?.value?.record_all === true;
-  return { recordAll, notice: recordAll && data?.value?.record_notice !== false };
+  return { recordAll, notice: recordAll && data?.value?.record_notice === true };
 }
 
 /**

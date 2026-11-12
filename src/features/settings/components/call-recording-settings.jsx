@@ -28,7 +28,7 @@ export default function CallRecordingSettings({ value = {} }) {
   return (
     <Card data-call-recording-settings>
       <SectionHeader label="Call Recording" icon={CircleDot} />
-      <RecordingForm key={`${saved?.record_all === true}|${saved?.record_notice !== false}`} value={saved} action={action} pending={pending} />
+      <RecordingForm key={`${saved?.record_all === true}|${saved?.record_notice === true}`} value={saved} action={action} pending={pending} />
     </Card>
   );
 }
@@ -49,12 +49,12 @@ function RecordingForm({ value, action, pending }) {
         </span>
       </label>
       <label className={`flex items-start gap-2.5 pl-6 text-sm ${all ? "cursor-pointer" : "opacity-50"}`}>
-        <input type="checkbox" name="record_notice" defaultChecked={value?.record_notice !== false} disabled={!all} className="mt-0.5 size-4 accent-[var(--primary)]" data-record-notice />
+        <input type="checkbox" name="record_notice" defaultChecked={value?.record_notice === true} disabled={!all} className="mt-0.5 size-4 accent-[var(--primary)]" data-record-notice />
         <span>
           <span className="font-medium">Say &ldquo;This call may be recorded&rdquo; first</span>
           <span className="block text-xs text-muted-foreground">
-            Said to the person called as they answer, and to callers before it rings. Some states, California among them, require
-            everyone on a call to know it&apos;s recorded.
+            Off unless you choose it. Said to the person called as they answer, and to callers before it rings. Only needed when
+            calling states, California among them, that require everyone on a call to know it&apos;s recorded.
           </span>
         </span>
       </label>

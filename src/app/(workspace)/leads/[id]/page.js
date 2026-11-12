@@ -206,6 +206,9 @@ export default async function LeadSheet({ params, searchParams }) {
   const sp = await searchParams;
   const listId = /^[1-9]\d{0,17}$/.test(sp?.project ?? "") ? Number(sp.project) : null;
   // Names already skipped on this pass through the list, so Skip keeps going down it.
+  // Just saved a Lead or an Appointment here (Sean, Nov 2026): the sheet stays for a look over it, or an
+  // email with the appointment in it, and moving on is the manager's own click.
+  const saved = sp?.saved === "1" && listId;
   const skipped = String(sp?.skipped ?? "").split(",").filter((v) => /^[1-9]\d{0,17}$/.test(v)).map(Number).slice(-50);
 
   // What needs only the lead and who is asking starts as soon as those two are in, alongside the
@@ -380,10 +383,15 @@ export default async function LeadSheet({ params, searchParams }) {
               <span className="text-muted-foreground">
                 {listProject?.name ?? "Call list"} · <span className="font-semibold tabular-nums text-foreground">{list.left.toLocaleString()}</span> left
               </span>
+              {saved ? <span data-saved-hold className="font-medium text-emerald-500">Saved · look it over, then move on</span> : null}
               {list.next ? (
-                <Button asChild size="sm" variant="outline">
-                  <Link href={`/leads/${list.next}?project=${listId}&skipped=${[...skipped, lead.id].slice(-50).join(",")}`}>Skip to next <ArrowRight /></Link>
+                <Button asChild size="sm" variant={saved ? "default" : "outline"}>
+                  <Link data-next-name href={saved ? `/leads/${list.next}?project=${listId}` : `/leads/${list.next}?project=${listId}&skipped=${[...skipped, lead.id].slice(-50).join(",")}`}>
+                    {saved ? "Next name" : "Skip to next"} <ArrowRight />
+                  </Link>
                 </Button>
+              ) : saved ? (
+                <Button asChild size="sm"><Link data-next-name href={`/work/${listId}?done=1`}>Back to call list <ArrowRight /></Link></Button>
               ) : null}
               <Button asChild size="sm" variant="ghost">
                 <Link href="/work"><Repeat /> Change project</Link>
@@ -675,6 +683,7 @@ export default async function LeadSheet({ params, searchParams }) {
                   currentAppt={movable}
                   timeZone={tz}
                   calendarProjectId={calendar?.projectId ?? null}
+                  holdOnWin={seesInternal}
                 />
               </PartBoundary>
             ) : staff ? (

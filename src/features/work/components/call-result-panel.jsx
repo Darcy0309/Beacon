@@ -36,9 +36,12 @@ const GROUPS = [
  * Ultimate X-Date, an appointment its date and time; one that sends the
  * client the lead sheet, the notes written for them ("Client notes",
  * `clientNote` on file to start from). The call notes stay internal. Saving
- * moves on to the next name when the sheet was opened from a call list.
+ * moves on to the next name when the sheet was opened from a call list, but for
+ * an account manager or administrator (`holdOnWin`) a Lead or an Appointment
+ * stays on the sheet (Sean, Nov 2026: to email them about it, which needs it
+ * saved, or check it over), and Next name on the call list bar moves on.
  */
-export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null, calendarProjectId = null }) {
+export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null, calendarProjectId = null, holdOnWin = false }) {
   // The slot being chosen for an appointment is told to the warning under it (taken, or blocked out, on the project's calendar).
   const [slotControl, tellSlot] = useSlotControl();
   const router = useNavigationRouter();
@@ -70,6 +73,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
     event.preventDefault();
     // The note boxes drop a stamped line left empty as the form is read.
     const form = new FormData(event.currentTarget);
+    const hold = holdOnWin && (picked?.effect === "promote" || picked?.effect === "appointment");
     startTransition(async () => {
       const result = await reach(() => recordCallResult(null, form));
       if (!result?.ok) {
@@ -88,7 +92,8 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
       toast.success(`${d.result} saved${where}`);
       setState(EMPTY);
       setChosen(null);
-      if (d.listId) router.push(d.next ? `/leads/${d.next}?project=${d.listId}` : `/work/${d.listId}?done=1`);
+      if (d.listId && hold) router.replace(`/leads/${leadId}?project=${d.listId}&saved=1`, { scroll: false });
+      else if (d.listId) router.push(d.next ? `/leads/${d.next}?project=${d.listId}` : `/work/${d.listId}?done=1`);
       else router.refresh();
     });
   };

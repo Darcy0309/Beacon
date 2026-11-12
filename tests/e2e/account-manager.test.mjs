@@ -1,6 +1,7 @@
 /**
  * The account manager's day, in a real browser: My Projects → a call list in
- * weighted order → the lead sheet → a result button → the next name. Then the
+ * weighted order → the lead sheet → a result button → the next name (after a Lead or an
+ * Appointment, the sheet stays until Next name). Then the
  * appointment follow-up, QA, and the appointment manager picking up the lead
  * that was promoted to them.
  *
@@ -115,7 +116,12 @@ try {
   check("…with it, the X-date is on the record", sql(`select ultimate_xdate from public.insurance_details where lead_id=${names[1]}`) === "2027-03-01");
   const promoted = lead(names[1]);
   check("Lead: promoted to the appointment project, handed to Mike", promoted.project_id === APPT && promoted.stage === "appt" && promoted.rep === MIKE && promoted.result === "Lead-No Contact", JSON.stringify(promoted));
-  check("…and Sean moved on to the third name", (await sean.url()) === `/leads/${names[2]}?project=${DBDV}`);
+  // A Lead or an Appointment stays on the sheet for a manager (Sean, Nov 2026): to email them about it, or check it over.
+  check("…and Sean stays on it, to look it over", (await sean.url()) === `/leads/${names[1]}?project=${DBDV}&saved=1`, await sean.url());
+  check("…told it is saved, with Next name to move on", Boolean(await until(() => sean.ev(`!!document.querySelector('[data-saved-hold]') && document.querySelector('[data-next-name]')?.textContent.includes('Next name')`))));
+  await sean.click("a", "Next name");
+  check("Next name: the third name", Boolean(await until(async () => (await sean.url()) === `/leads/${names[2]}?project=${DBDV}`, { timeout: 10000 })), await sean.url());
+  await sleep(1200);
 
   await pick(sean, "Appointment-Phone");
   check("an appointment result asks for the X-date, date and time", await sean.ev(`!!document.querySelector('input[name="ultimate_xdate"]') && !!document.querySelector('input[name="appt_date"]') && !!document.querySelector('select[name="appt_time"]')`));
@@ -131,6 +137,10 @@ try {
   await save(sean);
   const appt = JSON.parse(sql(`select row_to_json(a) from (select qa_status, appt_time, rep_name, user_id from public.appointments where lead_id=${names[2]}) a`));
   check("the appointment is on the calendar, waiting for QA", appt?.qa_status === "pending" && appt.appt_time === "2:30 PM" && appt.rep_name === "Bret Godsey" && appt.user_id === SEAN, JSON.stringify(appt));
+  check("an appointment stays on the sheet too", (await sean.url()) === `/leads/${names[2]}?project=${DBDV}&saved=1`, await sean.url());
+  await sean.click("a", "Next name");
+  await until(async () => (await sean.url()) === `/leads/${names[3]}?project=${DBDV}`, { timeout: 10000 });
+  await sleep(1200);
   check("Skip to next skips without recording", await sean.click("a", "Skip to next"));
   await until(async () => (await sean.path()) !== `/leads/${names[3]}`);
   check("…leaving the skipped name untouched", lead(names[3]).weight === 0);
