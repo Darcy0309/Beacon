@@ -67,11 +67,13 @@ try {
   check("…an X-date with another year counted by its month and day", digest[0]?.body.includes("Typed Next Year") && digest[0]?.body.includes("Last Year Kept"), digest[0]?.body);
 
   section("Appointment reminder");
-  const appt = (lead, date, confirmed = false, status = "Scheduled") =>
-    sql(`insert into public.appointments (lead_id, user_id, appt_date, appt_time, status_id, confirmed_at)
-      values (${lead}, ${SEAN}, ${lit(date)}, '10:00 AM', (select id from public.appointment_statuses where name=${lit(status)}), ${confirmed ? "now()" : "null"})`);
+  const apptSql = (lead, date, confirmed = false, status = "Scheduled") =>
+    `insert into public.appointments (lead_id, user_id, appt_date, appt_time, status_id, confirmed_at)
+      values (${lead}, ${SEAN}, ${lit(date)}, '10:00 AM', (select id from public.appointment_statuses where name=${lit(status)}), ${confirmed ? "now()" : "null"})`;
+  const appt = (...a) => sql(apptSql(...a));
+  appt.text = apptSql;
   appt(solo, DAY);
-  appt(unheld, "2031-01-03");
+  const toConfirm = Number(sql(`${appt.text(unheld, "2031-01-03")} returning id`));
   appt(name("Confirmed Co", SEAN, "2031-06-01"), "2031-01-03", true);
   appt(name("Cancelled Co", SEAN, "2031-06-01"), DAY, false, "Cancelled");
   run("send_appointment_reminders");
@@ -80,7 +82,8 @@ try {
     reminder.length === 1 && reminder[0].title === "1 appointment today, 1 to confirm for tomorrow"
     && reminder[0].body.includes(`Today: 10:00 AM ${TAG} Sine Wave`) && reminder[0].body.includes(`Confirm: ${TAG} Nobody Holds It`), JSON.stringify(reminder));
   check("…not a confirmed one, nor a cancelled one", !reminder[0]?.body.includes("Confirmed Co") && !reminder[0]?.body.includes("Cancelled Co"));
-  check("…linked to that day on the calendar", reminder[0]?.link === `/calendar?view=day&d=${DAY}`);
+  // Open calendar (client, Nov 2026): the day that needs doing, tomorrow's to confirm highlighted.
+  check("…linked to tomorrow on the calendar, the one to confirm highlighted", reminder[0]?.link === `/calendar?view=day&d=2031-01-03&a=${toConfirm}`, reminder[0]?.link);
   run("send_appointment_reminders");
   check("once a day", notes(SEAN, "appointment").length === 1);
 

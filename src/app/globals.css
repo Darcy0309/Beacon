@@ -684,7 +684,8 @@ option {
   border-color: var(--primary) !important;
   background: color-mix(in srgb, var(--primary) 16%, var(--card)) !important;
   box-shadow: 0 0 0 2px var(--primary), 0 0 22px -4px var(--primary);
-  animation: appt-focus 1.1s ease-in-out 4;
+  /* Long enough to be noticed on arriving from a notification (client, Nov 2026), then a steady glow. */
+  animation: appt-focus 1.1s ease-in-out 8;
 }
 @keyframes appt-focus {
   0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 0 22px -4px var(--primary); }

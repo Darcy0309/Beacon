@@ -82,6 +82,11 @@ try {
   check("without one named, nothing is highlighted", (await admin.ev(FOCUSED)) === null);
   await admin.go(`/calendar?view=day&d=${DAY}&a=${neighbour}`, 3000);
   check("another link highlights another", Boolean((await until(() => admin.ev(FOCUSED)))?.text.includes("Same Hour Co")));
+  // The morning reminder's "N to confirm for tomorrow" names each of them (client, Nov 2026).
+  await admin.go(`/calendar?view=day&d=${DAY}&a=${neighbour},${target}`, 3000);
+  const several = await until(() => admin.ev(`(() => { const all = [...document.querySelectorAll('[data-focused-appointment].appt-focus')]; return all.length === 2 ? all.map((e) => e.textContent).join(' | ') : null; })()`));
+  check("several named: each highlighted, the rest plain", /Same Hour Co/.test(several ?? "") && /Thornhill Late/.test(several ?? "")
+    && await admin.ev(`[...document.querySelectorAll('button')].some((b) => b.textContent.includes('Early Bird Co') && !b.hasAttribute('data-focused-appointment'))`), several);
 } finally {
   browser.close();
   sql(`delete from public.notifications where title like ${lit(`%${TAG}%`)} or body like ${lit(`%${TAG}%`)}`);

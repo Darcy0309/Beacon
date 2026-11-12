@@ -29,16 +29,18 @@ import { cn } from "@/lib/utils";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
 const OpenAppointment = createContext(() => {});
-/** The appointment a notification pointed at (?a=<id>): highlighted wherever it shows. */
-const FocusedAppointment = createContext(null);
+/** The appointments a notification pointed at (?a=<id>,<id>…): highlighted wherever they show. */
+const FocusedAppointment = createContext([]);
 
-/** Is this the appointment the visitor came to see? It is scrolled into view, once. */
+/** Is this one the visitor came to see? Highlighted; the first of them scrolled into view, once. */
 function useFocused(a) {
-  const focused = useContext(FocusedAppointment) === a.id;
+  const ids = useContext(FocusedAppointment);
+  const focused = ids.includes(a.id);
+  const first = ids[0] === a.id;
   const ref = useRef(null);
   useEffect(() => {
-    if (focused) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [focused]);
+    if (first) ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [first]);
   return [focused, ref];
 }
 
@@ -130,14 +132,14 @@ function layoutDay(events) {
  * live in the URL (?view=&d=), so every view is linkable.
  */
 export default function CalendarView(props) {
-  const { view, title, prev, next, todayHref, viewHrefs, focusId = null, monthHrefBase, today, year, month } = props;
+  const { view, title, prev, next, todayHref, viewHrefs, focusIds = [], monthHrefBase, today, year, month } = props;
   const [selected, setSelected] = useState(null);
   const router = useRouter();
   const shownMonth = `${year}-${String(month + 1).padStart(2, "0")}-01`;
 
   return (
     <OpenAppointment.Provider value={setSelected}>
-    <FocusedAppointment.Provider value={focusId}>
+    <FocusedAppointment.Provider value={focusIds}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="surface-chip flex items-center gap-1 rounded-lg border border-[var(--panel-border)] p-1">
@@ -293,7 +295,7 @@ const DRAG_LAST = 1260;
  * mouse down a day's hours marks a stretch of time and opens a note on it, from and until (a click
  * marks half an hour); appointments, notes and links under the pointer keep their own clicks.
  */
-function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = null, blocks = null, notes = null, noteProjectId = null }) {
+function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusIds = [], blocks = null, notes = null, noteProjectId = null }) {
   const router = useRouter();
   const [nowMin, setNowMin] = useState(null);
   const [drag, setDrag] = useState(null); // { date, a, b }: minutes where it began and where the pointer is
@@ -511,7 +513,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusId = 
                     return (
                       <div
                         key={a.id}
-                        className={cn("absolute px-0.5", a.id === focusId && "z-[5]")}
+                        className={cn("absolute px-0.5", focusIds.includes(a.id) && "z-[5]")}
                         style={{
                           top: blockTop,
                           height: blockHeight,
@@ -611,7 +613,7 @@ function Block({ a, dense = false, compact = false }) {
 /* --------------------------------------------------------------------------
    Month: heat-mapped grid with a side panel for the selected day.
    -------------------------------------------------------------------------- */
-function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusId = null, blockedDays = null, blocks = null, notes = null, today = null }) {
+function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBase, focusIds = [], blockedDays = null, blocks = null, notes = null, today = null }) {
   // Each day's appointments as the dashboard's calendar marks them (Sean, Oct 2026): confirmed or
   // gone by in the accent, still to come and not confirmed yet in the awaiting colour.
   const kinds = useMemo(() => {
@@ -626,7 +628,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
   }, [rows, today]);
   const dayOf = (a) => Number(String(a.date).slice(8, 10));
   // Opened from a notification: show that appointment's day.
-  const focusRow = focusId == null ? null : rows.find((a) => a.id === focusId);
+  const focusRow = rows.find((a) => focusIds.includes(a.id)) ?? null;
   const [selected, setSelected] = useState(focusRow ? dayOf(focusRow) : todayDay);
 
   const START = new Date(year, month, 1).getDay();

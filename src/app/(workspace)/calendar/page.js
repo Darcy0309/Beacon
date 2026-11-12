@@ -31,8 +31,8 @@ export default async function CalendarPage({ searchParams }) {
     anchor = makeIso(y, m, 1);
   }
   anchor ||= today;
-  // ?a=<appointment id>: a notification's "Open calendar" — that one is highlighted.
-  const focusId = /^\d{1,18}$/.test(sp?.a ?? "") ? Number(sp.a) : null;
+  // ?a=<appointment id>[,<id>…]: a notification's "Open calendar" — those are highlighted (the first scrolled to).
+  const focusIds = String(sp?.a ?? "").split(",").filter((v) => /^\d{1,18}$/.test(v)).map(Number).slice(0, 25);
 
   // ?client=<id> or ?project=<id>: that client's projects, or that project's calendar alone.
   const id = (v) => (/^[1-9]\d{0,17}$/.test(v ?? "") ? Number(v) : null);
@@ -155,7 +155,7 @@ export default async function CalendarPage({ searchParams }) {
           viewHrefs={viewHrefs}
           dayHrefBase={`/calendar?${only}view=day&d=`}
           monthHrefBase={`/calendar?${only}view=month&d=`}
-          focusId={focusId}
+          focusIds={focusIds}
           blockedDays={blockedDays}
           blocks={blocks}
           notes={notes}
