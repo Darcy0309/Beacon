@@ -169,10 +169,13 @@ export default async function Dashboard({ searchParams }) {
 
   // Call Activity (Nov 2026): every manager's calls on the Lighthouse phone, for administrators and managers,
   // over the day chosen (?ck=, ?cd=; today to begin with). Once the Twilio line is set up: before, there are none.
+  // A manager's dashboard (Sean, Nov 2026): their own line to begin with, the team (?cs=team: account
+  // managers only, no administrators or Sales Reps) a click away. The company's: everyone on the phone.
+  const callScope = isManager ? (sp?.cs === "team" ? "team" : "me") : "all";
   const callsP = (isManager || view.audience === "company") && twilioConfig()
-    ? basics.then(async ([businessToday, rules]) => {
+    ? basics.then(async ([businessToday, rules, tz]) => {
       const v = readView(sp, { keyParam: "ck", dateParam: "cd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
-      return { view: v, rows: await getCallActivity(v.range) };
+      return { view: v, tz, rows: await getCallActivity(v.range, { scope: callScope, userId: subject?.id ?? null }) };
     }).catch((err) => {
       // The rest of the dashboard still shows.
       console.error("[dashboard] call activity", err?.message ?? err);
@@ -230,7 +233,9 @@ export default async function Dashboard({ searchParams }) {
   ]);
   const calls = await callsP;
   const callCard = calls ? (
-    <CallActivityCard rows={calls.rows} view={calls.view}
+    <CallActivityCard rows={calls.rows} view={calls.view} timeZone={calls.tz}
+      scope={callScope} userId={subject?.id ?? null}
+      scopeLinks={isManager ? Object.fromEntries(["me", "team"].map((c) => [c, `/?${new URLSearchParams({ ...otherParams(sp, "cs"), ...(c === "team" ? { cs: "team" } : {}) })}`])) : null}
       {...viewControls(sp, calls.view, { keyParam: "ck", dateParam: "cd", options: VIEW_PERIODS })} />
   ) : null;
   const production = company?.production ?? null;

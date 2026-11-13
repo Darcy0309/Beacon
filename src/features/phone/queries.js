@@ -6,12 +6,17 @@ import { createClient } from "@/lib/supabase/server";
 /**
  * Each person's calls over the business's days from..to (phone_call_report),
  * most calls first: { userId, name, role, total, outHandled, outCancelled,
- * inHandled, missed, talk (seconds), onCall }. The calls in that rang nobody
- * come last, with no userId. Administrators and account managers only.
+ * inHandled, missed, talk (seconds), onCall, firstCall (when their first call
+ * out started) }. The calls in that rang nobody come last, with no userId.
+ * Administrators and account managers only.
+ *
+ *   scope   "all" (everyone on the phone; a manager asking for it gets "team"),
+ *           "team" (the account managers, not administrators or Sales Reps),
+ *           "me" (userId's line alone; a manager's own, whatever they give)
  */
-export async function getCallActivity({ from, to }) {
+export async function getCallActivity({ from, to }, { scope = "all", userId = null } = {}) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("phone_call_report", { p_from: from, p_to: to });
+  const { data, error } = await supabase.rpc("phone_call_report", { p_from: from, p_to: to, p_scope: scope, p_user: userId });
   if (error) throw error;
   const n = (v) => Number(v ?? 0);
   return (data ?? [])
@@ -26,6 +31,7 @@ export async function getCallActivity({ from, to }) {
       missed: n(r.missed),
       talk: n(r.talk_seconds),
       onCall: Boolean(r.on_call),
+      firstCall: r.first_call ?? null,
     }))
     .sort((a, b) => (a.userId ? 0 : 1) - (b.userId ? 0 : 1) || b.total - a.total || b.talk - a.talk || a.name.localeCompare(b.name));
 }

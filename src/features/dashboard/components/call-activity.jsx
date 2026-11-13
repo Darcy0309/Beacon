@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { PhoneCall } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
@@ -34,8 +35,14 @@ const COLUMNS = [
  * took is missed. Talk time counts calls answered, its average over them.
  * While it shows today it asks again every 20 seconds, and a person on a
  * call now is marked so. `rows`: getCallActivity(); `view`: readView().
+ *
+ * On a manager's dashboard (Sean, Nov 2026) it shows their own line to begin
+ * with, and the team (account managers only) a click away: `scope` "me" or
+ * "team", `scopeLinks` { me, team } the addresses of each, `userId` whose
+ * line "me" is. First call: when each person's first call out started, in
+ * the business's time zone (`timeZone`).
  */
-export default function CallActivityCard({ rows: initial, view, switcher, nav }) {
+export default function CallActivityCard({ rows: initial, view, switcher, nav, scope = "all", scopeLinks = null, userId = null, timeZone }) {
   const [rows, setRows] = useState(initial);
   const [live, setLive] = useState(view.showsToday);
   // Another period chosen: the server's numbers for it.
@@ -49,7 +56,7 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav })
     let gone = false;
     const refresh = () => {
       if (document.visibilityState !== "visible") return;
-      fetch(`/api/phone/calls?ck=${view.key}&cd=${view.anchor}`, { cache: "no-store" })
+      fetch(`/api/phone/calls?ck=${view.key}&cd=${view.anchor}&cs=${scope}${userId ? `&cu=${userId}` : ""}`, { cache: "no-store" })
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
         .then((d) => {
           if (gone) return;
@@ -66,11 +73,17 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav })
       clearInterval(t);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [live, view.key, view.anchor]);
+  }, [live, view.key, view.anchor, scope, userId]);
 
   const sum = (key) => rows.reduce((n, r) => n + r[key], 0);
   const avg = (talk, handled) => (handled ? talk / handled : 0);
   const totalHandled = sum("outHandled") + sum("inHandled");
+  // The time of day for a day's view; with the day too over a longer one.
+  const clock = (iso) => (iso ? new Date(iso).toLocaleString("en-US", {
+    timeZone: timeZone || undefined, hour: "numeric", minute: "2-digit",
+    ...(view.key === "day" ? {} : { month: "short", day: "numeric" }),
+  }) : "—");
+  const firsts = rows.map((r) => r.firstCall).filter(Boolean).sort();
   return (
     <Card data-call-activity>
       <SectionHeader wrap label="Call Activity" icon={PhoneCall} action={switcher} />
@@ -88,13 +101,26 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav })
             "Calls on the Lighthouse phone"
           )}
         </span>
-        {nav}
+        <span className="flex flex-wrap items-center gap-2">
+          {scopeLinks ? (
+            <span className="inline-flex rounded-md border border-[var(--panel-border)] p-0.5 text-xs" role="group" aria-label="Whose calls" data-call-scope={scope}>
+              {[["me", "Mine"], ["team", "Team"]].map(([k, label]) => (
+                <Link key={k} href={scopeLinks[k]} scroll={false} aria-current={scope === k ? "true" : undefined} data-call-scope-link={k}
+                  className={cn("rounded px-2.5 py-1 font-medium transition-colors", scope === k ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground")}>
+                  {label}
+                </Link>
+              ))}
+            </span>
+          ) : null}
+          {nav}
+        </span>
       </div>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
+              <TableHead className="text-right">First call</TableHead>
               {COLUMNS.map(([k, label]) => <TableHead key={k} className="text-right">{label}</TableHead>)}
               <TableHead className="text-right">Average talk time</TableHead>
               <TableHead className="text-right">Total talk time</TableHead>
@@ -113,6 +139,7 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav })
                     ) : null}
                   </span>
                 </TableCell>
+                <TableCell className={cn("text-right tabular-nums", !r.firstCall && "text-muted-foreground")} data-col="first">{r.userId ? clock(r.firstCall) : ""}</TableCell>
                 {COLUMNS.map(([k]) => (
                   <TableCell key={k} data-col={k}
                     className={cn("text-right tabular-nums", !r[k] && "text-muted-foreground", k === "missed" && r[k] > 0 && "font-semibold text-rose-500")}>
@@ -126,13 +153,14 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav })
             {rows.length ? (
               <TableRow className="font-semibold" data-call-row="total">
                 <TableCell className="text-xs uppercase tracking-[0.1em] text-muted-foreground">{view.key === "day" ? "Day total" : "Total"}</TableCell>
+                <TableCell className="text-right tabular-nums" data-col="first">{firsts.length ? clock(firsts[0]) : "—"}</TableCell>
                 {COLUMNS.map(([k]) => <TableCell key={k} className="text-right tabular-nums" data-col={k}>{sum(k)}</TableCell>)}
                 <TableCell className="text-right tabular-nums" data-col="avg">{talkClock(avg(sum("talk"), totalHandled))}</TableCell>
                 <TableCell className="text-right tabular-nums" data-col="talk">{talkClock(sum("talk"))}</TableCell>
               </TableRow>
             ) : (
               <TableRow>
-                <TableCell colSpan={COLUMNS.length + 3} className="py-6 text-center text-sm text-muted-foreground">No calls yet.</TableCell>
+                <TableCell colSpan={COLUMNS.length + 4} className="py-6 text-center text-sm text-muted-foreground">No calls yet.</TableCell>
               </TableRow>
             )}
           </TableBody>
