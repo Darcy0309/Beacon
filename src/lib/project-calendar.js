@@ -83,6 +83,27 @@ export function eventsOn(day, { appointments = [], blocks = [], notes = [] }) {
   return out.sort((x, y) => x.start - y.start || x.key.localeCompare(y.key));
 }
 
+/**
+ * One of eventsOn()'s entries in a line, as the date picker says it under its calendar: { key, kind,
+ * text }. Blocked time, a note on a time of day, or an appointment; null for anything else, so that a
+ * kind it doesn't know is left out rather than read as an appointment (Sean, Nov 2026: a day with a
+ * note on it, pointed at, broke the Call Result panel).
+ */
+export function eventLine(e) {
+  if (e?.kind === "block" && e.block) {
+    const b = e.block;
+    return { key: e.key, kind: "block", text: `${b.synced ? "Busy" : "Blocked"} · ${blockHours(b)}${b.note ? ` · ${b.note}` : ""}` };
+  }
+  if (e?.kind === "note" && e.note) {
+    return { key: e.key, kind: "note", text: `Note · ${noteTime(e.note)}${e.note.text ? ` · ${e.note.text}` : ""}` };
+  }
+  if (e?.kind === "appointment" && e.appointment) {
+    const a = e.appointment;
+    return { key: e.key, kind: "appointment", text: `${a.time ?? "No time"} · ${a.company ?? "Appointment"}` };
+  }
+  return null;
+}
+
 /** Per day from `from` to `to`: how many appointments and notes, and whether any of it is blocked ("day" or "part"). */
 export function dayMarks({ appointments = [], blocks = [], notes = [] }, from, to, today = null) {
   const marks = {};

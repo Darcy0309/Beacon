@@ -8,7 +8,10 @@ import {
   addDays, addMonths, addYears, formatIso, monthGrid, monthStart, parseTypedDate, relativeDay, todayIso,
 } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import { blockHours, dayMarks as calendarDayMarks, eventsOn } from "@/lib/project-calendar";
+import { dayMarks as calendarDayMarks, eventLine, eventsOn } from "@/lib/project-calendar";
+
+// Each line's colour, as the project's calendar shows them: blocked time amber, notes violet.
+const LINE_COLOR = { block: "var(--neon-amber)", note: "var(--neon-violet)" };
 
 /** Quick picks offered under the calendar, by name. */
 const PRESETS = {
@@ -137,9 +140,10 @@ export default function DatePicker({
   const shownBlocked = projectMarks
     ? Object.fromEntries(Object.entries(projectMarks).filter(([, m]) => m.blocked).map(([d, m]) => [d, m.blocked]))
     : undefined;
-  // What the day pointed at (else the one chosen) holds on the project's calendar.
+  // What the day pointed at (else the one chosen) holds on the project's calendar: its blocked time,
+  // notes and appointments, a line each.
   const shownDay = hoverDay ?? value;
-  const dayEvents = projectData && shownDay ? eventsOn(shownDay, projectData) : [];
+  const dayLines = projectData && shownDay ? eventsOn(shownDay, projectData).map(eventLine).filter(Boolean) : [];
 
   const set = (iso) => {
     setProblem(null);
@@ -326,11 +330,9 @@ export default function DatePicker({
               ) : shownDay ? (
                 <>
                   <div className="font-semibold">{formatIso(shownDay, "medium")}</div>
-                  {dayEvents.length ? dayEvents.map((e) => (
-                    <div key={e.key} className="truncate" style={e.kind === "block" ? { color: "var(--neon-amber)" } : undefined}>
-                      {e.kind === "block"
-                        ? `${e.block.synced ? "Busy" : "Blocked"} · ${blockHours(e.block)}${e.block.note ? ` · ${e.block.note}` : ""}`
-                        : `${e.appointment.time ?? "No time"} · ${e.appointment.company ?? "Appointment"}`}
+                  {dayLines.length ? dayLines.map((l) => (
+                    <div key={l.key} className="truncate" title={l.text} style={LINE_COLOR[l.kind] ? { color: LINE_COLOR[l.kind] } : undefined} data-picker-line={l.kind}>
+                      {l.text}
                     </div>
                   )) : <div className="text-muted-foreground">{projectData ? "Nothing booked or blocked." : "Reading the project's calendar…"}</div>}
                 </>

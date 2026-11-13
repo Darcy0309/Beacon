@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for a project's calendar: what is on a day, and what a slot being booked runs into. */
-import { BLOCK_TIMES, blockDays, blockHours, blockOn, clockOf, dayMarks, eventsOn, minutesOf, slotClashes, weeklyBlock } from "../../src/lib/project-calendar.js";
+import { BLOCK_TIMES, blockDays, blockHours, blockOn, clockOf, dayMarks, eventLine, eventsOn, minutesOf, slotClashes, weeklyBlock } from "../../src/lib/project-calendar.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -61,6 +61,19 @@ is("appointments still to be confirmed, from today on", JSON.stringify(dayMarks(
   JSON.stringify({ "2026-10-28": { appointments: 1, blocked: null }, "2026-10-30": { appointments: 2, blocked: null, waiting: 1 } }));
 is("…and booking at that time is not warned of it", slotClashes({ date: "2026-10-20", time: "10:00 AM" }, { appointments: [], blocks: [], notes: noted.notes }), []);
 is("no notes: the calendar is as it was", eventsOn("2026-10-20", cal).some((e) => e.kind === "note"), false);
+
+// The date picker's lines under its calendar (Sean, Nov 2026: a day with a note on it, pointed at, was read as
+// an appointment and broke the Call Result panel with "Cannot read properties of undefined (reading 'time')").
+is("a day in lines, in its order: the note at its time as a note, never as an appointment",
+  eventsOn("2026-10-20", noted).map(eventLine).map((l) => [l.kind, l.text]),
+  [["appointment", "10:00 AM · Acme Plumbing"], ["note", "Note · 10:00 AM · Owner back from vacation"], ["block", "Blocked · 12:00 PM – 1:00 PM · Lunch"], ["appointment", "2:00 PM · Beta Roofing"]]);
+is("…a note over a stretch of time says so", eventLine({ kind: "note", key: "n8", note: { id: 8, start: 540, end: 630, text: "Owner in the shop" } })?.text, "Note · 9:00 AM – 10:30 AM · Owner in the shop");
+is("…busy on a connected calendar says only when", eventLine({ kind: "block", key: "b9", block: { start: null, end: null, synced: true, note: null } })?.text, "Busy · All day");
+is("…an appointment with no time or company still reads", eventLine({ kind: "appointment", key: "a9", appointment: { id: 9 } })?.text, "No time · Appointment");
+is("…anything else is left out, not read as an appointment",
+  [eventLine({ kind: "something new", key: "x1" }), eventLine({ kind: "appointment", key: "a0" }), eventLine({ kind: "note", key: "n0" }), eventLine(null), eventLine(undefined)],
+  [null, null, null, null, null]);
+is("…each line keyed as its entry", eventsOn("2026-10-20", noted).map(eventLine).map((l) => l.key), eventsOn("2026-10-20", noted).map((e) => e.key));
 
 // Blocked out every week on some days, until a day (Sean, Oct 2026: every Tue & Thu for two months).
 const repeating = { id: 40, startsOn: "2026-11-03", endsOn: "2026-12-31", start: 780, end: 1020, weekdays: [2, 4], note: "Staff meetings" };

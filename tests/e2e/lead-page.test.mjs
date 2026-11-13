@@ -31,6 +31,8 @@ const lead = Number(sql(`insert into public.leads (company_name, contact_name, c
   values (${lit(`${TAG} Medford Knife and Tool`)}, 'Dana Reyes', 'Office Manager', '480-555-0100', 'Mesa', 'AZ', '85213', 'Bob Medford', ${APPT}, ${SEAN}, ${resultId("APPT", "Lead-No Contact")}, '20', '7342-00') returning id`));
 const tomorrow = sql("select ((now() at time zone public.business_tz())::date + 1)::text");
 sql(`insert into public.calendar_blocks (project_id, starts_on, ends_on, start_time, end_time, note) values (${APPT}, ${lit(tomorrow)}, ${lit(tomorrow)}, '10:00', '13:00', 'Staff meeting')`);
+// A note on a time of that day: the picker once took one for an appointment and broke the Call Result panel (Sean, Nov 2026).
+sql(`insert into public.calendar_notes (project_id, on_date, at_time, body, created_by) values (${APPT}, ${lit(tomorrow)}, '09:00', 'Owner prefers mornings', ${SEAN})`);
 const dir = mkdtempSync(path.join(tmpdir(), "lead-files-"));
 const pdf = path.join(dir, "policy.pdf");
 writeFileSync(pdf, "%PDF-1.4\n% a policy\n");
@@ -209,7 +211,12 @@ try {
   await sean.hover(`[data-iso="${tomorrow}"]`);
   const told = await until(() => sean.ev(`(document.querySelector('[data-picker-day]')?.innerText ?? '').includes('Staff meeting') ? document.querySelector('[data-picker-day]').innerText : null`));
   check("…and pointing at it says which hours, and why", /Blocked · 10:00 AM – 1:00 PM · Staff meeting/.test(told ?? ""), told);
+  check("…with the day's note at its time, before the blocked hours", /Note · 9:00 AM · Owner prefers mornings[\s\S]*Blocked · 10:00 AM/.test(told ?? ""), told);
+  check("…and the Call Result panel carries on", !(await sean.ev(`!!document.querySelector('[data-part-error]')`)));
   await shot("picker-calendar");
+  await sean.mouseClick(`[data-iso="${tomorrow}"]`);
+  check("choosing that day puts it in the field", Boolean(await until(() => sean.ev(`document.querySelector('input[name="appt_date"]')?.value === ${JSON.stringify(tomorrow)}`))));
+  check("…with the panel still there to save from", (await sean.ev(`!!document.querySelector('input[aria-label="Appointment date"]') && !document.querySelector('[data-part-error]')`)) === true);
   sean.close();
 
   section("A manager's side menu");
