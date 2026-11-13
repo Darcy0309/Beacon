@@ -81,6 +81,15 @@ try {
     await admin.ev(`!!document.querySelector('[data-my-schedule][data-stacked], [data-my-schedule] [data-stacked]') && document.querySelector('[data-schedule-all]')?.getAttribute('href') === '/appointments'`));
 
   section("Users");
+  // A to Z by name, whatever role is shown (Sean, Nov 2026).
+  const names = () => admin.ev(`[...document.querySelectorAll('[data-user-link]')].map((a) => a.textContent.trim())`);
+  const aToZ = (list) => list.length > 1 && list.every((n, i) => !i || list[i - 1].localeCompare(n, "en", { sensitivity: "base" }) <= 0);
+  await admin.go("/users", 5000);
+  const everyone = await names();
+  check("the users A to Z by name", aToZ(everyone), JSON.stringify(everyone));
+  await admin.go("/users?role=manager", 5000);
+  const managers = await names();
+  check("…a role's too", aToZ(managers) || managers.length < 2, JSON.stringify(managers));
   await admin.go(`/users?q=mike`, 5000);
   await admin.click("[data-user-link]", "Mike");
   await until(() => admin.ev(`!!document.querySelector('[role=dialog] input[name="start_date"]')`));
