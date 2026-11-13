@@ -17,11 +17,12 @@ const MIKE = userId("mike@beacon.test");
 const RACHEL = userId("rachel@beacon.test");
 const ADMIN = userId("admin@beacon.test");
 const today = sql("select (now() at time zone public.business_tz())::date::text");
+const yesterday = sql("select ((now() at time zone public.business_tz())::date - 1)::text");
 let n = 0;
-const call = (user, hhmm, talk) => {
+const call = (user, hhmm, talk, on = today) => {
   n += 1;
   const sid = `CA${TAG.toLowerCase()}${String(n).padStart(4, "0")}`;
-  const at = `(${lit(today)}::date + time ${lit(hhmm)}) at time zone public.business_tz()`;
+  const at = `(${lit(on)}::date + time ${lit(hhmm)}) at time zone public.business_tz()`;
   sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, started_at, rang_at, answered_at, ended_at, talk_seconds)
     values (${lit(sid)}, ${lit(sid)}, ${user}, 'out', '+16025550100', 'completed', ${at}, ${at}, ${at}, ${at} + interval '${talk} seconds', ${talk})`);
 };
@@ -55,6 +56,22 @@ try {
   check("…the earliest first call on the total line", (await firstOf(sean, "total")) === "7:41 AM", await firstOf(sean, "total"));
   await sean.ev(`document.querySelector('[data-call-scope-link="me"]').click()`);
   check("and back to Mine", Boolean(await until(async () => JSON.stringify(await rowsOf(sean)) === JSON.stringify([String(SEAN), "total"]), { timeout: 15000 })));
+
+  section("The day's calls as a chart (yesterday, a whole day)");
+  call(SEAN, "07:41", 60, yesterday);
+  call(SEAN, "10:05", 30, yesterday);
+  call(MIKE, "09:15", 120, yesterday);
+  await sean.go(`/?cs=team&cd=${yesterday}`, 8000);
+  await until(() => sean.ev(`!!document.querySelector('[data-call-chart-open]')`), { timeout: 15000 });
+  await sean.ev(`document.querySelector('[data-call-chart-open]').click()`);
+  const summary = () => sean.ev(`document.querySelector('[data-call-chart-summary]')?.textContent ?? null`);
+  check("Chart, beside the day: everyone's calls to begin with", /^3 calls/.test((await until(summary, { timeout: 10000 })) ?? ""), await summary());
+  check("…drawn as a line", await sean.ev(`(document.querySelector('[data-call-chart-line]')?.getAttribute('points') ?? '').split(' ').length > 20`));
+  await sean.fill("[data-call-chart-who]", String(SEAN));
+  check("one manager chosen: theirs, the first call's half hour, and their longest gap named",
+    Boolean(await until(async () => /^2 calls · first 7:30 AM–8:00 AM · longest gap 8:00 AM – 10:00 AM \(2h\)/.test((await summary()) ?? ""))), await summary());
+  check("…shaded on the chart", await sean.ev(`!!document.querySelector('[data-call-chart] [data-gap]')`));
+  await sean.key("Escape");
 
   section("An administrator's dashboard: everyone");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1500, height: 1000 });

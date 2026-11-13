@@ -7,6 +7,7 @@ import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import CallTimesChart from "@/features/dashboard/components/call-times-chart";
 
 // How often the numbers are asked for again while the card shows today.
 const REFRESH_MS = 20_000;
@@ -113,6 +114,11 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
             </span>
           ) : null}
           {nav}
+          {/* A day's calls added up through the day, for everyone here or one person (Sean, Nov 2026). */}
+          {view.key === "day" ? (
+            <CallTimesChart day={view.anchor} today={view.today} scope={scope} userId={userId} timeZone={timeZone}
+              people={rows.filter((r) => r.userId).map((r) => ({ id: r.userId, name: r.name }))} />
+          ) : null}
         </span>
       </div>
       <div className="overflow-x-auto">
