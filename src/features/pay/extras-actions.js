@@ -96,17 +96,40 @@ function tiers(formData, plan) {
   return { tiers: out };
 }
 
+/**
+ * The appointment managers' weekly scale from the form: "from 21 valid, $5 each" rows (from_N / each_N),
+ * the empty ones left out, each step starting higher than the last.
+ */
+function scale(formData, plan) {
+  const out = [];
+  for (let i = 0; i < 6; i += 1) {
+    const from = String(formData.get(`${plan}_from_${i}`) ?? "").trim();
+    const each = String(formData.get(`${plan}_each_${i}`) ?? "").trim();
+    if (!from && !each) continue;
+    const n = Number.parseInt(from, 10);
+    const a = money(each);
+    if (!(n > 0) || !(a > 0)) return { error: `Each step needs where it starts and its amount (row ${i + 1})` };
+    out.push({ from: n, each: a });
+  }
+  out.sort((x, y) => x.from - y.from);
+  if (out.some((s, i) => i && s.from === out[i - 1].from)) return { error: "Two steps start at the same count" };
+  return { scale: out };
+}
+
 /** Settings › Bonus plans: each plan's tiers, and the days in a pay period's first half. Administrators. */
 export async function saveBonusPlans(prevState, formData) {
   const supabase = await createClient();
   const me = await currentAppUser(supabase);
   if (me?.role !== "admin" || me.status !== "active") return fail("Only administrators can change the bonus plans.");
   const value = {};
-  for (const plan of ["lead_weekly", "appt_weekly", "appt_monthly"]) {
+  for (const plan of ["lead_weekly", "appt_monthly"]) {
     const t = tiers(formData, plan);
     if (t.error) return fail(t.error, { [plan]: t.error });
     value[plan] = t.tiers;
   }
+  const weekly = scale(formData, "appt_weekly_scale");
+  if (weekly.error) return fail(weekly.error, { appt_weekly_scale: weekly.error });
+  value.appt_weekly_scale = weekly.scale;
   const first = Number.parseInt(String(formData.get("first_days") ?? "5"), 10);
   if (!(first >= 1 && first <= 30)) return fail("The first half is 1 to 30 days", { first_days: "1 to 30 days" });
   value.first_days = first;

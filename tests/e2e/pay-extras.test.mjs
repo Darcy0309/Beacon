@@ -32,6 +32,7 @@ const leadB = Number(sql(`insert into public.leads (company_name, project_id, as
 sql(`insert into public.insurance_details (lead_id, ultimate_xdate) values (${leadB}, '2027-01-01')`);
 const events = (leadId) => JSON.parse(sql(`select coalesce(json_agg(json_build_object('user', user_id, 'kind', kind, 'amount', amount::float) order by id), '[]') from public.pay_events where lead_id = ${leadId}`));
 
+const plansBefore = sql("select value::text from public.app_settings where key = 'bonus_plans'") || null;
 const browser = await launchBrowser();
 try {
   section("Dec Sheet Pay on a lead");
@@ -95,6 +96,11 @@ try {
   section("Settings › Bonus Plans, and the Pay report");
   await admin.go("/settings", 6000);
   check("the bonus plans, with their tiers", Boolean(await until(() => admin.ev(`(() => { const c = document.querySelector('[data-bonus-plans]'); return !!c && c.querySelector('[name="lead_weekly_at_0"]')?.value === '50' && c.querySelector('[name="appt_monthly_amount_1"]')?.value === '500'; })()`))));
+  check("…and the appointment managers' weekly scale: from 21 on $5 each, from 31 on $10 each", await admin.ev(`(() => { const c = document.querySelector('[data-bonus-plans]');
+    return ['appt_weekly_scale_from_0', 'appt_weekly_scale_each_0', 'appt_weekly_scale_from_1', 'appt_weekly_scale_each_1'].map((n) => c.querySelector('[name="' + n + '"]')?.value).join() === '21,5,31,10'; })()`));
+  await admin.click("[data-bonus-plans] button[type=submit]", "Save");
+  check("saved as it reads", /Bonus plans saved/.test((await admin.waitToast(/Bonus plans/)) ?? "")
+    && sql("select value->'appt_weekly_scale' = '[{\"from\": 21, \"each\": 5}, {\"from\": 31, \"each\": 10}]'::jsonb from public.app_settings where key = 'bonus_plans'") === "t");
   await admin.go(`/reports/pay?user=${SEAN}`, 8000);
   const summary = await until(() => admin.ev(`document.querySelector('[data-pay-summary="${SEAN}"]')?.innerText ?? null`));
   check("Sean's summary: his dec sheet and Special Pay", /Dec sheets\s*\d+\s*\$/.test(summary ?? "") && /Special Pay asked for\s*\d+\s*\$/.test(summary ?? ""), summary);
@@ -104,7 +110,9 @@ try {
   await sleep(200);
 } finally {
   browser.close();
-  const leads = `select id from public.leads where project_id in (${DBDV}, ${APPT})`;
+  sql(plansBefore ? `insert into public.app_settings (key, value) values ('bonus_plans', ${lit(plansBefore)}::jsonb) on conflict (key) do update set value = excluded.value`
+    : "delete from public.app_settings where key = 'bonus_plans'");
+  const leads =`select id from public.leads where project_id in (${DBDV}, ${APPT})`;
   sql(`delete from public.notifications where (title like ${lit(`%${TAG}%`)} or title like 'Special Pay%') and created_at > now() - interval '1 hour'`);
   sql(`delete from public.special_pay_requests where lead_id in (${leads})`);
   sql(`delete from public.pay_events where lead_id in (${leads})`);

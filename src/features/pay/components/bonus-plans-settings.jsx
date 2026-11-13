@@ -13,8 +13,8 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
 const ROWS = 4;
 
 const PLANS = [
-  { key: "lead_weekly", title: "Lead manager · each half of a pay period", count: "units", note: "Paid on that pay period's check." },
-  { key: "appt_weekly", title: "Appointment manager · each half of a pay period", count: "valid appts", note: "Appointments set in the half, less any found invalid: paid on the next pay period's check." },
+  { key: "lead_weekly", title: "Lead manager · each half of a pay period", count: "units", note: "Paid on that pay period's check. Leads found invalid later count against the half they were earned in; a bonus that drops a tier is taken back on the pay period they're found in." },
+  { key: "appt_weekly_scale", scale: true, title: "Appointment manager · each half of a pay period", count: "valid appts", note: "Each valid appointment set in the half from a step on pays that step's amount (21 to 30: $5 each, 31 on: $10 each). Less any found invalid, paid on the next pay period's check." },
   { key: "appt_monthly", title: "Appointment manager · each month", count: "valid appts", note: "Appointments set in the month, less any found invalid: paid once a tier is reached and those appointments' dates have passed." },
 ];
 
@@ -44,6 +44,15 @@ export default function BonusPlansSettings({ rules }) {
               <legend className="px-1 text-xs font-semibold">{p.title}</legend>
               {Array.from({ length: ROWS }, (_, i) => {
                 const t = saved?.[p.key]?.[i];
+                if (p.scale) return (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <span className="text-xs text-muted-foreground">From</span>
+                    <Input name={`${p.key}_from_${i}`} type="number" min={1} defaultValue={t?.from ?? ""} placeholder="—" className="w-20" aria-label={`Step ${i + 1}: from`} />
+                    <span className="text-xs text-muted-foreground">on: $</span>
+                    <Input name={`${p.key}_each_${i}`} inputMode="decimal" defaultValue={t?.each ?? ""} placeholder="—" className="w-20" aria-label={`Step ${i + 1}: each`} />
+                    <span className="text-xs text-muted-foreground">each</span>
+                  </div>
+                );
                 return (
                   <div key={i} className="flex items-center gap-2 text-sm">
                     <Input name={`${p.key}_at_${i}`} type="number" min={1} defaultValue={t?.at ?? ""} placeholder="—" className="w-20" aria-label={`Tier ${i + 1}: ${p.count}`} />

@@ -146,7 +146,7 @@ try {
 
   section("A lead manager's units bonus");
   {
-    setPlans({ lead_weekly: [{ at: 50, amount: 50 }, { at: 75, amount: 75 }], appt_weekly: [{ at: 3, amount: 40 }], appt_monthly: [{ at: 3, amount: 300 }, { at: 4, amount: 500 }] });
+    setPlans({ lead_weekly: [{ at: 50, amount: 50 }, { at: 75, amount: 75 }], appt_weekly_scale: [{ from: 3, each: 20 }], appt_monthly: [{ at: 3, amount: 300 }, { at: 4, amount: 500 }] });
     profile(SEAN, { bonus_plan: "lead" });
     const before = one(`select coalesce(sum(public.bonus_units(${SEAN}, h.s, h.e)), 0)::float as u from (select case when ${lit(today)}::date < p.starts_on + 5 then p.starts_on else p.starts_on + 5 end as s,
       case when ${lit(today)}::date < p.starts_on + 5 then least(p.starts_on + 4, p.ends_on) else p.ends_on end as e from public.pay_period_of(${lit(today)}::date) p) h`)?.u ?? 0;
@@ -176,6 +176,49 @@ try {
       && Math.abs(Number(row.pay) - (Number(row.commission) + Number(row.bonus)) - (row.pay_model === "hybrid" ? Math.max(0, Number(row.hourly_pay) - Number(row.commission)) : 0)) < 0.01,
       report.error?.message ?? JSON.stringify(row));
     check("…its dec sheets, corrections and Special Pay too", Number(row?.dec_sheets) >= 1 && Number(row?.request_pay) >= 20, JSON.stringify(row));
+  }
+
+  section("A units bonus taken back when its leads are found invalid later (Sean, Nov 2026)");
+  {
+    profile(MIKE, { bonus_plan: "lead" });
+    const p = one(`select p.starts_on::text as s, p.ends_on::text as e, n.starts_on::text as ns, n.ends_on::text as ne
+      from public.pay_period_of((select starts_on - 1 from public.pay_period_of(${lit(today)}::date))) p, public.pay_period_of(${lit(today)}::date) n`);
+    const half = `${lit(p.s)}::date, least(${lit(p.s)}::date + 4, ${lit(p.e)}::date)`;
+    const units = () => Number(sql(`select public.bonus_units(${MIKE}, ${half})`));
+    const base = units();
+    const id = newLead(DBDV, MIKE);
+    // 50 units in last period's first half, paid then.
+    const paid = [];
+    for (let i = 0; i < Math.max(0, 50 - base); i += 1) paid.push(Number(sql(`insert into public.pay_events (user_id, project_id, lead_id, kind, amount, created_at)
+      values (${MIKE}, ${DBDV}, ${id}, 'lead', 10, (${lit(p.s)}::date + interval '10 hours') at time zone public.business_tz()) returning id`)));
+    const lastPeriod = () => all(`select plan, amount::float as amount from public.pay_bonuses(${lit(p.s)}, ${lit(p.e)}, ${MIKE}) where plan like 'lead%'`);
+    const thisPeriod = () => all(`select plan, amount::float as amount, counted::float as counted, from_day::text from public.pay_bonuses(${lit(p.ns)}, ${lit(p.ne)}, ${MIKE}) where plan = 'lead_adjust'`);
+    check("50 units last period: $50 on last period's check", base < 50 && lastPeriod().some((b) => b.plan === "lead" && b.amount === 50), `${base} ${JSON.stringify(lastPeriod())}`);
+    check("…nothing to take back yet", !thisPeriod().length, JSON.stringify(thisPeriod()));
+    const nowHalf = `(select case when ${lit(today)}::date < starts_on + 5 then starts_on else starts_on + 5 end from public.pay_period_of(${lit(today)}::date)), (select case when ${lit(today)}::date < starts_on + 5 then least(starts_on + 4, ends_on) else ends_on end from public.pay_period_of(${lit(today)}::date))`;
+    const nowUnits = Number(sql(`select public.bonus_units(${MIKE}, ${nowHalf})`));
+    // Three of those leads found invalid today: charged back.
+    for (const orig of paid.slice(0, 3)) sql(`insert into public.pay_events (user_id, project_id, lead_id, kind, amount, reverses_id, note) values (${MIKE}, ${DBDV}, ${id}, 'lead', -10, ${orig}, 'Lead invalid')`);
+    check("the leads come off the half they were earned in: 47 units", units() === 47, String(units()));
+    check("…not off this half's", Number(sql(`select public.bonus_units(${MIKE}, ${nowHalf})`)) === nowUnits);
+    check("last period's check stays as it was paid: $50", lastPeriod().some((b) => b.plan === "lead" && b.amount === 50) && !lastPeriod().some((b) => b.plan === "lead_adjust"), JSON.stringify(lastPeriod()));
+    check("…and the $50 is taken back on this period's", thisPeriod().some((b) => b.amount === -50 && b.counted === 47 && b.from_day === p.s), JSON.stringify(thisPeriod()));
+    const report = await admin.sb.rpc("pay_report", { p_from: p.ns, p_to: p.ne, p_user: MIKE });
+    check("…which the pay report takes off this period's bonus", !report.error && Number(report.data?.[0]?.bonus) <= -50, report.error?.message ?? JSON.stringify(report.data?.[0]));
+    sql(`delete from public.pay_events where lead_id = ${id}`);
+    profile(MIKE, { bonus_plan: null });
+  }
+
+  section("An appointment manager's week, on the scale (21 to 30: $5 each, 31 on: $10 each)");
+  {
+    const scale = (n) => Number(sql(`select public.bonus_scale('[{"from": 21, "each": 5}, {"from": 31, "each": 10}]'::jsonb, ${n})`));
+    check("Sean's sheet: 20 = $0, 21 = $5, 28 = $40, 30 = $50, 31 = $60, 32 = $70, 35 = $100, 50 = $250",
+      JSON.stringify([20, 21, 28, 30, 31, 32, 35, 50].map(scale)) === JSON.stringify([0, 5, 40, 50, 60, 70, 100, 250]), JSON.stringify([20, 21, 28, 30, 31, 32, 35, 50].map(scale)));
+    const set = sql("select value::text from public.app_settings where key = 'bonus_plans'");
+    setPlans({});
+    const defaults = one("select public.bonus_rules()->'appt_weekly_scale' as s")?.s;
+    setPlans(JSON.parse(set));
+    check("…which is the plan out of the box", JSON.stringify(defaults?.map((x) => [x.from, x.each])) === JSON.stringify([[21, 5], [31, 10]]), JSON.stringify(defaults));
   }
 
   section("An appointment manager's week, paid the period after");

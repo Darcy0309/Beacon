@@ -268,7 +268,8 @@ export default async function PayReport({ searchParams }) {
 }
 
 const PLAN_LABEL = { lead: "Lead manager", appointment: "Appointment manager" };
-const BONUS_LABEL = { lead: "Units", appt_weekly: "Valid appointments", appt_monthly: "Monthly valid appointments" };
+// lead_adjust: an earlier half's units bonus taken back, its leads found invalid since (a minus amount).
+const BONUS_LABEL = { lead: "Units", lead_adjust: "Units bonus taken back", appt_weekly: "Valid appointments", appt_monthly: "Monthly valid appointments" };
 
 /**
  * One person's production for the period (Sean, Nov 2026): what they were paid for, counted, with
@@ -305,9 +306,9 @@ function PaySummary({ person: p, bonuses }) {
               {bonuses.map((b) => (
                 <li key={`${b.plan}:${b.from}:${b.counted}`} className="flex items-baseline justify-between gap-3" data-bonus-line={b.plan}>
                   <span>
-                    {b.plan === "appt_monthly" ? b.label : BONUS_LABEL[b.plan]} <span className="text-muted-foreground">· {range(b)} · {b.counted.toLocaleString()}</span>
+                    {b.plan === "appt_monthly" ? b.label : BONUS_LABEL[b.plan]} <span className="text-muted-foreground">· {range(b)} · {b.counted.toLocaleString()}{b.plan === "lead_adjust" ? " units now" : ""}</span>
                   </span>
-                  <span className="font-semibold tabular-nums text-emerald-500">{usd(b.amount)}</span>
+                  <span className={`font-semibold tabular-nums ${b.amount < 0 ? "text-destructive" : "text-emerald-500"}`}>{usd(b.amount)}</span>
                 </li>
               ))}
             </ul>
