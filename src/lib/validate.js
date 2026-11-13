@@ -386,6 +386,10 @@ export const schemas = {
     // How an account manager or agent is paid. The hourly range is the one in Settings, checked by the database.
     pay_model: [oneOf(PAY_MODEL_KEYS, "Choose how they are paid")],
     hourly_rate: [num({ min: 0, max: 1000 })],
+    // Their own appointment and confirmation pay, and their bonus plan (Sean, Nov 2026).
+    appointment_rate: [num({ min: 0, max: 1000 })],
+    confirmation_rate: [num({ min: 0, max: 1000 })],
+    bonus_plan: [oneOf(["", "lead", "appointment"], "Choose a bonus plan")],
     // A new account: an emailed invitation link, or a temporary password the administrator gives them.
     access: [oneOf(["invite", "password"])],
     temp_password: [rules.custom((v) => (v && (String(v).length < 10 || String(v).length > 72) ? "A temporary password is 10 to 72 characters" : null))],
@@ -446,6 +450,8 @@ export const schemas = {
     duration_min: [oneOf(DURATIONS, "Choose a duration")],
     rep_name: [max(80)],
     corrected_xdate: [date],
+    // Lead-Corrected on a lead with no developer: the lead manager who developed it, or 0 for nobody (Sean, Nov 2026).
+    lead_manager: [rules.pattern(/^\d{1,18}$/, "Choose the lead manager who developed this lead")],
     // A Lead or an Appointment needs it; the action says so when it is missing.
     ultimate_xdate: [date],
   },

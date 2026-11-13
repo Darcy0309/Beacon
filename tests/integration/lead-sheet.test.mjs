@@ -128,11 +128,23 @@ try {
     (${past}, ${DBDV}, ${SEAN}, 'Viable-CallBack', '10/2/26 seanf: second', now() - interval '1 day'),
     (${past}, ${DBDV}, ${SEAN}, 'Viable-CallBack', '10/1/26 seanf: first', now() - interval '2 days')`);
   const migration = readFileSync(new URL("../../supabase/migrations/20261019100000_call_notes_history.sql", import.meta.url), "utf8");
+  // The functions it defines are older than today's (record_call_result has been redefined since, its
+  // arguments too): kept as they are now, and put back after, so the run leaves the database as it was.
+  const fns = [...new Set([...migration.matchAll(/function\s+public\.(\w+)\s*\(/gi)].map((m) => m[1]))];
+  const kept = JSON.parse(sql(`select coalesce(json_agg(json_build_object('sig', p.oid::regprocedure::text, 'def', pg_get_functiondef(p.oid))), '[]')
+    from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any(${lit(`{${fns.join(",")}}`)}::text[])`));
+  const putBack = () => {
+    const now = JSON.parse(sql(`select coalesce(json_agg(p.oid::regprocedure::text), '[]') from pg_proc p
+      where p.pronamespace = 'public'::regnamespace and p.proname = any(${lit(`{${fns.join(",")}}`)}::text[])`));
+    for (const sig of now) if (!kept.some((k) => k.sig === sig)) sql(`drop function ${sig}`);
+    for (const k of kept) sql(k.def);
+  };
   sql(migration);
   check("calls made before are added to the internal notes, oldest first",
     internal(past) === "Old system: 7-31-26 MP vm\n10/1/26 seanf: first\n10/2/26 seanf: second", internal(past));
   sql(migration);
   check("…once: running it again adds nothing", internal(past) === "Old system: 7-31-26 MP vm\n10/1/26 seanf: first\n10/2/26 seanf: second", internal(past));
+  putBack();
 
   section("“Moved” only when it moved");
   await record(mike, lead, "APPT", "Appointment", { p_appointment: { date: day(3), time: "10:00 AM" } });

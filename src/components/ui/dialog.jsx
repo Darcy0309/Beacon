@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, useSyncExternalStore } from "react";
+import { createContext, isValidElement, useCallback, useContext, useState, useSyncExternalStore } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import { X } from "lucide-react";
@@ -36,8 +36,29 @@ function Dialog({ open: openProp, defaultOpen = false, onOpenChange, children, .
     </DialogState.Provider>
   );
 }
-function DialogTrigger(props) {
-  return <DialogPrimitive.Trigger {...props} />;
+const LAZY = Symbol.for("react.lazy");
+
+/**
+ * The button that opens a dialog. A page often builds that button on the server (trigger={<Button>Edit</Button>});
+ * on a busy page it reaches the browser as a reference to it (a lazy element, sometimes one inside another), which
+ * Radix can't attach to ("Primitive.button failed to slot onto its children"): that took the whole page down
+ * (Nov 2026: the lead sheet, the Projects list). It is unwrapped here as React itself would (waiting, if it must,
+ * like any lazy element), so the button is the same one the server drew; anything still not an element is wrapped
+ * in a span that takes no space of its own, for the dialog to open from.
+ */
+function DialogTrigger({ asChild, children, ...props }) {
+  let child = children;
+  for (let i = 0; asChild && i < 5 && child?.$$typeof === LAZY && typeof child._init === "function"; i += 1) {
+    child = child._init(child._payload);
+  }
+  if (asChild && !isValidElement(child)) {
+    return (
+      <DialogPrimitive.Trigger asChild {...props}>
+        <span className="contents">{child}</span>
+      </DialogPrimitive.Trigger>
+    );
+  }
+  return <DialogPrimitive.Trigger asChild={asChild} {...props}>{child}</DialogPrimitive.Trigger>;
 }
 function DialogClose(props) {
   return <DialogPrimitive.Close {...props} />;

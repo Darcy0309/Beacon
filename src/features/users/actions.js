@@ -36,6 +36,15 @@ async function savePay(supabase, userId, role, formData, values) {
     const raw = s(formData, "hourly_rate");
     row.hourly_rate = raw === null ? null : Math.round(Number(raw.replace(/[$,\s]/g, "")) * 100) / 100;
   }
+  // Their own appointment and confirmation rates (blank: each project's), and their bonus plan (Sean, Nov 2026).
+  for (const key of ["appointment_rate", "confirmation_rate"]) {
+    if (!formData.has(key)) continue;
+    const raw = s(formData, key);
+    const v = raw === null ? null : Math.round(Number(raw.replace(/[$,\s]/g, "")) * 100) / 100;
+    if (v !== null && !(v >= 0 && v <= 1000)) return fail("Enter a rate from $0 to $1,000", { [key]: "From $0 to $1,000" }, values);
+    row[key] = v;
+  }
+  if (formData.has("bonus_plan")) row.bonus_plan = ["lead", "appointment"].includes(s(formData, "bonus_plan")) ? s(formData, "bonus_plan") : null;
   const { error } = await supabase.from("pay_profiles").upsert(row, { onConflict: "user_id" });
   if (!error) return null;
   return fail(error, /hourly rate/i.test(error.message) ? { hourly_rate: error.message } : null, values);

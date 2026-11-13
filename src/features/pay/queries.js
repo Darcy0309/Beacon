@@ -43,9 +43,14 @@ export const getPayRules = cache(async function getPayRules() {
 /** How each person is paid, by user id (administrators see everyone's; anyone else only their own). */
 export async function getPayProfiles() {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("pay_profiles").select("user_id, pay_model, hourly_rate");
+  const { data, error } = await supabase.from("pay_profiles").select("user_id, pay_model, hourly_rate, appointment_rate, confirmation_rate, bonus_plan");
   if (error) throw error;
-  return new Map((data ?? []).map((p) => [p.user_id, { model: p.pay_model, rate: p.hourly_rate == null ? null : n(p.hourly_rate) }]));
+  const money = (v) => (v == null ? null : n(v));
+  return new Map((data ?? []).map((p) => [p.user_id, {
+    model: p.pay_model, rate: money(p.hourly_rate),
+    // Their own appointment and confirmation rates, and their bonus plan (Sean, Nov 2026).
+    apptRate: money(p.appointment_rate), confRate: money(p.confirmation_rate), plan: p.bonus_plan ?? null,
+  }]));
 }
 
 /**
@@ -65,6 +70,11 @@ export async function getPayReport({ from, to, userId = null }) {
     // Hourly pay applies to hybrid pay only; a rate kept on a commission profile earns nothing.
     const hourlyPay = r.pay_model === "hybrid" ? n(r.hourly_pay) : 0;
     const specialPay = n(r.special_goal_pay);
+    // Dec Sheet Pay, Lead-Corrected and Special Pay requests (Sean, Nov 2026): pay events too, shown on their own.
+    const decSheetPay = n(r.dec_sheet_pay);
+    const correctedPay = n(r.corrected_pay);
+    const requestPay = n(r.request_pay);
+    const extras = Math.round((decSheetPay + correctedPay + requestPay) * 100) / 100;
     return {
       id: r.user_id,
       name: fullName(r) || r.email,
@@ -76,8 +86,18 @@ export async function getPayReport({ from, to, userId = null }) {
       paidMinutes,
       hourlyPay,
       // Every pay event in the period is the commission side; Special Pay is shown on its own.
-      commission: Math.round((n(r.commission) - specialPay) * 100) / 100,
+      commission: Math.round((n(r.commission) - specialPay - extras) * 100) / 100,
       specialPay,
+      extras,
+      decSheets: n(r.dec_sheets),
+      decSheetPay,
+      corrected: n(r.corrected),
+      correctedPay,
+      requests: n(r.requests),
+      requestPay,
+      // Bonuses paid in the period (pay_bonuses()), on top of the pay; and their plan.
+      bonus: n(r.bonus),
+      plan: r.bonus_plan ?? null,
       specials: n(r.specials),
       pay,
       // Which side of a hybrid won, for the report to say so.
@@ -101,4 +121,55 @@ export async function getWorkDays({ from, to, userId }) {
     .filter((d) => d.user_id === userId)
     .map((d) => ({ day: d.day, worked: n(d.worked), paid: n(d.paid), hours: (d.hours ?? []).map((h) => ({ hour: n(h.hour), minutes: n(h.minutes), paid: n(h.paid) })) }))
     .sort((a, b) => a.day.localeCompare(b.day));
+}
+
+/**
+ * A lead's Special Pay requests (Sean, Nov 2026) its viewer may see (their own, those sent to them to
+ * decide, or every one for an administrator), newest first; `canDecide`: theirs to approve or decline.
+ */
+export async function getLeadSpecialPay(leadId, me) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("special_pay_requests")
+    .select(`id, amount, approved_amount, reason, status, decision_note, created_at, user_id, decider_id,
+      asker:users!special_pay_requests_user_id_fkey(first_name, last_name, email),
+      decider:users!special_pay_requests_decider_id_fkey(first_name, last_name, email),
+      decided:users!special_pay_requests_decided_by_fkey(first_name, last_name, email)`)
+    .eq("lead_id", Number(leadId))
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const one = (v) => (Array.isArray(v) ? v[0] : v);
+  const name = (u) => (u ? fullName(u) || u.email : null);
+  return (data ?? []).map((q) => ({
+    id: q.id,
+    amount: n(q.amount),
+    approvedAmount: q.approved_amount == null ? null : n(q.approved_amount),
+    reason: q.reason,
+    status: q.status,
+    note: q.decision_note,
+    at: q.created_at,
+    by: name(one(q.asker)) ?? "A manager",
+    decider: name(one(q.decider)) ?? "the administrators",
+    decidedBy: name(one(q.decided)),
+    canDecide: q.status === "pending" && (me?.role === "admin" || (q.decider_id === me?.id && q.user_id !== me?.id)),
+  }));
+}
+
+/** The bonus plans (bonus_rules(): Settings, with the defaults for any not set). */
+export async function getBonusRules() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bonus_rules");
+  if (error) throw error;
+  return data;
+}
+
+/** The bonuses paid in the pay periods ending p_from..p_to (pay_bonuses()), each with its days and count. */
+export async function getPayBonuses({ from, to, userId = null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("pay_bonuses", { p_from: from, p_to: to, p_user: userId });
+  if (error) throw error;
+  return (data ?? []).map((b) => ({
+    userId: b.user_id, plan: b.plan, label: b.label, from: b.from_day, to: b.to_day,
+    counted: n(b.counted), amount: n(b.amount), paidFrom: b.paid_from, paidTo: b.paid_to,
+  }));
 }

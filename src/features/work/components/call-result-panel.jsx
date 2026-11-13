@@ -41,7 +41,7 @@ const GROUPS = [
  * stays on the sheet (Sean, Nov 2026: to email them about it, which needs it
  * saved, or check it over), and Next name on the call list bar moves on.
  */
-export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null, calendarProjectId = null, holdOnWin = false }) {
+export default function CallResultPanel({ leadId, listId, projectType, results, followUp, ultimateXdate = null, renewalHint = null, clientNote = "", currentAppt = null, timeZone = null, calendarProjectId = null, holdOnWin = false, correction = null }) {
   // The slot being chosen for an appointment is told to the warning under it (taken, or blocked out, on the project's calendar).
   const [slotControl, tellSlot] = useSlotControl();
   const router = useNavigationRouter();
@@ -209,6 +209,23 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
                   <DatePicker name="corrected_xdate" required defaultValue={dv("corrected_xdate")} invalid={invalid("corrected_xdate")}
                     aria-label="Corrected renewal date" placeholder="e.g. 11/1 or Nov 1" future />
                 </Field>
+              ) : null}
+              {/* Lead-Corrected pay (Sean, Nov 2026): the lead manager who developed it loses its lead pay, the corrector gets it. */}
+              {picked.effect === "correct_xdate" && correction ? (
+                correction.developer ? (
+                  <p data-correction-developer className="col-span-2 text-xs text-muted-foreground">
+                    Developed by <span className="font-medium text-foreground">{correction.developer}</span>: their lead pay for it moves to you.
+                  </p>
+                ) : (
+                  <Field label="Lead manager who developed it" required className="col-span-2" error={fe("lead_manager")}
+                    hint="Their lead pay for it moves to you. Check the notes for their name or initials.">
+                    <Select name="lead_manager" required defaultValue={dv("lead_manager", "")} aria-invalid={invalid("lead_manager")} data-lead-manager>
+                      <option value="" disabled>Choose…</option>
+                      {correction.managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      <option value="0">Nobody: not a lead we developed</option>
+                    </Select>
+                  </Field>
+                )
               ) : null}
             </div>
 

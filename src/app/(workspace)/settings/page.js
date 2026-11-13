@@ -4,7 +4,8 @@ import { getSettings } from "@/features/settings/queries";
 import PayRulesForm from "@/features/pay/components/pay-rules-form";
 import PaySchedule from "@/features/pay/components/pay-schedule";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
-import { getPayRules } from "@/features/pay/queries";
+import { getBonusRules, getPayRules } from "@/features/pay/queries";
+import BonusPlansSettings from "@/features/pay/components/bonus-plans-settings";
 import { mailServerInfo } from "@/lib/server/mail";
 import SicCodesCard from "@/features/sic/components/sic-codes-card";
 import CargoTypesCard from "@/features/cargo/components/cargo-types-card";
@@ -24,7 +25,7 @@ export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting] = await Promise.all([
+  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting, bonusRules] = await Promise.all([
     getSettings(), getPayRules(), getBusinessToday(),
     supabase.from("sic_codes").select("code", { count: "exact", head: true }),
     getDeletedRecords(),
@@ -32,6 +33,7 @@ export default async function SettingsPage() {
     getAllEmailTemplates(),
     getBusinessTimeZone(),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("appt_texts", true).is("deleted_at", null),
+    getBonusRules(),
   ]);
 
   return (
@@ -49,6 +51,8 @@ export default async function SettingsPage() {
         <IdleSettings minutes={settings.security?.idle_minutes} />
         <PayRulesForm rules={payRules} />
         <PaySchedule periods={payRules.time.schedule} today={today} editable />
+        {/* The lead and appointment managers' bonus plans (Sean, Nov 2026). */}
+        <BonusPlansSettings rules={bonusRules} />
         <SicCodesCard count={sic.count ?? 0} />
         <CargoTypesCard types={cargo} />
         <DeletedRecordsCard records={deleted} />

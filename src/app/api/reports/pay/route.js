@@ -26,6 +26,11 @@ const PEOPLE = [
   ["Hourly pay (USD)", (p) => money(p.hourlyPay), true],
   ["Commission (USD)", (p) => money(p.commission), true],
   ["Special Pay (USD)", (p) => money(p.specialPay), true],
+  // Sean, Nov 2026: dec sheets, Lead-Corrected, Special Pay asked for, and bonuses.
+  ["Dec Sheet Pay (USD)", (p) => money(p.decSheetPay), true],
+  ["Lead-Corrected pay (USD)", (p) => money(p.correctedPay), true],
+  ["Special Pay asked for (USD)", (p) => money(p.requestPay), true],
+  ["Bonus (USD)", (p) => money(p.bonus), true],
   ["Pay due (USD)", (p) => money(p.pay), true],
   ["Paid by", (p) => (p.model === "hybrid" ? (p.paidBy === "hourly" ? "Hourly" : "Commission") : "Commission")],
   ["Pay per hour (USD)", (p) => (p.perHour == null ? "" : money(p.perHour))],
@@ -34,6 +39,9 @@ const PEOPLE = [
   ["Appointments", (p) => p.appointments, true],
   ["Confirmations", (p) => p.confirmations, true],
   ["Chargebacks", (p) => p.chargebacks, true],
+  ["Dec sheets", (p) => p.decSheets, true],
+  ["Lead-Corrected", (p) => p.corrected, true],
+  ["Special Pay requests", (p) => p.requests, true],
 ];
 
 const DAYS = [

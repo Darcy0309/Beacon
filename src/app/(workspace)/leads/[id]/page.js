@@ -1,7 +1,7 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { ArrowLeft, ArrowRight, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, Printer, Repeat } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeDollarSign, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, Printer, Repeat } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import Tabs from "@/components/shared/tabs";
@@ -46,6 +46,9 @@ import { backFrom } from "@/lib/back-link";
 import { emailSignature } from "@/lib/email";
 import { apptDateText } from "@/lib/email-templates";
 import { one } from "@/lib/server/query-helpers";
+import { DecSheetToggle, SpecialPayRequests } from "@/features/pay/components/lead-pay-extras";
+import { getLeadSpecialPay } from "@/features/pay/queries";
+import SectionHeader from "@/components/shared/section-header";
 import ProjectInfoView from "@/features/project-info/components/project-info-view";
 import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
 import { getProjectInfo } from "@/features/project-info/queries";
@@ -250,6 +253,8 @@ export default async function LeadSheet({ params, searchParams }) {
       seesInternal || client ? getLeadAppointmentUpdates(lead.id) : [],
       // Its calls on the Lighthouse phone and its texts (Nov 2026): the staff's Conversation tab.
       staff ? getLeadConversation(lead.id) : null,
+      // Special Pay asked for on it (Sean, Nov 2026): the asker's, the Sales Rep's to decide, an administrator's.
+      staff ? getLeadSpecialPay(lead.id, me) : [],
     ]);
   });
   const [lead, activity, me, results, openAppt, today, tz, rest] = await Promise.all([
@@ -266,7 +271,7 @@ export default async function LeadSheet({ params, searchParams }) {
   const seesInternal = ["admin", "manager"].includes(me?.role);
 
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates, conversation] = rest;
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates, conversation, specialPay] = rest;
   const client = me?.role === "client";
   // A client's Call Result: the lead's latest appointment, as their Appointments list has it.
   const latestAppt = leadAppts[0] ?? null;
@@ -285,6 +290,8 @@ export default async function LeadSheet({ params, searchParams }) {
     : null;
 
   const canRecord = admin || r.assigned?.id === me?.id || Boolean(inProject) || Boolean(followUp);
+  // Who decides a Special Pay request on it: the Sales Rep of its project's client (else the administrators).
+  const salesRep = one(r.project?.company)?.sales_rep_id ?? null;
   // A Text button by each number (Nov 2026): when the Conversation's box can text from here.
   const texting = Boolean(conversation) && canRecord && Boolean(twilioConfig());
   // An appointment found invalid, its lead not since given another (Sean, Oct 2026: "call next year"):
@@ -624,7 +631,17 @@ export default async function LeadSheet({ params, searchParams }) {
                   id: "files",
                   label: "Policy Files",
                   count: files.length || null,
-                  content: <LeadFiles leadId={lead.id} initial={files} canDelete={staff} />,
+                  content: (
+                    <>
+                      {/* Dec Sheet Pay (Sean, Nov 2026): the policy information attached here, then ticked. */}
+                      {staff ? (
+                        <DecSheetToggle leadId={lead.id} rate={r.project?.dec_sheet_rate ?? 10}
+                          marked={r.dec_sheet_at ? { at: r.dec_sheet_at, by: one(r.dec_sheet_by) ? fullName(one(r.dec_sheet_by)) : null } : null}
+                          canUntick={admin || one(r.dec_sheet_by)?.id === me?.id} />
+                      ) : null}
+                      <LeadFiles leadId={lead.id} initial={files} canDelete={staff} />
+                    </>
+                  ),
                 },
               ]}
             />
@@ -684,11 +701,24 @@ export default async function LeadSheet({ params, searchParams }) {
                   timeZone={tz}
                   calendarProjectId={calendar?.projectId ?? null}
                   holdOnWin={seesInternal}
+                  correction={{
+                    developer: r.developer ? fullName(r.developer) : null,
+                    managers: staffList.filter((p) => p.id !== me?.id && p.role !== "Agent").map((p) => ({ id: p.id, name: p.name })),
+                  }}
                 />
               </PartBoundary>
             ) : staff ? (
               <Card className="p-5 text-sm text-muted-foreground">
                 Results on this name are recorded by {lead.rep === "Unassigned" ? "the reps on its project." : /\.$/.test(lead.rep) ? lead.rep : `${lead.rep}.`}
+              </Card>
+            ) : null}
+            {staff ? (
+              <Card data-special-pay-card>
+                <SectionHeader label="Special Pay" icon={BadgeDollarSign} />
+                <div className="p-4">
+                  <SpecialPayRequests leadId={lead.id} requests={specialPay} canAsk={canRecord}
+                    decider={salesRep ? (staffList.find((p) => p.id === salesRep)?.name ?? "the project's Sales Rep") : null} />
+                </div>
               </Card>
             ) : null}
             {client ? (

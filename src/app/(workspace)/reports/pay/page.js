@@ -1,5 +1,5 @@
 import Link from "@/components/shared/intent-link";
-import { Banknote, Clock, Download, ListChecks, Sparkles, Timer, Users } from "lucide-react";
+import { Banknote, Clock, Download, ListChecks, Sparkles, Timer, Trophy, Users } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
@@ -9,7 +9,7 @@ import TipLayer from "@/components/shared/tip-layer";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getPayReport, getPayRules, getWorkDays } from "@/features/pay/queries";
+import { getPayBonuses, getPayReport, getPayRules, getWorkDays } from "@/features/pay/queries";
 import PaySchedule from "@/features/pay/components/pay-schedule";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
@@ -48,7 +48,9 @@ export default async function PayReport({ searchParams }) {
   // An administrator opens anyone's days; everyone else always sees their own.
   const openId = admin ? idParam(sp?.user) : me?.id ?? null;
   const open = people.find((p) => p.id === openId) ?? null;
-  const days = open ? await getWorkDays({ from: range.from, to: range.to, userId: open.id }) : [];
+  const [days, bonuses] = open
+    ? await Promise.all([getWorkDays({ from: range.from, to: range.to, userId: open.id }), getPayBonuses({ from: range.from, to: range.to, userId: open.id })])
+    : [[], []];
 
   const sum = (key) => people.reduce((n, p) => n + p[key], 0);
   const paidMinutes = sum("paidMinutes");
@@ -60,6 +62,8 @@ export default async function PayReport({ searchParams }) {
     { label: "Special Pay", value: usd(sum("specialPay")), note: sum("specials") ? `${sum("specials")} lead${sum("specials") === 1 ? "" : "s"} on a DB dev goal hit` : "a DB dev project's lead goal hit in the period",
       icon: Sparkles, accent: "var(--neon-magenta)" },
     { label: "Hourly Pay", value: usd(sum("hourlyPay")), note: "hours paid × hourly rate", icon: Timer, accent: "var(--neon-violet)" },
+    { label: "Extras & Bonuses", value: usd(sum("extras") + sum("bonus")), note: `dec sheets, corrected leads, Special Pay asked for; ${usd(sum("bonus"))} in bonuses`,
+      icon: Trophy, accent: "var(--neon-lime, var(--neon-emerald))" },
   ];
 
   const keep = (extra) => {
@@ -129,6 +133,8 @@ export default async function PayReport({ searchParams }) {
                 <TableHead className="text-right">Hourly pay</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
                 <TableHead className="text-right">Special Pay</TableHead>
+                <TableHead className="text-right" title="Dec Sheet Pay, Lead-Corrected and Special Pay requests approved">Extras</TableHead>
+                <TableHead className="text-right">Bonus</TableHead>
                 <TableHead className="text-right">Pay due</TableHead>
                 <TableHead className="text-right">Per hour</TableHead>
                 <TableHead className="text-right">Calls</TableHead>
@@ -163,6 +169,15 @@ export default async function PayReport({ searchParams }) {
                   <TableCell className={cn("text-right tabular-nums", p.model === "hybrid" && p.paidBy === "commission" && p.specialPay && "font-semibold text-primary")} data-special-pay>
                     {p.specialPay ? usd(p.specialPay) : "—"}
                   </TableCell>
+                  <TableCell className="text-right tabular-nums" data-extras>
+                    {p.extras ? usd(p.extras) : "—"}
+                    {p.extras ? (
+                      <div className="text-[0.7rem] text-muted-foreground">
+                        {[p.decSheets ? `${p.decSheets} dec` : null, p.corrected ? `${p.corrected} corrected` : null, p.requests ? `${p.requests} asked` : null].filter(Boolean).join(" · ")}
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className={cn("text-right tabular-nums", p.bonus && "font-semibold text-emerald-500")} data-bonus>{p.bonus ? usd(p.bonus) : "—"}</TableCell>
                   <TableCell className="text-right font-semibold tabular-nums" data-pay-due>{usd(p.pay)}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">{p.perHour == null ? "—" : usd(p.perHour)}</TableCell>
                   <TableCell className="text-right tabular-nums">{p.calls.toLocaleString()}</TableCell>
@@ -176,6 +191,8 @@ export default async function PayReport({ searchParams }) {
                   <TableCell className="text-right tabular-nums">{usd(sum("hourlyPay"))}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(sum("commission"))}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(sum("specialPay"))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{usd(sum("extras"))}</TableCell>
+                  <TableCell className="text-right tabular-nums">{usd(sum("bonus"))}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(sum("pay"))}</TableCell>
                   <TableCell />
                   <TableCell className="text-right tabular-nums">{sum("calls").toLocaleString()}</TableCell>
@@ -183,15 +200,17 @@ export default async function PayReport({ searchParams }) {
               ) : null}
               {people.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">Nobody to pay in this period.</TableCell>
+                  <TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Nobody to pay in this period.</TableCell>
                 </TableRow>
               ) : null}
             </TableBody>
           </Table>
           <p className="border-t border-[var(--panel-border)] px-5 py-3 text-xs text-muted-foreground">
-            Hybrid pay is the higher of the hourly pay and the commission with any Special Pay, shown in colour. {admin ? "Open a name to see the hours behind it." : ""}
+            Hybrid pay is the higher of the hourly pay and the commission with any Special Pay and extras, shown in colour; a bonus is on top. {admin ? "Open a name to see the hours behind it." : ""}
           </p>
         </Card>
+
+        {open ? <PaySummary person={open} bonuses={bonuses} /> : null}
 
         {open ? (
           <Card data-days={open.id}>
@@ -245,5 +264,58 @@ export default async function PayReport({ searchParams }) {
         {rules.time.pay_period === "custom" && rules.time.schedule.length ? <PaySchedule periods={rules.time.schedule} today={today} /> : null}
       </div>
     </>
+  );
+}
+
+const PLAN_LABEL = { lead: "Lead manager", appointment: "Appointment manager" };
+const BONUS_LABEL = { lead: "Units", appt_weekly: "Valid appointments", appt_monthly: "Monthly valid appointments" };
+
+/**
+ * One person's production for the period (Sean, Nov 2026): what they were paid for, counted, with
+ * Lead-Corrected, dec sheets and Special Pay requests; and each bonus, with the days it counts.
+ */
+function PaySummary({ person: p, bonuses }) {
+  const lines = [
+    ["Leads", p.leads, null],
+    ["Appointments", p.appointments, null],
+    ["Confirmations", p.confirmations, null],
+    ["Lead-Corrected", p.corrected, p.correctedPay],
+    ["Dec sheets", p.decSheets, p.decSheetPay],
+    ["Special Pay asked for", p.requests, p.requestPay],
+    ["Chargebacks", p.chargebacks, null],
+  ];
+  const range = (b) => `${formatIso(b.from, "short")}–${formatIso(b.to, "short")}`;
+  return (
+    <Card data-pay-summary={p.id}>
+      <SectionHeader label={`${p.name} · Summary`} icon={Trophy} action={p.plan ? <ToneBadge tone="emerald">{PLAN_LABEL[p.plan]}</ToneBadge> : null} />
+      <div className="grid gap-5 p-5 md:grid-cols-2">
+        <dl className="grid grid-cols-[1fr_auto_auto] gap-x-4 gap-y-1.5 text-sm">
+          {lines.map(([label, count, amount]) => (
+            <div key={label} className="contents" data-summary-line={label}>
+              <dt className="text-muted-foreground">{label}</dt>
+              <dd className="text-right font-semibold tabular-nums">{Number(count ?? 0).toLocaleString()}</dd>
+              <dd className="text-right tabular-nums text-muted-foreground">{amount ? usd(amount) : ""}</dd>
+            </div>
+          ))}
+        </dl>
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Bonuses this period</div>
+          {bonuses.length ? (
+            <ul className="space-y-1.5 text-sm">
+              {bonuses.map((b) => (
+                <li key={`${b.plan}:${b.from}:${b.counted}`} className="flex items-baseline justify-between gap-3" data-bonus-line={b.plan}>
+                  <span>
+                    {b.plan === "appt_monthly" ? b.label : BONUS_LABEL[b.plan]} <span className="text-muted-foreground">· {range(b)} · {b.counted.toLocaleString()}</span>
+                  </span>
+                  <span className="font-semibold tabular-nums text-emerald-500">{usd(b.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">{p.plan ? "No bonus reached in this period yet." : "No bonus plan (set on their user form)."}</p>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }

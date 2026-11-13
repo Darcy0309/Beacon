@@ -64,6 +64,9 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
     ...(user ? { ...user, company_id: user.company?.id ?? "" } : { role: "agent", status: "invited" }),
     pay_model: pay?.model ?? "commission",
     hourly_rate: pay?.rate == null ? "" : Number(pay.rate).toFixed(2),
+    bonus_plan: pay?.plan ?? "",
+    appointment_rate: pay?.apptRate == null ? "" : Number(pay.apptRate).toFixed(2),
+    confirmation_rate: pay?.confRate == null ? "" : Number(pay.confRate).toFixed(2),
   };
   const paid = role === "manager" || role === "agent";
   const { fe, invalid, dv } = formHelpers(state, record);
@@ -225,6 +228,23 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
                       defaultValue={dv("hourly_rate")} aria-invalid={invalid("hourly_rate")} />
                   </Field>
                 ) : null}
+                {/* Sean, Nov 2026: a manager's own appointment and confirmation pay on every project, and their bonus plan. */}
+                <Field label="Their appointment pay ($)" error={fe("appointment_rate")} hint="On every project, in place of its rate. Blank: each project's.">
+                  <Input name="appointment_rate" type="number" inputMode="decimal" step="0.01" min={0} placeholder="Project's rate"
+                    defaultValue={dv("appointment_rate")} aria-invalid={invalid("appointment_rate")} data-appointment-rate />
+                </Field>
+                <Field label="Their confirmation pay ($)" error={fe("confirmation_rate")} hint="Blank: each project's.">
+                  <Input name="confirmation_rate" type="number" inputMode="decimal" step="0.01" min={0} placeholder="Project's rate"
+                    defaultValue={dv("confirmation_rate")} aria-invalid={invalid("confirmation_rate")} data-confirmation-rate />
+                </Field>
+                <Field label="Bonus plan" error={fe("bonus_plan")} className="sm:col-span-2"
+                  hint="Lead manager: units each half of the pay period. Appointment manager: valid appointments each half and each month. The tiers are in Settings › Bonus plans.">
+                  <Select name="bonus_plan" defaultValue={dv("bonus_plan")} aria-invalid={invalid("bonus_plan")} data-bonus-plan>
+                    <option value="">No bonus plan</option>
+                    <option value="lead">Lead manager</option>
+                    <option value="appointment">Appointment manager</option>
+                  </Select>
+                </Field>
               </>
             ) : null}
           </div>

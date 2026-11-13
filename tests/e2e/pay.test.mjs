@@ -62,8 +62,14 @@ try {
     const refused = await until(() => admin.ev("document.querySelector('input[name=hourly_rate]')?.closest('div')?.parentElement?.innerText ?? ''").then((t) => /between \$15\.15 and \$25\.00/.test(t) && t));
     check("$30 an hour is refused beside the field", Boolean(refused), String(refused));
     await admin.fill("input[name=hourly_rate]", "16");
+    // Her own appointment pay on every project, and her bonus plan (Sean, Nov 2026).
+    await admin.fill("input[name=appointment_rate]", "40");
+    await admin.fill("select[name=bonus_plan]", "appointment");
     await admin.ev(`document.querySelector('input[name="email"]').form.requestSubmit()`);
     await admin.waitToast(/User updated/);
+    check("…with her own $40 appointment pay and the appointment manager bonus plan",
+      await until(() => sql(`select appointment_rate || '/' || coalesce(confirmation_rate::text, 'project') || '/' || bonus_plan from public.pay_profiles where user_id=${RACHEL}`) === "40.00/project/appointment"),
+      sql(`select appointment_rate || '/' || coalesce(confirmation_rate::text, 'project') || '/' || bonus_plan from public.pay_profiles where user_id=${RACHEL}`));
     check("Rachel is on hybrid pay at $16/hr", await until(() => sql(`select pay_model || '/' || hourly_rate from public.pay_profiles where user_id=${RACHEL}`) === "hybrid/16.00"),
       sql(`select pay_model || '/' || hourly_rate from public.pay_profiles where user_id=${RACHEL}`));
     check("the users list says so", await until(async () => /Hybrid · \$16\.00\/hr/.test((await admin.ev(`document.querySelector('[data-pay="${RACHEL}"]')?.textContent ?? ''`)) ?? "")));

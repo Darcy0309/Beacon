@@ -16,6 +16,7 @@ import ProjectForm from "@/features/projects/components/project-form";
 import FundingCard from "@/features/funding/components/funding-card";
 import { getProjectFunding } from "@/features/funding/queries";
 import ProjectRatesForm from "@/features/projects/components/project-rates-form";
+import DecSheetRate from "@/features/projects/components/dec-sheet-rate";
 import ProjectTeam from "@/features/projects/components/project-team";
 import ProjectGoals from "@/features/projects/components/project-goals";
 import { projectDays, projectGoals } from "@/lib/project-goals";
@@ -191,6 +192,8 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <ToneBadge tone={typeTone[p.type] ?? "slate"}>{p.type}</ToneBadge>
                 <ToneBadge tone={statusTone[p.status] ?? "slate"}>{p.status}</ToneBadge>
                 {admin ? <ProjectRatesForm project={rates} ranges={payRules?.rates} /> : null}
+                {/* Dec Sheet Pay (Sean, Nov 2026): an administrator or the client's Sales Rep sets it. */}
+                {admin || (p.salesRepId && p.salesRepId === me?.id) ? <DecSheetRate projectId={p.id} rate={raw.dec_sheet_rate ?? 10} /> : null}
                 {/* The program's next term (Oct 2026): a new lead project carrying the viable names on. */}
                 {admin && dbdev ? <RenewProject project={{ id: p.id, name: p.name }} team={team} staff={staff}
                   filters={{ q: list.q, ...list.filters, ...names }} filterLabel={filterLabel} /> : null}

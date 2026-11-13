@@ -71,6 +71,8 @@ async function record(who, leadId, type, name, extra = {}) {
   const { data, error } = await who.sb.rpc("record_call_result", {
     p_lead_id: leadId, p_result_id: RESULT[`${type}:${name}`], p_notes: extra.notes ?? null,
     p_appointment: extra.appointment ?? null, p_corrected_xdate: extra.xdate ?? null,
+    // Lead-Corrected on a lead with no developer on record names one (Nov 2026): here, nobody (0).
+    ...(extra.leadManager !== undefined ? { p_lead_manager: extra.leadManager } : {}),
     p_ultimate_xdate: extra.ultimate ?? (needsXdate(name) && !hasXdate(leadId) ? "2027-03-01" : null),
   });
   return { data, error };
@@ -284,14 +286,14 @@ try {
     const id = newName(APPT, MIKE, `insert into public.insurance_details (lead_id, ultimate_xdate, wc_xdate) values ($ID, '2027-06-01', '2027-03-15')`);
     const missing = await record(mike, id, "APPT", "Lead-Corrected");
     check("Corrected: refused without the new date", /corrected renewal date/i.test(missing.error?.message ?? ""), missing.error?.message);
-    const { error } = await record(mike, id, "APPT", "Lead-Corrected", { xdate: "2027-09-15" });
+    const { error } = await record(mike, id, "APPT", "Lead-Corrected", { xdate: "2027-09-15", leadManager: 0 });
     const s = lead(id);
     check("Corrected: the renewal is now the corrected date", !error && s.renewal === "2027-09-15", error?.message ?? JSON.stringify(s));
     check("Corrected: the original renewal is kept (the ultimate X-date, June)", s.original_xdate === "2027-06-01", JSON.stringify(s));
     check("Corrected: a note of the change is on the call", /Renewal corrected from June 2027 to September 2027/.test(sql(`select notes from public.call_records where lead_id=${id} order by id desc limit 1`)));
     check("Corrected: the policy lines keep their own dates", sql(`select wc_xdate from public.insurance_details where lead_id=${id}`) === "2027-03-15");
     check("Corrected: stays on the list", await onList(mike, APPT, id));
-    await record(mike, id, "APPT", "Lead-Corrected", { xdate: "2027-10-01" });
+    await record(mike, id, "APPT", "Lead-Corrected", { xdate: "2027-10-01", leadManager: 0 });
     check("Corrected twice: the original is still the first one", lead(id).original_xdate === "2027-06-01" && lead(id).renewal === "2027-10-01");
   }
 

@@ -22,6 +22,7 @@ const FIELD_FOR = [
   [/appointment time|like 9:30 AM/i, "appt_time"],
   [/corrected renewal date/i, "corrected_xdate"],
   [/note for the client/i, "client_note"],
+  [/lead manager/i, "lead_manager"],
 ];
 
 // What a Lead or an Appointment cannot be saved without: [field, what it is, what to say beside it].
@@ -75,6 +76,9 @@ export async function recordCallResult(prevState, formData) {
     // What the client is told, when the result sends them the lead: given
     // only when the panel asked for it, so an empty box clears it.
     p_client_note: sendsSheet(result) && formData.has("client_note") ? (s(formData, "client_note") ?? "") : null,
+    // Lead-Corrected on a lead with no developer on record (Sean, Nov 2026): the lead manager who
+    // developed it, whose lead pay moves to the corrector, or 0 for a lead we didn't develop.
+    ...(/^\d{1,18}$/.test(String(formData.get("lead_manager") ?? "")) ? { p_lead_manager: Number(formData.get("lead_manager")) } : {}),
   });
   if (error) {
     const field = FIELD_FOR.find(([re]) => re.test(error.message))?.[1];
