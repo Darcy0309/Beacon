@@ -19,6 +19,9 @@ import { cn } from "@/lib/utils";
 const MIN_CHARS = 2;
 // Short, so results follow typing closely; a stale request is cancelled anyway (Nov 2026).
 const DEBOUNCE_MS = 150;
+// A term searched a moment ago shows again at once (typing back over it, opening the palette again).
+const RECENT_MS = 30_000;
+const recent = new Map();
 // What can be searched, and a page each kind opens: a role sees only the kinds it can open.
 const GROUPS = [
   ["leads", "Leads", Target, "/leads/1"],
@@ -123,6 +126,13 @@ export default function GlobalSearch() {
       setError("");
       return;
     }
+    const kept = recent.get(term.toLowerCase());
+    if (kept && Date.now() - kept.at < RECENT_MS) {
+      setGroups(kept.groups);
+      setLoading(false);
+      setError("");
+      return;
+    }
     setLoading(true);
     setError("");
     const ctrl = new AbortController();
@@ -131,6 +141,7 @@ export default function GlobalSearch() {
         const res = await fetch(`/api/search?q=${encodeURIComponent(term)}`, { signal: ctrl.signal });
         const json = await res.json();
         setGroups(json.groups ?? []);
+        if (res.ok && !json.error) recent.set(term.toLowerCase(), { groups: json.groups ?? [], at: Date.now() });
         // A failed search with no reason given is still said, not shown as "No matches" (Oct 2026).
         setError(json.error ?? (res.ok ? "" : "Search failed. Try again."));
       } catch (err) {
@@ -182,6 +193,25 @@ export default function GlobalSearch() {
       .map((p) => ({ key: `jump:${p.href}`, href: p.href, title: p.label, subtitle: "Go to page", icon: p.icon })),
     [role]
   );
+
+  // The result chosen (the first, as results come; then wherever the arrows or the pointer go): its page
+  // fetched ahead, so Enter shows it at once rather than starting to ask then (Nov 2026: opening a lead
+  // from the search took a second or more after Enter).
+  const [chosen, setChosen] = useState("");
+  const prefetched = useRef(new Set());
+  // Each opening fetches afresh: what was fetched ahead last time may be out of date by now.
+  useEffect(() => {
+    if (open) prefetched.current.clear();
+  }, [open]);
+  useEffect(() => {
+    if (!open || !chosen) return;
+    const item = [...sections.flatMap((g) => g.items), ...jump].find((i) => i.key === chosen);
+    if (!item?.href || prefetched.current.has(item.href)) return;
+    prefetched.current.add(item.href);
+    // A record found (a lead, a client…): its whole page, so it opens with its details already there. A
+    // page of the app: up to its loading screen, as its link in the side menu does.
+    router.prefetch(item.href, item.key.startsWith("page:") || item.key.startsWith("jump:") ? undefined : { kind: "full" });
+  }, [open, chosen, sections, jump, router]);
 
   const go = (item) => {
     if (!item) return;
@@ -255,7 +285,7 @@ export default function GlobalSearch() {
             {/* cmdk: the palette's keyboard (↑↓, Home/End, Enter, Ctrl+N/P),
                 the pointer choosing what it is over, and what a screen reader
                 is told. The server finds the matches, so cmdk does not filter. */}
-            <Command shouldFilter={false} loop label="Search everything" className="outline-none">
+            <Command shouldFilter={false} loop label="Search everything" className="outline-none" value={chosen} onValueChange={setChosen}>
               {/* A real field, outlined and lit, so it reads as the place to type
                   rather than as the dialog's heading. */}
               <div className="border-b border-[var(--panel-border)] p-3">
