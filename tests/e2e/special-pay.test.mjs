@@ -1,8 +1,9 @@
 /**
  * Special Pay in the browser (Sean, Oct 2026): an administrator sets a DB dev
- * project's goal and Special Pay a lead in its pay rates (an appointment
- * project has no such fields; a goal without an amount is refused beside the
- * field); the project page and Production & Pay's rates show it; a rep who
+ * project's goal and Special Pay a lead in its pay rates (a goal without an
+ * amount is refused beside the field); an appointment project's, on its
+ * appointments (Sean, Nov 2026), paid on each once a rep hits it and taken back
+ * with an appointment found invalid; the project page and Production & Pay's rates show it; a rep who
  * hits it is told, and their pay summary shows Special Pay apart from the
  * commission, on the page and in the CSV; confirmation pay goes by its name.
  *
@@ -31,13 +32,45 @@ const when = (page, expr, timeout = 25000) => until(() => page.ev(expr), { timeo
 try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
 
-  section("Set in a DB dev project's pay rates");
+  section("Set in an appointment project's pay rates (Sean, Nov 2026)");
   await admin.go(`/projects/${APPT}`, 6000);
   await admin.click("button", "Pay rates");
-  await when(admin, "!!document.querySelector('select[name=confirmation_rate]')");
-  check("an appointment project: no Special Pay, and its confirmation pay by name",
-    !(await admin.ev("!!document.querySelector('[data-special-pay-form]')")) && /Confirmation pay/.test(await admin.ev("document.querySelector('[role=dialog]')?.innerText ?? ''")));
-  await admin.key("Escape");
+  await when(admin, "!!document.querySelector('[data-special-pay-form]')");
+  const form = await admin.ev("document.querySelector('[role=dialog]')?.innerText ?? ''");
+  check("an appointment project: Special Pay on its appointments, and its confirmation pay by name",
+    /Goal \(appointments a pay period\)/.test(form) && /Special Pay an appointment/.test(form) && /sets this many appointments/.test(form) && /Confirmation pay/.test(form), form);
+  await admin.fill("input[name=special_goal]", "2");
+  await admin.fill("input[name=special_rate]", "5");
+  await admin.ev("document.querySelector('[data-special-pay-form]').closest('form').requestSubmit()");
+  check("saved: 2 appointments a pay period, $5 each", Boolean(await until(() => sql(`select special_goal || '/' || special_rate from public.projects where id=${APPT}`) === "2/5.00", { timeout: 15000 })));
+  await admin.go(`/projects/${APPT}`, 5000);
+  const apptLine = await admin.ev("document.querySelector('[data-special-pay]')?.textContent ?? ''");
+  check("the project page says so", /Special Pay \$5\.00 an appointment at 2 appointments a pay period/.test(apptLine), apptLine);
+
+  const mikeSb = await signIn("mike@beacon.test");
+  const SET = Number(sql("select id from public.call_results where project_type='APPT' and name='Appointment'"));
+  const INVALID = Number(sql("select id from public.call_results where project_type='APPT' and name='Appointment-Invalid'"));
+  const tomorrow = sql("select ((now() at time zone public.business_tz())::date + 1)::text");
+  const apptLeads = [];
+  for (let i = 1; i <= 3; i += 1) {
+    const lead = Number(sql(`insert into public.leads (company_name, project_id, assigned_user_id, stage) values (${lit(`${TAG} Appt ${i}`)}, ${APPT}, ${MIKE}, 'appt') returning id`));
+    apptLeads.push(lead);
+    const { error } = await mikeSb.sb.rpc("record_call_result", { p_lead_id: lead, p_result_id: SET, p_notes: null, p_appointment: { date: tomorrow, time: `${8 + i}:00 AM` }, p_corrected_xdate: null, p_ultimate_xdate: "2027-03-01" });
+    if (error) throw error;
+    if (i === 1) check("one appointment: short of the goal, no Special Pay yet", sql(`select count(*) from public.pay_events where kind='special' and project_id=${APPT}`) === "0");
+  }
+  check("the goal hit: $5 Special Pay on each appointment, the one after it too",
+    sql(`select count(*) || '/' || sum(amount) || '/' || count(distinct appointment_id) from public.pay_events where kind='special' and project_id=${APPT} and user_id=${MIKE}`) === "3/15.00/3");
+  const mikePage = await (await browser.newContext({ as: "mike@beacon.test" })).newPage({ width: 1440, height: 1000 });
+  await mikePage.go("/notifications", 6000);
+  check("Mike is told", Boolean(await when(mikePage, `document.body.innerText.includes(${JSON.stringify(`Special Pay: you hit 2 appointments on ${TAG} Appointments`)})`)));
+  const { error: invalidError } = await mikeSb.sb.rpc("record_call_result", { p_lead_id: apptLeads[0], p_result_id: INVALID, p_notes: "Owner cancelled", p_appointment: null, p_corrected_xdate: null, p_ultimate_xdate: null });
+  if (invalidError) throw invalidError;
+  check("an appointment found invalid takes its own Special Pay back, no other",
+    sql(`select coalesce(sum(amount), 0) from public.pay_events where kind='special' and project_id=${APPT} and user_id=${MIKE}`) === "10.00"
+    && sql(`select count(*) from public.pay_events where kind='special' and is_chargeback and lead_id=${apptLeads[0]}`) === "1", sql(`select coalesce(sum(amount), 0) from public.pay_events where kind='special' and project_id=${APPT}`));
+
+  section("Set in a DB dev project's pay rates");
 
   await admin.go(`/projects/${DBDV}`, 6000);
   await admin.click("button", "Pay rates");
@@ -45,7 +78,7 @@ try {
   check("a DB dev project: its goal and Special Pay a lead", await admin.ev("!!document.querySelector('input[name=special_goal]') && !!document.querySelector('input[name=special_rate]')"));
   await admin.fill("input[name=special_goal]", "5");
   await admin.ev("document.querySelector('[data-special-pay-form]').closest('form').requestSubmit()");
-  check("a goal without an amount: said beside the amount", Boolean(await when(admin, "/Set what the Special Pay is a lead/.test(document.querySelector('[role=dialog]')?.innerText ?? '')")));
+  check("a goal without an amount: said beside the amount", Boolean(await when(admin, "/Set what the Special Pay is each/.test(document.querySelector('[role=dialog]')?.innerText ?? '')")));
   await admin.fill("input[name=special_rate]", "1");
   await admin.ev("document.querySelector('[data-special-pay-form]').closest('form').requestSubmit()");
   check("saved", /Pay rates saved/.test((await admin.waitToast(/Pay rates saved|could not|fix|Special Pay/i)) ?? ""), await admin.toasts());
@@ -76,7 +109,7 @@ try {
   await rep.go("/reports/pay", 6000);
   await when(rep, `!!document.querySelector('tr[data-person="${SEAN}"]')`);
   const tile = await rep.ev("[...document.querySelectorAll('[data-panel]')].find((p) => /^special pay$/i.test(p.querySelector('.stat-label')?.textContent.trim() ?? ''))?.innerText.replace(/\\s+/g, ' ') ?? ''");
-  check("a Special Pay tile: $5.00 on 5 leads", /\$5\.00/.test(tile) && /5 leads/.test(tile), tile);
+  check("a Special Pay tile: $5.00 on 5 leads", /\$5\.00/.test(tile) && /5 leads or appointments on a project goal hit/.test(tile), tile);
   const cells = await rep.ev(`[...document.querySelector('tr[data-person="${SEAN}"]').cells].map((c) => c.innerText.trim())`);
   const heads2 = await rep.ev("[...document.querySelectorAll('thead th')].map((t) => t.textContent.trim())");
   const at = (h) => cells[heads2.indexOf(h)];

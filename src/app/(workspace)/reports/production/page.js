@@ -309,7 +309,7 @@ export default async function ProductionReport({ searchParams }) {
                     <TableCell className="text-right tabular-nums">{usd(p.lead)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(p.appointment)}</TableCell>
                     <TableCell className="text-right tabular-nums">{usd(p.confirmation)}</TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground" data-special-pay>{specialPayLabel(p.specialGoal, p.specialRate) ?? "—"}</TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground" data-special-pay>{specialPayLabel(p.specialGoal, p.specialRate, p.type) ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       <ProjectRatesForm project={p} ranges={payRules?.rates} trigger={<Button size="sm" variant="ghost"><Banknote /> Set rates</Button>} />
                     </TableCell>

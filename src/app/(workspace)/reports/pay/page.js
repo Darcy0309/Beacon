@@ -59,7 +59,7 @@ export default async function PayReport({ searchParams }) {
       icon: Banknote, accent: "var(--neon-amber)" },
     { label: "Hours Paid", value: hoursLabel(paidMinutes), note: `${hoursLabel(sum("workedMinutes"))} worked`, icon: Clock, accent: "var(--neon-cyan)" },
     { label: "Commission", value: usd(sum("commission")), note: "lead, appointment and confirmation pay, less chargebacks", icon: Users, accent: "var(--neon-emerald)" },
-    { label: "Special Pay", value: usd(sum("specialPay")), note: sum("specials") ? `${sum("specials")} lead${sum("specials") === 1 ? "" : "s"} on a DB dev goal hit` : "a DB dev project's lead goal hit in the period",
+    { label: "Special Pay", value: usd(sum("specialPay")), note: sum("specials") ? `${sum("specials")} lead${sum("specials") === 1 ? "" : "s"} or appointment${sum("specials") === 1 ? "" : "s"} on a project goal hit` : "a project's lead or appointment goal hit in the period",
       icon: Sparkles, accent: "var(--neon-magenta)" },
     { label: "Hourly Pay", value: usd(sum("hourlyPay")), note: "hours paid × hourly rate", icon: Timer, accent: "var(--neon-violet)" },
     { label: "Extras & Bonuses", value: usd(sum("extras") + sum("bonus")), note: `dec sheets, corrected leads, Special Pay asked for; ${usd(sum("bonus"))} in bonuses`,

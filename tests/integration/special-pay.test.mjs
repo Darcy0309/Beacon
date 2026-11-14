@@ -65,7 +65,9 @@ try {
   await sean.sb.from("projects").update({ special_goal: 3, special_rate: 1 }).eq("id", DBDV);
   check("…nor write it straight to the project", one(`select special_goal from public.projects where id=${DBDV}`).special_goal === null);
   const onAppt = await admin.sb.rpc("set_project_special_pay", { p_project_id: APPT, p_goal: 3, p_rate: 1 });
-  check("not on an appointment project", /DB dev projects/.test(onAppt.error?.message ?? ""), onAppt.error?.message);
+  // An appointment project has its own, on its appointments (Sean, Nov 2026); cleared again for what follows.
+  check("an appointment project too, on its appointments", !onAppt.error && onAppt.data?.special_goal === 3, onAppt.error?.message);
+  await admin.sb.rpc("set_project_special_pay", { p_project_id: APPT, p_goal: null, p_rate: 0 });
   const half = await admin.sb.rpc("set_project_special_pay", { p_project_id: DBDV, p_goal: 3, p_rate: 0 });
   check("a goal needs an amount", /both a goal and an amount/.test(half.error?.message ?? ""), half.error?.message);
   const set = await admin.sb.rpc("set_project_special_pay", { p_project_id: DBDV, p_goal: 3, p_rate: 1 });

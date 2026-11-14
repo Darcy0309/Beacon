@@ -34,12 +34,14 @@ export const RATE_KINDS = [
 ];
 
 /**
- * A DB dev project's Special Pay as the pages say it (Sean, Oct 2026): "$1.00
- * a lead at 5 leads a pay period", or null when it has none.
+ * A project's Special Pay as the pages say it (Sean, Oct 2026): "$1.00 a lead at 5 leads a pay period" on a
+ * DB dev project; on an appointment project (`type` "APPT"; Nov 2026), "$5.00 an appointment at 10
+ * appointments a pay period". Null when it has none.
  */
-export function specialPayLabel(goal, rate) {
+export function specialPayLabel(goal, rate, type = "DBDV") {
   if (!goal || !(Number(rate) > 0)) return null;
-  return `${usd(rate)} a lead at ${goal} lead${goal === 1 ? "" : "s"} a pay period`;
+  const [a, one] = type === "APPT" ? ["an", "appointment"] : ["a", "lead"];
+  return `${usd(rate)} ${a} ${one} at ${goal} ${one}${goal === 1 ? "" : "s"} a pay period`;
 }
 
 const cents = (n) => Math.round(Number(n) * 100);

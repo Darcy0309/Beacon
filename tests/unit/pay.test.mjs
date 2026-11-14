@@ -82,6 +82,7 @@ eq("the CSV's pay columns: confirmation pay and Special Pay by name", CSV_COLUMN
 
 // --- Special Pay, as the pages say it ----------------------------------------------
 eq("Special Pay: $1.00 a lead at 5 leads a pay period", specialPayLabel(5, 1), "$1.00 a lead at 5 leads a pay period");
+eq("…an appointment project's on its appointments (Nov 2026)", specialPayLabel(10, 5, "APPT"), "$5.00 an appointment at 10 appointments a pay period");
 eq("…none without a goal or an amount", [specialPayLabel(null, 1), specialPayLabel(5, 0)], [null, null]);
 // A client's agency group: the carrier group it belongs to.
 const grouped = withGroups(rows, { 7: { id: 31, name: "Farmers" } });

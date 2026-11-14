@@ -127,8 +127,8 @@ export async function redistributeProject(formData) {
 
 /**
  * An administrator sets one project's pay rates (USD per lead, appointment,
- * confirmation) and, on a DB dev project, its Special Pay: the leads a rep
- * develops there in a pay period to earn it, and how much more a lead.
+ * confirmation) and, on a DB dev or appointment project, its Special Pay: the leads (or appointments) a
+ * rep makes there in a pay period to earn it, and how much more each.
  */
 export async function saveProjectRates(prevState, formData) {
   const { failed } = check(formData, schemas.projectRates, cross.projectRates);
@@ -153,7 +153,7 @@ export async function saveProjectRates(prevState, formData) {
     // With what was chosen, so the form resets to it rather than to the old rates.
     return fail(error, field ? { [field]: error.message } : null, values());
   }
-  // Special Pay: only a DB dev project's form has it.
+  // Special Pay: only a DB dev or an appointment project's form has it.
   let special = null;
   if (formData.has("special_goal")) {
     const goal = Number(String(formData.get("special_goal") ?? "").trim()) || null;
@@ -168,7 +168,7 @@ export async function saveProjectRates(prevState, formData) {
   await logActivity(supabase, "project.rates", {
     entity: "project", entityId: projectId,
     detail: [`lead ${data.lead_rate} · appointment ${data.appointment_rate} · confirmation ${data.confirmation_rate}`,
-      special ? (special.special_goal ? `Special Pay ${special.special_rate} a lead at ${special.special_goal} leads` : "no Special Pay") : null].filter(Boolean).join(" · "),
+      special ? (special.special_goal ? `Special Pay ${special.special_rate} each at ${special.special_goal} a pay period` : "no Special Pay") : null].filter(Boolean).join(" · "),
   });
   revalidatePath("/reports/production");
   revalidatePath(`/projects/${projectId}`);

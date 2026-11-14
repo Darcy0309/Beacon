@@ -19,7 +19,8 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * project). A chargeback reverses whatever was paid at the time, so changing
  * a rate never changes what has already been earned. A DB dev project also
  * has its Special Pay (Sean, Oct 2026): once a rep develops `goal` leads on it
- * in a pay period, each of them, and each after, pays that much more.
+ * in a pay period, each of them, and each after, pays that much more. So does
+ * an appointment project (Sean, Nov 2026), with appointments set in place of leads.
  */
 export default function ProjectRatesForm({ project, ranges, trigger }) {
   const [open, setOpen] = useState(false);
@@ -35,7 +36,9 @@ export default function ProjectRatesForm({ project, ranges, trigger }) {
   }, [state, project.name]);
 
   const current = { lead_rate: project.lead, appointment_rate: project.appointment, confirmation_rate: project.confirmation };
-  const dbdev = project.type === "DBDV";
+  // Special Pay: a DB dev project's on its leads, an appointment project's on its appointments.
+  const special = project.type === "DBDV" ? { one: "lead", many: "leads", does: "develops" }
+    : project.type === "APPT" ? { one: "appointment", many: "appointments", does: "sets" } : null;
   const { fe, invalid, dv } = formHelpers(state, {
     ...Object.fromEntries(Object.entries(current).map(([k, v]) => [k, Number(v ?? 0).toFixed(2)])),
     special_goal: project.specialGoal ? String(project.specialGoal) : "",
@@ -68,19 +71,19 @@ export default function ProjectRatesForm({ project, ranges, trigger }) {
               </Field>
             ))}
           </div>
-          {dbdev ? (
+          {special ? (
             <fieldset className="flex flex-col gap-3 rounded-lg border border-[var(--panel-border)] p-3" data-special-pay-form>
               <legend className="px-1 text-sm font-medium">Special Pay</legend>
               <p className="text-xs text-muted-foreground">
-                When a rep develops this many leads on this project in one pay period, each of those leads, and each one after it that
+                When a rep {special.does} this many {special.many} on this project in one pay period, each of those {special.many}, and each one after it that
                 period, pays this much more. It shows on their pay as Special Pay. Leave both blank for none.
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Goal (leads a pay period)" error={fe("special_goal")}>
+                <Field label={`Goal (${special.many} a pay period)`} error={fe("special_goal")}>
                   <Input name="special_goal" type="number" min={1} max={1000} step={1} inputMode="numeric" placeholder="e.g. 5"
                     defaultValue={dv("special_goal")} aria-invalid={invalid("special_goal")} />
                 </Field>
-                <Field label="Special Pay a lead ($)" error={fe("special_rate")}>
+                <Field label={`Special Pay ${special.one === "appointment" ? "an appointment" : "a lead"} ($)`} error={fe("special_rate")}>
                   <Input name="special_rate" inputMode="decimal" placeholder="e.g. 1.00" defaultValue={dv("special_rate")} aria-invalid={invalid("special_rate")} />
                 </Field>
               </div>

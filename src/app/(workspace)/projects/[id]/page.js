@@ -164,7 +164,8 @@ export default async function ProjectDetail({ params, searchParams }) {
   const xdateReport = dbdev ? (raw.appt_project_id ? `/reports/x-dates?project=${raw.appt_project_id}` : null) : `/reports/x-dates?project=${p.id}`;
   const rates = { id: p.id, name: p.name, type: p.type, lead: Number(raw.lead_rate ?? 0), appointment: Number(raw.appointment_rate ?? 0), confirmation: Number(raw.confirmation_rate ?? 0),
     specialGoal: raw.special_goal ?? null, specialRate: Number(raw.special_rate ?? 0) };
-  const special = dbdev ? specialPayLabel(rates.specialGoal, rates.specialRate) : null;
+  // A DB dev project's Special Pay on its leads; an appointment project's on its appointments (Sean, Nov 2026).
+  const special = ["DBDV", "APPT"].includes(p.type) ? specialPayLabel(rates.specialGoal, rates.specialRate, p.type) : null;
 
   return (
     <>
