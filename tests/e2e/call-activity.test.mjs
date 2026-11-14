@@ -26,6 +26,16 @@ const call = (user, hhmm, talk, on = today) => {
   sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, started_at, rang_at, answered_at, ended_at, talk_seconds)
     values (${lit(sid)}, ${lit(sid)}, ${user}, 'out', '+16025550100', 'completed', ${at}, ${at}, ${at}, ${at} + interval '${talk} seconds', ${talk})`);
 };
+// Mike works on Central time: his times on his own clock (Sean, Nov 2026).
+const mikeZone = sql(`select coalesce(timezone_id::text, 'null') from public.users where id = ${MIKE}`);
+sql(`update public.users set timezone_id = (select id from public.timezones where iana = 'America/Chicago' order by id limit 1) where id = ${MIKE}`);
+const BUSINESS = sql("select public.business_tz()");
+const short = (tz) => new Intl.DateTimeFormat("en-US", { timeZone: tz, timeZoneName: "short" }).formatToParts(new Date()).find((p) => p.type === "timeZoneName").value;
+// 9:15 on the business's clock, read on Central's.
+const mikeAt = (hhmm) => {
+  const iso = sql(`select to_char(((${lit(today)}::date + time ${lit(hhmm)}) at time zone public.business_tz()) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`);
+  return new Date(iso).toLocaleTimeString("en-US", { timeZone: "America/Chicago", hour: "numeric", minute: "2-digit" });
+};
 const company = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Insurance`)}, ${RACHEL}) returning id`));
 const rowsOf = (page) => page.ev(`[...document.querySelectorAll('[data-call-activity] [data-call-row]')].map((r) => r.dataset.callRow)`);
 const firstOf = (page, id) => page.ev(`document.querySelector('[data-call-activity] [data-call-row="${id}"] [data-col="first"]')?.textContent.trim() ?? null`);
@@ -51,9 +61,10 @@ try {
   await sean.ev(`document.querySelector('[data-call-scope-link="team"]').click()`);
   check("Team chosen", Boolean(await until(() => sean.ev(`document.querySelector('[data-call-scope]')?.dataset.callScope === 'team'`), { timeout: 15000 })));
   const team = await rowsOf(sean);
-  check("the account managers, each with their first call", team.includes(String(SEAN)) && team.includes(String(MIKE)) && (await firstOf(sean, MIKE)) === "9:15 AM", JSON.stringify(team));
+  check("the account managers, each with their first call", team.includes(String(SEAN)) && team.includes(String(MIKE)), JSON.stringify(team));
+  check("…on their own clock, its zone named (Mike's on Central)", (await firstOf(sean, MIKE)) === `${mikeAt("09:15")} ${short("America/Chicago")}`, await firstOf(sean, MIKE));
   check("…not a client's Sales Rep, nor an administrator", !team.includes(String(RACHEL)) && !team.includes(String(ADMIN)), JSON.stringify(team));
-  check("…the earliest first call on the total line", (await firstOf(sean, "total")) === "7:41 AM", await firstOf(sean, "total"));
+  check("…the earliest first call on the total line, on the business's clock", (await firstOf(sean, "total")) === `7:41 AM ${short(BUSINESS)}`, await firstOf(sean, "total"));
   await sean.ev(`document.querySelector('[data-call-scope-link="me"]').click()`);
   check("and back to Mine", Boolean(await until(async () => JSON.stringify(await rowsOf(sean)) === JSON.stringify([String(SEAN), "total"]), { timeout: 15000 })));
 
@@ -71,6 +82,14 @@ try {
   check("one manager chosen: theirs, the first call's half hour, and their longest gap named",
     Boolean(await until(async () => /^2 calls · first 7:30 AM–8:00 AM · longest gap 8:00 AM – 10:00 AM \(2h\)/.test((await summary()) ?? ""))), await summary());
   check("…shaded on the chart", await sean.ev(`!!document.querySelector('[data-call-chart] [data-gap]')`));
+  const zoneNote = () => sean.ev(`document.querySelector('[data-call-chart-zone]')?.textContent ?? ''`);
+  check("…and on Sean's clock, the business's", (await zoneNote()) === `Times in ${short(BUSINESS)}.`, await zoneNote());
+  await sean.fill("[data-call-chart-who]", String(MIKE));
+  const mikeHalf = (() => { const [t, ap] = mikeAt("09:15").split(" "); const [h] = t.split(":"); return `${h}:00 ${ap}`; })();
+  check("Mike chosen: on his own clock",
+    Boolean(await until(async () => ((await summary()) ?? "").startsWith(`1 call · first ${mikeHalf}`))) && /Mike/.test(await zoneNote()), `${await summary()} | ${await zoneNote()}`);
+  await sean.fill("[data-call-chart-who]", "all");
+  check("everyone: back on the business's clock", Boolean(await until(async () => (await zoneNote()) === `Times in ${short(BUSINESS)}.`)), await zoneNote());
   await sean.key("Escape");
 
   section("An administrator's dashboard: everyone");
@@ -84,6 +103,7 @@ try {
   browser.close();
   sql(`delete from public.phone_calls where call_sid like ${lit(`CA${TAG.toLowerCase()}%`)}`);
   sql(`delete from public.companies where id = ${company}`);
+  sql(`update public.users set timezone_id = ${mikeZone} where id = ${MIKE}`);
 }
 
 finish("call activity on the dashboard");

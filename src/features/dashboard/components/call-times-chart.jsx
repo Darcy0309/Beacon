@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatIso } from "@/lib/dates";
 import { clockOf } from "@/lib/project-calendar";
+import { knownZone, zoneShort } from "@/lib/own-clock";
 
 // The working day the chart always shows (6 AM to 7 PM), widened for any call outside it.
 const FIRST = 6 * 60;
@@ -28,8 +29,10 @@ function nowMinutes(timeZone) {
 /**
  * Call Activity's chart (Sean, Nov 2026): the day's calls added up through the day, half hour by half
  * hour, for everyone on the card or one person, so a long stretch with no calls shows as a flat line
- * (the longest is shaded and named). `day` the day shown; `people` [{ id, name }] the card's; `scope`,
- * `userId` as the card asks for its numbers; `today`, `timeZone` the business's.
+ * (the longest is shaded and named). `day` the day shown; `people` [{ id, name, timeZone }] the card's;
+ * `scope`, `userId` as the card asks for its numbers; `today`, `timeZone` the business's. One person
+ * shown: on their own clock (their account's time zone); everyone: on the business's, since half hours
+ * on different clocks are different times.
  */
 export default function CallTimesChart({ day, today, people, scope, userId, timeZone }) {
   const [open, setOpen] = useState(false);
@@ -51,15 +54,23 @@ export default function CallTimesChart({ day, today, people, scope, userId, time
     };
   }, [open, day, scope, userId]);
 
+  // One person: their clock. Everyone: the business's.
+  const person = who !== "all" ? people.find((p) => String(p.id) === who) : people.length === 1 ? people[0] : null;
+  const zone = knownZone(person?.timeZone, timeZone) || undefined;
+  const local = Boolean(person);
+
   const chart = useMemo(() => {
     if (!slots) return null;
     const mine = slots.filter((s) => who === "all" || String(s.userId) === who);
     const per = new Map();
-    for (const s of mine) per.set(s.slot, (per.get(s.slot) ?? 0) + s.calls);
+    for (const s of mine) {
+      const at = local ? s.localSlot : s.slot;
+      per.set(at, (per.get(at) ?? 0) + s.calls);
+    }
     const times = [...per.keys()];
     const from = Math.min(FIRST, ...times);
     // Today: up to now, not a flat line into hours still to come.
-    const upTo = day === today ? Math.floor(nowMinutes(timeZone) / 30) * 30 : null;
+    const upTo = day === today ? Math.floor(nowMinutes(zone) / 30) * 30 : null;
     const to = Math.max(LAST, ...times.map((t) => t + 30));
     const xs = [];
     for (let m = from; m < to; m += 30) xs.push(m);
@@ -84,13 +95,16 @@ export default function CallTimesChart({ day, today, people, scope, userId, time
     const max = Math.max(5, total);
     const top = Math.ceil(max / 5) * 5;
     return { points: points.filter((p) => !p.future), all: points, total, firstAt, gap, top, from, to };
-  }, [slots, who, day, today, timeZone]);
+  }, [slots, who, day, today, zone, local]);
 
   const [hover, setHover] = useState(null);
   const x = (m) => PAD.left + ((m - (chart?.from ?? FIRST)) / ((chart?.to ?? LAST) - 30 - (chart?.from ?? FIRST))) * (W - PAD.left - PAD.right);
   const y = (v) => PAD.top + (1 - v / (chart?.top || 5)) * (H - PAD.top - PAD.bottom);
   const ticks = chart ? [0, 1, 2, 3, 4, 5].map((i) => (chart.top / 5) * i) : [];
-  const name = who === "all" ? "Everyone" : people.find((p) => String(p.id) === who)?.name ?? "";
+  const name = person?.name ?? "Everyone";
+  const zoneName = zoneShort(zone, new Date(`${day}T12:00:00Z`));
+  const clockNote = zoneName ? (person && zone !== timeZone && zoneName !== zoneShort(timeZone, new Date(`${day}T12:00:00Z`))
+    ? `Times in ${zoneName}, ${person.name}'s time zone.` : `Times in ${zoneName}.`) : "";
   const shown = hover != null ? chart?.points[hover] : null;
 
   return (
@@ -102,7 +116,7 @@ export default function CallTimesChart({ day, today, people, scope, userId, time
         <DialogContent className="max-w-3xl" data-call-chart>
           <DialogHeader>
             <DialogTitle>Calls through the day</DialogTitle>
-            <DialogDescription>{formatIso(day, "long")} · calls on the Lighthouse phone, added up half hour by half hour. A flat stretch is time with no calls.</DialogDescription>
+            <DialogDescription>{formatIso(day, "long")} · calls on the Lighthouse phone, added up half hour by half hour. A flat stretch is time with no calls. <span data-call-chart-zone>{clockNote}</span></DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm">

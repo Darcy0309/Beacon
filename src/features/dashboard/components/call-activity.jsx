@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import CallTimesChart from "@/features/dashboard/components/call-times-chart";
+import { knownZone, zoneShort } from "@/lib/own-clock";
 
 // How often the numbers are asked for again while the card shows today.
 const REFRESH_MS = 20_000;
@@ -40,8 +41,9 @@ const COLUMNS = [
  * On a manager's dashboard (Sean, Nov 2026) it shows their own line to begin
  * with, and the team (account managers only) a click away: `scope` "me" or
  * "team", `scopeLinks` { me, team } the addresses of each, `userId` whose
- * line "me" is. First call: when each person's first call out started, in
- * the business's time zone (`timeZone`).
+ * line "me" is. First call: when each person's first call out started, on
+ * their own clock (their account's time zone, named when it is not the
+ * business's `timeZone`); the total's on the business's.
  */
 export default function CallActivityCard({ rows: initial, view, switcher, nav, scope = "all", scopeLinks = null, userId = null, timeZone }) {
   const [rows, setRows] = useState(initial);
@@ -79,11 +81,20 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
   const sum = (key) => rows.reduce((n, r) => n + r[key], 0);
   const avg = (talk, handled) => (handled ? talk / handled : 0);
   const totalHandled = sum("outHandled") + sum("inHandled");
-  // The time of day for a day's view; with the day too over a longer one.
-  const clock = (iso) => (iso ? new Date(iso).toLocaleString("en-US", {
-    timeZone: timeZone || undefined, hour: "numeric", minute: "2-digit",
-    ...(view.key === "day" ? {} : { month: "short", day: "numeric" }),
-  }) : "—");
+  // The time of day for a day's view; with the day too over a longer one. On `tz`'s clock, its zone
+  // named when it is not the business's.
+  const clock = (iso, tz = null) => {
+    if (!iso) return "—";
+    const at = new Date(iso);
+    const zone = knownZone(tz, timeZone) || undefined;
+    const text = at.toLocaleString("en-US", {
+      timeZone: zone, hour: "numeric", minute: "2-digit",
+      ...(view.key === "day" ? {} : { month: "short", day: "numeric" }),
+    });
+    return zone && timeZone && zone !== timeZone && zoneShort(zone, at) !== zoneShort(timeZone, at) ? `${text} ${zoneShort(zone, at)}` : text;
+  };
+  // Anyone here on another clock: the total's time names the business's.
+  const mixed = rows.some((r) => r.firstCall && r.timeZone && clock(r.firstCall, r.timeZone) !== clock(r.firstCall));
   const firsts = rows.map((r) => r.firstCall).filter(Boolean).sort();
   return (
     <Card data-call-activity>
@@ -117,7 +128,7 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
           {/* A day's calls added up through the day, for everyone here or one person (Sean, Nov 2026). */}
           {view.key === "day" ? (
             <CallTimesChart day={view.anchor} today={view.today} scope={scope} userId={userId} timeZone={timeZone}
-              people={rows.filter((r) => r.userId).map((r) => ({ id: r.userId, name: r.name }))} />
+              people={rows.filter((r) => r.userId).map((r) => ({ id: r.userId, name: r.name, timeZone: r.timeZone }))} />
           ) : null}
         </span>
       </div>
@@ -145,7 +156,7 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
                     ) : null}
                   </span>
                 </TableCell>
-                <TableCell className={cn("text-right tabular-nums", !r.firstCall && "text-muted-foreground")} data-col="first">{r.userId ? clock(r.firstCall) : ""}</TableCell>
+                <TableCell className={cn("text-right tabular-nums", !r.firstCall && "text-muted-foreground")} data-col="first">{r.userId ? clock(r.firstCall, r.timeZone) : ""}</TableCell>
                 {COLUMNS.map(([k]) => (
                   <TableCell key={k} data-col={k}
                     className={cn("text-right tabular-nums", !r[k] && "text-muted-foreground", k === "missed" && r[k] > 0 && "font-semibold text-rose-500")}>
@@ -159,7 +170,7 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
             {rows.length ? (
               <TableRow className="font-semibold" data-call-row="total">
                 <TableCell className="text-xs uppercase tracking-[0.1em] text-muted-foreground">{view.key === "day" ? "Day total" : "Total"}</TableCell>
-                <TableCell className="text-right tabular-nums" data-col="first">{firsts.length ? clock(firsts[0]) : "—"}</TableCell>
+                <TableCell className="text-right tabular-nums" data-col="first">{firsts.length ? `${clock(firsts[0])}${mixed && timeZone ? ` ${zoneShort(timeZone, new Date(firsts[0])) ?? ""}` : ""}`.trim() : "—"}</TableCell>
                 {COLUMNS.map(([k]) => <TableCell key={k} className="text-right tabular-nums" data-col={k}>{sum(k)}</TableCell>)}
                 <TableCell className="text-right tabular-nums" data-col="avg">{talkClock(avg(sum("talk"), totalHandled))}</TableCell>
                 <TableCell className="text-right tabular-nums" data-col="talk">{talkClock(sum("talk"))}</TableCell>

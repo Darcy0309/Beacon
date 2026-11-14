@@ -32,17 +32,19 @@ export async function getCallActivity({ from, to }, { scope = "all", userId = nu
       talk: n(r.talk_seconds),
       onCall: Boolean(r.on_call),
       firstCall: r.first_call ?? null,
+      // Their own clock (their account's time zone); null: the business's.
+      timeZone: r.time_zone ?? null,
     }))
     .sort((a, b) => (a.userId ? 0 : 1) - (b.userId ? 0 : 1) || b.total - a.total || b.talk - a.talk || a.name.localeCompare(b.name));
 }
 
 /**
  * A day's calls by person and half hour (phone_call_times), for Call Activity's chart:
- * [{ userId, slot (minutes past midnight, business time), calls }]. The people as getCallActivity()'s scope.
+ * [{ userId, slot (minutes past midnight, business time), localSlot (on the person's own clock), calls }]. The people as getCallActivity()'s scope.
  */
 export async function getCallTimes(day, { scope = "all", userId = null } = {}) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("phone_call_times", { p_day: day, p_scope: scope, p_user: userId });
   if (error) throw error;
-  return (data ?? []).map((r) => ({ userId: r.user_id, slot: Number(r.slot), calls: Number(r.calls) }));
+  return (data ?? []).map((r) => ({ userId: r.user_id, slot: Number(r.slot), localSlot: Number(r.local_slot ?? r.slot), calls: Number(r.calls) }));
 }

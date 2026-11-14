@@ -26,6 +26,10 @@ const call = (user, dir, hhmm, talk = null) => {
     values (${lit(sid)}, ${lit(sid)}, ${user}, ${lit(dir)}, '+16025550100', ${talk == null ? "'no-answer'" : "'completed'"}, ${at}, ${at},
       ${talk == null ? "null" : at}, ${at} + interval '${talk ?? 5} seconds', ${talk ?? 0})`);
 };
+// Mike works on Central time (Sean, Nov 2026: each manager's own clock).
+const mikeZone = sql(`select coalesce(timezone_id::text, 'null') from public.users where id = ${MIKE}`);
+const CENTRAL = Number(sql("select id from public.timezones where iana = 'America/Chicago' order by id limit 1"));
+sql(`update public.users set timezone_id = ${CENTRAL} where id = ${MIKE}`);
 // Rachel is a client's Sales Rep.
 const company = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Insurance`)}, ${RACHEL}) returning id`));
 
@@ -37,7 +41,13 @@ const report = async (who, scope, user = null) => {
 };
 const ids = (rows) => rows.map((r) => r.user_id);
 const first = (rows, id) => rows.find((r) => r.user_id === id)?.first_call ?? null;
-const clock = (iso) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone: sql("select public.business_tz()"), hour: "numeric", minute: "2-digit" }) : null);
+const BUSINESS = sql("select public.business_tz()");
+const clock = (iso, timeZone = BUSINESS) => (iso ? new Date(iso).toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" }) : null);
+// Minutes past midnight on a clock, to the half hour.
+const halfHour = (iso, timeZone) => {
+  const [h, m] = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(new Date(iso)).filter((p) => p.type !== "literal").map((p) => Number(p.value));
+  return h * 60 + Math.floor(m / 30) * 30;
+};
 
 try {
   call(SEAN, "out", "08:02", 60);
@@ -66,6 +76,17 @@ try {
   const asked = await report(sean, "all");
   check("a manager asking for everyone gets the team", JSON.stringify(ids(asked).sort()) === JSON.stringify(ids(team).sort()));
 
+  section("Each person's own clock");
+  const mikeRow = team.find((r) => r.user_id === MIKE);
+  check("a manager's time zone comes with their line", mikeRow?.time_zone === "America/Chicago", mikeRow?.time_zone);
+  const { data: times, error: timesError } = await sean.sb.rpc("phone_call_times", { p_day: today, p_scope: "team", p_user: null });
+  if (timesError) throw timesError;
+  const mikeSlot = times.find((r) => r.user_id === MIKE);
+  check("the chart's half hour on the business's clock…", mikeSlot?.slot === halfHour(mikeRow.first_call, BUSINESS), JSON.stringify(mikeSlot));
+  check("…and on Mike's own (Central)", mikeSlot?.local_slot === halfHour(mikeRow.first_call, "America/Chicago"), JSON.stringify(mikeSlot));
+  check("Mountain split in two: Arizona, and Utah and Montana with daylight saving",
+    sql("select string_agg(iana, ',' order by iana) from public.timezones where name in ('MST (Arizona)', 'MT (Utah, Montana)')") === "America/Denver,America/Phoenix");
+
   section("An administrator");
   const everyone = await report(admin, "all");
   check("everyone on the phone: administrators and Sales Reps too", [SEAN, MIKE, RACHEL, ADMIN].every((id) => ids(everyone).includes(id)), JSON.stringify(ids(everyone)));
@@ -74,6 +95,7 @@ try {
 } finally {
   sql(`delete from public.phone_calls where call_sid like ${lit(`CA${TAG.toLowerCase()}%`)}`);
   sql(`delete from public.companies where id = ${company}`);
+  sql(`update public.users set timezone_id = ${mikeZone} where id = ${MIKE}`);
 }
 
 finish("call activity");
