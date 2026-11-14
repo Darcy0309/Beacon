@@ -7,9 +7,10 @@ import NotificationBell from "@/features/notifications/components/notification-b
 /**
  * The top of every page (client, Nov 2026): what the page shows on the left (`sub`, with `tag` over it,
  * the dashboard's "Signature Marketing · Lighthouse Platform"), its title in the middle on a tab that
- * hangs below the bar, and search, the theme and notifications on the right. Its shape: topbar-frame.jsx.
+ * hangs below the bar, and search, the theme and notifications on the right; `aside` beside what the page
+ * shows (the lead sheet's Weather button). Its shape: topbar-frame.jsx.
  */
-export default function Topbar({ title, sub, tag }) {
+export default function Topbar({ title, sub, tag, aside = null }) {
   return (
     <TopbarFrame
       data-topbar
@@ -22,6 +23,7 @@ export default function Topbar({ title, sub, tag }) {
               {sub ? <p data-topbar-sub className="truncate text-xs text-muted-foreground">{sub}</p> : null}
             </div>
           ) : null}
+          {aside ? <div className="hidden shrink-0 items-center gap-2 sm:flex" data-topbar-aside>{aside}</div> : null}
         </>
       }
       title={<h1 data-topbar-title className="max-w-[46vw] truncate text-sm font-bold uppercase tracking-[0.16em] sm:max-w-[32rem]">{title}</h1>}

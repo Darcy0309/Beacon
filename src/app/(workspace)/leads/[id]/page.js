@@ -52,7 +52,9 @@ import SectionHeader from "@/components/shared/section-header";
 import ProjectInfoView from "@/features/project-info/components/project-info-view";
 import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
 import { getProjectInfo } from "@/features/project-info/queries";
-import { leadPlace } from "@/lib/project-info";
+import { leadPlace, weatherLink } from "@/lib/project-info";
+import { zip5 } from "@/lib/weather";
+import WeatherCard from "@/features/project-info/components/weather-card";
 import HoldNotice from "@/features/delivery/components/hold-notice";
 import TransferDialog from "@/features/leads/components/transfer-dialog";
 import CallBackLater from "@/features/leads/components/call-back-later";
@@ -373,7 +375,10 @@ export default async function LeadSheet({ params, searchParams }) {
 
   return (
     <>
-      <Topbar title="Lead Sheet" sub={lead.co} />
+      {/* The weather at the project's ZIP (Sean, Nov 2026), in the top bar beside the business: a storm or a
+          flood there makes a poor day to call. Google's in a new tab; a forecast card as it is hovered. */}
+      <Topbar title="Lead Sheet" sub={lead.co}
+        aside={info && weatherLink(info.zip) ? <WeatherCard zip={zip5(info.zip)} href={weatherLink(info.zip)} place={[info.city, info.state].filter(Boolean).join(", ")} align="start" /> : null} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">

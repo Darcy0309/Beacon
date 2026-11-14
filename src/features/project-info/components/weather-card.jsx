@@ -22,9 +22,10 @@ const CLOSE_MS = 200;
  * The Weather button on Project Info (Sean, Nov 2026): Google's weather for the project's ZIP in a new tab,
  * and, hovered (or focused), a card with the forecast there from the National Weather Service: the hour at
  * hand, the next 24 hours' temperature, 7 days, and any warning in force (a winter storm, a flood).
- * `zip` the project's; `href` Google's weather for it; `place` its city and state ("Hayward, WI").
+ * `zip` the project's; `href` Google's weather for it; `place` its city and state ("Hayward, WI"); `align` the
+ * card's edge to the button's ("start" in the lead sheet's top bar, on the left).
  */
-export default function WeatherCard({ zip, href, place = "" }) {
+export default function WeatherCard({ zip, href, place = "", align = "end" }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(() => kept.get(zip) ?? null);
   const [error, setError] = useState("");
@@ -62,7 +63,7 @@ export default function WeatherCard({ zip, href, place = "" }) {
           <CloudSun className="size-4" aria-hidden /> Weather · {zip}
         </a>
       </PopoverAnchor>
-      <PopoverContent align="end" className="w-[22rem] p-0" data-weather-card
+      <PopoverContent align={align} className="w-[22rem] p-0" data-weather-card
         onOpenAutoFocus={(e) => e.preventDefault()} onCloseAutoFocus={(e) => e.preventDefault()}
         onMouseEnter={stay} onMouseLeave={() => later(false, CLOSE_MS)}>
         <div className="flex items-center justify-between gap-2 border-b border-[var(--panel-border)] px-4 py-2.5">
