@@ -62,6 +62,15 @@ export const directionsLink = (from, to) =>
     : null;
 
 /**
+ * Google's weather for a ZIP (Sean, Nov 2026): the forecast where the project is, to see a snowstorm or a
+ * flood coming before a day of calls. The first five digits of a ZIP; null without one.
+ */
+export const weatherLink = (zip) => {
+  const z = String(zip ?? "").match(/\d{5}/)?.[0];
+  return z ? `https://www.google.com/search?q=${encodeURIComponent(`weather ${z}`)}` : null;
+};
+
+/**
  * Producers as they are kept: each { first, last, email, leads }, trimmed,
  * the empty rows dropped, at most five. `leads`: they get each lead and
  * appointment by email (only with an address to send to).

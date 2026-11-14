@@ -2,7 +2,7 @@
 /** Unit tests for Project Info: its choices, the agent's area code, directions to a lead, the producers emailed leads. */
 import {
   MAX_PRODUCERS, QUOTE_TIMES, US_STATES, WEEKDAYS, addressLine, areaCode, cleanProducers, directionsLink, hasProfile,
-  infoProjectOf, leadPlace, producerAddresses, producerName, weekdayList, yesNoOf, yesWith,
+  infoProjectOf, leadPlace, producerAddresses, producerName, weatherLink, weekdayList, yesNoOf, yesWith,
 } from "../../src/lib/project-info.js";
 import { cross, schemas, validate } from "../../src/lib/validate.js";
 
@@ -11,6 +11,11 @@ const check = (label, cond, detail = "") => {
   if (cond) console.log(`✓ ${label}`);
   else { console.error(`✗ ${label}${detail ? ` — ${detail}` : ""}`); failures++; }
 };
+
+// The weather where the project is (Sean, Nov 2026).
+check("the weather at a ZIP: Google's", weatherLink("68022") === "https://www.google.com/search?q=weather%2068022", weatherLink("68022"));
+check("…its first five digits", weatherLink(" 68022-1234 ") === weatherLink("68022"));
+check("…none without a ZIP", weatherLink(null) === null && weatherLink("") === null && weatherLink("abc") === null);
 const is = (label, got, want) => check(label, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}`);
 
 is("the states and DC, in alphabetical order", [US_STATES.length, US_STATES.slice(0, 4), US_STATES.includes("DC"), [...US_STATES].sort().join() === US_STATES.join()],

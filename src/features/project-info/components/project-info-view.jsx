@@ -3,8 +3,10 @@ import ToneBadge from "@/components/shared/tone-badge";
 import { mapLink } from "@/lib/appointment-links";
 import { mediumDate, telHref } from "@/lib/format";
 import { SECTION_LINE } from "@/features/leads/form-section";
-import { addressLine, areaCode, directionsLink, hasProfile, producerName, weekdayList, yesNoOf, yesWith } from "@/lib/project-info";
+import { addressLine, areaCode, directionsLink, hasProfile, producerName, weatherLink, weekdayList, yesNoOf, yesWith } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
+import { zip5 } from "@/lib/weather";
+import WeatherCard from "@/features/project-info/components/weather-card";
 
 const blank = (v) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
 
@@ -44,7 +46,7 @@ function Rows({ rows }) {
  * Then, in the order the client's team reads them (Nov 2026), the producers
  * taking appointments, the carriers, the appointments it takes, and about the
  * agency; each boxed. `action`: buttons for its top bar (Edit, Send to
- * client). `wide`: two columns on a wide screen.
+ * client), beside the weather where the project is (its ZIP): Google's, and a card with the forecast as it is hovered. `wide`: two columns on a wide screen.
  */
 export default function ProjectInfoView({ info, toLead = null, action = null, wide = false, emptyHint = null }) {
   const office = addressLine(info);
@@ -56,6 +58,8 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
     ? `Shared with ${info.project_name}, the appointment project this one is tied to.`
     : info.own && info.tied_name ? `This project's own, apart from ${info.tied_name}'s.`
     : info.shared_with?.length ? `Also used by ${info.shared_with.join(", ")}.` : null;
+  // The weather at the project's ZIP (Sean, Nov 2026): a storm or a flood there makes a poor day to call.
+  const weather = weatherLink(info.zip);
   const stamp = info.updated_at
     ? `Updated ${mediumDate(info.updated_at)}${info.updated_via === "link" ? " by the client, from their link"
       : info.updated_by ? ` by ${info.updated_by}${info.updated_by_client ? " (client)" : ""}` : ""}`
@@ -152,13 +156,18 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
 
   return (
     <div data-project-info={info.project_id}>
-      {action || shared || stamp ? (
+      {action || weather || shared || stamp ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--panel-border)] px-4 py-2">
           <div className="min-w-0 text-xs text-muted-foreground">
             {shared ? <p data-info-shared>{shared}</p> : null}
             {stamp ? <p data-info-stamp>{stamp}</p> : null}
           </div>
-          {action ? <div className="ml-auto flex flex-wrap items-center gap-2">{action}</div> : null}
+          {action || weather ? (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              {weather ? <WeatherCard zip={zip5(info.zip)} href={weather} place={[info.city, info.state].filter(Boolean).join(", ")} /> : null}
+              {action}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {anything ? null : (
