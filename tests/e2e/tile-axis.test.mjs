@@ -41,8 +41,8 @@ try {
   section("A manager's own tiles");
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 1000 });
   await sean.go("/?ap=week", 9000);
-  const calls = await labels(sean, "Calls Today");
-  check("Calls Today: the last seven days by name", calls?.labels.length === 7 && calls.labels.every((l) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(l)), JSON.stringify(calls));
+  const calls = await labels(sean, "Names Processed");
+  check("Names Processed: the last seven days by name", calls?.labels.length === 7 && calls.labels.every((l) => /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/.test(l)), JSON.stringify(calls));
   const appts = await labels(sean, "Appointments");
   check("Appointments on Week: Mon to Sun", appts?.labels.join() === "Mon,Tue,Wed,Thu,Fri,Sat,Sun", JSON.stringify(appts));
 } finally {

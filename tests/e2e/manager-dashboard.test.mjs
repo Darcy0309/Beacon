@@ -48,8 +48,8 @@ try {
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 950 });
   await sean.go("/", 4000);
   const labels = await sean.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent.trim()).slice(0, 4)`);
-  check("four tiles of their own: Appointments, Leads, Active Projects, Calls Today",
-    JSON.stringify(labels) === JSON.stringify(["Appointments", "Leads", "Active Projects", "Calls Today"]), JSON.stringify(labels));
+  check("four tiles of their own: Appointments, Leads, Active Projects, Names Processed",
+    JSON.stringify(labels) === JSON.stringify(["Appointments", "Leads", "Active Projects", "Names Processed"]), JSON.stringify(labels));
   check("…no Total Leads or Conversion Rate", !/Total Leads|Conversion Rate/i.test(await sean.ev(`[...document.querySelectorAll('[data-panel] .stat-label')].map((e) => e.textContent).join(' ')`)));
   const chosen = (param) => sean.ev(`document.querySelector('[data-period-switch="${param}"] [aria-current]')?.textContent.trim() ?? null`);
   check("Appointments and Leads count this pay period by default", (await chosen("ap")) === "Pay" && (await chosen("ld")) === "Pay" && /Developed/.test(await tile(sean, "Leads")));
@@ -61,7 +61,7 @@ try {
   const switchTop = (param) => sean.ev(`Math.round(document.querySelector('[data-period-switch="${param}"]').getBoundingClientRect().top)`);
   check("…the switch stays in the same place whatever the period", (await switchTop("ap")) === (await switchTop("ld")), `${await switchTop("ap")} vs ${await switchTop("ld")}`);
   check("Active Projects: how many, by kind, and the change in 30 days", /\d+ Lead · \d+ Appointment/.test(await tile(sean, "Active Projects")) && /in the last 30 days/.test(await tile(sean, "Active Projects")), await tile(sean, "Active Projects"));
-  check("Calls Today: the calls made, and when the day started", /Calls Today\s*\d+/i.test(await tile(sean, "Calls Today")) && /Started|Not started yet/.test(await tile(sean, "Calls Today")), await tile(sean, "Calls Today"));
+  check("Names Processed: the names worked through today (the calls dialed are on Call Activity), and when the day started", /Names Processed\s*\d+/i.test(await tile(sean, "Names Processed")) && /Started|Not started yet/.test(await tile(sean, "Names Processed")), await tile(sean, "Names Processed"));
   const production = () => sean.ev(`document.querySelector('[data-production-card]')?.innerText ?? ''`);
   check("Daily Production (row two): before a goal is set, a place to set it", /Set today's goal/.test(await production()), await production());
   const tileHeight = (page) => page.ev(`Math.round(document.querySelector('[data-panel]').getBoundingClientRect().height)`);

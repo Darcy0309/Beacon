@@ -287,7 +287,9 @@ export default async function Dashboard({ searchParams }) {
           </div>
         ) },
       // Daily Production has the second row to itself.
-      { label: "Calls Today", value: String(t.calls),
+      // Names Processed (Sean, Nov 2026): the names worked through on a list today (a call result saved for
+      // each), not the calls dialed; those are on Call Activity, below.
+      { label: "Names Processed", value: String(t.calls),
         note: started ? `Started ${started} · ${hoursLabel(t.workedMinutes)} worked` : "Not started yet today",
         icon: PhoneCall, accent: "var(--neon-amber)", series: manager.calls.series, seriesLabels: manager.calls.labels, seriesTitles: manager.calls.titles },
     ];

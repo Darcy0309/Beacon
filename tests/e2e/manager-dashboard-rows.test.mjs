@@ -179,8 +179,8 @@ try {
   await admin.click(`[data-open-dashboard="${SEAN}"]`);
   check("the manager's name opens it", Boolean(await until(async () => (await admin.url()).includes(`view=${SEAN}`) && (await admin.ev(`!!document.querySelector('[data-viewing-as="${SEAN}"]')`)))), await admin.url());
   const asSean = await until(() => admin.ev(`document.body.innerText`).then((t) => (/Daily Team Production/i.test(t) ? t : null)));
-  check("…their tiles and rows: Calls Today, Daily Production, their calendar, what they developed, the team's day",
-    /Calls Today/i.test(asSean) && /Daily Production/i.test(asSean) && /Recent Leads & Appointments/i.test(asSean) && Boolean(await admin.ev(`!!document.querySelector('[data-my-schedule]')`)) && !/Appointments by Rep/i.test(asSean), asSean?.slice(0, 400));
+  check("…their tiles and rows: Names Processed, Daily Production, their calendar, what they developed, the team's day",
+    /Names Processed/i.test(asSean) && /Daily Production/i.test(asSean) && /Recent Leads & Appointments/i.test(asSean) && Boolean(await admin.ev(`!!document.querySelector('[data-my-schedule]')`)) && !/Appointments by Rep/i.test(asSean), asSean?.slice(0, 400));
   check("…their goal is theirs to set: no form for the administrator", !(await admin.ev(`!!document.querySelector('[data-daily-goals-form]')`)));
   check("…what they developed today is there", (await admin.ev(`document.querySelector('[data-developed]')?.innerText ?? ''`)).includes(`${TAG} Plumbing`));
   await admin.click('[data-period-switch="rl"] a', "Week");

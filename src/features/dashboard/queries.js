@@ -194,7 +194,7 @@ export async function getManagerDashboard({ userId, today, ranges }) {
   return {
     leads: tally(leads.data, "leads", ranges.leads),
     appts: tally(appts.data, "appointments", ranges.appts),
-    // Calls Today's sparkline: the last seven days.
+    // Names Processed's sparkline: the last seven days.
     calls: tally(calls.data, "calls", week),
     projects: { total: active.size, lead, appt, net, pct: before > 0 ? Math.round((net / before) * 100) : null },
     today: mine ? toProduction(mine) : null,
