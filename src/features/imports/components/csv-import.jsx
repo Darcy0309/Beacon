@@ -143,7 +143,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], people = [], duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
+      const { imported, errors, total, assigned, unknown = [], people = [], noDateAppts = 0, duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
       const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
         existing ? `${existing} already on the project` : "", others ? `${others} on other clients' lists` : ""].filter(Boolean).join(" · ");
       // What the list left out of a place and the rest said for certain (a ZIP's county, a city's ZIP…; Oct 2026).
@@ -158,6 +158,10 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
           description: unknown.slice(0, 6).map((u) => `“${u.text}” (${u.n})`).join(", ") + (unknown.length > 6 ? ", …" : ""),
           duration: 20000,
         });
+      }
+      // Appointment results with no appointment date (Sean, Nov 2026): brought in as Lead-No Contact.
+      if (noDateAppts) {
+        toast.info(`${noDateAppts} row${noDateAppts === 1 ? "" : "s"} had an appointment call result but no appointment date, so ${noDateAppts === 1 ? "it comes" : "they come"} in as Lead-No Contact`, { duration: 15000 });
       }
       // Managers the old system names who aren't ours (Sean, Nov 2026): their leads and appointments count to no one.
       if (people.length) {

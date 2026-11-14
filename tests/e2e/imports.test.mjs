@@ -74,7 +74,12 @@ writeFileSync(historyFile, ["Company,Phone,Call Result Appt,Date Developed,Devel
   `"${TAG} Hist A",602-555-0201,Appointment,3/14/2025,Sean Fitzgerald,04/02/2025,Rachel Colestock,4/20/2025`,
   `"${TAG} Hist B",602-555-0202,Lead-No Contact,5/1/2025,Nobody Known,,,`,
   // Marked invalid in the old system, which clears its set date: dated by its appointment's.
-  `"${TAG} Hist C",602-555-0203,Appointment-Invalid,5/2/2025,Sean Fitzgerald,,Rachel Colestock,6/10/2025`].join("\n"));
+  `"${TAG} Hist C",602-555-0203,Appointment-Invalid,5/2/2025,Sean Fitzgerald,,Rachel Colestock,6/10/2025`,
+  // The old system's appointment results (Sean, Nov 2026): one with no appointment date is no appointment;
+  // "-$Appointment" and "-$Survey Appointment" were its invalid ones.
+  `"${TAG} Hist D",801-255-5439,Appt From X-Date,5/3/2025,Sean Fitzgerald,,,`,
+  `"${TAG} Hist E",435-867-4773,-$Appointment,5/4/2025,Sean Fitzgerald,,,`,
+  `"${TAG} Hist F",801-265-8089,-$Survey Appointment,5/5/2025,Sean Fitzgerald,,Rachel Colestock,6/12/2025`].join("\n"));
 const developed = (name) => sql(`select coalesce((promoted_at at time zone public.business_tz())::date::text, '') || '|' || coalesce(dbdv_user_id::text, '')
   from public.leads where company_name = ${lit(`${TAG} ${name}`)}`);
 
@@ -272,7 +277,7 @@ try {
   section("The old system's dates and managers");
   await chooseFile(admin, historyFile, apptProject);
   await admin.click("button[type=submit]", "Import leads");
-  check("an old list imports", /Imported 3 of 3/.test((await admin.waitToast(/Imported 3 of 3/, 15000)) ?? ""));
+  check("an old list imports", /Imported 6 of 6/.test((await admin.waitToast(/Imported 6 of 6/, 15000)) ?? ""));
   check("a lead developed when the old system says, by the manager it names", developed("Hist A") === "2025-03-14|2", developed("Hist A"));
   const set = sql(`select (a.appt_create_date at time zone public.business_tz())::date || '|' || coalesce(a.user_id::text, '') from public.appointments a
     join public.leads l on l.id = a.lead_id where l.company_name = ${lit(`${TAG} Hist A`)}`);
@@ -282,6 +287,13 @@ try {
   check("an invalid appointment comes in invalid, its blank set date its appointment's, to whoever set it", invalid === "2025-06-10|true|Invalid|4", invalid);
   check("a manager who isn't ours: the date kept, no one named", developed("Hist B") === "2025-05-01|", developed("Hist B"));
   check("…and the import says who", Boolean(await until(async () => /manager the system doesn't have[\s\S]*Nobody Known/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
+  const resultOf = (name) => sql(`select coalesce(r.name, '') || '|' || (select count(*) from public.appointments a where a.lead_id = l.id)
+    || '|' || coalesce((select string_agg(s.name || ':' || (a.invalid_at is not null), ',') from public.appointments a join public.appointment_statuses s on s.id = a.status_id where a.lead_id = l.id), '')
+    from public.leads l left join public.call_results r on r.id = l.result_id where l.company_name = ${lit(`${TAG} ${name}`)}`);
+  check("an old appointment result with no appointment date: Lead-No Contact, no appointment", resultOf("Hist D") === "Lead-No Contact|0|", resultOf("Hist D"));
+  check("…and the import says so", Boolean(await until(async () => /1 row had an appointment call result but no appointment date/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
+  check("“-$Appointment” (no date): Appointment-Invalid, an invalid appointment", resultOf("Hist E") === "Appointment-Invalid|1|Invalid:true", resultOf("Hist E"));
+  check("“-$Survey Appointment”: Appointment-Invalid too", resultOf("Hist F") === "Appointment-Invalid|1|Invalid:true", resultOf("Hist F"));
 
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);

@@ -289,6 +289,8 @@ export async function importLeadsCsv(prevState, formData) {
   let imported = 0;
   let details = 0;
   let appointments = 0;
+  // Appointment results with no appointment date, brought in as Lead-No Contact.
+  let noDateAppts = 0;
   const childInserts = [];
 
   // A chunk's insurance, notes or appointments: how many went in.
@@ -328,6 +330,13 @@ export async function importLeadsCsv(prevState, formData) {
       }
       // New names start on the client's first result: Viable-CallBack (DBDev) or Lead-No Contact (Appt).
       result ??= firstResult[stageType];
+      // An appointment result with no appointment date (Sean, Nov 2026: "Appt From X-Date" with no date or time):
+      // no appointment was booked, so it comes in as the stage's first result (Lead-No Contact) rather than an
+      // Appointment. One the old system marked invalid ("-$Appointment") stays Appointment-Invalid, below.
+      if (result?.effect === "appointment" && !parsedRow.appointment) {
+        noDateAppts += 1;
+        result = firstResult[stageType];
+      }
       // An appointment the old system marked invalid (Sean, Nov 2026): it comes in as one, appointment date or not.
       parsedRow.invalidAppt = result?.effect === "appointment_invalid";
       // When it was developed and by whom, as the old system says: the reports count it then, to them.
@@ -454,5 +463,5 @@ export async function importLeadsCsv(prevState, formData) {
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
   const people = [...unknownPeople].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ people, imported, errors, details, appointments, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
+  return ok({ people, imported, errors, details, appointments, noDateAppts, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
 }
