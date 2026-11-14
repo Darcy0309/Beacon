@@ -13,6 +13,9 @@ function SkyIcon({ kind, night = false, className = "" }) {
   return <Icon className={`${TINT[kind] ?? ""} ${className}`} aria-hidden />;
 }
 
+/** °F as whole °C. */
+const celsius = (f) => Math.round(((Number(f) - 32) * 5) / 9);
+
 // The answers already had, by ZIP: hovering again shows them at once.
 const kept = new Map();
 const OPEN_MS = 250;
@@ -106,7 +109,11 @@ function WeatherBody({ data }) {
       {now ? (
         <div className="flex items-center gap-3" data-weather-now>
           <SkyIcon kind={now.kind} night={now.night} className="size-11 shrink-0" />
-          <span className="text-4xl font-semibold tabular-nums leading-none">{now.temp}°<span className="align-top text-base font-normal text-muted-foreground">F</span></span>
+          <span className="flex shrink-0 flex-col">
+            <span className="text-4xl font-semibold tabular-nums leading-none">{now.temp}°<span className="align-top text-base font-normal text-muted-foreground">F</span></span>
+            {/* The same in Celsius, beneath (Nov 2026). */}
+            <span className="mt-1 text-sm tabular-nums text-muted-foreground" data-weather-celsius>{celsius(now.temp)}°C</span>
+          </span>
           <span className="min-w-0 text-xs leading-relaxed text-muted-foreground">
             <span className="block truncate font-medium text-foreground">{now.sky}</span>
             Precipitation: {now.precip}%

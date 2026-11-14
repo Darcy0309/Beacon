@@ -203,6 +203,8 @@ try {
   check("…hovered: the weather card, with the forecast there now, the next hours and the days ahead",
     Boolean(await sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]') && !!document.querySelector('[data-weather-card] [data-weather-hours]') && document.querySelectorAll('[data-weather-card] [data-weather-days] > div').length >= 5`))
     && /Hayward, WI 54843/.test(card ?? ""), card);
+  const temps = await sean.ev(`(() => { const f = document.querySelector('[data-weather-now] .text-4xl')?.textContent.match(/-?\\d+/)?.[0]; const c = document.querySelector('[data-weather-celsius]')?.textContent; return { f, c }; })()`);
+  check("…the temperature in Celsius beneath it", temps?.c === `${Math.round(((Number(temps?.f) - 32) * 5) / 9)}°C`, JSON.stringify(temps));
   await shot(sean, "project-info-weather-card");
   // Away to the right of the page, clear of the card.
   await sean.hover({ x: 1300, y: 600 });
