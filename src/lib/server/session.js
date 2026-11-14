@@ -35,8 +35,14 @@ export const getCurrentUser = cache(async function getCurrentUser() {
     .maybeSingle();
   if (!data) return null;
 
+  // A client's Sales Rep (Sean, Nov 2026): an account manager who is one sees Payments Due; one who isn't doesn't.
+  const salesRep = data.role === "manager"
+    ? Boolean((await supabase.rpc("is_sales_rep", { p_user: data.id })).data)
+    : false;
+
   return {
     ...data,
+    salesRep,
     company: one(data.company),
     name: fullName(data),
     short: shortName(data),

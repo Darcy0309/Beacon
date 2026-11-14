@@ -92,9 +92,14 @@ try {
   if (SHOTS) await sean.screenshot(`${SHOTS}/payments-due.png`);
 
   const mike = await (await browser.newContext({ as: "mike@beacon.test" })).newPage({ width: 1440, height: 1000 });
+  // An account manager who is no client's Sales Rep (Sean, Nov 2026): no Accounts in their menu, and the page isn't theirs.
+  await mike.go("/", 6000);
+  const menu = (await when(mike, "document.querySelector('aside nav')?.innerText ?? null")) ?? "";
+  check("another manager, no client's Sales Rep: no Accounts, no Payments Due in their menu",
+    menu.length > 0 && !/Accounts/.test(menu) && !/Payments Due/.test(menu) && !(await mike.ev(`!!document.querySelector('aside nav a[href="/payments"]')`)), menu.slice(0, 200));
   await mike.go("/payments", 6000);
-  await when(mike, "!!document.querySelector('[data-payments-page]')");
-  check("another manager: none of them", !(await mike.ev(`document.querySelector('[data-payments-page]').innerText.includes(${JSON.stringify(TAG)})`)));
+  check("…nor the page, opened by its address", Boolean(await when(mike, "/You don't have access to this page/.test(document.body.innerText) || null"))
+    && !(await mike.ev(`!!document.querySelector('[data-payments-page]')`)));
 
   section("A payment removed: not owed after all (client, Nov 2026)");
   const fourth = Number(sql(`select id from public.project_payments where project_id = ${P} and seq = 4`));

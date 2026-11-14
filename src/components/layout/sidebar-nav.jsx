@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import ConfirmDialog from "@/components/shared/confirm-dialog";
 import SignatureLogo from "@/components/brand/signature-logo";
 import LighthouseMark from "@/components/brand/logo-mark";
-import { navGroups, ROLES } from "@/lib/nav";
+import { navGroups, ROLES, showsItem } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
 import { signOut } from "@/features/auth/actions";
 import { forgetPushThenSubmit } from "@/features/notifications/desktop";
@@ -103,7 +103,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
   const tipProps = (label) => (collapsed ? { onMouseEnter: showTip(label), onMouseLeave: hideTip, onFocus: showTip(label), onBlur: hideTip } : {});
 
   const groups = navGroups
-    .map((g) => ({ ...g, items: g.items.filter((i) => i.roles.includes(role)) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => showsItem(i, role, user)) }))
     .filter((g) => g.items.length > 0);
 
   return (

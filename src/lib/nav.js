@@ -43,6 +43,21 @@ export function rolesForPath(pathname) {
   return item?.roles ?? null;
 }
 
+/**
+ * Whether `user` (with `role`) sees a menu item: its roles, and for one kept to Sales Reps (`salesReps`),
+ * an account manager only when they are a client's Sales Rep (Sean, Nov 2026: Payments Due).
+ */
+export const showsItem = (item, role, user = null) =>
+  item.roles.includes(role) && !(item.salesReps && role === "manager" && !user?.salesRep);
+
+/** Whether `user` may open `pathname`: as rolesForPath() says, and its section's Sales Rep rule. Null when unlisted. */
+export function mayOpen(pathname, role, user = null) {
+  const roles = rolesForPath(pathname);
+  if (!roles) return null;
+  const item = navGroups.flatMap((g) => g.items).find((i) => i.salesReps && (pathname === i.href || pathname.startsWith(`${i.href}/`)));
+  return roles.includes(role) && !(item && role === "manager" && !user?.salesRep);
+}
+
 export const navGroups = [
   {
     label: "Workspace",
@@ -66,7 +81,8 @@ export const navGroups = [
       { href: "/projects", label: "Projects", icon: FolderKanban, roles: ["admin", "client"] },
       { href: "/account-managers", label: "Account Managers", icon: UserCog, roles: ["admin"] },
       // Program Funding's payments (client, Nov 2026): an administrator's every client's, a Sales Rep's their own.
-      { href: "/payments", label: "Payments Due", icon: Wallet, roles: ["admin", "manager"] },
+      // Not an account manager who is no client's Sales Rep (Sean, Nov 2026): Accounts is gone from their menu.
+      { href: "/payments", label: "Payments Due", icon: Wallet, roles: ["admin", "manager"], salesReps: true },
     ],
   },
   {

@@ -8,7 +8,7 @@ import AppSidebar from "@/components/layout/app-sidebar";
 import Topbar from "@/components/layout/topbar";
 import { Card } from "@/components/ui/card";
 import { useRole } from "@/components/layout/role-provider";
-import { rolesForPath } from "@/lib/nav";
+import { mayOpen } from "@/lib/nav";
 import { signOut } from "@/features/auth/actions";
 import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import ActivityTracker from "@/features/pay/components/activity-tracker";
@@ -48,8 +48,7 @@ export default function WorkspaceShell({ children }) {
   // A page this role cannot open — reached by typing the URL or following an
   // old link. Row Level Security already keeps the data out of reach; this
   // just says so plainly instead of rendering an empty screen.
-  const allowed = rolesForPath(path);
-  const denied = allowed && !allowed.includes(role) && !(invited && path === "/security");
+  const denied = mayOpen(path, role, user) === false && !(invited && path === "/security");
 
   // Time worked counts for the people paid by it: account managers and agents.
   const tracked = (role === "manager" || role === "agent") && user?.status === "active";

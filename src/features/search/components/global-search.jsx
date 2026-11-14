@@ -8,7 +8,7 @@ import { Command } from "cmdk";
 import {
   Search, Loader2, CornerDownLeft, Target, Users, FolderKanban, UserCog, FileText, Building2, X,
 } from "lucide-react";
-import { navGroups, rolesForPath } from "@/lib/nav";
+import { navGroups, rolesForPath, showsItem } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
 import { REACH_ERROR, isNetworkError } from "@/lib/reach";
 import { toast } from "sonner";
@@ -66,7 +66,7 @@ function Result({ item, onPick }) {
  */
 export default function GlobalSearch() {
   const router = useNavigationRouter();
-  const { role } = useRole();
+  const { role, user } = useRole();
   const [open, setOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const [q, setQ] = useState("");
@@ -163,9 +163,9 @@ export default function GlobalSearch() {
     if (term.length < MIN_CHARS) return [];
     return navGroups
       .flatMap((g) => g.items)
-      .filter((i) => i.roles.includes(role) && i.label.toLowerCase().includes(term))
+      .filter((i) => showsItem(i, role, user) && i.label.toLowerCase().includes(term))
       .slice(0, 4);
-  }, [q, role]);
+  }, [q, role, user]);
 
   // The results, a group each: matching pages first, then each kind of record.
   const sections = useMemo(
@@ -189,9 +189,9 @@ export default function GlobalSearch() {
   const searchable = useMemo(() => GROUPS.filter(([, , , sample]) => rolesForPath(sample)?.includes(role)), [role]);
   // Before anything is typed: the pages this role opens most, to jump straight to.
   const jump = useMemo(
-    () => navGroups.flatMap((g) => g.items).filter((i) => i.roles.includes(role)).slice(0, JUMP_TO)
+    () => navGroups.flatMap((g) => g.items).filter((i) => showsItem(i, role, user)).slice(0, JUMP_TO)
       .map((p) => ({ key: `jump:${p.href}`, href: p.href, title: p.label, subtitle: "Go to page", icon: p.icon })),
-    [role]
+    [role, user]
   );
 
   // The result chosen (the first, as results come; then wherever the arrows or the pointer go): its page
