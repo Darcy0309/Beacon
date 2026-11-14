@@ -23,10 +23,10 @@ const hourly = Array.from({ length: 30 }, (_, i) => {
     windSpeed: "5 mph", windDirection: "S", shortForecast: i < 2 ? "Sunny" : "Clear",
   };
 });
-const period = (start, isDaytime, temperature, shortForecast, rain = 0) => ({ startTime: start, isDaytime, temperature, shortForecast, probabilityOfPrecipitation: { value: rain } });
+const period = (start, isDaytime, temperature, shortForecast, rain = 0, detailedForecast = "") => ({ startTime: start, isDaytime, temperature, shortForecast, detailedForecast, windSpeed: "10 mph", windDirection: "NW", probabilityOfPrecipitation: { value: rain } });
 const daily = [
   period("2026-11-13T18:00:00-06:00", false, 25, "Clear"),
-  period("2026-11-14T06:00:00-06:00", true, 45, "Partly Sunny"), period("2026-11-14T18:00:00-06:00", false, 24, "Mostly Cloudy", 30),
+  period("2026-11-14T06:00:00-06:00", true, 45, "Partly Sunny", 0, "Partly sunny, with a high near 45."), period("2026-11-14T18:00:00-06:00", false, 24, "Mostly Cloudy", 30, "Mostly cloudy, with a low around 24."),
   period("2026-11-15T06:00:00-06:00", true, 51, "Heavy Snow", 80), period("2026-11-15T18:00:00-06:00", false, 26, "Snow"),
 ];
 const alerts = [
@@ -39,7 +39,10 @@ const w = shapeWeather({ place: { city: "Omaha", state: "NE", zip: "68022", time
 is("now: the hour at hand, not one gone", [w.now.temp, w.now.sky, w.now.kind, w.now.precip, w.now.humidity, w.now.wind], [42, "Sunny", "sun", 0, 50, "5 mph"]);
 is("the next 24 hours", w.hours.length, 24);
 is("…every 3rd hour labelled, on the place's clock", w.hours.filter((h) => h.label).map((h) => h.label).slice(0, 3), ["4PM", "7PM", "10PM"]);
-is("tonight first, its low alone", w.days[0], { name: "Fri", high: null, low: 25, sky: "Clear", kind: "sun", precip: 0, night: true });
+is("tonight first, its low alone", [w.days[0].name, w.days[0].high, w.days[0].low, w.days[0].kind, w.days[0].night], ["Fri", null, 25, "sun", true]);
+is("a day, clicked: its date, its forecast in words, the wind, its hours on the place's clock",
+  [w.days[1].date, w.days[1].title, w.days[1].detail, w.days[1].nightDetail, w.days[1].wind, w.days[1].hours.length, w.days[1].hours.find((h) => h.label)?.label],
+  ["2026-11-14", "Saturday, Nov 14", "Partly sunny, with a high near 45.", "Mostly cloudy, with a low around 24.", "10 mph NW", 21, "12AM"]);
 is("…then each day with its high and the night's low, the wetter half's chance", w.days.slice(1).map((d) => [d.name, d.high, d.low, d.kind, d.precip]), [["Sat", 45, 24, "partly", 30], ["Sun", 51, 26, "snow", 80]]);
 is("warnings: the worst first, each once", w.alerts.map((a) => a.event), ["Winter Storm Warning", "Wind Advisory"]);
 is("no forecast: nothing at hand", shapeWeather({ place: { timeZone: tz } }).now, null);

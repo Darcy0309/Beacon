@@ -22,6 +22,9 @@ const pct = (v) => (v && typeof v === "object" ? v.value : v) ?? null;
 /** "Fri", "2 PM": a moment on the place's clock. */
 const weekday = (iso, timeZone) => new Intl.DateTimeFormat("en-US", { timeZone, weekday: "short" }).format(new Date(iso));
 const hourOf = (iso, timeZone) => new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric" }).format(new Date(iso)).replace(" ", "");
+const hour24 = (iso, timeZone) => Number(new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23" }).format(new Date(iso)));
+const dateOf = (iso, timeZone) => new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+const longDay = (iso, timeZone) => new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long", month: "short", day: "numeric" }).format(new Date(iso));
 
 /**
  * The card's weather, from the Weather Service's answers:
@@ -31,7 +34,9 @@ const hourOf = (iso, timeZone) => new Intl.DateTimeFormat("en-US", { timeZone, h
  *   alerts   its active alerts' features
  *   now      the moment it is (for the hours still to come)
  * Returns { place, now, hours, days, alerts }: now the hour at hand; hours the next 24, every 3rd labelled;
- * days up to 7, each with its high and low; alerts the warnings in force, the worst first.
+ * days up to 7, each with its high and low, and what a click on it shows (its date, the forecast in words
+ * for the day and the night, the wind, its hours as far as the hourly forecast reaches); alerts the
+ * warnings in force, the worst first.
  */
 export function shapeWeather({ place, hourly = [], daily = [], alerts = [], now = new Date() }) {
   const tz = place?.timeZone || "America/Chicago";
@@ -40,6 +45,20 @@ export function shapeWeather({ place, hourly = [], daily = [], alerts = [], now 
   const hours = ahead.slice(0, 24).map((p, i) => ({
     at: p.startTime, label: i % 3 === 0 ? hourOf(p.startTime, tz) : null, temp: p.temperature, precip: pct(p.probabilityOfPrecipitation) ?? 0,
   }));
+
+  // Each day's hours, on the place's clock, every 3rd labelled.
+  const byDate = new Map();
+  for (const p of ahead) {
+    const d = dateOf(p.startTime, tz);
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d).push({ at: p.startTime, label: hour24(p.startTime, tz) % 3 === 0 ? hourOf(p.startTime, tz) : null, temp: p.temperature, precip: pct(p.probabilityOfPrecipitation) ?? 0 });
+  }
+  const more = (p, night) => ({
+    date: dateOf(p.startTime, tz), title: longDay(p.startTime, tz),
+    detail: (night ? null : p.detailedForecast) || null, nightDetail: (night ? p.detailedForecast : null) || null,
+    wind: p.windSpeed ? `${p.windSpeed}${p.windDirection ? ` ${p.windDirection}` : ""}` : null,
+    hours: byDate.get(dateOf(p.startTime, tz)) ?? [],
+  });
 
   // Day and night halves into days: the day's high, the night after's low.
   const days = [];
@@ -50,11 +69,15 @@ export function shapeWeather({ place, hourly = [], daily = [], alerts = [], now 
       days.push({
         name: weekday(p.startTime, tz), high: p.temperature, low: night?.temperature ?? null, sky: p.shortForecast, kind: skyKind(p.shortForecast),
         precip: Math.max(pct(p.probabilityOfPrecipitation) ?? 0, pct(night?.probabilityOfPrecipitation) ?? 0), night: false,
+        ...more(p, false), nightDetail: night?.detailedForecast || null, nightSky: night?.shortForecast ?? null,
       });
       if (night) i += 1;
     } else if (!days.length) {
       // Tonight, the day's daytime gone: its low alone.
-      days.push({ name: weekday(p.startTime, tz), high: null, low: p.temperature, sky: p.shortForecast, kind: skyKind(p.shortForecast), precip: pct(p.probabilityOfPrecipitation) ?? 0, night: true });
+      days.push({
+        name: weekday(p.startTime, tz), high: null, low: p.temperature, sky: p.shortForecast, kind: skyKind(p.shortForecast), precip: pct(p.probabilityOfPrecipitation) ?? 0, night: true,
+        ...more(p, true), nightSky: p.shortForecast,
+      });
     }
   }
 

@@ -192,23 +192,39 @@ try {
     && maps.searchParams.get("destination") === "Eau Claire, WI 54701" && maps.searchParams.get("travelmode") === "driving"
     && (await sean.ev(`document.querySelector('[data-tab-panel="info"] [data-agent-address]').target`)) === "_blank", href);
   check("…and says what it shows", t.includes("Miles and drive time to Eau Claire, WI 54701"));
-  const weather = await sean.ev(`(() => { const a = document.querySelector('[data-topbar-aside] [data-project-weather]'); return a ? { href: a.href, target: a.target, text: a.textContent.trim() } : null; })()`);
-  check("a Weather button in the top bar, beside the business: Google's weather for the project's ZIP, in a new tab",
-    weather?.href === "https://www.google.com/search?q=weather%2054843" && weather.target === "_blank" && weather.text === "Weather · 54843", JSON.stringify(weather));
-  // Hovered, a card with the forecast there (the National Weather Service's, read live: it needs the internet).
+  const weather = await sean.ev(`(() => { const b = document.querySelector('[data-topbar-aside] [data-project-weather]'); return b ? { tag: b.tagName, href: b.getAttribute('href'), text: b.textContent.trim() } : null; })()`);
+  check("a Weather button in the top bar, beside the business: a button, not a link to Google", weather?.tag === "BUTTON" && weather.href == null && weather.text === "Weather · 54843", JSON.stringify(weather));
   check("…not in the Project Info tab", await sean.ev(`!document.querySelector('[data-tab-panel="info"] [data-project-weather]')`));
   await sean.ev(`window.scrollTo(0, 0)`);
   await sean.hover('[data-topbar-aside] [data-project-weather]');
   const card = await until(() => sean.ev(`(() => { const c = document.querySelector('[data-weather-card]'); return c && (c.querySelector('[data-weather-now]') || c.querySelector('[data-weather-error]')) ? c.innerText.replace(/\\s+/g, ' ') : null; })()`), { timeout: 20000 });
   check("…hovered: the weather card, with the forecast there now, the next hours and the days ahead",
-    Boolean(await sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]') && !!document.querySelector('[data-weather-card] [data-weather-hours]') && document.querySelectorAll('[data-weather-card] [data-weather-days] > div').length >= 5`))
+    Boolean(await sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]') && !!document.querySelector('[data-weather-card] [data-weather-hours]') && document.querySelectorAll('[data-weather-card] [data-weather-days] > button').length >= 5`))
     && /Hayward, WI 54843/.test(card ?? ""), card);
   const temps = await sean.ev(`(() => { const f = document.querySelector('[data-weather-now] .text-4xl')?.textContent.match(/-?\\d+/)?.[0]; const c = document.querySelector('[data-weather-celsius]')?.textContent; return { f, c }; })()`);
   check("…the temperature in Celsius beneath it", temps?.c === `${Math.round(((Number(temps?.f) - 32) * 5) / 9)}°C`, JSON.stringify(temps));
+  const google = await sean.ev(`(() => { const a = document.querySelector('[data-weather-card] [data-weather-google]'); return a ? { href: a.href, target: a.target } : null; })()`);
+  check("…Google's weather only from its Open Google weather, in a new tab", google?.href === "https://www.google.com/search?q=weather%2054843" && google.target === "_blank", JSON.stringify(google));
+  // A day ahead, clicked: its forecast in the card, and back to now.
+  await sean.ev(`document.querySelector('[data-weather-card] [data-weather-day-pick="2"]').click()`);
+  const picked = await until(() => sean.ev(`(() => { const d = document.querySelector('[data-weather-card] [data-weather-day]'); return d ? { title: d.querySelector('[data-weather-day-title]')?.textContent, words: d.querySelector('[data-weather-day-detail]')?.textContent ?? '', hours: !!d.querySelector('[data-weather-hours]') } : null; })()`), { timeout: 5000 });
+  check("…a day ahead clicked: its date, the forecast in words for its day and night, and its hours",
+    /^\w+day, \w{3} \d+$/.test(picked?.title ?? "") && /Day:.+Night:/.test(picked?.words ?? "") && picked.hours
+    && !(await sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]')`)), JSON.stringify(picked));
+  await shot(sean, "project-info-weather-day");
+  await sean.ev(`document.querySelector('[data-weather-card] [data-weather-back]').click()`);
+  check("…Now: back to the hour at hand", Boolean(await until(() => sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]') && !document.querySelector('[data-weather-card] [data-weather-day]')`), { timeout: 5000 })));
   await shot(sean, "project-info-weather-card");
   // Away to the right of the page, clear of the card.
   await sean.hover({ x: 1300, y: 600 });
   check("…and gone as the mouse moves away", Boolean(await until(() => sean.ev(`!document.querySelector('[data-weather-card]')`), { timeout: 5000 })));
+  const tabs = await sean.ev(`window.__tabs = 0; window.open = (...a) => { window.__tabs += 1; return null; }; location.href`);
+  await sean.mouseClick('[data-topbar-aside] [data-project-weather]');
+  check("clicked: the card opens, and nowhere is gone to",
+    Boolean(await until(() => sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]')`), { timeout: 10000 }))
+    && (await sean.ev(`location.href`)) === tabs && (await sean.ev(`window.__tabs`)) === 0);
+  await sean.key("Escape");
+  check("…Escape closes it", Boolean(await until(() => sean.ev(`!document.querySelector('[data-weather-card]')`), { timeout: 5000 })));
   check("the caller ID area code", Boolean(await sean.ev(`!!document.querySelector('[data-tab-panel="info"] [data-area-code="715"]')`)));
   check("the producers who get leads are marked", (await sean.ev(`document.querySelectorAll('[data-tab-panel="info"] [data-gets-leads]').length`)) === 2);
 
