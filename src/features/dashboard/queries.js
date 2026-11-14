@@ -341,7 +341,7 @@ export async function getDeveloped({ userId = null, from, to, timeZone, kinds = 
  * appointments they set, still to come, wait for confirmation. `owner`:
  * false when an administrator is looking at someone else's.
  */
-export async function getMySchedule({ userId, from, to, today, timeZone, owner = true, everyone = false, client = false }) {
+export async function getMySchedule({ userId, from, to, today, timeZone, owner = true, everyone = false, client = false, salesRep = false }) {
   // `client`: a client's own calendar (Sean, Oct 2026): every appointment of theirs Row Level Security
   // shows them, to open but not to move, without who set it.
   if (client) everyone = true;
@@ -350,14 +350,32 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
   // `everyone`: an administrator's calendar, every manager's appointments with who set each (Sean, Oct 2026).
   // Theirs: the ones they follow up, set by them or handed over to them (Oct 2026: a manager who left).
   const uid = Number(userId);
-  const theirs = (q) => (everyone ? q : q.or(`follow_up_user_id.eq.${uid},and(follow_up_user_id.is.null,user_id.eq.${uid})`));
+  // `salesRep`: an administrator who is a client's Sales Rep (Sean, Nov 2026: "Mike's Today's Schedule should
+  // only show his clients"): the appointments of their own clients' projects, and of clients with no Sales Rep
+  // yet, as Payments Due shows them.
+  let mine = null;
+  if (everyone && !client && salesRep) {
+    const { data: clients, error: cErr } = await supabase.from("companies").select("id")
+      .or(`sales_rep_id.eq.${uid},sales_rep_id.is.null`).is("deleted_at", null).limit(5000);
+    if (cErr) throw cErr;
+    const ids = (clients ?? []).map((c) => c.id);
+    const { data: projects, error: pErr } = ids.length
+      ? await supabase.from("projects").select("id").in("company_id", ids).limit(10000)
+      : { data: [], error: null };
+    if (pErr) throw pErr;
+    mine = (projects ?? []).map((p) => p.id);
+  }
+  // Their clients' only: by the lead's project (an appointment's own project is often not kept).
+  const lead = mine ? "lead:leads!inner" : "lead:leads";
+  const theirs = (q) => (mine ? q.in("lead.project_id", mine.length ? mine : [0])
+    : everyone ? q : q.or(`follow_up_user_id.eq.${uid},and(follow_up_user_id.is.null,user_id.eq.${uid})`));
   const [appts, reminders, messages, awaiting] = await Promise.all([
     theirs(supabase
       .from("appointments")
       .select(`id, appt_date, appt_time, duration_min, confirmed_at, qa_status,
         status:appointment_statuses(name),
         setter:users!appointments_user_id_fkey(first_name, last_name),
-        lead:leads(id, company_name, contact_name, result:call_results(name),
+        ${lead}(id, company_name, contact_name, project_id, result:call_results(name),
           project:projects!leads_project_id_fkey(name, company:companies(name)))`))
       .is("invalid_at", null)
       .gte("appt_date", from)
@@ -385,7 +403,7 @@ export async function getMySchedule({ userId, from, to, today, timeZone, owner =
     // Every one still to come that has not been confirmed, whatever month is on show.
     theirs(supabase
       .from("appointments")
-      .select("id", { count: "exact", head: true }))
+      .select(mine ? "id, lead:leads!inner(project_id)" : "id", { count: "exact", head: true }))
       .is("invalid_at", null)
       .is("confirmed_at", null)
       .gte("appt_date", today),

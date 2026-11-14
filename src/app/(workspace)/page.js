@@ -131,7 +131,8 @@ export default async function Dashboard({ searchParams }) {
     // And the top tiles: what the managers developed over a day, the pay period (to begin with), a week or a month.
     const tp = { tl: VIEW_KEYS.includes(sp?.tl) ? sp.tl : "period", ta: VIEW_KEYS.includes(sp?.ta) ? sp.ta : "period" };
     // The calendar in place of Today's Schedule, as a manager's dashboard has it: every manager's
-    // appointments, and the administrator's own reminders and messages (Sean, Oct 2026).
+    // appointments (an administrator who is a Sales Rep, their own clients'), and the administrator's own
+    // reminders and messages (Sean, Oct 2026).
     const cm = typeof sp?.cm === "string" && isIsoDate(`${sp.cm}-01`) ? `${sp.cm}-01` : monthStart(businessToday);
     const grid = monthGrid(cm);
     // The administrator's chart of what the team developed: a day (by the hour) to two years, everyone or one manager or project.
@@ -152,7 +153,8 @@ export default async function Dashboard({ searchParams }) {
     const [rows, tiles, schedule, data, goals, options, developed] = await Promise.all([
       getProduction(v.range),
       getTeamTiles({ today: businessToday, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
-      getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true }),
+      // An administrator who is a client's Sales Rep: their own clients' (Sean, Nov 2026).
+      getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true, salesRep: Boolean(me.salesRep) }),
       getProductionChart({ from: range.from, to: range.to, ...selected }),
       // The months shown, and a year either way for setting goals ahead.
       getProductionGoals(addDays(range.from < businessToday ? range.from : businessToday, -366), addDays(businessToday, 366)),
