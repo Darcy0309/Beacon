@@ -34,7 +34,7 @@ export default function DeliverySettings({ value }) {
         <p className="max-w-2xl text-sm text-muted-foreground">
           When a call makes a name a lead or an appointment, its sheet is emailed to the client: straight away, or held in Quality QA
           until an administrator sends it (one, some or all) or the schedule below clears what is held. One held back there stays
-          unsent until its manager marks it fixed.
+          unsent until its manager marks it fixed. An appointment marked Confirmed or Invalid always goes to the client straight away.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {[["leads", "Leads"], ["appointments", "Appointments"]].map(([key, label]) => (

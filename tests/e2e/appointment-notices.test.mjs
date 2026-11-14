@@ -4,7 +4,8 @@
  * "Appointment - <company> (CONFIRMED)"; Appointment-Invalid sends it as
  * "(CANCELLED)", the appointment marked so and nothing to add to a calendar.
  * The Client notes written with each go with it. Sending it again by hand
- * sends the latest.
+ * sends the latest. Both go straight away even with appointments held for QA
+ * (Sean, Nov 2026): the client hears now, not at the next clearing.
  *
  * Needs the app started with SMTP_HOST=127.0.0.1 SMTP_PORT=2525, as the
  * delivery test does. Removes everything it made.
@@ -24,6 +25,11 @@ const typeId = (code) => sql(`select id from public.project_types where code=${l
 const resultId = (name) => sql(`select id from public.call_results where project_type = 'APPT' and name = ${lit(name)}`);
 const mailSetting = sql("select value::text from public.app_settings where key = 'mail'");
 sql(`update public.app_settings set value = value || '{"from": "alerts@signaturemktg.net"}'::jsonb where key = 'mail'`);
+// Leads and appointments held for QA, cleared every 2 hours: Confirmed and Invalid still go now.
+const deliveryBefore = sql("select coalesce((select value::text from public.app_settings where key = 'delivery'), '')");
+sql(`insert into public.app_settings (key, value) values ('delivery', '{"leads":"hold","appointments":"hold","every":2,"from":8,"to":18,"zone":"America/Los_Angeles"}')
+  on conflict (key) do update set value = excluded.value`);
+const held = () => Number(sql(`select count(*) from public.delivery_holds where lead_id = ${lead}`));
 const inDays = (n) => sql(`select ((now() at time zone public.business_tz())::date + ${n})::text`);
 
 const company = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Capital Insurance`)}) returning id`));
@@ -64,6 +70,7 @@ try {
   check("…marked confirmed, with the note and the appointment to add to a calendar",
     body.includes("APPOINTMENT CONFIRMED") && body.includes("Confirmed with Dana; bring the dec pages") && body.includes("10:00 AM") && /Add to calendar/.test(body), body.slice(body.indexOf("LEAD SHEET"), body.indexOf("LEAD SHEET") + 1500));
   check("…and kept on the lead", sql(`select string_agg(result || ':' || status, ',') from public.lead_deliveries where lead_id = ${lead}`) === "Appointment-Confirmed:sent");
+  check("…straight away, though appointments are held for QA: nothing waiting in QA", held() === 0, String(held()));
 
   section("Cancelled");
   await record(sean, "Appointment-Invalid", "Cancelled: the owner is out of town until next month");
@@ -73,6 +80,7 @@ try {
   const cbody = cancelled ? plain(cancelled) : "";
   check("…the appointment shown cancelled, with the reason, and nothing to add to a calendar",
     cbody.includes("APPOINTMENT CANCELLED") && /10:00 AM \(CANCELLED\)/.test(cbody) && cbody.includes("out of town until next month") && !/Add to calendar/.test(cbody), cbody.slice(0, 400));
+  check("…straight away too: nothing waiting in QA", held() === 0, String(held()));
 
   section("Sent again by hand");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage();
@@ -84,6 +92,9 @@ try {
   browser.close();
   await mail.close();
   sql(`update public.app_settings set value = ${lit(mailSetting)}::jsonb where key = 'mail'`);
+  if (deliveryBefore) sql(`update public.app_settings set value = ${lit(deliveryBefore)}::jsonb where key = 'delivery'`);
+  else sql("delete from public.app_settings where key = 'delivery'");
+  sql(`delete from public.delivery_holds where lead_id = ${lead}`);
   sql(`delete from public.lead_deliveries where lead_id = ${lead}`);
   sql(`delete from public.pay_events where lead_id = ${lead}`);
   sql(`delete from public.call_records where lead_id = ${lead}`);

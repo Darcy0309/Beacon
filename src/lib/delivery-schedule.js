@@ -33,6 +33,16 @@ export function deliverySettings(value) {
 /** Whether a kind ("lead" or "appointment") waits in QA rather than going straight to the client. */
 export const holds = (settings, kind) => (kind === "appointment" ? settings.appointments : settings.leads) === "hold";
 
+// News of an appointment already sent (call result effects): confirmed, or cancelled (marked invalid).
+const NEWS = new Set(["confirm", "appointment_invalid"]);
+
+/**
+ * Whether a call result's sheet waits in QA. News of an appointment the client already has (Confirmed,
+ * Invalid) never does (Sean, Nov 2026): it goes to the client straight away, whatever the schedule.
+ */
+export const holdsResult = (settings, result) =>
+  !NEWS.has(result?.effect) && holds(settings, result?.effect === "appointment" ? "appointment" : "lead");
+
 /** The hours of the day held ones are cleared at: from, from + every, … up to to. None when clearing is off. */
 export function clearingHours({ every, from, to }) {
   if (!every) return [];

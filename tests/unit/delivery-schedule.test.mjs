@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for when held leads and appointments go to clients (Settings › Delivery). */
-import { clearingDue, clearingHours, clockIn, deliverySettings, holds, nextClearing } from "../../src/lib/delivery-schedule.js";
+import { clearingDue, clearingHours, clockIn, deliverySettings, holds, holdsResult, nextClearing } from "../../src/lib/delivery-schedule.js";
 
 let failures = 0;
 const is = (label, got, want) => {
@@ -12,6 +12,9 @@ const off = deliverySettings(undefined);
 is("nothing set: both straight away, as before; no clearing", [off.leads, off.appointments, off.every, clearingHours(off)], ["now", "now", 0, []]);
 const sean = deliverySettings({ leads: "hold", appointments: "now", every: 2, from: 8, to: 18, zone: "America/Los_Angeles" });
 is("Sean's: leads held, appointments straight away", [holds(sean, "lead"), holds(sean, "appointment")], [true, false]);
+const both = deliverySettings({ leads: "hold", appointments: "hold" });
+is("both held: a lead and a new appointment wait in QA", [holdsResult(both, { effect: null, delivers: true }), holdsResult(both, { effect: "appointment" })], [true, true]);
+is("…an appointment Confirmed or Invalid goes straight away (Sean, Nov 2026)", [holdsResult(both, { effect: "confirm" }), holdsResult(both, { effect: "appointment_invalid" })], [false, false]);
 is("…cleared every 2 hours, 8 AM to 6 PM", clearingHours(sean), [8, 10, 12, 14, 16, 18]);
 is("every 3 hours: 8, 11, 2 PM, 5 PM", clearingHours({ ...sean, every: 3 }), [8, 11, 14, 17]);
 is("anything odd read safely", deliverySettings({ leads: "x", every: 7, from: 30, to: 2, zone: "Mars" }), { leads: "now", appointments: "now", every: 0, from: 8, to: 8, zone: "America/Los_Angeles" });

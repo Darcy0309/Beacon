@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache";
 import { check, currentAppUser, fail, idFrom, logActivity, n, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { cleanCriteria } from "@/lib/call-list-filter";
 import { deliverLead } from "@/features/delivery/server";
-import { holdDelivery, holdKind, readDeliverySettings } from "@/features/delivery/holds";
-import { holds } from "@/lib/delivery-schedule";
+import { holdDelivery, readDeliverySettings } from "@/features/delivery/holds";
+import { holdsResult } from "@/lib/delivery-schedule";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { APPOINTMENT_NOTICES, sendsSheet } from "@/lib/delivery";
 import { createClient } from "@/lib/supabase/server";
@@ -99,10 +99,11 @@ export async function recordCallResult(prevState, formData) {
   // project's delivery addresses, once the rep has moved on. So does news of
   // the appointment: confirmed, or cancelled (marked invalid).
   // Unless Settings › Delivery holds that kind in QA (Sean, Oct 2026): then it waits there, for an
-  // administrator or the next clearing.
+  // administrator or the next clearing. News of an appointment (Confirmed, Invalid) never waits (Sean,
+  // Nov 2026): the client hears straight away.
   if (sendsSheet(result)) {
     const [me, origin, settings] = await Promise.all([currentAppUser(supabase), requestOrigin(), readDeliverySettings(supabase)]);
-    const admin = holds(settings, holdKind(result)) ? createAdminClient() : null;
+    const admin = holdsResult(settings, result) ? createAdminClient() : null;
     if (admin) {
       try {
         await holdDelivery(admin, { leadId, callRecordId: data.call_record_id, result, userId: me?.id ?? null });
