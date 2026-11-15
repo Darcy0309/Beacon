@@ -70,7 +70,7 @@ const sg = (name) => sql(`select coalesce(contact_name, '') || '|' || coalesce(c
 const apptProject = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Appts`)}, ${company},
   (select id from public.project_types where code = 'APPT'), 1) returning id`));
 const historyFile = path.join(path.dirname(file), "history.csv");
-writeFileSync(historyFile, ["Company,Phone,Call Result Appt,Date Developed,Developed By,Appt Create Date,Set By,Appointment Date",
+writeFileSync(historyFile, ["Company,Phone,Call Result Appt,Date Developed,Developed By,Appt Create Date,Set By,Appointment Date,Appointment Time",
   `"${TAG} Hist A",602-555-0201,Appointment,3/14/2025,Sean Fitzgerald,04/02/2025,Rachel Colestock,4/20/2025`,
   `"${TAG} Hist B",602-555-0202,Lead-No Contact,5/1/2025,Nobody Known,,,`,
   // Marked invalid in the old system, which clears its set date: dated by its appointment's.
@@ -79,7 +79,9 @@ writeFileSync(historyFile, ["Company,Phone,Call Result Appt,Date Developed,Devel
   // "-$Appointment" and "-$Survey Appointment" were its invalid ones.
   `"${TAG} Hist D",801-255-5439,Appt From X-Date,5/3/2025,Sean Fitzgerald,,,`,
   `"${TAG} Hist E",435-867-4773,-$Appointment,5/4/2025,Sean Fitzgerald,,,`,
-  `"${TAG} Hist F",801-265-8089,-$Survey Appointment,5/5/2025,Sean Fitzgerald,,Rachel Colestock,6/12/2025`].join("\n"));
+  `"${TAG} Hist F",801-265-8089,-$Survey Appointment,5/5/2025,Sean Fitzgerald,,Rachel Colestock,6/12/2025`,
+  // An invalid one with its appointment's time: found invalid then (the old system doesn't keep when).
+  `"${TAG} Hist G",801-265-8090,-$Appointment,5/6/2025,Sean Fitzgerald,,Rachel Colestock,6/13/2025,2:30 PM`].join("\n"));
 const developed = (name) => sql(`select coalesce((promoted_at at time zone public.business_tz())::date::text, '') || '|' || coalesce(dbdv_user_id::text, '')
   from public.leads where company_name = ${lit(`${TAG} ${name}`)}`);
 
@@ -277,7 +279,7 @@ try {
   section("The old system's dates and managers");
   await chooseFile(admin, historyFile, apptProject);
   await admin.click("button[type=submit]", "Import leads");
-  check("an old list imports", /Imported 6 of 6/.test((await admin.waitToast(/Imported 6 of 6/, 15000)) ?? ""));
+  check("an old list imports", /Imported 7 of 7/.test((await admin.waitToast(/Imported 7 of 7/, 15000)) ?? ""));
   check("a lead developed when the old system says, by the manager it names", developed("Hist A") === "2025-03-14|2", developed("Hist A"));
   const set = sql(`select (a.appt_create_date at time zone public.business_tz())::date || '|' || coalesce(a.user_id::text, '') from public.appointments a
     join public.leads l on l.id = a.lead_id where l.company_name = ${lit(`${TAG} Hist A`)}`);
@@ -294,6 +296,10 @@ try {
   check("…and the import says so", Boolean(await until(async () => /1 row had an appointment call result but no appointment date/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
   check("“-$Appointment” (no date): Appointment-Invalid, an invalid appointment", resultOf("Hist E") === "Appointment-Invalid|1|Invalid:true", resultOf("Hist E"));
   check("“-$Survey Appointment”: Appointment-Invalid too", resultOf("Hist F") === "Appointment-Invalid|1|Invalid:true", resultOf("Hist F"));
+  const invalidAt = (name) => sql(`select to_char(a.invalid_at at time zone public.business_tz(), 'YYYY-MM-DD HH24:MI') from public.appointments a
+    join public.leads l on l.id = a.lead_id where l.company_name = ${lit(`${TAG} ${name}`)}`);
+  check("found invalid on its appointment's date and time (the old system doesn't keep when)", invalidAt("Hist G") === "2025-06-13 14:30", invalidAt("Hist G"));
+  check("…its date alone, without a time", (invalidAt("Hist F") ?? "").startsWith("2025-06-12"), invalidAt("Hist F"));
 
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);

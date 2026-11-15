@@ -4,6 +4,7 @@
 
 import { revalidatePath } from "next/cache";
 import { MAX_IMPORT_MB, dayAt, parseCsv, rowsToImport, staffMatcher } from "@/lib/csv";
+import { appointmentSpan } from "@/lib/appointment-links";
 import { removalMatcher } from "@/lib/dedupe";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -291,6 +292,8 @@ export async function importLeadsCsv(prevState, formData) {
   let appointments = 0;
   // Appointment results with no appointment date, brought in as Lead-No Contact.
   let noDateAppts = 0;
+  // The business's clock, for an invalid appointment's date and time.
+  const businessTz = (await supabase.rpc("business_tz")).data || "America/Phoenix";
   const childInserts = [];
 
   // A chunk's insurance, notes or appointments: how many went in.
@@ -389,7 +392,13 @@ export async function importLeadsCsv(prevState, formData) {
           appt_date: source.appointment?.appt_date ?? null,
           appt_time: source.appointment?.appt_time ?? null,
           status_id: (source.invalidAppt ? invalidStatus?.id : apptStatus?.id) ?? null,
-          ...(source.invalidAppt ? { invalid_at: setAt, status_update_date: setAt } : {}),
+          // When it was found invalid: the old system doesn't keep that, so its appointment's own date and time
+          // (Sean, Nov 2026), on the business's clock; the day alone without a time; else the date above.
+          ...(source.invalidAppt ? (() => {
+            const at = appointmentSpan(source.appointment?.appt_date, source.appointment?.appt_time, 30, businessTz)?.start?.toISOString()
+              ?? dayAt(source.appointment?.appt_date) ?? setAt;
+            return { invalid_at: at, status_update_date: at };
+          })() : {}),
           rep_name: source.lead.producer_name ?? null,
           list_source: source.lead.list_source || listSource,
           appt_create_date: setAt,
