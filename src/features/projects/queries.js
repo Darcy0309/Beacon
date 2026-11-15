@@ -254,3 +254,25 @@ export async function getProjectedConversion(projectId) {
   if (error) throw error;
   return data?.projected_conversion ?? null;
 }
+
+/**
+ * For the delete box (Sean, Nov 2026): how many names each of these DB dev projects sent on to its appointment
+ * project, and that project's name: { [id]: { sent, to } }. Only projects that sent any.
+ */
+export async function getSentNames(projects) {
+  const dbdev = projects.filter((p) => p.raw?.appt_project_id && (one(p.raw?.type)?.code ?? p.type) === "DBDV");
+  if (!dbdev.length) return {};
+  const supabase = await createClient();
+  const [{ data: counts, error }, { data: targets }] = await Promise.all([
+    supabase.rpc("project_sent_counts", { p_ids: dbdev.map((p) => p.id) }),
+    supabase.from("projects").select("id, name").in("id", [...new Set(dbdev.map((p) => p.raw.appt_project_id))]),
+  ]);
+  if (error) throw error;
+  const nameOf = new Map((targets ?? []).map((t) => [t.id, t.name]));
+  const out = {};
+  for (const c of counts ?? []) {
+    const p = dbdev.find((x) => x.id === c.project_id);
+    if (p && Number(c.sent) > 0) out[p.id] = { sent: Number(c.sent), to: nameOf.get(p.raw.appt_project_id) ?? "its appointment project" };
+  }
+  return out;
+}

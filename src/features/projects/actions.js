@@ -77,7 +77,16 @@ export async function saveProject(prevState, formData) {
 export async function deleteProject(formData) {
   // Its leads and their appointments go with it, and come back with it.
   const result = await deleteRow("projects", formData, ["/projects", "/clients", "/leads", "/appointments", "/calendar"], { action: "project.delete", entity: "project", name: "name" });
-  if (result.ok) revalidatePath("/work", "layout");
+  if (!result.ok) return result;
+  // Asked to (Sean, Nov 2026): the names it sent on to its appointment project go with it too, and come back with it.
+  if (formData.get("with_sent") === "1") {
+    const supabase = await createClient();
+    const { data: removed, error } = await supabase.rpc("remove_sent_names", { p_project: result.data.id });
+    if (error) return fail(`The project is deleted, but the names it sent on couldn't be taken off: ${error.message}`);
+    await logActivity(supabase, "project.delete_sent", { entity: "project", entityId: result.data.id, detail: `${removed} name${removed === 1 ? "" : "s"} it sent on, taken off with it` });
+    result.data.sent = removed;
+  }
+  revalidatePath("/work", "layout");
   return result;
 }
 

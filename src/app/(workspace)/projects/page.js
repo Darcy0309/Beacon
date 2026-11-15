@@ -9,7 +9,7 @@ import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
-import { listProjects, getFilteredClients, getProjectStats, getOfficeOptions } from "@/features/projects/queries";
+import { listProjects, getFilteredClients, getProjectStats, getOfficeOptions, getSentNames } from "@/features/projects/queries";
 import { getClientGroups } from "@/features/clients/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
@@ -49,6 +49,8 @@ export default async function ProjectsPage({ searchParams }) {
   // Who can manage a project: its account managers and administrators.
   const managerChoices = staff.filter((u) => u.role === "Manager" || u.role === "Administrator")
     .map((u) => ({ id: u.id, name: u.name, role: u.role === "Administrator" ? "admin" : "manager" }));
+  // A lead project's names on its appointment project, for its delete box (Sean, Nov 2026).
+  const sentNames = client ? {} : await getSentNames(rows);
   const { projects } = stats;
   const statsOf = new Map(projects.map((p) => [p.id, p]));
   const groupOptions = [...new Map(Object.values(clientGroups).map((g) => [g.id, { value: String(g.id), label: g.name }])).values()].sort((a, b) => a.label.localeCompare(b.label));
@@ -174,6 +176,11 @@ export default async function ProjectsPage({ searchParams }) {
                         />
                       }
                       onDelete={deleteProject}
+                      deleteOption={sentNames[p.id] ? {
+                        name: "with_sent",
+                        label: `Also remove the ${sentNames[p.id].sent.toLocaleString()} name${sentNames[p.id].sent === 1 ? "" : "s"} it sent to ${sentNames[p.id].to}`,
+                        hint: "Only the names from this lead project, as leads or appointments, with their appointments. Names other lead projects sent there stay. Restoring the project brings them back too.",
+                      } : null}
                       warning={`The project comes off Lighthouse for everyone, with its ${Number(p.leads).toLocaleString()} name${Number(p.leads) === 1 ? "" : "s"} and their appointments: no list, call list, calendar or count shows them. Nothing is erased: an administrator can restore all of it under Settings › Deleted records. Calls made and pay earned stay as they are.`}
                     />
                     )}

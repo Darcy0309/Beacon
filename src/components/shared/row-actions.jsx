@@ -27,6 +27,9 @@ const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is 
  *   onDelete          — a server action taking FormData with `id`; "Delete"
  *                       asks first, then runs it
  *   warning           — what the delete confirmation says will happen
+ *   deleteOption      — a choice in the delete confirmation, sent with it
+ *                       when ticked: { name, label, hint } (a lead project's
+ *                       names sent on; Sean, Nov 2026)
  *   onResetTwoFactor  — a server action taking FormData with `id`
  *   onResendInvite    — a server action taking FormData with `id`
  *   forms             — more dialogs, each opened by its own item, as `edit`
@@ -34,8 +37,9 @@ const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is 
  *                       (<KeyRound />): a server page cannot pass a component
  */
 export default function RowActions({
-  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, onResetTwoFactor, onResendInvite, forms = [],
+  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, deleteOption = null, onResetTwoFactor, onResendInvite, forms = [],
 }) {
+  const [ticked, setTicked] = useState(false);
   const router = useRouter();
   const triggerRef = useRef(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -55,10 +59,11 @@ export default function RowActions({
     startTransition(async () => {
       const f = new FormData();
       f.set("id", String(id));
+      if (action === onDelete && deleteOption && ticked) f.set(deleteOption.name, "1");
       // A call that never gets there (offline) comes back failed too, and says so (Oct 2026).
       const result = await reach(() => action(f));
       if (result?.ok) {
-        toast.success(done);
+        toast.success(typeof done === "function" ? done(result) : done);
         setConfirm(null);
         router.refresh();
       } else {
@@ -123,7 +128,7 @@ export default function RowActions({
         </RowEditContext.Provider>
       ))}
 
-      <Dialog open={confirm !== null} onOpenChange={(o) => !o && !pending && setConfirm(null)}>
+      <Dialog open={confirm !== null} onOpenChange={(o) => { if (!o && !pending) { setConfirm(null); setTicked(false); } }}>
         <DialogContent className="max-w-md" onCloseAutoFocus={returnFocus}>
           <DialogHeader>
             <DialogTitle>{confirm === "reset" ? `Reset two-factor for ${name}?` : `Delete ${name}?`}</DialogTitle>
@@ -133,6 +138,16 @@ export default function RowActions({
                 : warning}
             </DialogDescription>
           </DialogHeader>
+          {confirm === "delete" && deleteOption ? (
+            <label className="flex items-start gap-2.5 rounded-md border border-[var(--panel-border)] p-3 text-sm" data-delete-option={deleteOption.name}>
+              <input type="checkbox" checked={ticked} onChange={(e) => setTicked(e.target.checked)} disabled={pending}
+                className="mt-0.5 size-4 shrink-0 accent-[var(--destructive)]" />
+              <span>
+                <span className="font-medium">{deleteOption.label}</span>
+                {deleteOption.hint ? <span className="mt-0.5 block text-xs text-muted-foreground">{deleteOption.hint}</span> : null}
+              </span>
+            </label>
+          ) : null}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setConfirm(null)} disabled={pending}>Cancel</Button>
             <Button
@@ -142,7 +157,7 @@ export default function RowActions({
               onClick={() =>
                 confirm === "reset"
                   ? run(onResetTwoFactor, `Two-factor reset for ${name}`)
-                  : run(onDelete, `Deleted ${name}`)
+                  : run(onDelete, (r) => `Deleted ${name}${r?.data?.sent ? `, and the ${r.data.sent.toLocaleString()} name${r.data.sent === 1 ? "" : "s"} it sent on` : ""}`)
               }
             >
               {pending ? <Loader2 className="animate-spin" /> : confirm === "reset" ? <KeyRound /> : <Trash2 />}
