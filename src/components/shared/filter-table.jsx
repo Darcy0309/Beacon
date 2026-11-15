@@ -118,7 +118,7 @@ export default function FilterTable({
   const setPerPage = (per) => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
-    if (Number(per) === PAGE_SIZE) params.delete("per");
+    if (Number(per) === (paging?.defaultPer ?? PAGE_SIZE)) params.delete("per");
     else params.set("per", String(per));
     const qs = params.toString();
     startTransition(() => router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));

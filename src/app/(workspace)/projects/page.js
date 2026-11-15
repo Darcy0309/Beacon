@@ -24,7 +24,8 @@ const typeTone = { DBDV: "cyan", APPT: "violet" };
 const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Completed: "sky" };
 
 export default async function ProjectsPage({ searchParams }) {
-  const params = readListParams(await searchParams, ["status", "type", "client", "group", "rep"]);
+  // 100 to a page to begin with (Sean, Nov 2026): each client has a DB dev and an appointment project, so 10 showed only 5 clients.
+  const params = readListParams(await searchParams, ["status", "type", "client", "group", "rep"], { defaultPer: 100 });
   // ?rep=<user id>: the projects of the clients that Sales Rep owns (Sean, Oct 2026).
   if (params.filters.rep && !/^[1-9]\d{0,17}$/.test(params.filters.rep)) delete params.filters.rep;
   // ?group=<insurance company id>: the projects of the clients in that agency group.
@@ -121,7 +122,7 @@ export default async function ProjectsPage({ searchParams }) {
             empty="No projects yet."
             query={params.q}
             selected={params.filters}
-            paging={pageInfo(total, params.page, params.perPage)}
+            paging={pageInfo(total, params.page, params.perPage, params.defaultPer)}
             rows={rows.map((p) => ({
               id: p.id,
               node: (

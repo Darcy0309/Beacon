@@ -9,32 +9,35 @@ export const PAGE_SIZE = 10;
 /**
  * Read paging and filter state from a page's searchParams. `facetKeys` names
  * the query-string keys that carry facet selections for this table. An
- * unknown page size falls back to the default.
+ * unknown page size falls back to the default: `defaultPer`, a page's own
+ * (All Projects shows 100; Sean, Nov 2026), else PAGE_SIZE.
  */
-export function readListParams(sp, facetKeys = []) {
+export function readListParams(sp, facetKeys = [], { defaultPer = PAGE_SIZE } = {}) {
   const page = Math.max(1, Number.parseInt(sp?.page ?? "1", 10) || 1);
   const per = Number.parseInt(sp?.per ?? "", 10);
-  const perPage = PAGE_SIZES.includes(per) ? per : PAGE_SIZE;
+  const perPage = PAGE_SIZES.includes(per) ? per : defaultPer;
   const q = String(sp?.q ?? "").trim().slice(0, 100);
   const filters = {};
   for (const key of facetKeys) {
     const v = String(sp?.[key] ?? "").trim();
     if (v) filters[key] = v;
   }
-  return { page, perPage, q, filters };
+  return { page, perPage, q, filters, defaultPer };
 }
 
 /**
  * Everything the pagination footer needs. A page past the end (a stale link)
- * reads as page 1, which is the page the query falls back to.
+ * reads as page 1, which is the page the query falls back to. `defaultPer`:
+ * the page's own default size, left out of the address when chosen.
  */
-export function pageInfo(total, page, perPage = PAGE_SIZE) {
+export function pageInfo(total, page, perPage = PAGE_SIZE, defaultPer = PAGE_SIZE) {
   const pages = Math.max(1, Math.ceil(total / perPage));
   const current = page >= 1 && page <= pages ? page : 1;
   return {
     page: current,
     pages,
     perPage,
+    defaultPer,
     total,
     from: total ? (current - 1) * perPage + 1 : 0,
     to: Math.min(total, current * perPage),
