@@ -38,24 +38,73 @@ function Stat({ label, value, muted }) {
   );
 }
 
-/** Leads and appointments day by day across a week, pay period or month (or the week up to a day, `mark`ed). */
+const WEEKDAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekday = (iso) => WEEKDAY[new Date(`${iso}T12:00:00Z`).getUTCDay()];
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/** "1 of 6 appointments", or "1 appointment" with no goal set. */
+const against = (n, goal, word) => (goal ? `${n} of ${goal} ${word}s` : plural(n, word));
+
+/** A day's count of one kind, over its bar: a dot in its colour and the number. */
+function Count({ n, color }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} />
+      <span className="tabular-nums text-foreground">{n}</span>
+    </span>
+  );
+}
+
+/**
+ * Leads and appointments day by day across a week, pay period or month (or the week up to a day, `mark`ed,
+ * outlined). Each day is named under its bar (Sean, Nov 2026: "can the days be represented on the bottom");
+ * a week's bars carry their numbers over them too, and every bar says them, with the day's goals, on hover.
+ */
 function DayBars({ days, from, to, mark, caption }) {
   const byDay = new Map(days.map((d) => [d.day, d]));
   const list = [];
   for (let d = from; d <= to && list.length < 62; d = addDays(d, 1)) list.push(d);
   const most = Math.max(1, ...list.map((d) => (byDay.get(d)?.leads ?? 0) + (byDay.get(d)?.appts ?? 0)));
+  // A week has room for each day's numbers and name; a pay period or month, the date (every other one past 16).
+  const roomy = list.length <= 8;
+  const dayLabel = (d, i) => {
+    if (roomy) return weekday(d);
+    if (list.length > 16 && i % 2 && i !== list.length - 1) return "";
+    return String(Number(d.slice(8)));
+  };
+  // A pay period or month has no room for each day's numbers: a scale beside the bars says how tall is how many
+  // (Sean, Nov 2026: "#s on the side"): the most in a day at the top, half way when it is a whole number, 0.
+  const ticks = roomy ? [] : [most, most % 2 === 0 && most >= 4 ? most / 2 : null, 0].filter((v) => v !== null);
   return (
-    <div className="px-5 pb-4" data-day-bars>
-      <div className="flex h-16 items-end gap-[3px]">
-        {list.map((d) => {
+    <div className="flex gap-1.5 px-5 pb-4" data-day-bars>
+      {ticks.length ? (
+        <div className="relative h-14 w-4 shrink-0 text-right text-[0.6rem] font-semibold tabular-nums leading-none text-muted-foreground" data-day-scale>
+          {ticks.map((t) => (
+            <span key={t} className="absolute right-0 -translate-y-1/2" style={{ top: `${100 - (t / most) * 100}%` }}>{t}</span>
+          ))}
+        </div>
+      ) : null}
+      <div className="min-w-0 flex-1">
+      <div className="flex gap-[3px]">
+        {list.map((d, i) => {
           const r = byDay.get(d);
           const leads = r?.leads ?? 0;
           const appts = r?.appts ?? 0;
           return (
-            <div key={d} className={cn("flex h-full min-w-0 flex-1 flex-col justify-end rounded-sm bg-muted/40", d === mark && "ring-1 ring-primary/60")}
-              title={`${formatIso(d, "long")}: ${leads} lead${leads === 1 ? "" : "s"}, ${appts} appointment${appts === 1 ? "" : "s"}`}>
-              {appts ? <div className="rounded-t-sm" style={{ height: `${(appts / most) * 100}%`, background: APPTS }} /> : null}
-              {leads ? <div className={cn(!appts && "rounded-t-sm")} style={{ height: `${(leads / most) * 100}%`, background: LEADS }} /> : null}
+            <div key={d} className="flex min-w-0 flex-1 flex-col items-stretch" data-day={d}
+              title={`${formatIso(d, "long")}: ${against(leads, r?.leadsGoal, "lead")}, ${against(appts, r?.apptsGoal, "appointment")}`}>
+              {roomy ? (
+                <div className="mb-1 flex h-3.5 items-center justify-center gap-1.5 text-[0.65rem] font-semibold" data-day-counts>
+                  {leads ? <Count n={leads} color={LEADS} /> : null}
+                  {appts ? <Count n={appts} color={APPTS} /> : null}
+                </div>
+              ) : null}
+              <div className={cn("flex h-14 flex-col justify-end overflow-hidden rounded-sm bg-muted/40", d === mark && "ring-1 ring-primary/60")}>
+                {appts ? <div className="rounded-t-sm" style={{ height: `${(appts / most) * 100}%`, background: APPTS }} /> : null}
+                {leads ? <div className={cn(!appts && "rounded-t-sm")} style={{ height: `${(leads / most) * 100}%`, background: LEADS }} /> : null}
+              </div>
+              <div className={cn("mt-1 truncate text-center text-[0.6rem] font-semibold text-muted-foreground", d === mark && "text-foreground")} data-day-label>
+                {dayLabel(d, i)}
+              </div>
             </div>
           );
         })}
@@ -67,6 +116,7 @@ function DayBars({ days, from, to, mark, caption }) {
           <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: APPTS }} /> Appts</span>
         </span>
         <span>{mark ? "" : formatIso(to, "short")}</span>
+      </div>
       </div>
     </div>
   );

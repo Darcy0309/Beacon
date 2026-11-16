@@ -76,6 +76,14 @@ try {
   await sean.click("[data-production-card] [data-daily-goals-form] button[type=submit]");
   check("the goal is set on the card, and it tracks the % reached",
     Boolean(await until(async () => /of 4 · 25%/.test((await card("[data-production-card]")) ?? "") && /of 2 · 50%/.test((await card("[data-production-card]")) ?? ""))), await card("[data-production-card]"));
+  // Sean, Nov 2026: "can the days be represented on the bottom", and the numbers on the bars.
+  const bars = await sean.ev(`(() => { const b = document.querySelector('[data-production-card] [data-day-bars]');
+    const days = [...b.querySelectorAll('[data-day]')];
+    return { labels: days.map((d) => d.querySelector('[data-day-label]').textContent), today: days.at(-1).querySelector('[data-day-counts]').innerText.replace(/\\s+/g, ' '), title: days.at(-1).title }; })()`);
+  check("the last 7 days, each named under its bar", bars.labels.length === 7 && bars.labels.every((l) => /^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$/.test(l)), JSON.stringify(bars.labels));
+  check("…today's numbers over its bar", bars.today === "1 1", bars.today);
+  check("…and against the day's goals on hover", /1 of 4 leads, 1 of 2 appointments/.test(bars.title), bars.title);
+  await sean.screenshot(`${process.env.SHOT_DIR ?? "/tmp"}/dp-day.png`);
   await sean.click('[data-period-switch="dp"] a', "Week");
   check("…or the week around the day: the days worked and each day's bars",
     Boolean(await until(async () => /days? worked/.test((await card("[data-production-card]")) ?? "") && (await sean.ev(`!!document.querySelector('[data-production-card] [data-day-bars]')`)))), await card("[data-production-card]"));
@@ -83,6 +91,14 @@ try {
     await sean.click('[data-period-switch="dp"] a', label);
     check(`…the ${label === "Pay" ? "pay period" : "month"} too`, Boolean(await until(async () => re.test((await sean.ev(`document.querySelector('[data-period-switch="dp"] [aria-current]')?.textContent`)) ?? ""))));
   }
+  // Sean, Nov 2026 (on the month): "#s on the side". Too many days for numbers over each bar: a scale beside them.
+  const month = await until(async () => sean.ev(`(() => { const b = document.querySelector('[data-production-card] [data-day-bars]');
+    const s = b?.querySelector('[data-day-scale]'); const days = [...(b?.querySelectorAll('[data-day]') ?? [])];
+    return s && days.length > 8 ? { scale: [...s.children].map((t) => t.textContent), first: days[0].querySelector('[data-day-label]').textContent,
+      counts: b.querySelectorAll('[data-day-counts]').length, todayLabel: b.querySelector('[data-day="${today}"] [data-day-label]')?.textContent } : null; })()`), { timeout: 10000 });
+  check("the month: a scale beside the bars, the most in a day at the top down to 0", month?.scale?.at(-1) === "0" && Number(month?.scale?.[0]) >= 2, JSON.stringify(month));
+  check("…each day's date under its bar, no numbers over them", month?.first === "1" && month?.counts === 0, JSON.stringify(month));
+  await sean.screenshot(`${process.env.SHOT_DIR ?? "/tmp"}/dp-month.png`);
   await sean.click('[data-period-switch="dp"] a', "Day");
   await until(async () => /So far today/.test((await card("[data-production-card]")) ?? ""));
   await sean.click('[data-view-nav="dd"] [data-view-prev]');
