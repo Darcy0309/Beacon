@@ -13,7 +13,7 @@ import { importChecks, importLeadsCsv } from "@/features/imports/actions";
 import { cn } from "@/lib/utils";
 import { reach } from "@/lib/reach";
 import { MAX_IMPORT_MB, MAX_SOURCE_MB, TEMPLATE_HEADERS, csvText, keepColumns, parseCsv, rowsToImport } from "@/lib/csv";
-import { findDuplicates, removalMatcher, reasonLabel } from "@/lib/dedupe";
+import { findDuplicates, removalMatcher, reasonLabel, stageOf } from "@/lib/dedupe";
 
 // The template: every column the import reads, as a CSV of headings only.
 const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(`${TEMPLATE_HEADERS.join(",")}\r\n`)}`;
@@ -75,6 +75,7 @@ async function checkFile(file, projectId, checkIds = []) {
   const groups = findDuplicates(open.map((i) => rows[i])).map((g) => ({
     rows: g.rows.map((k) => open[k]),
     keep: open[g.keep],
+    kept: g.kept.map((k) => open[k]),
     why: g.why,
   }));
   return { csvRows, rows, groups, removedRows, existingRows, otherRows, client: checks.data.client ?? null };
@@ -130,7 +131,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
       (p) => {
         if (checking.current !== run) return null;
         setPlan(p);
-        setKeep(new Set(p.rows.map((_, i) => i).filter((i) => !p.groups.some((g) => g.rows.includes(i) && g.keep !== i))));
+        setKeep(new Set(p.rows.map((_, i) => i).filter((i) => !p.groups.some((g) => g.rows.includes(i) && !g.kept.includes(i)))));
         return p;
       },
       (e) => {
@@ -171,7 +172,6 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
           duration: 20000,
         });
       }
-      formRef.current?.reset();
       // Carriers not on the Insurance Companies list (Sean, Nov 2026): left blank.
       if (carriersBlank) {
         toast.warning(`${carriersBlank} carrier entr${carriersBlank === 1 ? "y wasn't a match" : "ies weren't a match"} for a carrier on the Insurance Companies list, so ${carriersBlank === 1 ? "it was" : "they were"} left blank`, {
@@ -179,6 +179,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
           duration: 20000,
         });
       }
+      formRef.current?.reset();
       setFileName("");
       setProjectId(formRef.current?.elements?.project_id?.value ?? "");
       recheck(null);
@@ -270,11 +271,11 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
     return n;
   });
   // Every duplicate kept, or one of each group again (Sean, Nov 2026: not 71 groups one by one).
-  const keepEvery = (on) => setKeep(() => new Set(plan.rows.map((_, i) => i).filter((i) => on || !plan.groups.some((g) => g.rows.includes(i) && g.keep !== i))));
+  const keepEvery = (on) => setKeep(() => new Set(plan.rows.map((_, i) => i).filter((i) => on || !plan.groups.some((g) => g.rows.includes(i) && !g.kept.includes(i)))));
   const keepAll = (group, on) => setKeep((s) => {
     const n = new Set(s);
     for (const i of group.rows) {
-      if (on || i === group.keep) n.add(i);
+      if (on || group.kept.includes(i)) n.add(i);
       else n.delete(i);
     }
     return n;
@@ -398,7 +399,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
                         <Copy className="size-4 text-amber-500" />
                         <span>
                           <span className="font-semibold tabular-nums" data-duplicate-count>{dropped.length.toLocaleString()}</span> duplicate{dropped.length === 1 ? "" : "s"} in {plan.groups.length.toLocaleString()} group{plan.groups.length === 1 ? "" : "s"} left off
-                          <span className="text-muted-foreground"> · kept: the record with the FEIN, then the most contacts, then the most filled in.</span>
+                          <span className="text-muted-foreground"> · kept: an appointment (every one), else a lead, then the record with the FEIN, the most contacts, the most filled in.</span>
                         </span>
                         <span className="ml-auto shrink-0 font-semibold text-primary">{reviewing ? "Hide" : "Review duplicates"}</span>
                       </button>
@@ -429,6 +430,8 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
                                 {g.rows.map((i) => {
                                   const { lead, contacts } = plan.rows[i];
                                   const kept = keep.has(i);
+                                  // Which is already a lead or an appointment (Sean, Nov 2026), and its call result.
+                                  const stage = stageOf(plan.rows[i]);
                                   return (
                                     <label key={i} className={cn("flex cursor-pointer items-start gap-3 px-3 py-2 text-xs", kept ? "" : "opacity-60")}>
                                       <input type="checkbox" className="mt-0.5 size-4 accent-[var(--primary)]" checked={kept} onChange={() => toggle(g, i)} data-keep-row={i} />
@@ -440,6 +443,11 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
                                         </span>
                                       </span>
                                       <span className="flex shrink-0 flex-wrap justify-end gap-1">
+                                        <span title={stage.result || undefined} data-stage={stage.label}>
+                                          <ToneBadge tone={stage.rank === 2 ? "violet" : stage.rank === 1 ? "amber" : "slate"}>
+                                            {stage.label}{stage.result ? `: ${stage.result}` : ""}
+                                          </ToneBadge>
+                                        </span>
                                         {lead.ein ? <ToneBadge tone="emerald">FEIN</ToneBadge> : null}
                                         <ToneBadge tone="slate">{contacts} contact{contacts === 1 ? "" : "s"}</ToneBadge>
                                         <ToneBadge tone={kept ? "cyan" : "rose"}>{kept ? "Keep" : "Deletion"}</ToneBadge>

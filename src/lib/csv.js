@@ -240,7 +240,8 @@ export const HISTORY_ALIASES = {
   datedeveloped: "developed_at", developeddate: "developed_at", developedon: "developed_at", leaddeveloped: "developed_at",
   leaddevelopeddate: "developed_at", datepromoted: "developed_at", promoteddate: "developed_at", leadcreatedate: "developed_at", leadcreateddate: "developed_at",
   developedby: "developed_by", dbdvmanager: "developed_by", dbdevmanager: "developed_by", dbdvuser: "developed_by", dbdevuser: "developed_by",
-  dbdvrep: "developed_by", dbdevrep: "developed_by", leadmanager: "developed_by", manager: "developed_by", accountmanager: "developed_by",
+  // Not the old system's DBDV_REP: it held "User 10" on the names its match tool added, not who developed a lead (Sean, Nov 2026).
+  leadmanager: "developed_by", manager: "developed_by", accountmanager: "developed_by",
   apptcreatedate: "set_at", apptcreateddate: "set_at", appointmentcreatedate: "set_at", appointmentcreateddate: "set_at", appointmentcreated: "set_at",
   apptsetdate: "set_at", appointmentsetdate: "set_at", dateset: "set_at", apptdateset: "set_at",
   setby: "set_by", apptrep: "set_by", apptsetby: "set_by", appointmentsetby: "set_by", setter: "set_by", apptsetter: "set_by", apptmanager: "set_by", apptuser: "set_by",
@@ -274,7 +275,6 @@ export function staffMatcher(users) {
   };
 }
 
-/** A day the old system gives (2025-03-14) as a moment: noon in Arizona, the same day in every US time zone. */
 /**
  * A call result as the import looks it up: lower case, one space between words. "Call 3" and "XD-Call 14" are the
  * old system's count of calls with no answer yet (DB Dev's Call 0 to 9, appointments' XD-Call 0 to 20; Sean,
@@ -283,6 +283,7 @@ export function staffMatcher(users) {
 export const resultSpelling = (text) => String(text ?? "").trim().toLowerCase().replace(/\s+/g, " ")
   .replace(/^(xd-?\s?)?call ?#?\d+$/, (_, xd) => `${xd ? "xd-" : ""}call 0`);
 
+/** A day the old system gives (2025-03-14) as a moment: noon in Arizona, the same day in every US time zone. */
 export const dayAt = (day) => (day ? `${day}T19:00:00Z` : null);
 
 /** Date columns, wherever they live — these need parsing rather than copying. */

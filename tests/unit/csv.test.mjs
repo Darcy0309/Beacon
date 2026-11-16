@@ -148,13 +148,14 @@ check("the template has Drivers and XMOD after Autos, before Sales Volume",
     JSON.stringify(rows[0]?.history) === JSON.stringify({ developed_at: "2025-03-14", developed_by: "Sean Fitzgerald", set_at: "2025-04-02", set_by: "Mike P" }), JSON.stringify(rows[0]?.history));
   check("…none on a row without them", rows[1]?.history === null, JSON.stringify(rows[1]?.history));
   check("…the history columns aren't the lead's", !("developed_at" in (rows[0]?.lead ?? {})) && !("developed_by" in (rows[0]?.lead ?? {})));
-  // The old system's own template: DBDV_REP and APPT_REP the managers, its QA dates when developed and set.
+  // The old system's own template: APPT_REP who set the appointment, its QA dates when developed and set. Not DBDV_REP: it
+  // held "User 10" on the names its match tool added (Sean, Nov 2026).
   const old = rowsToImport([["CALLRESULT_DBDV", "CALLRESULT_APPT", "DBDV_REP", "APPT_REP", "COMPANYNAME", "APPOINTMENTDATE", "APPTCREATEDDATE", "QA_DATE_DBDV", "QA_DATE_APPT"],
-    ["Appointment", "Appointment", "Old System", "Jen Bell", "Template Co", "5/20/2025", "", "3/14/2025", "4/02/2025"],
-    ["Lead", "Lead-No Contact", "Old System", "", "Lead Only Co", "", "", "6/1/2024", ""]]).rows;
-  check("the old template: its reps the managers, QA_DATE_DBDV and QA_DATE_APPT the dates developed and set",
-    JSON.stringify(old[0]?.history) === JSON.stringify({ developed_by: "Old System", set_by: "Jen Bell", developed_at: "2025-03-14", set_at: "2025-04-02" }), JSON.stringify(old[0]?.history));
-  check("…a lead with no appointment: developed only", JSON.stringify(old[1]?.history) === JSON.stringify({ developed_by: "Old System", developed_at: "2024-06-01" }), JSON.stringify(old[1]?.history));
+    ["Appointment", "Appointment", "User 10", "Jen Bell", "Template Co", "5/20/2025", "", "3/14/2025", "4/02/2025"],
+    ["Lead", "Lead-No Contact", "User 10", "", "Lead Only Co", "", "", "6/1/2024", ""]]).rows;
+  check("the old template: APPT_REP who set it (DBDV_REP ignored), QA_DATE_DBDV and QA_DATE_APPT the dates developed and set",
+    JSON.stringify(old[0]?.history) === JSON.stringify({ set_by: "Jen Bell", developed_at: "2025-03-14", set_at: "2025-04-02" }), JSON.stringify(old[0]?.history));
+  check("…a lead with no appointment: developed only", JSON.stringify(old[1]?.history) === JSON.stringify({ developed_at: "2024-06-01" }), JSON.stringify(old[1]?.history));
   check("an old export's \\u0026 is an &", rowsToImport([["COMPANYNAME"], ["Dr Spray Paint U0026 Body"], ["A \\u0026 B"]]).rows.map((r) => r.lead.company_name).join("|") === "Dr Spray Paint & Body|A & B");
   check("LEADDATE: when the old system took the name on", rowsToImport([["COMPANYNAME", "LEADDATE"], ["Dated Co", "8/17/2023"]]).rows[0]?.lead.lead_date === "2023-08-17");
   const created = rowsToImport([["COMPANYNAME", "LEADDATE", "QA_DATE_DBDV"], ["Blank Co", "", "3/14/2025"], ["Both Co", "8/17/2023", "3/14/2025"]]).rows;
@@ -204,10 +205,10 @@ check("the template has Drivers and XMOD after Autos, before Sales Volume",
   eq("a date in a carrier field: the line's X-date, unless it has one", [r.insurance.pkg_carrier ?? null, r.insurance.pkg_xdate, r.insurance.wc_carrier ?? null, r.insurance.wc_xdate], [null, "2026-04-01", null, "2026-07-01"]);
 }
 
-console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
 // The old system's call counts (Sean, Nov 2026: "our Appt call results go from XD-Call 0 to XD-Call 20").
 check("XD-Call 0 to XD-Call 20 all read as XD-Call 0 (Lead-No Contact)", Array.from({ length: 21 }, (_, i) => resultSpelling(`XD-Call ${i}`)).every((t) => t === "xd-call 0"));
 check("…and Call 0 to Call 9 as Call 0 (Viable-CallBack), however spaced", ["Call 0", "Call 9", " call  15 ", "CALL 3"].every((t) => resultSpelling(t) === "call 0"));
 check("…any other result as written, in lower case", resultSpelling("X-Date-Lead") === "x-date-lead" && resultSpelling("Callback") === "callback" && resultSpelling("Call Back") === "call back");
 
+console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
 process.exit(failures ? 1 : 0);

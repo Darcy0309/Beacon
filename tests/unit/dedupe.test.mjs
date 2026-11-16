@@ -4,7 +4,7 @@
  * on rows from the client's own SalesGenie sample (Northeast Wisconsin).
  */
 import { parseCsv, rowsToImport, mapAllHeaders } from "../../src/lib/csv.js";
-import { findDuplicates, keepScore, nameKey, phoneKey, einKey, removalMatcher } from "../../src/lib/dedupe.js";
+import { findDuplicates, keepScore, nameKey, phoneKey, einKey, removalMatcher, stageOf } from "../../src/lib/dedupe.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -127,6 +127,26 @@ eq("nothing on the list, nothing taken off", removalMatcher([])(rows[0].lead), n
   const groups = findDuplicates(list);
   check("two businesses with an Eva in one city are two businesses", !groups.some((g) => g.rows.includes(0) && g.rows.includes(1)), JSON.stringify(groups));
   check("…the same Dan Widney at one address one business", groups.some((g) => g.rows.includes(2) && g.rows.includes(3) && g.why.includes("contact")), JSON.stringify(groups));
+}
+
+// One business twice on an old list, one already a lead or an appointment (Sean, Nov 2026: "we'd want to keep the lead/appt").
+{
+  const cold = { lead: { company_name: "Acme Roofing", phone: "602-555-0101", ein: "39-1178301", contact_name: "Pat Lee", decision_maker: "Sam Lee", call_result_dbdv: "Call 3" }, contacts: 2 };
+  const lead = { lead: { company_name: "Acme Roofing LLC", phone: "602-555-0101", call_result_dbdv: "X-Date-Lead", call_result_appt: "XD-Call 2" }, contacts: 0 };
+  const appt = { lead: { company_name: "Acme Roofing", phone: "602-555-0101", call_result_dbdv: "X-Date-Lead", call_result_appt: "Appt From X-Date" }, appointment: { appt_date: "2025-05-01" }, contacts: 0 };
+  check("each record's stage: a name, a lead, an appointment", [cold, lead, appt].map((r) => stageOf(r).label).join() === "Name,Lead,Appointment",
+    [cold, lead, appt].map((r) => stageOf(r).label).join());
+  check("…with the furthest result it gives", stageOf(appt).result === "Appt From X-Date" && stageOf(lead).result === "XD-Call 2" && stageOf(cold).result === "Call 3");
+  check("…an appointment the old system marked invalid is still one", stageOf({ lead: { call_result_dbdv: "X-Date-Lead", call_result_appt: "-$Appointment" } }).label === "Appointment");
+  check("…a DB Dev Lead with nothing on the appointment side is a lead", stageOf({ lead: { call_result_dbdv: "X-Date Hot Lead" } }).label === "Lead");
+  const keep = (list) => { const g = findDuplicates(list); return g.length === 1 ? g[0].keep : null; };
+  check("a lead is kept over a cold name, FEIN and people named or not", keep([cold, lead]) === 1);
+  check("…and an appointment over both", keep([cold, lead, appt]) === 2 && keep([appt, cold]) === 0);
+  const again = { lead: { company_name: "Acme Roofing Inc", phone: "602-555-0101", call_result_dbdv: "X-Date-Lead", call_result_appt: "Phone Appointment" }, appointment: { appt_date: "2023-04-17" }, contacts: 0 };
+  const [g] = findDuplicates([cold, appt, again, lead]);
+  check("two appointments of one business (2021 and 2023): both kept to begin with, the names and leads left off",
+    JSON.stringify(g?.kept) === JSON.stringify([1, 2]) && g?.keep === 1, JSON.stringify(g));
+  check("…one record to keep when there is no other appointment", JSON.stringify(findDuplicates([cold, lead])[0]?.kept) === "[1]");
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll dedupe tests passed.\n");

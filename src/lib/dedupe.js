@@ -62,18 +62,33 @@ const people = (lead) => [lead.contact_name, lead.contact2_name, lead.decision_m
 const filled = (lead) => Object.values(lead).filter((v) => v !== null && v !== undefined && String(v).trim() !== "").length;
 
 /**
- * Which record of a group to keep: the FEIN, then the most people named,
- * then the most filled in; the first in the file when they tie.
+ * How far an old list's record of a business got, by its call results (Sean, Nov 2026: "a record is already a lead
+ * or appt and the other is just a cold viable name… we'd want to keep the lead/appt"): an appointment (a date, or an
+ * appointment result on either side, invalid ones too), a lead (the DB Dev side's Lead / Hot Lead, or anything on
+ * the appointment side), or a name. `result` the furthest result it gives.
+ */
+export function stageOf(row) {
+  const dbdv = String(row.lead.call_result_dbdv ?? "").trim();
+  const appt = String(row.lead.call_result_appt ?? "").trim();
+  const isAppt = (t) => /appointment|appt/i.test(t);
+  if (row.appointment || isAppt(appt) || isAppt(dbdv)) return { rank: 2, label: "Appointment", result: isAppt(appt) ? appt : isAppt(dbdv) ? dbdv : appt || dbdv };
+  if (appt || /lead/i.test(dbdv)) return { rank: 1, label: "Lead", result: appt || dbdv };
+  return { rank: 0, label: "Name", result: dbdv };
+}
+
+/**
+ * Which record of a group to keep: the one that got furthest (an appointment, then a lead, then a name), then
+ * the FEIN, then the most people named, then the most filled in; the first in the file when they tie.
  */
 export function keepScore(row) {
-  return (einKey(row.lead.ein) ? 1_000_000 : 0) + (row.contacts ?? people(row.lead).length) * 1_000 + filled(row.lead);
+  return stageOf(row).rank * 100_000_000 + (einKey(row.lead.ein) ? 1_000_000 : 0) + (row.contacts ?? people(row.lead).length) * 1_000 + filled(row.lead);
 }
 
 /**
  * The groups of records of one business in a list.
  *
  *   rows: [{ lead, contacts }]  as rowsToImport makes them
- *   → [{ rows: [index…], keep: index, why: ["ein", "phone", "name", "contact"] }]
+ *   → [{ rows: [index…], keep: index, kept: [index…], why: ["ein", "phone", "name", "contact"] }]   (kept: keep and any other appointment)
  *
  * Records are one business when they share an EIN, a phone, or a person in
  * the same city; or carry the same name and either share a person, a city or
@@ -135,11 +150,17 @@ export function findDuplicates(rows) {
   return [...groups.entries()]
     .filter(([, members]) => members.length > 1)
     .sort((a, b) => a[1][0] - b[1][0])
-    .map(([root, members]) => ({
-      rows: members,
-      keep: members.reduce((best, i) => (keepScore(rows[i]) > keepScore(rows[best]) ? i : best), members[0]),
-      why: ["ein", "phone", "name", "contact"].filter((r) => why.get(root)?.has(r)),
-    }));
+    .map(([root, members]) => {
+      const keep = members.reduce((best, i) => (keepScore(rows[i]) > keepScore(rows[best]) ? i : best), members[0]);
+      return {
+        rows: members,
+        keep,
+        // Kept to begin with: the one above and every other appointment (Nov 2026: one business's appointments in
+        // 2021 and 2023 are two appointments, each with its history; leaving one off is a choice to make, not made).
+        kept: members.filter((i) => i === keep || stageOf(rows[i]).rank === 2),
+        why: ["ein", "phone", "name", "contact"].filter((r) => why.get(root)?.has(r)),
+      };
+    });
 }
 
 /**
