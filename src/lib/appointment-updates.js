@@ -17,8 +17,14 @@ export const UPDATE_STATUSES = [
   ["invalid", "Invalid", "var(--neon-rose)"],
   ["reschedule", "Please Reschedule", "var(--neon-amber)"],
   ["pending_appointment", "Pending Appointment", "var(--muted-foreground)"],
+  // Given by the system once an update's due date passes with none (Sean, Nov 2026): listed and filtered by, not picked.
+  ["valid_not_updated", "Valid-Not Updated", "var(--neon-cyan)"],
 ];
-export const STATUS_KEYS = UPDATE_STATUSES.map(([k]) => k);
+/** The statuses given by the system, not offered to pick. */
+export const SYSTEM_STATUSES = new Set(["valid_not_updated"]);
+/** The statuses someone can give an appointment. */
+export const PICKABLE_STATUSES = UPDATE_STATUSES.filter(([k]) => !SYSTEM_STATUSES.has(k));
+export const STATUS_KEYS = PICKABLE_STATUSES.map(([k]) => k);
 const BY_KEY = Object.fromEntries(UPDATE_STATUSES.map(([k, label, color]) => [k, { label, color }]));
 export const statusLabel = (key) => BY_KEY[key]?.label ?? key ?? "—";
 export const statusColor = (key) => BY_KEY[key]?.color ?? "var(--muted-foreground)";
@@ -61,3 +67,18 @@ export function soldLines(boxes) {
 
 /** Whether an update is late: past the day it was due by (5 business days after), with no status yet. */
 export const overdue = (status, dueOn, today) => status === "no_status" && Boolean(dueOn) && today > dueOn;
+
+/**
+ * The line under an appointment's update status about its due date, or null: "Due by Nov 12", "Overdue · due Nov 12",
+ * and once the system has made it Valid-Not Updated, "Not updated · was due Nov 12" (Sean: "the red overdue date …
+ * will stay"). Nothing for one found invalid: it needs no update. `late` when it is to show in red.
+ */
+export function dueLine({ update, dueOn, invalid }, today, day) {
+  if (!dueOn || invalid) return null;
+  if (update === "valid_not_updated") return { text: `Not updated · was due ${day(dueOn)}`, late: true };
+  if (update !== "no_status") return null;
+  return overdue(update, dueOn, today) ? { text: `Overdue · due ${day(dueOn)}`, late: true } : { text: `Due by ${day(dueOn)}`, late: false };
+}
+
+/** Who made an update, as its history names them: the system's Valid-Not Updated says so. */
+export const updateBy = (status, name) => name ?? (SYSTEM_STATUSES.has(status) ? "Lighthouse (not updated by the due date)" : "—");

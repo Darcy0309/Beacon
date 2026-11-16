@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "@/components/shared/intent-link";
 import UpdateStatus from "@/features/appointments/components/update-status";
-import { money, overdue, statusColor } from "@/lib/appointment-updates";
+import { dueLine, money, statusColor } from "@/lib/appointment-updates";
 import { formatIso } from "@/lib/dates";
 import { leadHref } from "@/lib/back-link";
 
@@ -33,7 +33,10 @@ export default function ClientAppointments({ rows, carriers, today, timeZone, op
         {COLS.map((c, i) => <span key={i}>{c}</span>)}
       </div>
       {rows.map((a) => {
-        const late = overdue(a.update, a.dueOn, today);
+        // Found invalid on our side: no update is asked for, so no due date (Sean, Nov 2026).
+        const invalid = a.status === "Appointment-Invalid";
+        const due = dueLine({ update: a.update, dueOn: a.dueOn, invalid }, today, day);
+        const late = Boolean(due?.late);
         const tone = STATUS_TONE[a.status] ?? "var(--neon-cyan)";
         return (
           <div key={a.id} data-client-appt={a.id} data-update={a.update}
@@ -60,8 +63,9 @@ export default function ClientAppointments({ rows, carriers, today, timeZone, op
               </span>
               <div className={`text-xs ${late ? "font-semibold text-rose-400" : "text-muted-foreground"}`} data-update-meta>
                 {a.update === "sold" && a.total != null ? `${money(a.total)} written · ` : a.update === "valid_quoting" && a.potential != null ? `${money(a.potential)} potential · ` : ""}
-                {a.updateAt ? `${a.updateBy ?? "Updated"} · ${developed(a.updateAt, timeZone)}`
-                  : a.update === "no_status" ? (late ? `Overdue · due ${day(a.dueOn)}` : `Due by ${day(a.dueOn)}`) : "Not yet held"}
+                {a.update === "valid_not_updated" ? due?.text ?? "Not updated by the due date"
+                  : a.updateAt ? `${a.updateBy ?? "Updated"} · ${developed(a.updateAt, timeZone)}`
+                  : a.update === "no_status" ? (invalid ? "Found invalid · no update needed" : due?.text) : "Not yet held"}
               </div>
             </div>
             <div className="lg:text-right">

@@ -10,7 +10,7 @@ import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import StampedTextarea from "@/components/shared/stamped-textarea";
 import { updateAppointmentStatus } from "@/features/appointments/actions";
-import { SOLD_LINES, UPDATE_STATUSES, money, parseAmount } from "@/lib/appointment-updates";
+import { PICKABLE_STATUSES, SOLD_LINES, SYSTEM_STATUSES, money, parseAmount } from "@/lib/appointment-updates";
 import { formatIso } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +33,7 @@ export default function UpdateStatus({ appt, carriers, open: openProp, onOpenCha
   const setOpen = onOpenChange ?? setOwnOpen;
   const [state, action, pending] = useActionState(updateAppointmentStatus, EMPTY);
   const { fe, invalid } = formHelpers(state, null);
-  const current = appt.update && appt.update !== "pending_appointment" && appt.update !== "no_status" ? appt.update : "";
+  const current = appt.update && appt.update !== "pending_appointment" && appt.update !== "no_status" && !SYSTEM_STATUSES.has(appt.update) ? appt.update : "";
   const [status, setStatus] = useState(current);
   const [boxes, setBoxes] = useState({});
   const handled = useRef(null);
@@ -85,7 +85,7 @@ export default function UpdateStatus({ appt, carriers, open: openProp, onOpenCha
             <fieldset>
               <legend className="mb-2 text-xs font-medium text-muted-foreground">How did it go? Choose one.</legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Status">
-                {UPDATE_STATUSES.map(([key, label, color]) => (
+                {PICKABLE_STATUSES.map(([key, label, color]) => (
                   <button key={key} type="button" role="radio" aria-checked={status === key} onClick={() => setStatus(key)} data-status-option={key}
                     className={cn("flex items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
                       status === key ? "border-primary bg-primary/12 font-semibold" : "border-[var(--panel-border)] hover:bg-muted")}>

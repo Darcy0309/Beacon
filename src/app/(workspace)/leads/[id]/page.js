@@ -25,7 +25,7 @@ import { publicOrigin } from "@/lib/origin";
 import ProjectCalendar from "@/features/calendar/components/project-calendar";
 import UpdateStatus from "@/features/appointments/components/update-status";
 import { getLeadAppointmentUpdates, getLeadAppointments } from "@/features/appointments/queries";
-import { lineLabel, money, overdue, statusColor, statusLabel } from "@/lib/appointment-updates";
+import { dueLine, lineLabel, money, statusColor, statusLabel } from "@/lib/appointment-updates";
 import { getProjectCalendar } from "@/features/calendar/queries";
 import ResendButton from "@/features/delivery/components/resend-button";
 import { getCarrierNames } from "@/features/insurance/queries";
@@ -741,11 +741,11 @@ export default async function LeadSheet({ params, searchParams }) {
                           <span aria-hidden className="size-2 rounded-full" style={{ background: statusColor(latestAppt.update) }} />{latestAppt.updateLabel}
                         </span>
                       </Fact>
-                      {latestAppt.update === "no_status" ? (
-                        <p className={cn("text-xs", overdue(latestAppt.update, latestAppt.dueOn, today) ? "font-semibold text-rose-400" : "text-muted-foreground")}>
-                          {overdue(latestAppt.update, latestAppt.dueOn, today) ? `Overdue: was due ${shortDate(latestAppt.dueOn)}` : `Update it by ${shortDate(latestAppt.dueOn)}`}
-                        </p>
-                      ) : null}
+                      {(() => {
+                        // Its due date, red once past; Valid-Not Updated keeps it; none for one found invalid (Sean, Nov 2026).
+                        const due = dueLine({ update: latestAppt.update, dueOn: latestAppt.dueOn, invalid: latestAppt.status === "Appointment-Invalid" }, today, shortDate);
+                        return due ? <p className={cn("text-xs", due.late ? "font-semibold text-rose-400" : "text-muted-foreground")} data-update-due>{due.text}</p> : null;
+                      })()}
                       <UpdateStatus appt={{ ...latestAppt, co: lead.co }} carriers={carriers} />
                     </>
                   ) : null}

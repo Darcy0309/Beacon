@@ -3,6 +3,7 @@
 import "server-only";
 import { appointmentKind, cityState, colorFor, initialsOf, isoDay, longDate, shortName, splitTime, timeRank } from "@/lib/format";
 import { addDays } from "@/lib/dates";
+import { updateBy } from "@/lib/appointment-updates";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -302,7 +303,7 @@ function shapeUpdate(u) {
     id: u.id, appointmentId: u.appointment_id, leadId: u.lead_id, status: u.status, previous: u.previous_status, note: u.note,
     potential: u.potential_premium == null ? null : Number(u.potential_premium),
     total: u.total_premium == null ? null : Number(u.total_premium), lines: u.sold_lines ?? null, at: u.created_at,
-    by: by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || "—" : "—", byClient: by?.role === "client",
+    by: updateBy(u.status, by ? [by.first_name, by.last_name].filter(Boolean).join(" ") || "—" : null), byClient: by?.role === "client",
     apptDate: appt?.appt_date ?? null, apptTime: appt?.appt_time ?? null,
     manager: setter ? [setter.first_name, setter.last_name].filter(Boolean).join(" ") || "—" : "—", managerId: appt?.follow_up_user_id ?? setter?.id ?? null,
     co: one(u.lead)?.company_name ?? "—", project: one(u.project)?.name ?? "—", client: one(u.company)?.name ?? "—",
@@ -323,7 +324,7 @@ export async function getLeadAppointmentUpdates(leadId) {
     id: u.id, appointmentId: u.appointment_id, status: u.status, previous: u.previous_status, note: u.note,
     potential: u.potential_premium == null ? null : Number(u.potential_premium),
     total: u.total_premium == null ? null : Number(u.total_premium), lines: u.sold_lines ?? null, at: u.created_at,
-    by: u.by_name ?? "—", byClient: Boolean(u.by_client), apptDate: u.appt_date ?? null, apptTime: u.appt_time ?? null,
+    by: updateBy(u.status, u.by_name ?? null), byClient: Boolean(u.by_client), apptDate: u.appt_date ?? null, apptTime: u.appt_time ?? null,
   }));
 }
 
