@@ -18,7 +18,7 @@ export async function listDocuments(params) {
           supabase
             .from("documents")
             .select(`*, company:companies${inner(Boolean(p.filters?.client))}(name), project:projects(name, contact_name),
-              lead:leads(id, company_name, producer_name)`, { count: "exact" })
+              lead:leads!documents_lead_id_fkey(id, company_name, producer_name)`, { count: "exact" })
             .order("created_at", { ascending: false })
             .order("id", { ascending: false }),
           p,
