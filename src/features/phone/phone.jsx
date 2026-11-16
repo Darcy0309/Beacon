@@ -13,6 +13,7 @@ import { colorFor, initialsOf } from "@/lib/format";
 import { toast } from "sonner";
 import { deviceLine } from "@/features/phone/lines";
 import { createTwilioLine } from "@/features/phone/twilio-line";
+import CallerIdPicker, { useCallerId } from "@/features/phone/caller-id";
 import { CallScene, SCENE_NAMES } from "@/features/phone/call-scenes";
 import {
   RINGTONES, closeCallNotification, keepRingtone, previewRingtone, readRingtone, showCallNotification, startRingtone,
@@ -160,6 +161,8 @@ export function PhoneProvider({ children, tracked = false }) {
   const [tab, setTab] = useState("keypad");
   const [value, setValue] = useState("");
   const [lead, setLead] = useState(null); // { id, co, contact, city } or null
+  // The number calls go out from: "" for Auto, the project's local line (Nov 2026).
+  const [callerId, setCallerId] = useCallerId();
   const leadRef = useRef(null); // the same, for a missed call recorded later by its timer
   const [checked, setChecked] = useState(null); // the digits whose lookup has answered
   const lookingUp = useRef(null); // the digits being looked up (a ref: setting it must not run the lookup again)
@@ -380,7 +383,7 @@ export function PhoneProvider({ children, tracked = false }) {
     (number, who, { fromLink = false } = {}) => {
       const tel = telOf(number);
       if (!tel || ringingRef.current) return;
-      const lineId = line.call(tel, { leadId: who?.id ?? null });
+      const lineId = line.call(tel, { leadId: who?.id ?? null, callerId: callerId || null });
       // A phone link pressed is already reported by the activity tracker; one dialed here is reported now.
       if (!fromLink) report(who?.id);
       setControls({ muted: false, held: false, recording: false, keys: false });
@@ -388,7 +391,7 @@ export function PhoneProvider({ children, tracked = false }) {
       setCall({ number: dialable(number), lead: who ?? null, startedAt: at, answeredAt: line.can.answered ? null : at, dir: "out", lineId });
       setNow(Date.now());
     },
-    [line, report]
+    [line, report, callerId]
   );
 
   // End: kept under Recent, then a blank keypad for the next call (Sean, Oct 2026); a lead's Call button calls again.
@@ -833,6 +836,7 @@ export function PhoneProvider({ children, tracked = false }) {
                       data-phone-status={active ? "active" : "idle"} data-phone-answered={active ? String(!ringingOut) : undefined}>
                       {ringingOut ? "Calling…" : active ? `${callLabel} · ${callClock(now - call.answeredAt)}` : "Ready"}
                     </div>
+                    {line.id === "twilio" && !active ? <CallerIdPicker value={callerId} onChange={setCallerId} /> : null}
                   </div>
 
                   {active && !controls.keys ? (

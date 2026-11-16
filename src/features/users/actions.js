@@ -90,6 +90,17 @@ export async function saveUser(prevState, formData) {
     username: s(formData, "username"),
   };
 
+  // An extension rings one person (Sean, Nov 2026: the managers' line): nobody else active may have it.
+  if (payload.phone_ext) {
+    let others = supabase.from("users").select("first_name, last_name").eq("phone_ext", payload.phone_ext).neq("status", "disabled").is("deleted_at", null).limit(1);
+    if (id) others = others.neq("id", id);
+    const { data: clash } = await others;
+    if (clash?.length) {
+      const who = [clash[0].first_name, clash[0].last_name].filter(Boolean).join(" ") || "Someone else";
+      return back(`${who} already has extension ${payload.phone_ext}.`, { phone_ext: "Already in use" });
+    }
+  }
+
   if (id) {
     const status = s(formData, "status") || "active";
     if (id === me.id && (payload.role !== "admin" || status !== "active")) {

@@ -19,13 +19,14 @@ import { getDeletedRecords } from "@/features/trash/queries";
 import { createClient } from "@/lib/supabase/server";
 import ApptTextSettings from "@/features/settings/components/appt-text-settings";
 import CallRecordingSettings from "@/features/settings/components/call-recording-settings";
+import PhoneLinesSettings from "@/features/settings/components/phone-lines-settings";
 import { apptTextSettings } from "@/lib/appointment-texts";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting, bonusRules] = await Promise.all([
+  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting, bonusRules, phoneLines, callers] = await Promise.all([
     getSettings(), getPayRules(), getBusinessToday(),
     supabase.from("sic_codes").select("code", { count: "exact", head: true }),
     getDeletedRecords(),
@@ -34,6 +35,9 @@ export default async function SettingsPage() {
     getBusinessTimeZone(),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("appt_texts", true).is("deleted_at", null),
     getBonusRules(),
+    supabase.from("phone_lines").select("id, number, kind, label, ring_user_ids, area_code").order("kind").order("number"),
+    supabase.from("users").select("id, first_name, last_name, email, phone_ext").in("role", ["admin", "manager", "agent"]).eq("status", "active")
+      .is("deleted_at", null).order("first_name").order("last_name").limit(500),
   ]);
 
   return (
@@ -47,6 +51,8 @@ export default async function SettingsPage() {
         <ApptTextSettings value={apptTextSettings(settings.appt_texts, tz)} projects={texting.count ?? 0} />
         {/* Every call on the Lighthouse phone recorded, without pressing Record (Sean, Nov 2026). */}
         <CallRecordingSettings value={settings.phone} />
+        {/* The lines, extensions and voicemail (Sean, Nov 2026: the toll-free lines moved from PanTerra). */}
+        <PhoneLinesSettings lines={phoneLines.data ?? []} staff={callers.data ?? []} value={settings.phone ?? {}} />
         <DeliverySettings value={settings.delivery} />
         <IdleSettings minutes={settings.security?.idle_minutes} />
         <PayRulesForm rules={payRules} />

@@ -8,6 +8,8 @@
  *   --url      where Lighthouse is reached from the internet (Twilio calls it for every call)
  *   --number   the Twilio number to call from and ring on (+16025550100); needed when the account has several
  *   --write F  also write the keys into the env file F (an existing TWILIO_* line there is replaced)
+ *   --all      also send every other voice number in the account to Lighthouse (the phone lines, Nov 2026:
+ *              the toll-free lines and the local caller IDs, listed in Settings → Phone Lines)
  *
  * It makes or updates, in the Twilio account:
  *   - a TwiML App, "Lighthouse phone", whose Voice URL is <url>/api/twilio/voice
@@ -33,6 +35,7 @@ const authToken = (arg("token") ?? process.env.TWILIO_AUTH_TOKEN ?? "").trim();
 const site = (arg("url") ?? "").trim().replace(/\/+$/, "");
 const wanted = (arg("number") ?? "").replace(/[^\d+]/g, "");
 const envFile = arg("write");
+const allNumbers = args.includes("--all");
 
 const stop = (message) => {
   console.error(`\n✗ ${message}\n`);
@@ -85,6 +88,22 @@ if (number.voice_application_sid !== app.sid) {
   console.log(`✓ Calls to ${number.phone_number} now ring Lighthouse (they went to ${before})`);
 } else {
   console.log(`✓ Calls to ${number.phone_number} already ring Lighthouse`);
+}
+
+// The phone lines (Nov 2026): every other voice number rings Lighthouse too, which answers each as Settings → Phone
+// Lines says (the managers' line's greeting and extensions, a line's chosen people, a local caller ID called back).
+if (allNumbers) {
+  for (const other of voice.filter((n) => n.sid !== number.sid)) {
+    if (other.voice_application_sid === app.sid) {
+      console.log(`✓ Calls to ${other.phone_number} already ring Lighthouse`);
+      continue;
+    }
+    await api(`/IncomingPhoneNumbers/${other.sid}.json`, { method: "POST", form: { VoiceApplicationSid: app.sid } });
+    console.log(`✓ Calls to ${other.phone_number} now ring Lighthouse`);
+  }
+  console.log("  List each one in Settings → Phone Lines to say what it is for.");
+} else if (voice.length > 1) {
+  console.log(`  ${voice.length - 1} other voice number${voice.length === 2 ? "" : "s"} left as they are: add --all to send them to Lighthouse too.`);
 }
 
 // Texts to the number: replies come back to Lighthouse (Nov 2026).

@@ -6,6 +6,8 @@ import { callableNumber, identityOf, twiml, userIdOf, validTwilioSignature, xml 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { startCallTranscript } from "@/lib/server/call-transcripts";
 import { fullName } from "@/lib/format";
+import { DEFAULT_VOICEMAIL_GREETING, VOICE, boxParam, parseBox } from "@/lib/phone-lines";
+import { boxPeople, callerIdFor, greetingFor, lastCaller, lineOf, lineSettings, staffByExtension } from "@/lib/server/phone-lines";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +20,11 @@ const PRESENT_MS = 12 * 60 * 1000;
 const MAX_RINGS = 10;
 // Said first on every call while "Record every call" is on, with its notice (Settings → Call Recording).
 const RECORDING_NOTICE = "This call may be recorded.";
-const VOICEMAIL_GREETING = "Sorry, no one can take your call right now. Please leave a message after the tone, and we will call you back.";
-
-const say = (text) => `<Say voice="Polly.Joanna">${xml(text)}</Say>`;
+// Said in the AI voice (Sean, Nov 2026: "Would it be an AI voice? If so, that would be cool").
+const say = (text) => `<Say voice="${VOICE}">${xml(text)}</Say>`;
+const play = (url) => `<Play>${xml(url)}</Play>`;
+// A manager's extension rings them this long before their voicemail.
+const EXTENSION_RING_SECONDS = 30;
 const answer = (inner) => new NextResponse(twiml(inner), { headers: { "content-type": "text/xml; charset=utf-8" } });
 
 /**
@@ -84,14 +88,49 @@ export async function POST(request) {
     await logLeg(admin, params, here.searchParams);
     return new NextResponse(null, { status: 204 });
   }
+  // Whose voicemail the call is for (Sean, Nov 2026): a manager's, a line's, the general one; none, the admins'.
+  const box = parseBox(here.searchParams.get("box"));
+  const boxed = (s, b = box) => `${self(s)}${b ? `&box=${boxParam(b)}` : ""}`;
+  const toVoicemail = async (b) => answer(await voicemail(admin, b, boxed("left", b), `${publicOrigin(request.headers)}${self("transcribed")}`));
   if (step === "after") {
     // The call in, as a whole: answered by someone, or not (Call Activity counts it missed when it rang no one).
     await logLeg(admin, { ...params, CallStatus: params.DialCallStatus === "completed" ? "completed" : "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
-    return answer(params.DialCallStatus === "completed" ? "<Hangup/>" : voicemail(self("left"), `${publicOrigin(request.headers)}${self("transcribed")}`));
+    return params.DialCallStatus === "completed" ? answer("<Hangup/>") : toVoicemail(box);
   }
   if (step === "left") {
-    await tellOfVoicemail(admin, params, publicOrigin(request.headers));
+    await tellOfVoicemail(admin, params, publicOrigin(request.headers), box);
     return answer("<Hangup/>");
+  }
+
+  /** Ring these people where they have the phone open; nobody there (or nobody to ring), the box's voicemail. */
+  const ringThem = async (ids, b, seconds = RING_SECONDS) => {
+    const ring = admin && ids.length ? (await presentStaff(admin)).filter((id) => ids.includes(id)) : [];
+    await logLeg(admin, { ...params, CallStatus: ring.length ? "initiated" : "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
+    if (!ring.length) return toVoicemail(b);
+    const clients = ring.map((id) => `<Client${statusOf("in", id)}>${xml(identityOf(id))}</Client>`).join("");
+    const { notice } = await phoneSettings(admin);
+    return answer(`${notice ? say(RECORDING_NOTICE) : ""}<Dial timeout="${seconds}" answerOnBridge="true" action="${xml(boxed("after", b))}" method="POST">${clients}</Dial>`);
+  };
+  /** The managers' line: its greeting, waiting for an extension (# or a pause ends it). `again`: said after a wrong one. */
+  const attendant = async (again = "") => {
+    const { attendantGreeting } = await lineSettings(admin);
+    // Call Activity has the call from its start; an extension's ring, or the general voicemail, says how it went.
+    if (!again) await logLeg(admin, { ...params, CallStatus: "initiated", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
+    const next = `${self("ext")}${again ? "&try=2" : ""}`;
+    return answer(`<Gather input="dtmf" timeout="5" finishOnKey="#" actionOnEmptyResult="true" action="${xml(next)}" method="POST">${again ? say(again) : ""}${say(attendantGreeting)}</Gather>`);
+  };
+  if (step === "ext") {
+    // An extension dialed: that manager rings, then their voicemail. None: the general voicemail. A wrong one: once more.
+    const digits = String(params.Digits ?? "").replace(/\D/g, "");
+    const general = async () => {
+      await logLeg(admin, { ...params, CallStatus: "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
+      return toVoicemail({ kind: "general", id: null });
+    };
+    if (!digits) return general();
+    const who = await staffByExtension(admin, digits);
+    if (who) return ringThem([who], { kind: "user", id: who }, EXTENSION_RING_SECONDS);
+    if (here.searchParams.get("try") !== "2") return attendant("Sorry, that extension is not in service.");
+    return general();
   }
 
   // A call from a browser: someone with the phone, still allowed it, to a number Lighthouse may call.
@@ -109,13 +148,25 @@ export async function POST(request) {
     const told = notice ? ` url="${xml(`${publicOrigin(request.headers)}${self("notice")}`)}" method="POST"` : "";
     // The lead it is made from (the phone sends it): the call, and its recording, are on that lead alone.
     const leadId = /^[1-9]\d{0,17}$/.test(params.Lead ?? "") ? Number(params.Lead) : null;
-    return answer(`<Dial callerId="${xml(config.callerId)}" answerOnBridge="true"><Number${tones}${told}${statusOf("out", userId, leadId)}>${xml(to.number)}</Number></Dial>`);
+    // The caller ID (Sean, Nov 2026): the one picked in the phone, else the local line in the project's area code.
+    const from = await callerIdFor(admin, { requested: params.CallerId, leadId, fallback: config.callerId });
+    return answer(`<Dial callerId="${xml(from.number)}" answerOnBridge="true"><Number${tones}${told}${statusOf("out", userId, leadId)}>${xml(to.number)}</Number></Dial>`);
   }
 
-  // A call to the Twilio number: everyone with the phone open rings (the first to answer takes it), else voicemail.
+  // A call to one of the lines (Sean, Nov 2026): the managers' line answers with its greeting; a line for chosen
+  // people rings them; a local caller ID called back rings the manager who last called that number (else the greeting).
+  const line = await lineOf(admin, params.To);
+  if (line?.kind === "attendant") return attendant();
+  if (line?.kind === "main") return ringThem(line.ring_user_ids ?? [], { kind: "line", id: line.id });
+  if (line?.kind === "local") {
+    const last = await lastCaller(admin, params.From);
+    return last ? ringThem([last], { kind: "user", id: last }) : attendant();
+  }
+
+  // A number not listed (the one Twilio number before the lines): everyone with the phone open rings, else voicemail.
   const ring = admin ? await presentStaff(admin) : [];
   await logLeg(admin, { ...params, CallStatus: ring.length ? "initiated" : "no-answer", CallDuration: "0" }, new URLSearchParams("dir=in"), { whole: true });
-  if (!ring.length) return answer(voicemail(self("left"), `${publicOrigin(request.headers)}${self("transcribed")}`));
+  if (!ring.length) return toVoicemail(null);
   const clients = ring.map((id) => `<Client${statusOf("in", id)}>${xml(identityOf(id))}</Client>`).join("");
   // Every call recorded, with its notice: the caller hears it before it rings.
   const { notice } = await phoneSettings(admin);
@@ -143,9 +194,13 @@ async function logLeg(admin, params, query, { whole = false } = {}) {
   if (error) console.error("[twilio/voice] call activity", error.message);
 }
 
-/** The greeting, and up to three minutes of message; # or silence ends it. Twilio writes out its words (`transcribed`, an address). */
-function voicemail(action, transcribed) {
-  return `${say(VOICEMAIL_GREETING)}<Record maxLength="180" timeout="6" finishOnKey="#" playBeep="true" trim="trim-silence" action="${xml(action)}" method="POST" transcribe="true" transcribeCallback="${xml(transcribed)}"/>${say("We did not get a message. Goodbye.")}<Hangup/>`;
+/**
+ * A box's greeting (a manager's own, recorded or in the AI voice; else the usual one), and up to three minutes of
+ * message; # or silence ends it. Twilio writes out its words (`transcribed`, an address).
+ */
+async function voicemail(admin, box, action, transcribed) {
+  const greeting = await greetingFor(admin, box, { say, play, fallback: DEFAULT_VOICEMAIL_GREETING });
+  return `${greeting}<Record maxLength="180" timeout="6" finishOnKey="#" playBeep="true" trim="trim-silence" action="${xml(action)}" method="POST" transcribe="true" transcribeCallback="${xml(transcribed)}"/>${say("We did not get a message. Goodbye.")}<Hangup/>`;
 }
 
 /** The staff with the phone open now, the most recently seen first (at most MAX_RINGS). */
@@ -209,8 +264,12 @@ async function tellOfRecording(admin, params, query, origin) {
   }
 }
 
-/** A voicemail left: a notification to each administrator (pushed to their desktop too), naming the lead when the number is one's. */
-async function tellOfVoicemail(admin, params, origin) {
+/**
+ * A voicemail left: a notification (pushed to their desktop too) to its box's people (Sean, Nov 2026: a manager's
+ * own; the general voicemail's 1-2 people, "the voicemails have been coming to my inbox… which I don't want
+ * anymore"; a line's), who may play it; else each administrator. It names the lead when the number is one's.
+ */
+async function tellOfVoicemail(admin, params, origin, box = null) {
   const sid = params.RecordingSid;
   const secs = Number(params.RecordingDuration) || 0;
   if (!admin || !/^RE[0-9a-f]{32}$/i.test(sid ?? "") || secs < 1) return;
@@ -225,6 +284,9 @@ async function tellOfVoicemail(admin, params, origin) {
     `${callClock(secs * 1000)} long`,
     `Listen: ${origin}/api/phone/recordings/${sid}`,
   ].filter(Boolean).join("\n");
-  const { error } = await admin.rpc("phone_voicemail_notice", { p_title: `Voicemail from ${from}`, p_body: body, p_link: lead ? `/leads/${lead.id}` : null });
+  const title = `${box?.kind === "general" ? "General voicemail" : "Voicemail"} from ${from}`;
+  const { error } = await admin.rpc("phone_voicemail_notice_to", {
+    p_users: await boxPeople(admin, box), p_sid: sid, p_title: title, p_body: body, p_link: lead ? `/leads/${lead.id}` : null,
+  });
   if (error) console.error("[twilio/voice] voicemail notice", error.message);
 }

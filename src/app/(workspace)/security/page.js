@@ -1,4 +1,5 @@
-import { ShieldCheck, History, KeyRound, UserRound, Camera } from "lucide-react";
+import { ShieldCheck, History, KeyRound, UserRound, Camera, Voicemail } from "lucide-react";
+import VoicemailGreeting from "@/features/phone/components/voicemail-greeting";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import TwoFactorSetup from "@/features/auth/components/two-factor-setup";
@@ -52,6 +53,15 @@ export default async function SecurityPage({ searchParams }) {
           <Card>
             <SectionHeader label="My Profile" icon={UserRound} />
             <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email, bio: me.bio ?? "", birthday: me.birthday ?? null }} staff={me.role !== "client"} />
+          </Card>
+        ) : null}
+
+        {/* Staff who take calls: what their extension's voicemail says (Sean, Nov 2026: an AI voice, or their own). */}
+        {me?.status === "active" && ["admin", "manager", "agent"].includes(me.role) ? (
+          <Card data-my-voicemail>
+            <SectionHeader label="My Voicemail Greeting" icon={Voicemail} />
+            <VoicemailGreeting me={{ first_name: me.first_name, phone_ext: me.phone_ext, voicemail_greeting: me.voicemail_greeting,
+              voicemail_use_recording: me.voicemail_use_recording, voicemail_audio_path: me.voicemail_audio_path }} />
           </Card>
         ) : null}
 

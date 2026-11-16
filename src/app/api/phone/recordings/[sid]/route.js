@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
  * A recording kept in the Twilio account (a voicemail or a recorded call,
  * linked from its notification), played here for an administrator, or for the
  * person who recorded the call (phone_recordings): Twilio asks for the
- * account's own login to fetch one, which never leaves the server.
+ * account's own login to fetch one, which never leaves the server. A voicemail plays for the people of the
+ * box it was left in (phone_voicemail_access).
  */
 export async function GET(request, { params }) {
   const me = await getCurrentUser();
@@ -18,8 +19,14 @@ export async function GET(request, { params }) {
   if (!/^RE[0-9a-f]{32}$/i.test(sid)) return NextResponse.json({ error: "No such recording" }, { status: 404 });
   if (me.role !== "admin") {
     const admin = createAdminClient();
-    const { data } = admin ? await admin.from("phone_recordings").select("user_id").eq("recording_sid", sid).maybeSingle() : { data: null };
-    if (data?.user_id !== me.id) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    const [{ data }, { data: left }] = admin
+      ? await Promise.all([
+        admin.from("phone_recordings").select("user_id").eq("recording_sid", sid).maybeSingle(),
+        // A voicemail left in their box (Nov 2026): theirs to play.
+        admin.from("phone_voicemail_access").select("user_id").eq("recording_sid", sid).eq("user_id", me.id).maybeSingle(),
+      ])
+      : [{ data: null }, { data: null }];
+    if (data?.user_id !== me.id && !left) return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
   const config = twilioConfig();
   if (!config) return NextResponse.json({ error: "Twilio is not set up on the server" }, { status: 503 });
