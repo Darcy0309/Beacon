@@ -275,6 +275,14 @@ export function staffMatcher(users) {
 }
 
 /** A day the old system gives (2025-03-14) as a moment: noon in Arizona, the same day in every US time zone. */
+/**
+ * A call result as the import looks it up: lower case, one space between words. "Call 3" and "XD-Call 14" are the
+ * old system's count of calls with no answer yet (DB Dev's Call 0 to 9, appointments' XD-Call 0 to 20; Sean,
+ * Nov 2026), so any count reads as its "Call 0" / "XD-Call 0": Viable-CallBack and Lead-No Contact.
+ */
+export const resultSpelling = (text) => String(text ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+  .replace(/^(xd-?\s?)?call ?#?\d+$/, (_, xd) => `${xd ? "xd-" : ""}call 0`);
+
 export const dayAt = (day) => (day ? `${day}T19:00:00Z` : null);
 
 /** Date columns, wherever they live — these need parsing rather than copying. */

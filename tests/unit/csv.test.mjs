@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for the CSV lead importer. */
-import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, parseDrivers, parseXmod, TEMPLATE_HEADERS, cleanValue, staffMatcher, dayAt } from "../../src/lib/csv.js";
+import { parseCsv, rowsToImport, rowsToLeads, mapHeaders, mapAllHeaders, normalizeState, parseYears, parseDrivers, parseXmod, TEMPLATE_HEADERS, cleanValue, staffMatcher, dayAt, resultSpelling } from "../../src/lib/csv.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -205,4 +205,9 @@ check("the template has Drivers and XMOD after Autos, before Sales Volume",
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");
+// The old system's call counts (Sean, Nov 2026: "our Appt call results go from XD-Call 0 to XD-Call 20").
+check("XD-Call 0 to XD-Call 20 all read as XD-Call 0 (Lead-No Contact)", Array.from({ length: 21 }, (_, i) => resultSpelling(`XD-Call ${i}`)).every((t) => t === "xd-call 0"));
+check("…and Call 0 to Call 9 as Call 0 (Viable-CallBack), however spaced", ["Call 0", "Call 9", " call  15 ", "CALL 3"].every((t) => resultSpelling(t) === "call 0"));
+check("…any other result as written, in lower case", resultSpelling("X-Date-Lead") === "x-date-lead" && resultSpelling("Callback") === "callback" && resultSpelling("Call Back") === "call back");
+
 process.exit(failures ? 1 : 0);

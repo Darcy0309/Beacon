@@ -301,6 +301,23 @@ try {
   check("found invalid on its appointment's date and time (the old system doesn't keep when)", invalidAt("Hist G") === "2025-06-13 14:30", invalidAt("Hist G"));
   check("…its date alone, without a time", (invalidAt("Hist F") ?? "").startsWith("2025-06-12"), invalidAt("Hist F"));
 
+  section("Carriers against the Insurance Companies list (Nov 2026)");
+  // Sean: "if whatever is in the old system's carrier fields isn't a similar match to the master list, it just imports blank".
+  sql(`insert into public.agencies (name) values ('Quillfeather Casualty')`);
+  const carrierFile = path.join(path.dirname(file), "carriers.csv");
+  writeFileSync(carrierFile, ["Company,Phone,PKG Carrier,WC Carrier,WC XDate",
+    `"${TAG} Carrier A",602-555-0301,Quilfeather Casualty Ins Co,unsure,7/1/2026`,
+    `"${TAG} Carrier B",602-555-0302,QUILLFEATHER CASUALTY,will provide,`].join("\n"));
+  await chooseFile(admin, carrierFile);
+  await admin.click("button[type=submit]", "Import leads");
+  await admin.waitToast(/Imported 2 of 2/, 15000);
+  const carriersOf = (name) => sql(`select coalesce(i.pkg_carrier, '') || '|' || coalesce(i.wc_carrier, '') || '|' || coalesce(i.wc_xdate::text, '')
+    from public.insurance_details i join public.leads l on l.id = i.lead_id where l.company_name = ${lit(`${TAG} ${name}`)}`);
+  check("a similar match comes in as the list spells it; the rest blank (the X-date kept)",
+    carriersOf("Carrier A") === "Quillfeather Casualty||2026-07-01" && carriersOf("Carrier B") === "Quillfeather Casualty||", `${carriersOf("Carrier A")} / ${carriersOf("Carrier B")}`);
+  check("…and the import says which were left blank",
+    Boolean(await until(async () => /2 carrier entries weren't a match[\s\S]*unsure[\s\S]*will provide|2 carrier entries weren't a match[\s\S]*will provide[\s\S]*unsure/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
+
   section("The SIC list in Settings");
   await admin.go("/settings", 4000);
   const before = Number((await admin.ev(`document.querySelector('[data-sic-count]')?.textContent ?? '0'`)).replace(/\D/g, ""));
@@ -315,6 +332,7 @@ try {
   check("…and the list can be downloaded", (await admin.ev(`fetch('/api/sic-codes').then((r) => r.text())`)).startsWith("SIC Code,SIC Description"));
 } finally {
   sql(`delete from public.sic_codes where description like ${lit(`${TAG}%`)}`);
+  sql(`delete from public.agencies where name = 'Quillfeather Casualty'`);
   browser.close();
   sql(`delete from public.lead_notes where lead_id in (select id from public.leads where project_id = ${project})`);
   sql(`delete from public.insurance_details where lead_id in (select id from public.leads where project_id = ${project})`);

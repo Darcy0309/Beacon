@@ -3,13 +3,14 @@
 /** CSV lead import (the legacy Imports module). */
 
 import { revalidatePath } from "next/cache";
-import { MAX_IMPORT_MB, dayAt, parseCsv, rowsToImport, staffMatcher } from "@/lib/csv";
+import { MAX_IMPORT_MB, dayAt, parseCsv, resultSpelling, rowsToImport, staffMatcher } from "@/lib/csv";
 import { appointmentSpan } from "@/lib/appointment-links";
 import { removalMatcher } from "@/lib/dedupe";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
 import { sicCode, sicMatcher } from "@/lib/sic";
+import { POLICY_LINES, carrierMatcher } from "@/lib/coverage";
 import { fillPlaces } from "@/lib/server/zip-places";
 
 const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
@@ -233,8 +234,7 @@ export async function importLeadsCsv(prevState, formData) {
     }
   }
   const resultFor = (type, text) => {
-    // "Call 3", "XD-Call 4": the old system's count of calls with no answer yet, read as its "Call 0" (Sean's test lists, Nov 2026).
-    const t = String(text ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/^(xd-?\s?)?call ?#?\d+$/, (_, xd) => `${xd ? "xd-" : ""}call 0`);
+    const t = resultSpelling(text);
     return t ? resultIndex.get(`${type}|${t}`) ?? null : null;
   };
   // The appointment column repeating the DB Dev result ("X-Date-Lead" in both): not worked as an appointment lead yet.
@@ -275,6 +275,39 @@ export async function importLeadsCsv(prevState, formData) {
     }
     if (fresh.size) {
       await supabase.from("sic_codes").upsert([...fresh].map(([code, description]) => ({ code, description })), { onConflict: "code", ignoreDuplicates: true });
+    }
+  }
+
+  // The carriers (Sean, Nov 2026): an old list's carrier fields hold "same", "unsure", "will provide", an agency's
+  // name… What is a similar match to a carrier on the Insurance Companies list comes in as the list spells it; the
+  // rest come in blank, and the import says which, to add a carrier the list is missing and import again. With no
+  // list yet, as written.
+  const unmatchedCarriers = new Map();
+  {
+    let agencies;
+    try {
+      agencies = await allRows((from, opts) => supabase.from("agencies").select("name", opts).is("deleted_at", null).order("id").range(from, from + 999));
+    } catch (e) {
+      return fail(e);
+    }
+    if (agencies.length) {
+      const carrierFor = carrierMatcher(agencies.map((a) => a.name));
+      const columns = [...POLICY_LINES.map((l) => l.carrier), "homeowner_carrier", "personal_auto_carrier"];
+      for (const row of parsed) {
+        if (!row.insurance) continue;
+        for (const column of columns) {
+          const written = row.insurance[column];
+          if (!written) continue;
+          const carrier = carrierFor(written);
+          if (carrier) row.insurance[column] = carrier;
+          else {
+            delete row.insurance[column];
+            const key = written.trim();
+            unmatchedCarriers.set(key, (unmatchedCarriers.get(key) ?? 0) + 1);
+          }
+        }
+        if (!Object.keys(row.insurance).length) row.insurance = null;
+      }
     }
   }
 
@@ -478,5 +511,7 @@ export async function importLeadsCsv(prevState, formData) {
   revalidatePath("/");
   const unknown = [...unknownResults].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
   const people = [...unknownPeople].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
-  return ok({ people, imported, errors, details, appointments, noDateAppts, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
+  const carriers = [...unmatchedCarriers].sort((a, b) => b[1] - a[1]).slice(0, 50).map(([text, n]) => ({ text, n }));
+  const carriersBlank = [...unmatchedCarriers.values()].reduce((sum, n) => sum + n, 0);
+  return ok({ people, carriers, carriersBlank, imported, errors, details, appointments, noDateAppts, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
 }

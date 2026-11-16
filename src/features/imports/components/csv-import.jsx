@@ -143,7 +143,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], people = [], noDateAppts = 0, duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
+      const { imported, errors, total, assigned, unknown = [], people = [], carriers = [], carriersBlank = 0, noDateAppts = 0, duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
       const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
         existing ? `${existing} already on the project` : "", others ? `${others} on other clients' lists` : ""].filter(Boolean).join(" · ");
       // What the list left out of a place and the rest said for certain (a ZIP's county, a city's ZIP…; Oct 2026).
@@ -172,6 +172,13 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
         });
       }
       formRef.current?.reset();
+      // Carriers not on the Insurance Companies list (Sean, Nov 2026): left blank.
+      if (carriersBlank) {
+        toast.warning(`${carriersBlank} carrier entr${carriersBlank === 1 ? "y wasn't a match" : "ies weren't a match"} for a carrier on the Insurance Companies list, so ${carriersBlank === 1 ? "it was" : "they were"} left blank`, {
+          description: carriers.slice(0, 8).map((u) => `“${u.text}” (${u.n})`).join(", ") + (carriers.length > 8 ? ", …" : ""),
+          duration: 20000,
+        });
+      }
       setFileName("");
       setProjectId(formRef.current?.elements?.project_id?.value ?? "");
       recheck(null);

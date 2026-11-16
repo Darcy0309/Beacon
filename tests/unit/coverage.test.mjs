@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for coverage: the policy lines, carrier suggestions and carrier imports. */
-import { POLICY_LINES, carrierKey, carrierNamesFromRows, suggestCarriers } from "../../src/lib/coverage.js";
+import { POLICY_LINES, carrierCore, carrierKey, carrierMatcher, carrierNamesFromRows, suggestCarriers } from "../../src/lib/coverage.js";
 import { schemas, validate } from "../../src/lib/validate.js";
 
 let failures = 0;
@@ -31,6 +31,23 @@ const good = { lead_id: "4", ultimate_xdate: "2027-12-20", agency_name: "Garry I
 check("a coverage form passes", validate(good, schemas.coverage).ok);
 const bad = validate({ ...good, wc_xdate: "2027-02-30", auto_carrier: "x".repeat(121) }, schemas.coverage);
 check("…a date that does not exist, or a carrier too long, is named", Boolean(bad.errors.wc_xdate && bad.errors.auto_carrier), JSON.stringify(bad.errors));
+
+// An old list's carriers against the Insurance Companies list (Sean, Nov 2026): a similar match, else blank.
+{
+  const carrier = carrierMatcher(["The Hartford", "Travelers", "Cincinnati Insurance", "Acuity", "West Bend Mutual", "Auto-Owners Insurance",
+    "Amerisure", "State Farm", "State Auto", "EMC Insurance", "Liberty Mutual", "Donegal"]);
+  const same = (pairs) => pairs.filter(([written, want]) => carrier(written) !== want).map(([w]) => `${w} → ${carrier(w)}`);
+  check("the same carrier without its filler words, any case", carrierCore("Auto Owners Mutual Ins Co") === "autoowners" && !same([
+    ["hartford", "The Hartford"], ["HARTFORD INS GROUP", "The Hartford"], ["the travelers cos", "Travelers"], ["auto owners mutual ins co", "Auto-Owners Insurance"],
+    ["westbend", "West Bend Mutual"], ["emc", "EMC Insurance"], ["Liberty", "Liberty Mutual"]]).length, same([["hartford", "The Hartford"]]).join());
+  check("…a longer form of it, and a slip of a letter (two in a long name)", !same([["Travelers Casualty", "Travelers"], ["cincinatti", "Cincinnati Insurance"],
+    ["cinncinati ins", "Cincinnati Insurance"], ["aquity", "Acuity"], ["accuity", "Acuity"], ["hardford", "The Hartford"]]).length,
+    same([["Travelers Casualty", "Travelers"], ["cincinatti", "Cincinnati Insurance"], ["aquity", "Acuity"], ["hardford", "The Hartford"]]).join());
+  check("what isn't a carrier on the list comes in blank", ["same", "unsure", "undisclosed", "will provide", "not erie insurance", "Monopolistic", "see notes", "/", "Gallagher"]
+    .every((w) => carrier(w) === null), ["unsure", "will provide", "Monopolistic"].map((w) => `${w} → ${carrier(w)}`).join());
+  check("…a name two letters off a short one isn't taken for it (Acrisure is not Amerisure)", carrier("Acrisure") === null && carrier("donagul") === null);
+  check("…nor one as near two carriers as each other", carrier("state") === null && carrier("State Farm Ins Co") === "State Farm");
+}
 
 console.log(failures ? `\n${failures} coverage check(s) failed.\n` : "\nAll coverage checks passed.\n");
 process.exit(failures ? 1 : 0);
