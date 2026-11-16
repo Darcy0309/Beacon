@@ -268,7 +268,8 @@ export function staffMatcher(users) {
     put(key(u.email), u.id);
   }
   return (name) => {
-    const k = key(name);
+    // The old system's appointment setters carry their team before the name ("Appts-David Bishop", Nov 2026).
+    const k = key(String(name ?? "").replace(/^\s*(appts?|appointments?|dbdv|dbdev|xd)\s*[-:]\s*/i, ""));
     return k && !clash.has(k) ? index.get(k) ?? null : null;
   };
 }
@@ -287,20 +288,27 @@ const DATE_COLUMNS = new Set([
 // What old lists put in a field that has nothing in it: read as blank.
 const PLACEHOLDERS = new Set(["n/a", "na", "n.a.", "none", "null", "nil", "unknown", "unk", "tbd", "-", "--", "---", ".", "?", "x",
   "no", "no site", "no website", "no web site", "nosite", "no web", "no email", "no e-mail", "noemail", "no email address",
-  "not available", "not listed", "none listed", "no info", "same", "n\\a"]);
+  "not available", "not listed", "none listed", "no info", "same", "n\\a",
+  // …and what the old system's callers wrote when a business wouldn't say (Sean's test lists, Nov 2026).
+  "did not say", "didn't say", "declined", "decline", "declined to give", "none given", "not given", "see notes", "see note",
+  "see e-mail", "see email", "e-mail"]);
 const EMAIL_COLUMNS = new Set(["email", "dm_email", "contact2_email"]);
 const EMAIL = /^[^\s@,;]+@[^\s@,;]+\.[a-z]{2,}$/i;
 const WEBSITE = /^(https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,}(:\d+)?(\/\S*)?$/i;
 
 /**
  * A text value as it should be kept, or null for nothing: a placeholder
- * ("n/a", "no site", "none") is blank; an email field keeps the first
+ * ("n/a", "no site", "none", "declined", "see notes..") is blank; an email field keeps the first
  * address that is one; a website field keeps what is a web address.
  */
 export function cleanValue(column, value) {
   const v = String(value ?? "").trim();
-  if (!v || PLACEHOLDERS.has(v.toLowerCase())) return null;
-  if (EMAIL_COLUMNS.has(column)) return v.split(/[\s,;]+/).find((x) => EMAIL.test(x)) ?? null;
+  if (!v || PLACEHOLDERS.has(v.toLowerCase()) || PLACEHOLDERS.has(v.toLowerCase().replace(/[\s.]+$/, ""))) return null;
+  if (EMAIL_COLUMNS.has(column)) {
+    // One address typed with a space in it ("info@the marketexpress.com") or a full stop after it.
+    const one = (v.match(/@/g) ?? []).length === 1 && !/[,;/]/.test(v) ? v.replace(/\s+/g, "") : v;
+    return one.split(/[\s,;]+/).map((x) => x.replace(/\.+$/, "")).find((x) => EMAIL.test(x)) ?? null;
+  }
   if (column === "website") return WEBSITE.test(v.replace(/^www\./i, "www.")) ? v : null;
   return v;
 }
@@ -466,6 +474,95 @@ export function parseXmod(value) {
   return n > 0 && n < 10 ? n : null;
 }
 
+// A phone number written into a person's name or title (Sean, Nov 2026: "cell #s in the title or contact fields"):
+// "Vinod Patel 361-550-1360 cell", "cell 435-777-3006", "Shawn Arvey231-730-1776 (cell)", "1- 775-289-4473",
+// with what labels it ("cell", "direct line", "office #") and an extension after it.
+const PHONE_LABEL = String.raw`(?:cell(?:\s*(?:phone|#))?|mobile|direct(?:\s+line)?|home(?:\s*\/\s*direct)?(?:\s*#)?|office(?:\s*#)?|loc|ph|phone|c)`;
+const PHONE_IN_TEXT = new RegExp(String.raw`(?:\(?\b${PHONE_LABEL}\)?\s*[:#]?\s*)?(?<!\d)(?:\+?1[\s.-]*)?\(?(\d{3})\)?[\s.-]*(\d{3})[\s.-]*(\d{4})(?!\d)(?:\s*(?:ext|x)\.?\s*(\d{1,5}))?(?:\s*\(?\s*${PHONE_LABEL}\b(?:\s*#)?\s*\)?)?`, "gi");
+const MOBILE_LABEL = /\b(cell|mobile)\b|\bc\b\s*:?\s*\(?\d/i;
+// An extension alone, off the business's own number: "Brent Sweet EXT 1", "CFO ext.116", "Lori Robbins x221".
+const EXT_IN_TEXT = /\b(?:ext|x)\.?\s*(\d{1,5})(?!\d)/i;
+// The people a row names and where each one's numbers go: the office line, then the cell.
+const PERSON_PHONES = [
+  ["contact_name", "contact_phone", "contact_mobile"], ["contact_title", "contact_phone", "contact_mobile"],
+  ["decision_maker", "dm_phone", "dm_mobile"], ["dm_title", "dm_phone", "dm_mobile"],
+  ["contact2_name", "contact2_phone", "contact2_mobile"], ["contact2_title", "contact2_phone", "contact2_mobile"],
+];
+const digitsOf = (v) => String(v ?? "").replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+/** What is left of a name or title once its number is out: no dangling "-", "@", "*" or empty "()". */
+const tidyText = (v) => v.replace(/\(\s*\)/g, " ").replace(/\s{2,}/g, " ").replace(/^[\s\-–:@*#,/]+|[\s\-–:@*#,/(]+$/g, "").trim();
+
+/**
+ * The numbers written into a row's names and titles, moved to the phone fields of that person (the contact's,
+ * the decision maker's): a cell as their mobile, any other as their phone, an extension alone as the
+ * business's number with it ("801-253-3672 x1"). A number with nowhere free to go is kept in the internal
+ * notes, and one that is the business's own number is just taken off. A name or title that was only a
+ * number is blank.
+ */
+function movePhones(lead, notes) {
+  const business = digitsOf(lead.phone);
+  const extra = [];
+  for (const [field, office, cell] of PERSON_PHONES) {
+    const text = lead[field];
+    if (!text || !/\d/.test(text)) continue;
+    let rest = text;
+    let found = false;
+    rest = rest.replace(PHONE_IN_TEXT, (whole, a, b, c, ext) => {
+      found = true;
+      const number = `${a}-${b}-${c}${ext ? ` x${ext}` : ""}`;
+      if (`${a}${b}${c}` === business && !ext) return " ";
+      const slot = MOBILE_LABEL.test(whole) ? cell : office;
+      const other = slot === cell ? office : cell;
+      if (!lead[slot] || digitsOf(lead[slot]) === digitsOf(number)) lead[slot] = number;
+      else if (!lead[other]) lead[other] = number;
+      else extra.push(`${field.replace(/_/g, " ")}: ${whole.trim()}`);
+      return " ";
+    });
+    if (!found && business.length === 10 && EXT_IN_TEXT.test(rest)) {
+      const ext = EXT_IN_TEXT.exec(rest)[1];
+      if (!lead[office]) lead[office] = `${business.slice(0, 3)}-${business.slice(3, 6)}-${business.slice(6)} x${ext}`;
+      else extra.push(`${field.replace(/_/g, " ")}: ext ${ext}`);
+      rest = rest.replace(EXT_IN_TEXT, " ");
+      found = true;
+    }
+    if (!found) continue;
+    const left = tidyText(rest);
+    if (left) lead[field] = left;
+    else delete lead[field];
+  }
+  if (extra.length) {
+    const line = `Other numbers: ${extra.join("; ")}`;
+    notes.internal_notes = notes.internal_notes ? `${notes.internal_notes}\n${line}` : line;
+  }
+}
+
+const MONTH = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+// Counts the lead keeps as written ("20+", "2 to 3", "1 own"), apart from what isn't one.
+const COUNT_COLUMNS = ["employees", "covered_employees", "autos", "location", "professionals", "years_in_business"];
+/**
+ * A count as the lead keeps it: a range Excel turned into a date put back ("15-Dec" was 12-15, "5-Jan" 1-5),
+ * a word with no number in it ("yes", "lots", "multi", "see notes") left out. Anything else as written.
+ */
+export function cleanCount(value) {
+  const v = String(value ?? "").trim();
+  const dayFirst = /^(\d{1,2})[-/ ]([a-z]{3})$/i.exec(v);
+  const monthFirst = /^([a-z]{3})[-/ ](\d{1,2})$/i.exec(v);
+  const [day, mon] = dayFirst ? [dayFirst[1], dayFirst[2]] : monthFirst ? [monthFirst[2], monthFirst[1]] : [];
+  const month = mon && MONTH[mon.toLowerCase()];
+  if (month) {
+    const [lo, hi] = [month, Number(day)].sort((x, y) => x - y);
+    return `${lo}-${hi}`;
+  }
+  return /\d/.test(v) ? v : null;
+}
+
+// A carrier column holding a date (Sean, Nov 2026: "dates in the carrier fields"): the date is the line's X-date.
+const CARRIER_XDATE = {
+  pkg_carrier: "pkg_xdate", wc_carrier: "wc_xdate", auto_carrier: "auto_xdate", health_carrier: "health_xdate",
+  dental_provider: "dental_xdate", vision_provider: "vision_xdate", prof_liab_carrier: "prof_liab_xdate",
+  do_carrier: "do_xdate", eo_carrier: "eo_xdate", homeowner_carrier: "homeowner_xdate", personal_auto_carrier: "personal_auto_xdate",
+};
+
 /**
  * Turn parsed CSV rows into the records each row can produce: the lead, its
  * insurance detail, a booked appointment, and its internal notes. Rows without a company name
@@ -551,6 +648,27 @@ export function rowsToImport(csvRows) {
       const ein = normalizeEin(lead.ein);
       if (ein) lead.ein = ein;
       else delete lead.ein;
+    }
+    // "Drivers: 2" written in Employees: the drivers.
+    const drivers = /^drivers?\s*[:=-]?\s*(\d{1,6})$/i.exec(lead.employees ?? "");
+    if (drivers) {
+      lead.drivers ??= drivers[1];
+      delete lead.employees;
+    }
+    for (const column of COUNT_COLUMNS) {
+      if (!(column in lead)) continue;
+      const v = cleanCount(lead[column]);
+      if (v === null) delete lead[column];
+      else lead[column] = v;
+    }
+    movePhones(lead, notes);
+    // A ZIP+4 written without its dash, or the same ZIP twice ("89030/89030").
+    if (lead.zip) lead.zip = lead.zip.replace(/^(\d{5})(\d{4})$/, "$1-$2").replace(/^(\d{5}(?:-\d{4})?)\s*[/,;]\s*\d{5}(?:-\d{4})?$/, "$1");
+    for (const [carrier, xdate] of Object.entries(CARRIER_XDATE)) {
+      const day = insurance[carrier] && parseDate(insurance[carrier]);
+      if (!day) continue;
+      insurance[xdate] ??= day;
+      delete insurance[carrier];
     }
     // Numbers in the database: one that is not a count or an XMOD is left out, or the whole batch would fail.
     for (const [column, parse] of [["drivers", parseDrivers], ["xmod", parseXmod]]) {

@@ -167,7 +167,41 @@ check("the template has Drivers and XMOD after Autos, before Sales Volume",
   check("a manager found by full name, either way round, any case, by first name and initial, or email",
     JSON.stringify(["Sean Fitzgerald", "sean  fitzgerald", "Fitzgerald, Sean", "Mike P", "mike@x.test", "Nobody Here", ""].map(who)) === JSON.stringify([2, 2, 2, 3, 3, null, null]));
   check("…a short form two people share finds neither", who("S Fox") === null && who("Sam F") === 9);
+  check("…the old system's team before the name (Appts-Mike Preston) taken off", who("Appts-Mike Preston") === 3 && who("DBDV - Sean Fitzgerald") === 2);
   check("a day given as noon in Arizona: the same day in every US time zone", dayAt("2025-03-14") === "2025-03-14T19:00:00Z" && dayAt(null) === null);
+}
+
+// --- Sean's messy test lists (Nov 2026) ---------------------------------------------
+{
+  const H = ["CompanyName", "Phone1", "Contact1", "Title1", "DecisionMaker", "DMTitle", "EMPLOYEES", "AUTOS", "LOCATIONS", "Zip", "Email", "Fax", "PKGCARRIER", "PKGXDATE", "WCCARRIER", "WCXDATE"];
+  const one = (vals) => rowsToImport([H, H.map((h) => vals[h] ?? "")]).rows[0];
+  let r = one({ CompanyName: "A", Phone1: "801-253-3672", Contact1: "Vinod Patel 361-550-1360 cell", Title1: "Controller", DecisionMaker: "Jay Faskas direct line 361-788-6210", DMTitle: "Owner ext.116" });
+  eq("a cell in the contact's name: their mobile, the name alone", [r.lead.contact_name, r.lead.contact_mobile, r.lead.contact_phone ?? null], ["Vinod Patel", "361-550-1360", null]);
+  eq("…a direct line in the DM's: their phone; an extension in the DM title, ignored once they have one", [r.lead.decision_maker, r.lead.dm_phone, r.lead.dm_title], ["Jay Faskas", "361-788-6210", "Owner"]);
+  r = one({ CompanyName: "A", Phone1: "801-253-3672", Contact1: "Brent Sweet EXT 1", Title1: "cell 435-777-3006", DecisionMaker: "Shawn Arvey231-730-1776 (cell)", DMTitle: "1- 775-289-4473" });
+  eq("an extension alone: the business's number with it", [r.lead.contact_name, r.lead.contact_phone], ["Brent Sweet", "801-253-3672 x1"]);
+  eq("a title that was only a number is blank", [r.lead.contact_title ?? null, r.lead.contact_mobile], [null, "435-777-3006"]);
+  eq("a number run into the name, and one with a 1 in front", [r.lead.decision_maker, r.lead.dm_mobile, r.lead.dm_phone, r.lead.dm_title ?? null], ["Shawn Arvey", "231-730-1776", "775-289-4473", null]);
+  r = one({ CompanyName: "A", Phone1: "920-619-5040", Title1: "920-619-5040 cell", Contact1: "David Merill @ 801-857-6533" });
+  eq("the business's own number in a title is just taken off; a dangling @ goes too", [r.lead.contact_title ?? null, r.lead.contact_mobile ?? null, r.lead.contact_name, r.lead.contact_phone], [null, null, "David Merill", "801-857-6533"]);
+  r = one({ CompanyName: "A", Contact1: "Ann 602-555-0101 / 602-555-0102 / 602-555-0103" });
+  check("a third number with nowhere to go is kept in the internal notes", /Other numbers: contact name: 602-555-0103/.test(r.notes?.internal_notes ?? "") && r.lead.contact_phone === "602-555-0101" && r.lead.contact_mobile === "602-555-0102", JSON.stringify([r.lead, r.notes]));
+  eq("a company name is left alone", one({ CompanyName: "X-cell Construction 2 Llc", Phone1: "801-253-3672" }).lead.company_name, "X-cell Construction 2 Llc");
+
+  r = one({ CompanyName: "A", EMPLOYEES: "15-Dec", AUTOS: "5-Jan", LOCATIONS: "4-Mar" });
+  eq("a range Excel made a date is a range again", [r.lead.employees, r.lead.autos, r.lead.location], ["12-15", "1-5", "3-4"]);
+  r = one({ CompanyName: "A", EMPLOYEES: "20+", AUTOS: "yes", LOCATIONS: "1 own" });
+  eq("…a count as written kept; a word with no number in it left out", [r.lead.employees, r.lead.autos ?? null, r.lead.location], ["20+", null, "1 own"]);
+  r = one({ CompanyName: "A", EMPLOYEES: "Drivers: 5" });
+  eq("\"Drivers: 5\" in Employees: the drivers", [r.lead.employees ?? null, r.lead.drivers], [null, 5]);
+
+  r = one({ CompanyName: "A", Zip: "789420632", Email: "info@the marketexpress.com", Fax: "did not say" });
+  eq("a ZIP+4 without its dash; one email typed with a space; a fax that \"did not say\"", [r.lead.zip, r.lead.email, r.lead.fax ?? null], ["78942-0632", "info@themarketexpress.com", null]);
+  eq("…the same ZIP twice; a full stop after an email; SEE NOTES", [one({ CompanyName: "A", Zip: "89030/89030", Email: "ej@rennoldsco.com.", Fax: "SEE NOTES" })].map((x) => [x.lead.zip, x.lead.email, x.lead.fax ?? null])[0], ["89030", "ej@rennoldsco.com", null]);
+  check("…two emails: the first", one({ CompanyName: "A", Email: "todd@ceipave.com; jodie@ceipave.com" }).lead.email === "todd@ceipave.com");
+
+  r = one({ CompanyName: "A", PKGCARRIER: "4/1/2026", WCCARRIER: "4/1/2026", WCXDATE: "7/1/2026" });
+  eq("a date in a carrier field: the line's X-date, unless it has one", [r.insurance.pkg_carrier ?? null, r.insurance.pkg_xdate, r.insurance.wc_carrier ?? null, r.insurance.wc_xdate], [null, "2026-04-01", null, "2026-07-01"]);
 }
 
 console.log(failures ? `\n${failures} test(s) failed.\n` : "\nAll CSV tests passed.\n");

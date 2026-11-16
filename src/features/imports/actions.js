@@ -233,9 +233,12 @@ export async function importLeadsCsv(prevState, formData) {
     }
   }
   const resultFor = (type, text) => {
-    const t = String(text ?? "").trim().toLowerCase();
+    // "Call 3", "XD-Call 4": the old system's count of calls with no answer yet, read as its "Call 0" (Sean's test lists, Nov 2026).
+    const t = String(text ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/^(xd-?\s?)?call ?#?\d+$/, (_, xd) => `${xd ? "xd-" : ""}call 0`);
     return t ? resultIndex.get(`${type}|${t}`) ?? null : null;
   };
+  // The appointment column repeating the DB Dev result ("X-Date-Lead" in both): not worked as an appointment lead yet.
+  const apptSaid = (text) => (["promote", "appointment"].includes(resultFor("DBDV", text)?.effect) && !resultFor("APPT", text) ? null : text);
   const byName = (type, name) => (resultRows ?? []).find((r) => r.project_type === type && r.name === name);
   // A new name's first result on each stage, found once rather than per row.
   const firstResult = { DBDV: byName("DBDV", "Viable-CallBack"), APPT: byName("APPT", "Lead-No Contact") };
@@ -317,7 +320,7 @@ export async function importLeadsCsv(prevState, formData) {
       const { lead, status, history } = parsedRow;
       let target = projectId;
       let stageType = projectType;
-      const said = projectType === "DBDV" ? lead.call_result_dbdv : lead.call_result_appt;
+      const said = projectType === "DBDV" ? lead.call_result_dbdv : apptSaid(lead.call_result_appt);
       let result = resultFor(projectType, said);
       // A result the system does not know: the name starts at the stage's first; the import says which.
       if (said && !result) unknownResults.set(said.trim(), (unknownResults.get(said.trim()) ?? 0) + 1);
@@ -328,7 +331,7 @@ export async function importLeadsCsv(prevState, formData) {
         target = project.appt_project_id;
         stageType = "APPT";
         source = projectId;
-        result = resultFor("APPT", lead.call_result_appt)
+        result = resultFor("APPT", apptSaid(lead.call_result_appt))
           ?? byName("APPT", result.effect === "appointment" ? result.name : "Lead-No Contact");
       }
       // New names start on the client's first result: Viable-CallBack (DBDev) or Lead-No Contact (Appt).
@@ -341,7 +344,10 @@ export async function importLeadsCsv(prevState, formData) {
         result = firstResult[stageType];
       }
       // An appointment the old system marked invalid (Sean, Nov 2026): it comes in as one, appointment date or not.
-      parsedRow.invalidAppt = result?.effect === "appointment_invalid";
+      // …and so does one on a DB Dev project with no appointment project to go to (an old, closed project kept for
+      // the Match Tool, Sean, Nov 2026): the lead stays a Lead there, its appointment as the old system marked it.
+      parsedRow.invalidAppt = result?.effect === "appointment_invalid"
+        || (stageType === "DBDV" && resultFor("APPT", apptSaid(lead.call_result_appt))?.effect === "appointment_invalid");
       // When it was developed and by whom, as the old system says: the reports count it then, to them.
       const developedBy = whoIs(history?.developed_by);
       return {
