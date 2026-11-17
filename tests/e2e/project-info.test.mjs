@@ -193,18 +193,18 @@ try {
     && (await sean.ev(`document.querySelector('[data-tab-panel="info"] [data-agent-address]').target`)) === "_blank", href);
   check("…and says what it shows", t.includes("Miles and drive time to Eau Claire, WI 54701"));
   const weather = await sean.ev(`(() => { const b = document.querySelector('[data-topbar-aside] [data-project-weather]'); return b ? { tag: b.tagName, href: b.getAttribute('href'), text: b.textContent.trim() } : null; })()`);
-  check("a Weather button in the top bar, beside the business: a button, not a link to Google", weather?.tag === "BUTTON" && weather.href == null && weather.text === "Weather · 54843", JSON.stringify(weather));
+  check("a Weather button in the top bar, for the lead's own ZIP (not the project office's): a button, not a link to Google", weather?.tag === "BUTTON" && weather.href == null && weather.text === "Weather · 54701", JSON.stringify(weather));
   check("…not in the Project Info tab", await sean.ev(`!document.querySelector('[data-tab-panel="info"] [data-project-weather]')`));
   await sean.ev(`window.scrollTo(0, 0)`);
   await sean.hover('[data-topbar-aside] [data-project-weather]');
   const card = await until(() => sean.ev(`(() => { const c = document.querySelector('[data-weather-card]'); return c && (c.querySelector('[data-weather-now]') || c.querySelector('[data-weather-error]')) ? c.innerText.replace(/\\s+/g, ' ') : null; })()`), { timeout: 20000 });
   check("…hovered: the weather card, with the forecast there now, the next hours and the days ahead",
     Boolean(await sean.ev(`!!document.querySelector('[data-weather-card] [data-weather-now]') && !!document.querySelector('[data-weather-card] [data-weather-hours]') && document.querySelectorAll('[data-weather-card] [data-weather-days] > button').length >= 5`))
-    && /Hayward, WI 54843/.test(card ?? ""), card);
+    && /Eau Claire, WI 54701/.test(card ?? ""), card);
   const temps = await sean.ev(`(() => { const f = document.querySelector('[data-weather-now] .text-4xl')?.textContent.match(/-?\\d+/)?.[0]; const c = document.querySelector('[data-weather-celsius]')?.textContent; return { f, c }; })()`);
   check("…the temperature in Celsius beneath it", temps?.c === `${Math.round(((Number(temps?.f) - 32) * 5) / 9)}°C`, JSON.stringify(temps));
   const google = await sean.ev(`(() => { const a = document.querySelector('[data-weather-card] [data-weather-google]'); return a ? { href: a.href, target: a.target } : null; })()`);
-  check("…Google's weather only from its Open Google weather, in a new tab", google?.href === "https://www.google.com/search?q=weather%2054843" && google.target === "_blank", JSON.stringify(google));
+  check("…Google's weather only from its Open Google weather, in a new tab", google?.href === "https://www.google.com/search?q=weather%2054701" && google.target === "_blank", JSON.stringify(google));
   // A day ahead, clicked: its forecast in the card, and back to now.
   await sean.ev(`document.querySelector('[data-weather-card] [data-weather-day-pick="2"]').click()`);
   const picked = await until(() => sean.ev(`(() => { const d = document.querySelector('[data-weather-card] [data-weather-day]'); return d ? { title: d.querySelector('[data-weather-day-title]')?.textContent, words: d.querySelector('[data-weather-day-detail]')?.textContent ?? '', hours: !!d.querySelector('[data-weather-hours]') } : null; })()`), { timeout: 5000 });

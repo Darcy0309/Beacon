@@ -376,10 +376,12 @@ export default async function LeadSheet({ params, searchParams }) {
 
   return (
     <>
-      {/* The weather at the project's ZIP (Sean, Nov 2026), in the top bar beside the business: a storm or a
-          flood there makes a poor day to call. Google's in a new tab; a forecast card as it is hovered. */}
+      {/* The weather where the business is (Sean, Nov 2026), in the top bar beside it: a storm or a flood there
+          makes a poor day to call. The lead's own ZIP (Nov 2026: it showed the project office's, another town),
+          the project's only when the lead has none. Google's in a new tab; a forecast card as it is hovered. */}
       <Topbar title="Lead Sheet" sub={lead.co}
-        aside={info && weatherLink(info.zip) ? <WeatherCard zip={zip5(info.zip)} href={weatherLink(info.zip)} place={[info.city, info.state].filter(Boolean).join(", ")} align="start" /> : null} />
+        aside={weatherLink(r.zip) ? <WeatherCard zip={zip5(r.zip)} href={weatherLink(r.zip)} place={[r.city, r.state].filter(Boolean).join(", ")} align="start" />
+          : info && weatherLink(info.zip) ? <WeatherCard zip={zip5(info.zip)} href={weatherLink(info.zip)} place={[info.city, info.state].filter(Boolean).join(", ")} align="start" /> : null} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2">
