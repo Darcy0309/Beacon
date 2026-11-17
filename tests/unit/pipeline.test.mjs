@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { filterParams, personShort, pipelineCsv, pipelineMonths, readXdateFilters, sortPipeline, stale } from "../../src/lib/pipeline.js";
+import { NO_MANAGER, filterParams, personShort, pipelineCsv, pipelineMonths, readXdateFilters, sortPipeline, stale } from "../../src/lib/pipeline.js";
 
 // The address.
 const f = readXdateFilters({ project: "14,7,abc,14", managers: "5", months: "11,12,1,13", client: "3", rep: "x", type: "APPT" });
@@ -27,6 +27,10 @@ const rows = [
   { project: "C", manager: "Amy K", lastWorkedDay: null },
 ];
 assert.deepEqual(sortPipeline(rows).map((r) => r.project), ["C", "A", "B"], "by manager, the longest unworked first");
+// Names no manager holds (an imported list's, Nov 2026): their own row, after the managers'.
+const held = rows.map((r, i) => ({ ...r, managerId: i + 1 }));
+assert.deepEqual(sortPipeline([{ project: "D", manager: NO_MANAGER, managerId: null, lastWorkedDay: null }, ...held]).map((r) => r.project),
+  ["C", "A", "B", "D"], "no manager: last");
 
 // The sample's first row, back out as CSV.
 const csv = pipelineCsv([{

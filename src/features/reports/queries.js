@@ -4,7 +4,7 @@ import "server-only";
 import { fullName, shortName } from "@/lib/format";
 import { readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
-import { personShort, sortPipeline } from "@/lib/pipeline";
+import { NO_MANAGER, personShort, sortPipeline } from "@/lib/pipeline";
 
 export const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -106,7 +106,9 @@ export async function getPipelineReport({ filters, months, timeZone }) {
     const appts = Number(r.appts) || 0;
     return {
       key: `${r.project_id}-${r.manager_id}`, projectId: r.project_id, project: r.project, type: r.project_type,
-      timeZone: r.time_zone, state: r.state, managerId: r.manager_id, manager: personShort(r.manager_first, r.manager_last),
+      timeZone: r.time_zone, state: r.state, managerId: r.manager_id,
+      // Names nobody holds (an imported list's): a row of their own (Sean, Nov 2026).
+      manager: r.manager_id == null ? NO_MANAGER : personShort(r.manager_first, r.manager_last),
       lastApptSet: r.last_appt_set, lastWorked: r.last_worked, lastWorkedDay: day(r.last_worked), calls: Number(r.calls) || 0,
       months: Object.fromEntries(Object.entries(r.months ?? {}).map(([m, n]) => [Number(m), Number(n)])),
       total, appts, offList: Number(r.off_list) || 0, viableLeft: Number(r.viable_left) || 0,

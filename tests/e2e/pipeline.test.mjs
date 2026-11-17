@@ -44,6 +44,9 @@ const name = (project, user, res, m) => {
 // On the Appointments project, Sean's: next month 2 appointments, 1 off, 3 viable; the month after, 2 viable. Rachel's: 1 viable.
 for (const [res, m] of [[APPT, M1], [APPT, M1], [OFF, M1], [VIABLE, M1], [VIABLE, M1], [VIABLE, M1], [VIABLE, M2], [VIABLE, M2]]) name(P, SEAN, res, m);
 name(P, RACHEL, VIABLE, M1);
+// And two nobody holds (Sean, Nov 2026: an imported list's names, which left the report blank): 1 appointment, 1 viable.
+name(P, "null", APPT, M1);
+name(P, "null", VIABLE, M2);
 // On the DB dev project, Sean's: 4 next month.
 for (let i = 0; i < 4; i += 1) name(Q, SEAN, DBV, M1);
 // Sean's last call on the Appointments project 12 days ago (behind); on the DB dev one, today.
@@ -82,6 +85,13 @@ try {
   const qCells = await admin.ev(`[...document.querySelector('[data-pipeline-row="${Q}-${SEAN}"]').cells].map((c) => c.innerText.trim().replace(/\\s+/g, ' '))`);
   check("…its Special Pay a lead at its goal, not a confirmation's", qCells[15] === "$1 at 5 leads", JSON.stringify(qCells));
   check("the time zone: the project's own (PST), none when it has none (not the client's EST)", qCells[1] === "PST" && cells[1] === "—", `${qCells[1]} / ${cells[1]}`);
+  const none = await admin.ev(`[...document.querySelector('[data-pipeline-row="${P}-null"]')?.cells ?? []].map((c) => c.innerText.trim())`);
+  check("names no manager holds: a No manager row of their own (1 and 1; 1 appointment, 1 viable)", none[3] === "No manager" && none[7] === "1" && none[8] === "1"
+    && none[10] === "2" && none[11] === "1" && none[13] === "1", JSON.stringify(none));
+  check("…its last call anyone's on the project (12 days ago), shared by both its managers", /\d+\/\d+\/\d\d/.test(none[5])
+    && (await admin.ev(`document.querySelector('[data-pipeline-row="${P}-null"] [data-shared]')?.dataset.shared`)) === "2", JSON.stringify(none));
+  check("…after the managers' rows", await admin.ev(`(() => { const keys = [...document.querySelectorAll('[data-pipeline-row]')].map((r) => r.dataset.pipelineRow);
+    return keys.at(-1) === '${P}-null'; })()`));
   // Focus opens it as hover does (a toast in the corner could sit over the badge for the mouse).
   await admin.ev(`document.querySelector('[data-pipeline-row="${P}-${SEAN}"] [data-shared]').scrollIntoView({ block: 'center' })`);
   await sleep(300);

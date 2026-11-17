@@ -54,6 +54,9 @@ export function pipelineMonths(months, today) {
   return [...chosen].sort((a, b) => ahead(a) - ahead(b));
 }
 
+/** The Pipeline Report's row for a project's names no manager holds (an imported list's). */
+export const NO_MANAGER = "No manager";
+
 /** "Jen B": a first name and the last name's initial, as the report shows people. */
 export const personShort = (first, last) => [first, last ? last[0] : null].filter(Boolean).join(" ") || "—";
 
@@ -64,7 +67,8 @@ export const stale = (lastWorkedDay, today) => !lastWorkedDay || dayNumber(today
 
 /** By manager, then the one last worked longest ago first (never worked before all). */
 export function sortPipeline(rows) {
-  return [...rows].sort((a, b) => a.manager.localeCompare(b.manager)
+  // The managers' rows by name, then the names no manager holds.
+  return [...rows].sort((a, b) => (a.managerId == null) - (b.managerId == null) || a.manager.localeCompare(b.manager)
     || (a.lastWorkedDay ?? "").localeCompare(b.lastWorkedDay ?? "")
     || a.project.localeCompare(b.project));
 }

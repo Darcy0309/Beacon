@@ -85,7 +85,7 @@ export default function PipelineReport({ rows, months, today, linkTo = "project"
                     </td>
                     <td className={cn(TD, "text-muted-foreground")}>{r.timeZone ?? "—"}</td>
                     <td className={cn(TD, "text-muted-foreground")}>{r.state ?? "—"}</td>
-                    <td className={cn(TD, "whitespace-nowrap font-medium")}>{r.manager}</td>
+                    <td className={cn(TD, "whitespace-nowrap font-medium", r.managerId == null && "italic text-muted-foreground")} data-manager={r.managerId ?? "none"}>{r.manager}</td>
                     <td className={cn(TD, "tabular-nums")}>{mdy(r.lastApptSet)}</td>
                     <td className={cn(TD, "tabular-nums", behind ? "font-semibold text-rose-400" : "")} data-last-worked>{r.lastWorkedDay ? mdy(r.lastWorkedDay) : "Never"}</td>
                     <td className={cn(TD, "text-right tabular-nums")}>{r.calls.toLocaleString()}</td>
