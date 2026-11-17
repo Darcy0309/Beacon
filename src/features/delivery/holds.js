@@ -31,18 +31,33 @@ export async function holdDelivery(admin, { leadId, callRecordId, result, userId
   if (error) throw error;
 }
 
+// A claim older than this was cut off part way (the server's time limit): it is held again.
+const STUCK_MINUTES = 10;
+// The schedule stops claiming more before the server's limit (maxDuration 300 s); the rest go at the next clearing.
+const SCHEDULE_BUDGET_MS = 200_000;
+
 /**
  * Send held ones: `ids` (an administrator's pick, failed ones too), or every
- * one waiting (the schedule). Each is claimed first, so two at once never
- * send it twice; an appointment's QA passes as it goes. Returns how many went.
+ * one waiting (the schedule). Each is claimed as it is sent ('sending', with
+ * the time), so two at once never send it twice, and one cut off part way is
+ * held again after STUCK_MINUTES (Sean, Nov 2026: a long backlog left the rest
+ * stuck); an appointment's QA passes as it goes. Returns how many went.
  */
-export async function releaseHolds(admin, { ids = null, sentBy = null, origin }) {
-  let claim = admin.from("delivery_holds").update({ status: "sending" });
-  claim = ids ? claim.in("id", ids).in("status", ["held", "failed"]) : claim.eq("status", "held");
-  const { data: claimed, error } = await claim.select("id, lead_id, call_record_id, appointment_id");
+export async function releaseHolds(admin, { ids = null, sentBy = null, origin, budgetMs = ids ? Infinity : SCHEDULE_BUDGET_MS }) {
+  const started = Date.now();
+  const stuck = new Date(Date.now() - STUCK_MINUTES * 60_000).toISOString();
+  // Claims cut off part way: back in the queue.
+  await admin.from("delivery_holds").update({ status: "held" }).eq("status", "sending").or(`sending_at.is.null,sending_at.lt.${stuck}`);
+  let list = admin.from("delivery_holds").select("id").order("created_at").limit(5000);
+  list = ids ? list.in("id", ids).in("status", ["held", "failed"]) : list.eq("status", "held");
+  const { data: waiting, error } = await list;
   if (error) throw error;
   let sent = 0;
-  for (const h of claimed ?? []) {
+  for (const { id } of waiting ?? []) {
+    if (Date.now() - started > budgetMs) break;
+    const { data: h } = await admin.from("delivery_holds").update({ status: "sending", sending_at: new Date().toISOString() })
+      .eq("id", id).in("status", ids ? ["held", "failed"] : ["held"]).select("id, lead_id, call_record_id, appointment_id").maybeSingle();
+    if (!h) continue; // taken by another send meanwhile
     try {
       if (h.appointment_id) {
         const { error: qaError } = await admin.rpc("release_appointment_qa", { p_appointment_id: h.appointment_id, p_by: sentBy });

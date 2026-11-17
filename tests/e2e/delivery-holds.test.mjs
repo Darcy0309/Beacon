@@ -104,6 +104,19 @@ try {
   await admin.ev(`(() => { const r = [...document.querySelectorAll('[data-list-row]')].find((x) => x.innerText.includes(${JSON.stringify(`${TAG} Grace Chapel`)})); [...r.querySelectorAll('button')].find((b) => /Pass/.test(b.textContent))?.click(); })()`);
   check("passed in QA, its email goes to the client", Boolean(await until(() => sent().length === 2, { timeout: 15000 })) && hold(shop)[0]?.status === "sent"
     && sql(`select qa_status from public.appointments where id = ${appt}`) === "passed", JSON.stringify(hold(shop)));
+
+  section("One cut off part way (Sean, Nov 2026: still sitting in QA)");
+  const lodge = Number(sql(`insert into public.leads (company_name, contact_name, phone, city, state, project_id, assigned_user_id)
+    values (${lit(`${TAG} Elks Lodge`)}, 'Lou', '310-829-2482', 'Santa Monica', 'CA', ${DBDV}, ${SEAN}) returning id`));
+  const busy = Number(sql(`insert into public.leads (company_name, project_id, assigned_user_id) values (${lit(`${TAG} Moose Lodge`)}, ${DBDV}, ${SEAN}) returning id`));
+  // A clearing cut off 20 minutes ago left one 'sending'; another is being sent right now.
+  sql(`insert into public.delivery_holds (lead_id, kind, label, user_id, project_id, status, sending_at) values
+    (${lodge}, 'lead', 'Lead', ${SEAN}, ${DBDV}, 'sending', now() - interval '20 minutes'),
+    (${busy}, 'lead', 'Lead', ${SEAN}, ${DBDV}, 'sending', now())`);
+  const again = await flush();
+  check("the next clearing sends the one cut off", again.due === true && Boolean(await until(() => sent().length === 3, { timeout: 15000 })) && hold(lodge)[0]?.status === "sent",
+    JSON.stringify([again, hold(lodge)]));
+  check("…but leaves one being sent this minute alone", hold(busy)[0]?.status === "sending", JSON.stringify(hold(busy)));
 } finally {
   browser.close();
   await mail.close();
