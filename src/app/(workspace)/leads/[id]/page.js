@@ -23,6 +23,7 @@ import { reminderEvent } from "@/lib/reminder-event";
 import { stampIn } from "@/lib/own-clock";
 import { publicOrigin } from "@/lib/origin";
 import ProjectCalendar from "@/features/calendar/components/project-calendar";
+import ScrollColumn from "@/components/shared/scroll-column";
 import UpdateStatus from "@/features/appointments/components/update-status";
 import { getLeadAppointmentUpdates, getLeadAppointments } from "@/features/appointments/queries";
 import { dueLine, lineLabel, money, statusColor, statusLabel } from "@/lib/appointment-updates";
@@ -654,7 +655,8 @@ export default async function LeadSheet({ params, searchParams }) {
 
           {/* Right: a call-back reminder, the project's calendar (staff's on top, Sean, Oct 2026: they use it most), then the call result buttons. */}
           {/* Pinned beside the sheet; with the calendar under it, it scrolls on its own on a short screen. */}
-          <div className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1">
+          {/* Says when there is more below it (Nov 2026: the Call Result hidden under the calendar). */}
+          <ScrollColumn className="space-y-4 lg:col-span-2 xl:sticky xl:top-20 xl:col-span-1 xl:max-h-[calc(100svh-6rem)] xl:overflow-y-auto xl:pb-1" data-side-column>
             {hold?.status === "failed" ? <HoldNotice hold={hold} /> : null}
             {seesInternal && people.length ? <SendLead leadId={lead.id} company={lead.co} people={people} /> : null}
             {canRecord || client ? (
@@ -753,7 +755,7 @@ export default async function LeadSheet({ params, searchParams }) {
               </Card>
             ) : null}
             {!staff && calendar ? <ProjectCalendar projectId={r.project.id} initial={calendar} today={today} leadLinks /> : null}
-          </div>
+          </ScrollColumn>
         </div>
 
         {/* Along the bottom: the history. */}
