@@ -63,8 +63,11 @@ export async function saveCompany(prevState, formData) {
   return ok({ name: payload.name });
 }
 
+/** Delete a client, with its projects, their names and its people's logins (all restorable): administrators only. */
 export async function deleteCompany(formData) {
-  return deleteRow("companies", formData, ["/clients", "/projects", "/leads", "/appointments", "/calendar"], { action: "company.delete", entity: "company", name: "name" });
+  const me = await currentAppUser(await createClient());
+  if (me?.role !== "admin") return fail("Only an administrator can delete a client.");
+  return deleteRow("companies", formData, ["/clients", "/projects", "/leads", "/appointments", "/calendar", "/users"], { action: "company.delete", entity: "company", name: "name" });
 }
 
 /**

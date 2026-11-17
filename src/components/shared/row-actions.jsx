@@ -30,6 +30,7 @@ const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is 
  *   deleteOption      — a choice in the delete confirmation, sent with it
  *                       when ticked: { name, label, hint } (a lead project's
  *                       names sent on; Sean, Nov 2026)
+ *   deletedHref       — where to go once it is deleted (its own page, gone)
  *   onResetTwoFactor  — a server action taking FormData with `id`
  *   onResendInvite    — a server action taking FormData with `id`
  *   forms             — more dialogs, each opened by its own item, as `edit`
@@ -37,7 +38,7 @@ const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is 
  *                       (<KeyRound />): a server page cannot pass a component
  */
 export default function RowActions({
-  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, deleteOption = null, onResetTwoFactor, onResendInvite, forms = [],
+  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, deleteOption = null, deletedHref = null, onResetTwoFactor, onResendInvite, forms = [],
 }) {
   const [ticked, setTicked] = useState(false);
   const router = useRouter();
@@ -65,7 +66,8 @@ export default function RowActions({
       if (result?.ok) {
         toast.success(typeof done === "function" ? done(result) : done);
         setConfirm(null);
-        router.refresh();
+        if (action === onDelete && deletedHref) router.push(deletedHref);
+        else router.refresh();
       } else {
         toast.error(result?.error ?? "That didn't work. Try again.");
       }

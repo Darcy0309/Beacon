@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { clientSlug, mediumDate } from "@/lib/format";
 import { getClientBySlug, getAgencyGroups, getTimeZones } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
+import RowActions from "@/components/shared/row-actions";
+import { deleteCompany } from "@/features/clients/actions";
 import { getSalesReps } from "@/features/users/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getAppointmentDays, getBlockedDays, getLeadStats } from "@/features/stats/queries";
@@ -119,6 +121,9 @@ export default async function ClientProfile({ params, searchParams }) {
                 {/* Its subscription near its end, or past it (the old client bulletin's warning). */}
                 {notice ? <span data-subscription-notice><ToneBadge tone={notice.ended ? "rose" : "amber"}>Subscription {notice.text}</ToneBadge></span> : null}
                 <ClientForm client={c.raw} groups={groups} zones={zones} reps={reps} />
+                {/* Delete the client (Sean, Nov 2026): with its projects, names and its people's logins; restorable. */}
+                <RowActions name={c.name} id={c.id} onDelete={deleteCompany} deletedHref="/clients"
+                  warning={`The client comes off Lighthouse for everyone, with its ${clientProjects.length.toLocaleString()} project${clientProjects.length === 1 ? "" : "s"}, their names and appointments, and its people's logins (they can no longer sign in). Nothing is erased: an administrator can restore all of it under Settings › Deleted records.`} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 pt-5 sm:grid-cols-3">
