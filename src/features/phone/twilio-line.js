@@ -69,7 +69,9 @@ export async function createTwilioLine() {
   const { Device } = await import("@twilio/voice-sdk");
   const device = new Device(token, {
     closeProtection: "A call is on: leaving Lighthouse will hang it up.",
-    codecPreferences: ["opus", "pcmu"],
+    // PCMU first (Twilio's own default): the phone network's codec, whose keypad tones (telephone-event at 8 kHz)
+    // every office menu hears; with Opus first, a menu's "press 1" went unheard (Nov 2026).
+    codecPreferences: ["pcmu", "opus"],
     tokenRefreshMs: 60_000,
     logLevel: "error",
   });

@@ -181,6 +181,8 @@ export function PhoneProvider({ children, tracked = false }) {
   const testTimer = useRef(null);
   const [now, setNow] = useState(Date.now());
   const [controls, setControls] = useState({ muted: false, held: false, recording: false, keys: false });
+  // The keys pressed during the call (an office's menu: "press 1…"), shown so a press is seen to have gone.
+  const [keysSent, setKeysSent] = useState("");
   const [recent, setRecent] = useState([]);
   const [wallpaper, setWallpaperState] = useState("plain");
   const [callBackground, setCallBackgroundState] = useState("light");
@@ -387,6 +389,7 @@ export function PhoneProvider({ children, tracked = false }) {
       // A phone link pressed is already reported by the activity tracker; one dialed here is reported now.
       if (!fromLink) report(who?.id);
       setControls({ muted: false, held: false, recording: false, keys: false });
+      setKeysSent("");
       const at = Date.now();
       setCall({ number: dialable(number), lead: who ?? null, startedAt: at, answeredAt: line.can.answered ? null : at, dir: "out", lineId });
       setNow(Date.now());
@@ -441,6 +444,7 @@ export function PhoneProvider({ children, tracked = false }) {
     if (!r.test) line.answer(r.id);
     stopRinging(r.id);
     setControls({ muted: false, held: false, recording: false, keys: false });
+    setKeysSent("");
     const at = Date.now();
     setCall({ number: r.number, lead, startedAt: at, answeredAt: at, dir: "in", test: r.test, lineId: r.test ? null : r.id });
     setNow(Date.now());
@@ -621,7 +625,10 @@ export function PhoneProvider({ children, tracked = false }) {
   const press = useCallback(
     (key) => {
       if (active) {
-        if (line.can.tones) line.tone(key);
+        if (line.can.tones) {
+          line.tone(key);
+          setKeysSent((k) => (k + key).slice(-24));
+        }
         return;
       }
       setValue((v) => dialable(v + key));
@@ -836,6 +843,9 @@ export function PhoneProvider({ children, tracked = false }) {
                       data-phone-status={active ? "active" : "idle"} data-phone-answered={active ? String(!ringingOut) : undefined}>
                       {ringingOut ? "Calling…" : active ? `${callLabel} · ${callClock(now - call.answeredAt)}` : "Ready"}
                     </div>
+                    {active && controls.keys && keysSent ? (
+                      <div className="mt-0.5 font-semibold tracking-[0.2em] text-foreground tabular-nums" data-phone-keys-sent title="Keys sent on this call">{keysSent}</div>
+                    ) : null}
                     {line.id === "twilio" && !active ? <CallerIdPicker value={callerId} onChange={setCallerId} /> : null}
                   </div>
 
