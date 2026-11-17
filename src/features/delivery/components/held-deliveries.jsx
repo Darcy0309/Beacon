@@ -41,7 +41,7 @@ function HoldBack({ item, onClose }) {
         <form action={action} noValidate className="flex flex-col gap-4">
           <input type="hidden" name="id" value={item?.id ?? ""} />
           <Field label="What needs fixing" required error={fe("note")}>
-            <Textarea name="note" rows={3} maxLength={500} aria-invalid={invalid("note")} autoFocus placeholder="e.g. The decision maker's email is missing" />
+            <Textarea name="note" rows={3} maxLength={500} aria-invalid={invalid("note")} autoFocus />
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>

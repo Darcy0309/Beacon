@@ -41,7 +41,7 @@ export default function ProfileForm({ me, staff = false }) {
           <Input name="last_name" maxLength={40} defaultValue={dv("last_name")} aria-invalid={invalid("last_name")} autoComplete="family-name" />
         </Field>
         <Field label="Phone" error={fe("phone")}>
-          <Input name="phone" type="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} autoComplete="tel" placeholder="(602) 555-0100" />
+          <Input name="phone" type="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} autoComplete="tel" />
         </Field>
         <Field label="Mobile" error={fe("mobile")}>
           <Input name="mobile" type="tel" defaultValue={dv("mobile")} aria-invalid={invalid("mobile")} autoComplete="tel" />

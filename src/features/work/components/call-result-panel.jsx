@@ -168,7 +168,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
                   hint={ultimateXdate ? "On file. Change it if the contact gave a different date."
                     : renewalHint ? `Not confirmed yet. ${renewalHint}: confirm it with the contact.` : "Ask the contact for the renewal date."}>
                   <DatePicker name="ultimate_xdate" required defaultValue={dv("ultimate_xdate", ultimateXdate ?? "")} invalid={invalid("ultimate_xdate")}
-                    aria-label="Ultimate X-Date" placeholder="e.g. 3/1/27 or Mar 1" future />
+                    aria-label="Ultimate X-Date" future />
                 </Field>
               ) : null}
 
@@ -207,7 +207,7 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
               {picked.effect === "correct_xdate" ? (
                 <Field label="Corrected renewal date" required error={fe("corrected_xdate")}>
                   <DatePicker name="corrected_xdate" required defaultValue={dv("corrected_xdate")} invalid={invalid("corrected_xdate")}
-                    aria-label="Corrected renewal date" placeholder="e.g. 11/1 or Nov 1" future />
+                    aria-label="Corrected renewal date" future />
                 </Field>
               ) : null}
               {/* Lead-Corrected pay (Sean, Nov 2026): the lead manager who developed it loses its lead pay, the corrector gets it. */}

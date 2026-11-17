@@ -272,7 +272,6 @@ function ZipInput({ value, onCommit }) {
             onCommit(text);
           }
         }}
-        placeholder="85018, 85016…"
         aria-label="ZIP codes"
         inputMode="numeric"
         className="h-8 w-44 text-xs"

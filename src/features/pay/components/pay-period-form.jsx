@@ -76,16 +76,16 @@ export default function PayPeriodForm({ period, next }) {
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr]">
             <Field label="Closed days" error={fe("closed_dates")} hint="Not work days: 12/31, 1/1, 1/2">
-              <Input name="closed_dates" maxLength={300} defaultValue={dv("closed_dates")} aria-invalid={invalid("closed_dates")} placeholder="12/31, 1/1, 1/2" />
+              <Input name="closed_dates" maxLength={300} defaultValue={dv("closed_dates")} aria-invalid={invalid("closed_dates")} />
             </Field>
             <Field label="Closed for" error={fe("closed_label")}>
-              <Input name="closed_label" maxLength={80} defaultValue={dv("closed_label")} aria-invalid={invalid("closed_label")} placeholder="New Years" />
+              <Input name="closed_label" maxLength={80} defaultValue={dv("closed_label")} aria-invalid={invalid("closed_label")} />
             </Field>
             <Field label="Optional days" error={fe("optional_dates")} hint="Still work days: 1/19">
-              <Input name="optional_dates" maxLength={300} defaultValue={dv("optional_dates")} aria-invalid={invalid("optional_dates")} placeholder="1/19" />
+              <Input name="optional_dates" maxLength={300} defaultValue={dv("optional_dates")} aria-invalid={invalid("optional_dates")} />
             </Field>
             <Field label="Optional for" error={fe("optional_label")}>
-              <Input name="optional_label" maxLength={80} defaultValue={dv("optional_label")} aria-invalid={invalid("optional_label")} placeholder="MLK Day" />
+              <Input name="optional_label" maxLength={80} defaultValue={dv("optional_label")} aria-invalid={invalid("optional_label")} />
             </Field>
           </div>
           <DialogFooter>

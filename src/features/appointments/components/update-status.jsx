@@ -99,7 +99,7 @@ export default function UpdateStatus({ appt, carriers, open: openProp, onOpenCha
 
             {status === "valid_quoting" ? (
               <Field label="Potential premium" error={fe("potential_premium")} hint="What you expect to write: it counts in your Sale Pipeline as In the pipe.">
-                <Input name="potential_premium" inputMode="decimal" placeholder="e.g. 12,500" defaultValue={appt.potential ?? ""} aria-invalid={invalid("potential_premium")} data-potential-premium />
+                <Input name="potential_premium" inputMode="decimal" defaultValue={appt.potential ?? ""} aria-invalid={invalid("potential_premium")} data-potential-premium />
               </Field>
             ) : null}
 

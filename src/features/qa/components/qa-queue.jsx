@@ -91,7 +91,7 @@ export default function QaQueue({ items, me }) {
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   maxLength={500}
-                  placeholder="Why it failed, e.g. no decision maker on the call"
+                  placeholder="Why it failed"
                   aria-label="Why it failed"
                   className="min-w-0 flex-1"
                 />

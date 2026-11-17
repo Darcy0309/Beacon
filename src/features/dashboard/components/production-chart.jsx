@@ -87,9 +87,9 @@ function GoalsDialog({ goals, month: start }) {
               </div>
               {/* From the team: managers × hours a day × working days × per hour. */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground" data-goal-calc={k}>
-                <Input aria-label={`${who}`} type="number" min="0" placeholder="0" className="h-7 w-14" value={calc[people]} onChange={(e) => setCalc((c) => ({ ...c, [people]: e.target.value }))} />
+                <Input aria-label={`${who}`} type="number" min="0" className="h-7 w-14" value={calc[people]} onChange={(e) => setCalc((c) => ({ ...c, [people]: e.target.value }))} />
                 {who.toLowerCase()} ×
-                <Input aria-label="Hours a day each" type="number" min="0" step="0.5" placeholder="0" className="h-7 w-14" value={calc[hours]} onChange={(e) => setCalc((c) => ({ ...c, [hours]: e.target.value }))} />
+                <Input aria-label="Hours a day each" type="number" min="0" step="0.5" className="h-7 w-14" value={calc[hours]} onChange={(e) => setCalc((c) => ({ ...c, [hours]: e.target.value }))} />
                 hrs/day × {days} days × {form[`${k}_per_hour`] || 0}/hr = <strong className="text-foreground">{fmt(worked)}</strong>
                 <button type="button" disabled={!worked} onClick={() => setForm((f) => ({ ...f, [`${k}_goal`]: worked }))}
                   className="ml-1 font-semibold text-primary hover:underline disabled:opacity-40" data-use-calc={k}>Use</button>

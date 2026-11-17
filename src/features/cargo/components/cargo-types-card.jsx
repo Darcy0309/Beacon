@@ -78,7 +78,7 @@ export default function CargoTypesCard({ types }) {
           }}
           data-cargo-add
         >
-          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} placeholder="e.g. Building materials" aria-label="Cargo type" />
+          <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} aria-label="Cargo type" />
           <Button type="submit" size="sm" disabled={pending || !name.trim()}><Plus /> Add</Button>
         </form>
         {types.length ? (

@@ -121,8 +121,7 @@ export default function AppointmentForm({ appointment, options, leads = [], defa
             {!isEdit ? (
               <Field label="Client notes" error={fe("client_note")} className="sm:col-span-2" hint="The client sees these, with the lead sheet. Internal notes stay on the lead.">
                 {noteKnown ? <input type="hidden" name="client_note_known" value="1" /> : null}
-                <StampedTextarea name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note")} aria-invalid={invalid("client_note")}
-                  placeholder="e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am" data-client-note />
+                <StampedTextarea name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note")} aria-invalid={invalid("client_note")} data-client-note />
               </Field>
             ) : null}
           </div>

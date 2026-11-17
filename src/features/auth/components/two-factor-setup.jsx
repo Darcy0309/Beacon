@@ -146,7 +146,6 @@ export default function TwoFactorSetup({ enabled, factors }) {
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
-              placeholder="000000"
               required
               autoFocus
               aria-invalid={state?.fieldErrors?.code ? true : undefined}

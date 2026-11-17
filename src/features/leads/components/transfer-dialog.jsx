@@ -87,7 +87,7 @@ export default function TransferDialog({ lead }) {
               <h3 className="eyebrow mb-2">Clients nearby</h3>
               <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); load(); }}>
                 <Field label="Within (miles)" className="w-28"><Input inputMode="numeric" value={miles} onChange={(e) => setMiles(e.target.value.replace(/\D/g, ""))} data-transfer-miles /></Field>
-                <Field label="Of (ZIP or city)" className="min-w-40 flex-1"><Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder={choices.from ? `${choices.from} (the lead's)` : "e.g. 85201 or Mesa, AZ"} data-transfer-from /></Field>
+                <Field label="Of (ZIP or city)" className="min-w-40 flex-1"><Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder={choices.from ? `${choices.from} (the lead's)` : undefined} data-transfer-from /></Field>
                 <Button type="submit" size="sm" variant="outline" disabled={loading} data-transfer-find>{loading ? <Loader2 className="animate-spin" /> : <Search />} Find</Button>
               </form>
               <p className="mt-1.5 text-xs text-muted-foreground">

@@ -194,7 +194,6 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin,
                 ref={subjectRef}
                 name="subject"
                 maxLength={EMAIL_LIMITS.subject}
-                placeholder="Following up on our call"
                 defaultValue={dv("subject")}
                 aria-invalid={invalid("subject")}
                 autoFocus={Boolean(to)}
@@ -208,7 +207,6 @@ export default function EmailLead({ leadId, company, to, contact, sender, admin,
                   name="body"
                   rows={9}
                   maxLength={EMAIL_LIMITS.body}
-                  placeholder={first ? `Hi ${first},` : "Hi,"}
                   defaultValue={dv("body")}
                   onChange={(e) => setLength(e.target.value.length)}
                   aria-invalid={invalid("body")}

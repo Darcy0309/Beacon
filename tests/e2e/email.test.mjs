@@ -183,7 +183,8 @@ try {
   await sean.go(`/leads/${electric}`, 4000);
   d = await openEmail(sean);
   check("the address is left to type, with the reason", d?.to === "" && d?.focused === "to" && /No email on file/.test(d?.text), JSON.stringify(d));
-  check("…and the greeting suggests the contact's name", await sean.ev(`document.querySelector('[role=dialog] textarea[name="body"]')?.placeholder`) === "Hi Ben,");
+  // No example text in a field (Sean, Nov 2026): the message starts blank.
+  check("…and the message starts blank, no example in it", await sean.ev(`document.querySelector('[role=dialog] textarea[name="body"]')?.placeholder`) === "");
 
   section("At most 50 an hour each");
   sql(`insert into public.lead_emails (lead_id, user_id, to_address, subject, body, status)

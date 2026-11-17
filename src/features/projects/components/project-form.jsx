@@ -182,7 +182,7 @@ export default function ProjectForm({ project, options, trigger, funding = null,
                   <Input name="contact_title" value={office.contact_title} onChange={setO("contact_title")} maxLength={60} aria-invalid={invalid("contact_title")} />
                 </Field>
                 <Field label="Phone" error={fe("phone")}>
-                  <Input name="phone" type="tel" value={office.phone} onChange={setO("phone")} aria-invalid={invalid("phone")} placeholder="(602) 555-0100" />
+                  <Input name="phone" type="tel" value={office.phone} onChange={setO("phone")} aria-invalid={invalid("phone")} />
                 </Field>
                 <Field label="Time zone" error={fe("timezone_id")}>
                   <Select name="timezone_id" value={office.timezone_id} onChange={setO("timezone_id")} aria-invalid={invalid("timezone_id")}>
@@ -198,7 +198,7 @@ export default function ProjectForm({ project, options, trigger, funding = null,
                     <Input name="city" value={office.city} onChange={setO("city")} maxLength={60} aria-invalid={invalid("city")} />
                   </Field>
                   <Field label="State" error={fe("state")}>
-                    <Input name="state" value={office.state} onChange={setO("state")} maxLength={2} placeholder="AZ" aria-invalid={invalid("state")} />
+                    <Input name="state" value={office.state} onChange={setO("state")} maxLength={2} aria-invalid={invalid("state")} />
                   </Field>
                   <Field label="ZIP" error={fe("zip")}>
                     <Input name="zip" value={office.zip} onChange={setO("zip")} maxLength={10} aria-invalid={invalid("zip")} />
@@ -264,7 +264,7 @@ export default function ProjectForm({ project, options, trigger, funding = null,
             {/* Where its leads go: a lead's sheet is emailed here when a call makes it a lead or an appointment. */}
             <Field label="Lead delivery emails" error={fe("email")} className="sm:col-span-2"
               hint="Each lead and appointment's sheet is emailed here, and to the producers ticked in Project Info. Separate several with commas.">
-              <Input name="email" maxLength={500} placeholder="leads@client.com, producer@client.com" defaultValue={dv("email")} aria-invalid={invalid("email")} />
+              <Input name="email" maxLength={500} defaultValue={dv("email")} aria-invalid={invalid("email")} />
             </Field>
             <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
               <input type="hidden" name="delivery_link_only" value="off" />

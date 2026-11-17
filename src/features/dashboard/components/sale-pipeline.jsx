@@ -190,7 +190,7 @@ function GoalButton({ year, goal, companyId }) {
           <form onSubmit={save} className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Goal ($)</span>
-              <Input name="goal" inputMode="decimal" autoFocus value={value} onChange={(e) => setValue(e.target.value)} placeholder="e.g. 250,000" data-goal-input />
+              <Input name="goal" inputMode="decimal" autoFocus value={value} onChange={(e) => setValue(e.target.value)} data-goal-input />
             </label>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button>

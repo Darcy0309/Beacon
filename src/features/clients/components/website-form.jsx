@@ -30,7 +30,7 @@ export default function WebsiteForm({ website, companyId = null }) {
     <form action={action} noValidate className="flex flex-wrap items-end gap-3" data-website-form>
       {companyId ? <input type="hidden" name="company_id" value={companyId} /> : null}
       <Field label="Website" error={fe("website")} className="min-w-64 flex-1">
-        <Input name="website" maxLength={200} placeholder="www.yourcompany.com" defaultValue={dv("website")} aria-invalid={invalid("website")} />
+        <Input name="website" maxLength={200} defaultValue={dv("website")} aria-invalid={invalid("website")} />
       </Field>
       <Button type="submit" size="sm" disabled={pending}><Save /> {pending ? "Saving…" : "Save website"}</Button>
     </form>

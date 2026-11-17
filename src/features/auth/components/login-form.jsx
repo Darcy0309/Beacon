@@ -52,7 +52,6 @@ export default function LoginForm({ next = "/" }) {
           required
           autoFocus
           defaultValue={state?.values?.email ?? ""}
-          placeholder="you@company.com"
           autoComplete="username"
           aria-invalid={state?.fieldErrors?.email ? true : undefined}
           className={`${field} ${state?.fieldErrors?.email ? "border-rose-400/60" : ""}`}
@@ -123,7 +122,6 @@ function ForgotPassword({ onBack }) {
             required
             autoFocus
             defaultValue={state?.values?.email ?? ""}
-            placeholder="you@company.com"
             autoComplete="username"
             aria-invalid={state?.fieldErrors?.email ? true : undefined}
             className={`${field} ${state?.fieldErrors?.email ? "border-rose-400/60" : ""}`}
@@ -178,7 +176,6 @@ function TwoFactorStep({ next }) {
           autoFocus
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          placeholder="000000"
           aria-invalid={state?.fieldErrors?.code ? true : undefined}
           className={`${field} text-center font-mono text-base tracking-[0.4em] ${state?.fieldErrors?.code ? "border-rose-400/60" : ""}`}
         />

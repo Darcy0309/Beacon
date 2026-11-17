@@ -173,12 +173,11 @@ function TemplateDialog({ template, onClose }) {
               <Input value={form.name} onChange={set("name")} maxLength={80} aria-invalid={Boolean(errors.name)} autoFocus data-template-name />
             </Field>
             <Field label="Subject" required error={errors.subject}>
-              <Input value={form.subject} onChange={set("subject")} maxLength={EMAIL_LIMITS.subject} placeholder="Your renewal, {company}" aria-invalid={Boolean(errors.subject)} data-template-subject />
+              <Input value={form.subject} onChange={set("subject")} maxLength={EMAIL_LIMITS.subject} aria-invalid={Boolean(errors.subject)} data-template-subject />
             </Field>
             <Field label="Message" required error={errors.body}
               hint="Without {signature}, the sender's signature goes at the end, as on any email they write.">
-              <Textarea ref={bodyRef} value={form.body} onChange={set("body")} rows={10} maxLength={EMAIL_LIMITS.body}
-                placeholder={"Hi {first_name},\n\nThanks for your time today…"} aria-invalid={Boolean(errors.body)} className="max-h-[38svh]" data-template-body />
+              <Textarea ref={bodyRef} value={form.body} onChange={set("body")} rows={10} maxLength={EMAIL_LIMITS.body} aria-invalid={Boolean(errors.body)} className="max-h-[38svh]" data-template-body />
             </Field>
             <div className="-mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               Fill in for each lead:

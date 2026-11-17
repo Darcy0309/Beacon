@@ -67,7 +67,7 @@ function MarkDialog({ open, onOpenChange, ids, onDone }) {
             ))}
           </fieldset>
           <Field label="Note" hint="Optional">
-            <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="e.g. we insure them already" data-mark-note />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} data-mark-note />
           </Field>
         </div>
         <DialogFooter>

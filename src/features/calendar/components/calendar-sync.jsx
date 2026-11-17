@@ -109,7 +109,7 @@ export default function CalendarSync({ projectId, feed }) {
         <form action={action} noValidate className="flex flex-col gap-3" data-sync-form>
           <input type="hidden" name="project_id" value={projectId} />
           <Field label="Your calendar's private link" required error={fe("url")}>
-            <Input name="url" type="url" inputMode="url" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics" autoComplete="off" spellCheck={false}
+            <Input name="url" type="url" inputMode="url" autoComplete="off" spellCheck={false}
               aria-invalid={invalid("url")} />
           </Field>
           <details className="rounded-md border border-[var(--panel-border)] px-3 py-2 text-xs">

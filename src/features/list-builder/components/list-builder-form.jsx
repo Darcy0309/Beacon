@@ -243,9 +243,9 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
             <Field label="States"><StatePicker label="States" value={inc.states} onChange={(v) => setInc({ ...inc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Counties" hint="Type to find one, or Browse the list"><TagInput label="Counties" suggest={suggestFrom("counties")} value={inc.counties} onChange={tagsOf("counties", inc, setInc)}
-                addon={<PlaceBrowser kind="counties" label="Counties" states={inc.states} value={inc.counties} onChange={(v) => setInc((x) => ({ ...x, counties: v }))} />} placeholder="e.g. Maricopa, Pinal" data-tag-input="include-counties" /></Field>
+                addon={<PlaceBrowser kind="counties" label="Counties" states={inc.states} value={inc.counties} onChange={(v) => setInc((x) => ({ ...x, counties: v }))} />} data-tag-input="include-counties" /></Field>
               <Field label="Cities" hint="Type to find one, or Browse the list"><TagInput label="Cities" suggest={suggestFrom("cities")} value={inc.cities} onChange={tagsOf("cities", inc, setInc)}
-                addon={<PlaceBrowser kind="cities" label="Cities" states={inc.states} value={inc.cities} onChange={(v) => setInc((x) => ({ ...x, cities: v }))} />} placeholder="e.g. Mesa, Tempe" data-tag-input="include-cities" /></Field>
+                addon={<PlaceBrowser kind="cities" label="Cities" states={inc.states} value={inc.cities} onChange={(v) => setInc((x) => ({ ...x, cities: v }))} />} data-tag-input="include-cities" /></Field>
             </div>
             {countyLists.length ? (
               <div className="space-y-2" data-county-zips>
@@ -277,7 +277,7 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
               </div>
             ) : null}
             <Field label="ZIP codes" hint="Type or paste them, a comma between">
-              <TagInput label="ZIP codes" value={inc.zips} onChange={tagsOf("zips", inc, setInc)} onReject={badZips} normalize={zipTag} placeholder="e.g. 85201, 85202" data-tag-input="include-zips" />
+              <TagInput label="ZIP codes" value={inc.zips} onChange={tagsOf("zips", inc, setInc)} onReject={badZips} normalize={zipTag} data-tag-input="include-zips" />
             </Field>
             <div className="rounded-lg border border-[var(--panel-border)] p-3" data-radius>
               <div className="text-sm font-medium">A radius around a ZIP</div>
@@ -306,12 +306,12 @@ export default function ListBuilderForm({ mode, rows, initial = null, clients = 
             <Field label="States"><StatePicker label="Leave out states" value={exc.states} onChange={(v) => setExc({ ...exc, states: v })} /></Field>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field label="Counties"><TagInput label="Leave out counties" suggest={suggestFrom("counties")} value={exc.counties} onChange={tagsOf("counties", exc, setExc)}
-                addon={<PlaceBrowser kind="counties" label="Leave out counties" states={inc.states} value={exc.counties} onChange={(v) => setExc((x) => ({ ...x, counties: v }))} />} placeholder="e.g. Pinal" data-tag-input="exclude-counties" /></Field>
+                addon={<PlaceBrowser kind="counties" label="Leave out counties" states={inc.states} value={exc.counties} onChange={(v) => setExc((x) => ({ ...x, counties: v }))} />} data-tag-input="exclude-counties" /></Field>
               <Field label="Cities"><TagInput label="Leave out cities" suggest={suggestFrom("cities")} value={exc.cities} onChange={tagsOf("cities", exc, setExc)}
-                addon={<PlaceBrowser kind="cities" label="Leave out cities" states={inc.states} value={exc.cities} onChange={(v) => setExc((x) => ({ ...x, cities: v }))} />} placeholder="e.g. Apache Junction" data-tag-input="exclude-cities" /></Field>
+                addon={<PlaceBrowser kind="cities" label="Leave out cities" states={inc.states} value={exc.cities} onChange={(v) => setExc((x) => ({ ...x, cities: v }))} />} data-tag-input="exclude-cities" /></Field>
             </div>
             <Field label="ZIP codes" hint="Taken out of the radius and the ZIPs above">
-              <TagInput label="Leave out ZIP codes" value={exc.zips} onChange={tagsOf("zips", exc, setExc)} onReject={badZips} normalize={zipTag} placeholder="e.g. 85203" data-tag-input="exclude-zips" />
+              <TagInput label="Leave out ZIP codes" value={exc.zips} onChange={tagsOf("zips", exc, setExc)} onReject={badZips} normalize={zipTag} data-tag-input="exclude-zips" />
             </Field>
           </div>
         </Card>

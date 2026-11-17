@@ -66,7 +66,7 @@ export default function SettingsForm({ settings, mailServer }) {
               <Input name="product_name" maxLength={40} defaultValue={dv("product_name", branding.product ?? "Lighthouse")} aria-invalid={inv("product_name")} />
             </Field>
             <Field label="Logo URL" error={fe("logo")} hint="https://… or a path like /logo.svg">
-              <Input name="logo" type="url" maxLength={200} placeholder="/logo.svg" defaultValue={dv("logo", branding.logo ?? "")} aria-invalid={inv("logo")} />
+              <Input name="logo" type="url" maxLength={200} defaultValue={dv("logo", branding.logo ?? "")} aria-invalid={inv("logo")} />
             </Field>
           </div>
         </Card>

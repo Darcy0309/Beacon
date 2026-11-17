@@ -177,7 +177,7 @@ export default function NotificationComposer({ people, projects = [], everyone =
       </div>
 
       <Field label="Title" required error={fe("title")}>
-        <Input name="title" maxLength={120} placeholder="Please work the Capital account today" defaultValue={dv("title")} aria-invalid={invalid("title")} />
+        <Input name="title" maxLength={120} defaultValue={dv("title")} aria-invalid={invalid("title")} />
       </Field>
 
       <Field label="Message" error={fe("body")} hint={`${length}/${MAX_BODY}`}>

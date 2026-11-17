@@ -73,7 +73,7 @@ export default function SendLead({ leadId, company, people }) {
             </Field>
           </div>
           <Field label="Note" error={fe("note")}>
-            <Textarea name="note" rows={3} maxLength={1000} defaultValue={dv("note")} placeholder="Hot lead: owner wants a quote before the 15th" aria-invalid={invalid("note")} />
+            <Textarea name="note" rows={3} maxLength={1000} defaultValue={dv("note")} aria-invalid={invalid("note")} />
           </Field>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

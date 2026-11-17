@@ -47,8 +47,7 @@ export default function MessageManager({ leadId, managerId, manager, company }) 
             <DialogDescription>About {company}. It reaches them as a message in Lighthouse, with a link to this lead.</DialogDescription>
           </DialogHeader>
           <form onSubmit={send} className="flex flex-col gap-4">
-            <Textarea name="body" rows={5} maxLength={1000} autoFocus value={body} onChange={(e) => setBody(e.target.value)}
-              placeholder="e.g. Can you confirm the owner's email before Thursday's meeting?" data-message-body />
+            <Textarea name="body" rows={5} maxLength={1000} autoFocus value={body} onChange={(e) => setBody(e.target.value)} data-message-body />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={pending}>Cancel</Button>
               <Button type="submit" disabled={pending || !body.trim()} data-send-message><Send /> {pending ? "Sending…" : "Send"}</Button>

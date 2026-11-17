@@ -80,11 +80,11 @@ export default function ProjectRatesForm({ project, ranges, trigger }) {
               </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label={`Goal (${special.many} a pay period)`} error={fe("special_goal")}>
-                  <Input name="special_goal" type="number" min={1} max={1000} step={1} inputMode="numeric" placeholder="e.g. 5"
+                  <Input name="special_goal" type="number" min={1} max={1000} step={1} inputMode="numeric"
                     defaultValue={dv("special_goal")} aria-invalid={invalid("special_goal")} />
                 </Field>
                 <Field label={`Special Pay ${special.one === "appointment" ? "an appointment" : "a lead"} ($)`} error={fe("special_rate")}>
-                  <Input name="special_rate" inputMode="decimal" placeholder="e.g. 1.00" defaultValue={dv("special_rate")} aria-invalid={invalid("special_rate")} />
+                  <Input name="special_rate" inputMode="decimal" defaultValue={dv("special_rate")} aria-invalid={invalid("special_rate")} />
                 </Field>
               </div>
             </fieldset>

@@ -76,7 +76,7 @@ export default function ClientForm({ client, groups = [], zones = [], reps = [] 
           {problem ? <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive">{problem}</p> : null}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Client name" required error={fe("name")} className="sm:col-span-2">
-              <Input name="name" defaultValue={dv("name")} maxLength={120} autoFocus aria-invalid={invalid("name")} placeholder="e.g. Capital Insurance Services" />
+              <Input name="name" defaultValue={dv("name")} maxLength={120} autoFocus aria-invalid={invalid("name")} />
             </Field>
             <Field label="Primary contact" error={fe("contact_name")}>
               <Input name="contact_name" defaultValue={dv("contact_name")} maxLength={80} aria-invalid={invalid("contact_name")} />
@@ -92,7 +92,7 @@ export default function ClientForm({ client, groups = [], zones = [], reps = [] 
               </Select>
             </Field>
             <Field label="Phone" error={fe("phone")}>
-              <Input name="phone" type="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} placeholder="(602) 555-0100" />
+              <Input name="phone" type="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} />
             </Field>
             <Field label="Email" error={fe("email")}>
               <Input name="email" type="email" defaultValue={dv("email")} maxLength={120} aria-invalid={invalid("email")} />
@@ -105,7 +105,7 @@ export default function ClientForm({ client, groups = [], zones = [], reps = [] 
                 <Input name="city" defaultValue={dv("city")} maxLength={60} aria-invalid={invalid("city")} />
               </Field>
               <Field label="State" error={fe("state")}>
-                <Input name="state" defaultValue={dv("state")} maxLength={2} placeholder="AZ" aria-invalid={invalid("state")} />
+                <Input name="state" defaultValue={dv("state")} maxLength={2} aria-invalid={invalid("state")} />
               </Field>
               <Field label="ZIP" error={fe("zip")}>
                 <Input name="zip" defaultValue={dv("zip")} maxLength={10} aria-invalid={invalid("zip")} />

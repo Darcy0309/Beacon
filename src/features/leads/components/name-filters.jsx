@@ -43,9 +43,9 @@ export default function NameFilters({ names, sort, sorts }) {
       <label className="flex flex-col gap-1"><span className="eyebrow">to</span>
         <input name="emp_max" inputMode="numeric" value={v.emp_max} onChange={(e) => setV({ ...v, emp_max: digits(e.target.value) })} placeholder="Any" className={`${box} w-20`} data-filter-emp-max /></label>
       <label className="flex flex-col gap-1"><span className="eyebrow">SIC code</span>
-        <input name="sic" inputMode="numeric" value={v.sic} onChange={(e) => setV({ ...v, sic: e.target.value.replace(/[^\d-]/g, "") })} placeholder="e.g. 1521 or 15" className={`${box} w-32`} data-filter-sic /></label>
+        <input name="sic" inputMode="numeric" value={v.sic} onChange={(e) => setV({ ...v, sic: e.target.value.replace(/[^\d-]/g, "") })} className={`${box} w-32`} data-filter-sic /></label>
       <label className="flex flex-col gap-1"><span className="eyebrow">State</span>
-        <input name="state" maxLength={2} value={v.state} onChange={(e) => setV({ ...v, state: e.target.value.replace(/[^A-Za-z]/g, "").toUpperCase() })} placeholder="AZ" className={`${box} w-14 uppercase`} data-filter-state /></label>
+        <input name="state" maxLength={2} value={v.state} onChange={(e) => setV({ ...v, state: e.target.value.replace(/[^A-Za-z]/g, "").toUpperCase() })} className={`${box} w-14 uppercase`} data-filter-state /></label>
       <label className="flex flex-col gap-1"><span className="eyebrow">Sort</span>
         {/* Choosing an order sorts at once; the other boxes wait for Apply. */}
         <select name="sort" value={v.sort} onChange={(e) => { const next = { ...v, sort: e.target.value }; setV(next); go(next); }} className={box} data-filter-sort>

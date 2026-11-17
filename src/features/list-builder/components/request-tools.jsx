@@ -85,7 +85,7 @@ export function ProspectLinks({ links, reps, clients, origin }) {
   return (
     <div className="space-y-4 p-5" data-prospect-links>
       <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_6rem_auto]">
-        <Field label="For"><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Farmers agent, Tempe" maxLength={120} data-link-label /></Field>
+        <Field label="For"><Input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={120} data-link-label /></Field>
         <Field label="Sales Rep"><Select value={rep} onChange={(e) => setRep(e.target.value)} aria-label="Sales Rep">
           <option value="">Me</option>{reps.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}</Select></Field>
         <Field label="Client"><Select value={client} onChange={(e) => setClient(e.target.value)} aria-label="Client for the link">

@@ -133,7 +133,7 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
         </div>
         <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3">
           <Field label="Phone" error={fe("phone")} hint="Our calls for you come from its area code">
-            <Input name="phone" type="tel" inputMode="tel" defaultValue={dv("phone") ?? ""} aria-invalid={invalid("phone")} placeholder="(715) 555-0100" />
+            <Input name="phone" type="tel" inputMode="tel" defaultValue={dv("phone") ?? ""} aria-invalid={invalid("phone")} />
           </Field>
           <Field label="Mobile" error={fe("agent_mobile")}>
             <Input name="agent_mobile" type="tel" inputMode="tel" defaultValue={dv("agent_mobile") ?? ""} aria-invalid={invalid("agent_mobile")} />

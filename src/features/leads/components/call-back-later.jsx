@@ -55,7 +55,7 @@ export default function CallBackLater({ leadId, company, today, renewal }) {
             <DatePicker name="on" value={on} onChange={setOn} min={addDays(today, 1)} max={addDays(today, 731)} presets={["nextMonth", "nextYear"]} future required aria-label="Call back on" />
           </Field>
           <Field label="Why (optional)">
-            <Textarea rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. No time this year, call in the new year" data-call-back-note />
+            <Textarea rows={2} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} data-call-back-note />
           </Field>
           <DialogFooter>
             <Button type="submit" disabled={saving || !on} data-call-back-save>{saving ? <Loader2 className="animate-spin" /> : <CalendarClock />} Put back on the list</Button>

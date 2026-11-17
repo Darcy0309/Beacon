@@ -105,7 +105,7 @@ try {
     Boolean(await until(() => Number(sql(`select count(*) from public.work_activity where user_id=${SEAN} and kind='call' and lead_id=${lead}`)) > before)));
   await sean.mouseClick('[data-person="Decision maker"] [data-email-to]');
   const d = await until(() => sean.ev(`(() => { const d = document.querySelector('[role=dialog]'); return d ? { to: d.querySelector('input[name="to"]').value, hi: d.querySelector('textarea[name="body"]').placeholder } : null; })()`));
-  check("the decision maker's Email button writes to the decision maker", d?.to === "robert@agsi.test" && d?.hi === "Hi Robert,", JSON.stringify(d));
+  check("the decision maker's Email button writes to the decision maker", d?.to === "robert@agsi.test" && d?.hi === "", JSON.stringify(d));
   await sean.key("Escape");
 
   section("Searching and editing");

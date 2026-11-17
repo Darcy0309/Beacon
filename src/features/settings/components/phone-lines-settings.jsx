@@ -48,7 +48,7 @@ function LineRow({ line, staff }) {
         <select name="kind" value={kind} onChange={(e) => setKind(e.target.value)} className={`${SELECT} w-full`} aria-label="What the line is for">
           {LINE_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
-        <Input name="label" defaultValue={line.label ?? ""} maxLength={80} placeholder={kind === "local" ? "Eau Claire, WI" : "Signature Marketing"} aria-label="Label" />
+        <Input name="label" defaultValue={line.label ?? ""} maxLength={80} aria-label="Label" />
       </div>
       <div className="min-w-0 text-xs text-muted-foreground">
         {kind === "main" ? <People staff={staff} field="ring" chosen={line.ring_user_ids ?? []} label="Rings (then their voicemail)" /> : LINE_KINDS.find(([k]) => k === kind)?.[2]}
@@ -102,12 +102,12 @@ export default function PhoneLinesSettings({ lines = [], staff = [], value = {} 
       </div>
 
       <form action={addAction} className="grid gap-3 border-t border-[var(--panel-border)] bg-muted/20 px-5 py-4 lg:grid-cols-[11rem_12rem_1fr_auto]" data-add-phone-line>
-        <Input name="number" inputMode="tel" placeholder="(715) 555-0100" aria-label="Number" aria-invalid={Boolean(added.fieldErrors?.number)} />
+        <Input name="number" inputMode="tel" aria-label="Number" aria-invalid={Boolean(added.fieldErrors?.number)} />
         <div className="space-y-2">
           <select name="kind" value={addKind} onChange={(e) => setAddKind(e.target.value)} className={`${SELECT} w-full`} aria-label="What the line is for">
             {LINE_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </select>
-          <Input name="label" maxLength={80} placeholder={addKind === "local" ? "Eau Claire, WI" : "Signature Marketing"} aria-label="Label" />
+          <Input name="label" maxLength={80} aria-label="Label" />
         </div>
         <div className="min-w-0 text-xs text-muted-foreground">
           {addKind === "main" ? <People staff={staff} field="ring" label="Rings (then their voicemail)" /> : LINE_KINDS.find(([k]) => k === addKind)?.[2]}

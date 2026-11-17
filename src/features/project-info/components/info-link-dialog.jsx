@@ -89,10 +89,10 @@ export default function InfoLinkDialog({ projectId, defaultTo = "", defaultName 
           <input type="hidden" name="project_id" value={projectId} />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Their name" error={fe("name")} hint="The email starts Hi and this name.">
-              <Input name="name" defaultValue={dv("name")} maxLength={120} aria-invalid={invalid("name")} placeholder="Josh" autoComplete="off" />
+              <Input name="name" defaultValue={dv("name")} maxLength={120} aria-invalid={invalid("name")} autoComplete="off" />
             </Field>
             <Field label="Email it to" required error={fe("to")}>
-              <Input name="to" type="email" defaultValue={dv("to")} maxLength={254} aria-invalid={invalid("to")} placeholder="agent@agency.com" autoFocus />
+              <Input name="to" type="email" defaultValue={dv("to")} maxLength={254} aria-invalid={invalid("to")} autoFocus />
             </Field>
           </div>
           <Field label="Or copy the link to send yourself">

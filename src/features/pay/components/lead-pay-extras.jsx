@@ -114,10 +114,10 @@ export function SpecialPayRequests({ leadId, requests = [], canAsk = false, deci
         <form onSubmit={ask} noValidate className="space-y-3 rounded-lg border border-[var(--panel-border)] p-3" data-special-pay-form>
           <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
             <Field label="Amount" required error={errors.amount}>
-              <Input name="amount" inputMode="decimal" placeholder="$25" aria-invalid={errors.amount ? true : undefined} autoFocus />
+              <Input name="amount" inputMode="decimal" aria-invalid={errors.amount ? true : undefined} autoFocus />
             </Field>
             <Field label="What it's for" required error={errors.reason}>
-              <Input name="reason" maxLength={500} placeholder="e.g. Owner meeting set across two locations" aria-invalid={errors.reason ? true : undefined} />
+              <Input name="reason" maxLength={500} aria-invalid={errors.reason ? true : undefined} />
             </Field>
           </div>
           <p className="text-xs text-muted-foreground">Goes to {decider ? <span className="font-medium text-foreground">{decider}</span> : "the administrators"} to approve, adjust or decline.</p>
