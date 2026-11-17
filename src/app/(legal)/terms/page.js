@@ -16,7 +16,7 @@ export default async function TermsPage() {
   return (
     <LegalPage title="Terms & Conditions" org={org} updated="November 11, 2026">
       <p>
-        These Terms &amp; Conditions apply to the services of {n} (&ldquo;{n},&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), including the
+        These Terms &amp; Conditions apply to the services of {org.legalName ? <>{org.legalName}, doing business as {n}</> : n} (&ldquo;{n},&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;), including the
         calls, emails and text messages we send about appointments. By using our services or agreeing to receive our messages, you agree
         to these terms.
       </p>

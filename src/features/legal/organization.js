@@ -8,7 +8,8 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export const LEGAL_DEFAULTS = { name: "Signature Marketing", email: "info@signaturemktg.net", phone: null };
+// The company the texting brand is registered to (Twilio's A2P brand, Nov 2026), doing business as `name`.
+export const LEGAL_DEFAULTS = { name: "Signature Marketing", legalName: "Lakeside Insurance Marketing LLC", email: "info@signaturemktg.net", phone: null };
 
 export async function legalOrganization() {
   const admin = createAdminClient();
@@ -18,6 +19,7 @@ export async function legalOrganization() {
   const text = (x) => (typeof x === "string" && x.trim() ? x.trim() : null);
   return {
     name: text(v.name) ?? LEGAL_DEFAULTS.name,
+    legalName: text(v.legal_name) ?? LEGAL_DEFAULTS.legalName,
     email: text(v.email) ?? LEGAL_DEFAULTS.email,
     phone: text(v.phone) ?? LEGAL_DEFAULTS.phone,
   };

@@ -15,7 +15,7 @@ export default async function PrivacyPolicyPage() {
   return (
     <LegalPage title="Privacy Policy" org={org} updated="November 11, 2026">
       <p>
-        This Privacy Policy explains how {n} (&ldquo;{n},&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) collects, uses and protects
+        This Privacy Policy explains how {org.legalName ? <>{org.legalName}, doing business as {n}</> : n} (&ldquo;{n},&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) collects, uses and protects
         information about the businesses and people we contact, including when we send text messages (SMS) about appointments.
       </p>
 

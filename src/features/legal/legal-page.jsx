@@ -5,12 +5,12 @@ export function LegalPage({ title, org, updated, children }) {
   return (
     <div className="min-h-svh bg-background text-foreground">
       <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-        <div className="text-sm text-muted-foreground">{org.name}</div>
+        <div className="text-sm text-muted-foreground" data-legal-org>{org.name}{org.legalName ? <> &middot; {org.legalName}</> : null}</div>
         <h1 className="mt-1 text-3xl font-bold tracking-tight" data-legal-title>{title}</h1>
         <p className="mt-2 text-sm text-muted-foreground">Last updated {updated}</p>
         <div className="mt-8 space-y-8 text-[0.95rem] leading-7">{children}</div>
         <footer className="mt-12 flex flex-wrap gap-x-6 gap-y-2 border-t pt-6 text-sm text-muted-foreground">
-          <span>© {new Date().getFullYear()} {org.name}</span>
+          <span>© {new Date().getFullYear()} {org.legalName ? `${org.legalName}, doing business as ${org.name}` : org.name}</span>
           <Link href="/privacy" className="underline underline-offset-4">Privacy Policy</Link>
           <Link href="/terms" className="underline underline-offset-4">Terms &amp; Conditions</Link>
         </footer>
