@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, Combine, MessageSquareText, ClipboardCheck, Megaphone, FileText,
-  Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall,
+  Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall, PhoneForwarded,
   CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet,
 } from "lucide-react";
 
@@ -110,6 +110,8 @@ export const navGroups = [
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.
       { href: "/reports/pay", label: "Pay & Hours", icon: Clock, roles: ["admin", "manager", "agent"] },
+      // Every call on the Lighthouse phone, listed, and a number looked up (Sean, Nov 2026); a manager their own.
+      { href: "/reports/calls", label: "Call Log", icon: PhoneForwarded, roles: ["admin", "manager"] },
       // One person's day by the hour: calls, leads and appointments; agents see their own.
       { href: "/reports/hourly", label: "Hourly Progress", icon: Timer, roles: ["admin", "manager", "agent"] },
       // A manager's Pipeline Report (Sean, Oct 2026): their projects' renewals by manager, as on X-Dates by Month.

@@ -9,15 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import CallTimesChart from "@/features/dashboard/components/call-times-chart";
 import { knownZone, zoneShort } from "@/lib/own-clock";
+import { ACTIVITY_KIND, callLogHref, talkClock } from "@/lib/call-log";
 
 // How often the numbers are asked for again while the card shows today.
 const REFRESH_MS = 20_000;
 
-/** A length of time as the Streams report wrote it: "0:00:17", "1:29:00". */
-export function talkClock(seconds) {
-  const s = Math.max(0, Math.round(Number(seconds) || 0));
-  return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-}
+export { talkClock };
 
 // The columns, as the Streams call report had them (and the calls taken, which it counted in its total).
 const COLUMNS = [
@@ -45,7 +42,7 @@ const COLUMNS = [
  * their own clock (their account's time zone, named when it is not the
  * business's `timeZone`); the total's on the business's.
  */
-export default function CallActivityCard({ rows: initial, view, switcher, nav, scope = "all", scopeLinks = null, userId = null, timeZone }) {
+export default function CallActivityCard({ rows: initial, view, switcher, nav, scope = "all", scopeLinks = null, userId = null, timeZone, opens = null }) {
   const [rows, setRows] = useState(initial);
   const [live, setLive] = useState(view.showsToday);
   // Another period chosen: the server's numbers for it.
@@ -96,6 +93,10 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
   // Anyone here on another clock: the total's time names the business's.
   const mixed = rows.some((r) => r.firstCall && r.timeZone && clock(r.firstCall, r.timeZone) !== clock(r.firstCall));
   const firsts = rows.map((r) => r.firstCall).filter(Boolean).sort();
+  // Each person's calls, listed (Sean, Nov 2026: the Call Log): `opens` "all" (an administrator) or the one
+  // user id whose calls the viewer may list (a manager's own). Over the days shown, of a kind for a count.
+  const canOpen = (r) => opens === "all" || (r.userId != null && opens != null && String(r.userId) === String(opens));
+  const logHref = (r, kind = null) => callLogHref({ user: r.userId ?? "none", kind, from: view.range.from, to: view.range.to });
   return (
     <Card data-call-activity>
       <SectionHeader wrap label="Call Activity" icon={PhoneCall} action={switcher} />
@@ -148,7 +149,9 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
               <TableRow key={r.userId ?? "nobody"} data-call-row={r.userId ?? "nobody"}>
                 <TableCell className={cn("font-medium", !r.userId && "text-muted-foreground")}>
                   <span className="flex items-center gap-2">
-                    {r.name}
+                    {canOpen(r) ? (
+                      <Link href={logHref(r)} className="transition-colors hover:text-primary" title="Every call, listed" data-call-log-link={r.userId ?? "nobody"}>{r.name}</Link>
+                    ) : r.name}
                     {r.onCall ? (
                       <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-[0.12em] text-emerald-500" data-on-call>
                         On a call
@@ -160,7 +163,7 @@ export default function CallActivityCard({ rows: initial, view, switcher, nav, s
                 {COLUMNS.map(([k]) => (
                   <TableCell key={k} data-col={k}
                     className={cn("text-right tabular-nums", !r[k] && "text-muted-foreground", k === "missed" && r[k] > 0 && "font-semibold text-rose-500")}>
-                    {r[k]}
+                    {canOpen(r) && r[k] ? <Link href={logHref(r, ACTIVITY_KIND[k])} className="hover:text-primary hover:underline" data-call-log-count={k}>{r[k]}</Link> : r[k]}
                   </TableCell>
                 ))}
                 <TableCell className="text-right tabular-nums" data-col="avg">{r.userId ? talkClock(avg(r.talk, r.outHandled + r.inHandled)) : ""}</TableCell>

@@ -236,7 +236,7 @@ export default async function Dashboard({ searchParams }) {
   const calls = await callsP;
   const callCard = calls ? (
     <CallActivityCard rows={calls.rows} view={calls.view} timeZone={calls.tz}
-      scope={callScope} userId={subject?.id ?? null}
+      scope={callScope} userId={subject?.id ?? null} opens={me.role === "admin" ? "all" : me.id}
       scopeLinks={isManager ? Object.fromEntries(["me", "team"].map((c) => [c, `/?${new URLSearchParams({ ...otherParams(sp, "cs"), ...(c === "team" ? { cs: "team" } : {}) })}`])) : null}
       {...viewControls(sp, calls.view, { keyParam: "ck", dateParam: "cd", options: VIEW_PERIODS })} />
   ) : null;
