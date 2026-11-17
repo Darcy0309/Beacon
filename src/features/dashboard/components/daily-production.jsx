@@ -1,4 +1,5 @@
 import Link from "@/components/shared/intent-link";
+import LinkPending from "@/components/shared/link-pending";
 import { Gauge, Wallet } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
@@ -68,7 +69,7 @@ export default function DailyProductionCard({ rows, view, switcher, nav, picker,
               <TableRow key={r.userId} data-production-row={r.userId}>
                 <TableCell className="font-medium">
                   {r.role === "manager" ? (
-                    <Link href={`/?view=${r.userId}`} className="hover:text-primary" title="Open their dashboard, as they see it" data-open-dashboard={r.userId}>{r.name}</Link>
+                    <Link href={`/?view=${r.userId}`} className="hover:text-primary" title="Open their dashboard, as they see it" data-open-dashboard={r.userId}>{r.name}<LinkPending /></Link>
                   ) : r.name}
                   {r.role === "agent" ? <span className="ml-1.5 text-xs text-muted-foreground">agent</span> : null}
                   <Link href={`/reports/pay?user=${r.userId}`} aria-label={`${r.name}'s pay and hours`} title="Pay & Hours"
