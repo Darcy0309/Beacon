@@ -106,6 +106,17 @@ try {
     check("the CSV: a row a person and a Total", lines[0].includes("Pay due (USD)") && lines.at(-1).startsWith("Total") && lines.some((l) => l.includes("Rachel Colestock,rachel@beacon.test,Hybrid,16.00")),
       `${lines[0]} … ${lines.at(-1)}`);
 
+    // From Daily Production's Pay & Hours link (Sean, Nov 2026): that manager alone, with their days below.
+    await admin.go("/", 6000);
+    const link = await until(() => admin.ev(`document.querySelector('[data-production-row="${RACHEL}"] a[href*="/reports/pay"]')?.getAttribute('href') ?? null`));
+    check("Daily Production's link opens her alone", link === `/reports/pay?user=${RACHEL}&only=1`, link);
+    await admin.go(link, 4000);
+    const alone = await admin.ev("[...document.querySelectorAll('tr[data-person]')].map((r) => Number(r.dataset.person))");
+    check("…just her row, her days below, and a way back to everyone", JSON.stringify(alone) === JSON.stringify([RACHEL])
+      && await admin.ev(`!!document.querySelector('[data-days="${RACHEL}"]') && !!document.querySelector('[data-show-everyone]')`), JSON.stringify(alone));
+    await admin.click("[data-show-everyone]");
+    check("…and everyone again", await until(() => admin.ev("document.querySelectorAll('tr[data-person]').length > 1")));
+
     await rachel.go("/reports/pay", 4000);
     const theirs = await rachel.ev("[...document.querySelectorAll('tr[data-person]')].map((r) => Number(r.dataset.person))");
     check("Rachel sees only her own pay", JSON.stringify(theirs) === JSON.stringify([RACHEL]), JSON.stringify(theirs));

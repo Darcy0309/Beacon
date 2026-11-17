@@ -72,7 +72,7 @@ export default function DailyProductionCard({ rows, view, switcher, nav, picker,
                     <Link href={`/?view=${r.userId}`} className="hover:text-primary" title="Open their dashboard, as they see it" data-open-dashboard={r.userId}>{r.name}<LinkPending /></Link>
                   ) : r.name}
                   {r.role === "agent" ? <span className="ml-1.5 text-xs text-muted-foreground">agent</span> : null}
-                  <Link href={`/reports/pay?user=${r.userId}`} aria-label={`${r.name}'s pay and hours`} title="Pay & Hours"
+                  <Link href={`/reports/pay?user=${r.userId}&only=1`} aria-label={`${r.name}'s pay and hours`} title="Pay & Hours"
                     className="ml-1.5 inline-flex align-middle text-muted-foreground transition-colors hover:text-primary">
                     <Wallet className="size-3.5" />
                   </Link>

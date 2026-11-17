@@ -48,14 +48,17 @@ export default async function PayReport({ searchParams }) {
   // An administrator opens anyone's days; everyone else always sees their own.
   const openId = admin ? idParam(sp?.user) : me?.id ?? null;
   const open = people.find((p) => p.id === openId) ?? null;
+  // Opened from Daily Production's Pay & Hours link (Sean, Nov 2026): that manager alone, list and totals.
+  const only = Boolean(admin && open && sp?.only === "1");
+  const shown = only ? [open] : people;
   const [days, bonuses] = open
     ? await Promise.all([getWorkDays({ from: range.from, to: range.to, userId: open.id }), getPayBonuses({ from: range.from, to: range.to, userId: open.id })])
     : [[], []];
 
-  const sum = (key) => people.reduce((n, p) => n + p[key], 0);
+  const sum = (key) => shown.reduce((n, p) => n + p[key], 0);
   const paidMinutes = sum("paidMinutes");
   const tiles = [
-    { label: admin ? "Pay Due" : "My Pay", value: usd(sum("pay")), note: admin ? `${people.length} people` : open?.model === "hybrid" ? "the higher of hourly and commission" : "commission",
+    { label: admin ? "Pay Due" : "My Pay", value: usd(sum("pay")), note: admin ? `${shown.length} ${shown.length === 1 ? "person" : "people"}` : open?.model === "hybrid" ? "the higher of hourly and commission" : "commission",
       icon: Banknote, accent: "var(--neon-amber)" },
     { label: "Hours Paid", value: hoursLabel(paidMinutes), note: `${hoursLabel(sum("workedMinutes"))} worked`, icon: Clock, accent: "var(--neon-cyan)" },
     { label: "Commission", value: usd(sum("commission")), note: "lead, appointment and confirmation pay, less chargebacks", icon: Users, accent: "var(--neon-emerald)" },
@@ -82,14 +85,14 @@ export default async function PayReport({ searchParams }) {
 
   return (
     <>
-      <Topbar title="Pay & Hours" sub={`${range.label} · ${admin ? "every account manager" : "your pay"}`} />
+      <Topbar title="Pay & Hours" sub={`${range.label} · ${only ? open.name : admin ? "every account manager" : "your pay"}`} />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <Card>
           <div className="flex flex-wrap items-center gap-2 px-5 py-3">
             {PERIOD_PRESETS.map(([key, label]) => (
               <Link
                 key={key}
-                href={`/reports/pay?${keep({ period: key, user: admin ? openId : null })}`}
+                href={`/reports/pay?${keep({ period: key, user: admin ? openId : null, only: only ? 1 : null })}`}
                 aria-current={range.period === key ? "true" : undefined}
                 className={cn(
                   "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
@@ -102,9 +105,16 @@ export default async function PayReport({ searchParams }) {
             <form action="/reports/pay">
               <input type="hidden" name="period" value="custom" />
               {admin && openId ? <input type="hidden" name="user" value={openId} /> : null}
+              {only ? <input type="hidden" name="only" value="1" /> : null}
               <DateRangePicker key={`${range.from}:${range.to}`} defaultFrom={range.from} defaultTo={range.to} active={range.period === "custom"} />
             </form>
-            <Button asChild size="sm" variant="outline" className="ml-auto">
+            {only ? (
+              <Link href={`/reports/pay?${keep({ ...periodParams, user: open.id })}`} data-show-everyone
+                className="ml-auto rounded-full border border-[var(--panel-border)] px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary">
+                Show every account manager
+              </Link>
+            ) : null}
+            <Button asChild size="sm" variant="outline" className={only ? "" : "ml-auto"}>
               <a href={csv} download data-export="people"><Download /> Export CSV</a>
             </Button>
           </div>
@@ -141,7 +151,7 @@ export default async function PayReport({ searchParams }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {people.map((p) => (
+              {shown.map((p) => (
                 <TableRow key={p.id} data-person={p.id} className={cn(p.id === openId && "bg-primary/5")}>
                   <TableCell>
                     {admin ? (
@@ -183,7 +193,7 @@ export default async function PayReport({ searchParams }) {
                   <TableCell className="text-right tabular-nums">{p.calls.toLocaleString()}</TableCell>
                 </TableRow>
               ))}
-              {people.length > 1 ? (
+              {shown.length > 1 ? (
                 <TableRow className="border-t-2 font-semibold">
                   <TableCell colSpan={2}>Total</TableCell>
                   <TableCell className="text-right tabular-nums">{hoursLabel(sum("workedMinutes"))}</TableCell>
@@ -198,7 +208,7 @@ export default async function PayReport({ searchParams }) {
                   <TableCell className="text-right tabular-nums">{sum("calls").toLocaleString()}</TableCell>
                 </TableRow>
               ) : null}
-              {people.length === 0 ? (
+              {shown.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={12} className="py-10 text-center text-muted-foreground">Nobody to pay in this period.</TableCell>
                 </TableRow>
