@@ -14,6 +14,7 @@ import { appointmentSpan, calendarLinks, mapLink } from "@/lib/appointment-links
 import { fileSize, fullName, sicLabel } from "@/lib/format";
 import { autosLine, employeesLine, locationsLine, subcontractorsLine, xmodText, yesNo } from "@/lib/business";
 import { infoProjectOf, producerAddresses } from "@/lib/project-info";
+import { textProducers } from "@/features/delivery/producer-texts";
 import { mailServer, sendMail } from "@/lib/server/mail";
 import { LINK_DAYS, sheetToken } from "@/lib/server/sheet-link";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -55,7 +56,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
 
   let call = null;
   const calls = admin.from("call_records")
-    .select("id, project_id, call_result, appointment_id, user:users(first_name, last_name, email), result:call_results(delivers, effect)")
+    .select("id, project_id, call_result, appointment_id, notes, user:users(first_name, last_name, email), result:call_results(delivers, effect)")
     .eq("lead_id", leadId);
   if (callRecordId) {
     ({ data: call } = await calls.eq("id", callRecordId).maybeSingle());
@@ -67,7 +68,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   // News of the appointment: confirmed, or cancelled. A cancelled one is no longer the lead's
   // appointment, so it is read by the call that cancelled it.
   const notice = APPOINTMENT_NOTICES[one(call?.result)?.effect] ?? null;
-  const apptColumns = "id, appt_date, appt_time, duration_min, rep_name";
+  const apptColumns = "id, appt_date, appt_time, duration_min, rep_name, call_record_id";
   const apptQuery = notice === "CANCELLED" && call?.appointment_id
     ? admin.from("appointments").select(apptColumns).eq("id", call.appointment_id).maybeSingle()
     : admin.from("appointments").select(apptColumns).eq("lead_id", leadId).is("invalid_at", null).is("deleted_at", null)
@@ -143,7 +144,17 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
   const token = event && origin ? sheetToken(leadId) : null;
   if (event) sheet.appointment.links = calendarLinks(event, token ? `${origin}/sheet/${token}/appointment.ics` : null);
 
-  return { project, rep, sheet, event, appointmentId: appt?.id ?? null };
+  // What it means for the producers' texts (Sean, Nov 2026): set by this call, moved by it, or confirmed.
+  const texting = {
+    effect: one(call?.result)?.effect ?? null,
+    ownCall: Boolean(appt && call && (appt.call_record_id == null || appt.call_record_id === call.id)),
+    moved: /Appointment moved from /.test(String(call?.notes ?? "")),
+    apptDate: appt?.appt_date ?? null,
+    time: appt?.appt_time ?? null,
+    contact: lead.contact_name || lead.decision_maker || null,
+    phone: lead.contact_mobile || lead.contact_phone || lead.phone || null,
+  };
+  return { project, rep, sheet, event, appointmentId: appt?.id ?? null, texting };
 }
 
 /**
@@ -157,18 +168,23 @@ export function appointmentEvent(company, appt, address, timeZone, details) {
   return { ...span, title: `Appointment: ${company}`, location: address.join(", ") || null, details: details || null };
 }
 
+/** The producers of a project's Project Info: the appointment project's it is tied to, unless it keeps its own. { producers } or null. */
+export async function projectProducers(admin, project) {
+  if (!project) return null;
+  const { data: rows } = await admin.from("project_profiles").select("project_id, own, producers").in("project_id", [...new Set([project.id, infoProjectOf(project)])]);
+  return rows?.find((r) => r.project_id === project.id && (r.own || !project.appt_project_id)) ?? rows?.find((r) => r.project_id === infoProjectOf(project)) ?? null;
+}
+
 /**
  * Where a project's leads and appointments go: its delivery addresses (the
  * project form's), and the producers its Project Info ticks to get leads by
  * email (Sean, Oct 2026; a DB dev project's Project Info is the appointment
  * project's). Each address once: [{ address, linkOnly }].
  */
-export async function deliveryAddresses(admin, project) {
+export async function deliveryAddresses(admin, project, info = undefined) {
   if (!project) return [];
   const { list } = parseDeliveryAddresses(project.email, project.delivery_link_only);
-  // Its Project Info: the appointment project's it is tied to, unless it keeps its own.
-  const { data: rows } = await admin.from("project_profiles").select("project_id, own, producers").in("project_id", [...new Set([project.id, infoProjectOf(project)])]);
-  const info = rows?.find((r) => r.project_id === project.id && (r.own || !project.appt_project_id)) ?? rows?.find((r) => r.project_id === infoProjectOf(project));
+  if (info === undefined) info = await projectProducers(admin, project);
   // A producer's address as it is: no "_" marks a link for them.
   const seen = new Set(list.map((a) => a.address.toLowerCase()));
   for (const address of producerAddresses(info?.producers)) {
@@ -195,11 +211,17 @@ export async function deliverLead({ leadId, callRecordId = null, sentBy = null, 
     const loaded = await loadLeadSheet(admin, leadId, callRecordId, { origin });
     if (!loaded) return { sent: 0, failed: 0, addresses: 0 };
     const { project, rep, sheet } = loaded;
-    const list = await deliveryAddresses(admin, project);
-    if (!list.length) return { sent: 0, failed: 0, addresses: 0 };
-
+    const info = await projectProducers(admin, project);
+    const list = await deliveryAddresses(admin, project, info);
     const { data: settings } = await admin.from("app_settings").select("key, value").in("key", ["mail", "organization"]);
     const setting = (k) => settings?.find((s) => s.key === k)?.value ?? {};
+    // The producers ticked for texts (Sean, Nov 2026): a text as an appointment is set, confirmed or moved. Not when sent again by hand.
+    if (!resent) {
+      await textProducers(admin, { leadId, callRecordId, loaded, producers: info?.producers, from: setting("organization").name || null, origin, emailed: list.length > 0 })
+        .catch((err) => console.error("[delivery] producer texts", leadId, err?.message ?? err));
+    }
+    if (!list.length) return { sent: 0, failed: 0, addresses: 0 };
+
     const from = setting("mail").from;
     const sender = { name: setting("organization").name || "Customer Service", address: from };
     const replyTo = rep?.email && !isReservedAddress(rep.email) ? { name: fullName(rep), address: rep.email } : undefined;

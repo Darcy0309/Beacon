@@ -1,7 +1,7 @@
 import { Ban, Building2, CalendarX2, Landmark, MapPin, MessageSquareText, Navigation, Users } from "lucide-react";
 import ToneBadge from "@/components/shared/tone-badge";
 import { mapLink } from "@/lib/appointment-links";
-import { mediumDate, telHref } from "@/lib/format";
+import { formatPhone, mediumDate, telHref } from "@/lib/format";
 import { SECTION_LINE } from "@/features/leads/form-section";
 import { addressLine, areaCode, directionsLink, hasProfile, producerName, weekdayList, yesNoOf, yesWith } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
@@ -120,7 +120,10 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
                 <span className="font-medium">{producerName(p) || <span className="text-muted-foreground">No name</span>}</span>
                 {p.email ? <a href={`mailto:${p.email}`} className="block break-all text-xs text-muted-foreground hover:text-primary">{p.email}</a> : null}
               </span>
-              {p.leads ? <ToneBadge tone="emerald" className="normal-case tracking-normal"><span data-gets-leads>Gets leads by email</span></ToneBadge> : null}
+              <span className="flex flex-wrap gap-1.5">
+                {p.leads ? <ToneBadge tone="emerald" className="normal-case tracking-normal"><span data-gets-leads>Gets leads by email</span></ToneBadge> : null}
+                {p.texts ? <ToneBadge tone="cyan" className="normal-case tracking-normal"><span data-gets-texts>Texts to {formatPhone(p.mobile)}</span></ToneBadge> : null}
+              </span>
             </li>
           ))}
         </ul>

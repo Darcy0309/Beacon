@@ -6,6 +6,7 @@
  * the forms, the pages, the calendar and the tests share it.
  */
 
+import { textDigits } from "./texts.js";
 import { PHONE_EXTENSION } from "./format.js";
 
 /** The states and DC, by their two letters in alphabetical order. */
@@ -71,20 +72,29 @@ export const weatherLink = (zip) => {
 };
 
 /**
- * Producers as they are kept: each { first, last, email, leads }, trimmed,
+ * Producers as they are kept: each { first, last, email, leads, mobile, texts }, trimmed,
  * the empty rows dropped, at most five. `leads`: they get each lead and
- * appointment by email (only with an address to send to).
+ * appointment by email (only with an address to send to). `texts`: a text to their
+ * `mobile` (ten digits) as an appointment is set, confirmed or rescheduled (Sean, Nov 2026).
  */
 export function cleanProducers(list) {
   const text = (v, max) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
   return (Array.isArray(list) ? list : [])
     .map((p) => {
       const email = text(p?.email, 254);
-      return { first: text(p?.first, 40), last: text(p?.last, 40), email, leads: Boolean(p?.leads && email) };
+      const mobile = textDigits(p?.mobile) ?? "";
+      return { first: text(p?.first, 40), last: text(p?.last, 40), email, leads: Boolean(p?.leads && email), mobile, texts: Boolean(p?.texts && mobile) };
     })
-    .filter((p) => p.first || p.last || p.email)
+    .filter((p) => p.first || p.last || p.email || p.mobile)
     .slice(0, MAX_PRODUCERS);
 }
+
+/** The producers who get a text as an appointment is set, confirmed or rescheduled: [{ name, mobile }], each number once. */
+export const producerTextTo = (producers) => {
+  const seen = new Set();
+  return cleanProducers(producers).filter((p) => p.texts && !seen.has(p.mobile) && seen.add(p.mobile))
+    .map((p) => ({ name: producerName(p), mobile: p.mobile }));
+};
 
 /** The producers who get each lead and appointment by email: their addresses. */
 export const producerAddresses = (producers) => cleanProducers(producers).filter((p) => p.leads).map((p) => p.email);

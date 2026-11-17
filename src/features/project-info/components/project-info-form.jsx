@@ -18,7 +18,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
 const YN = (v) => (v === true ? "yes" : v === false ? "no" : "");
 const EMPLOYEE_SIZES = Array.from({ length: MIN_EMPLOYEES_MAX + 1 }, (_, i) => String(i));
 const ROWS = Array.from({ length: MAX_PRODUCERS }, (_, i) => i);
-const padProducers = (list) => ROWS.map((i) => ({ first: "", last: "", email: "", leads: false, ...(list?.[i] ?? {}) }));
+const padProducers = (list) => ROWS.map((i) => ({ first: "", last: "", email: "", leads: false, mobile: "", texts: false, ...(list?.[i] ?? {}) }));
 
 /** A part of the form, boxed and titled. */
 function Group({ title, icon: Icon, hint, group, children }) {
@@ -148,7 +148,7 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
       </Group>
 
       <Group title="Producers taking appointments" icon={Users} group="producers"
-        hint="Up to five. Tick Leads by email for each producer who should be sent every lead and appointment.">
+        hint="Up to five. Tick Leads by email for each producer who should be sent every lead and appointment, and Texts for a text to their mobile as an appointment is set, confirmed or rescheduled.">
         <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_7.5rem] gap-2 text-[0.7rem] font-medium text-muted-foreground sm:col-span-2 sm:grid" aria-hidden>
           <span>First name</span><span>Last name</span><span>Email</span><span>Leads by email</span>
         </div>
@@ -172,6 +172,18 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
                 <span aria-hidden className="hidden sm:inline">Leads by email</span>
               </label>
               <input type="hidden" name={`producer_leads_${n}`} value={p.leads ? "on" : ""} />
+              {/* Texts as an appointment is set, confirmed or rescheduled (Sean, Nov 2026). */}
+              <div className="col-span-2">
+                <Input name={`producer_mobile_${n}`} type="tel" inputMode="tel" value={p.mobile} onChange={(e) => setProducer(i, "mobile", e.target.value)} maxLength={20}
+                  placeholder="Mobile, for texts" aria-label={`Producer ${n}: mobile`} aria-invalid={invalid(`producer_mobile_${n}`)} />
+                {fe(`producer_mobile_${n}`) ? <p role="alert" className="mt-1 text-[0.7rem] font-medium text-destructive">{fe(`producer_mobile_${n}`)}</p> : null}
+              </div>
+              <label className="col-span-2 flex h-9 cursor-pointer items-center gap-2 text-xs">
+                <input type="checkbox" data-producer-texts checked={p.texts} onChange={(e) => setProducer(i, "texts", e.target.checked)} className="size-4 accent-[var(--primary)]"
+                  aria-label={`Producer ${n}: text them new, confirmed and rescheduled appointments`} />
+                <span>Texts: new, confirmed &amp; rescheduled appointments</span>
+              </label>
+              <input type="hidden" name={`producer_texts_${n}`} value={p.texts ? "on" : ""} />
             </div>
           );
         })}

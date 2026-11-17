@@ -169,6 +169,7 @@ export function readInfoForm(formData, { carriers = [], kept = [] } = {}) {
   const producers = cleanProducers(Array.from({ length: MAX_PRODUCERS }, (_, i) => i + 1).map((n) => ({
     first: values[`producer_first_${n}`], last: values[`producer_last_${n}`], email: values[`producer_email_${n}`],
     leads: values[`producer_leads_${n}`] === "on",
+    mobile: values[`producer_mobile_${n}`], texts: values[`producer_texts_${n}`] === "on",
   })));
   return {
     values,

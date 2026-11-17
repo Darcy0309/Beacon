@@ -55,6 +55,12 @@ export async function POST(request) {
         .eq("twilio_sid", sid)
         .not("status", "in", `(${FINAL.join(",")})`);
       if (error) console.error("[twilio/sms] status", error.message);
+      // A text to a client's producer (Nov 2026), kept apart from the leads' conversations.
+      const { error: producerError } = await admin.from("producer_texts")
+        .update({ status, error: failed ? textFailure(params.ErrorCode, params.ErrorMessage) : null, updated_at: new Date().toISOString() })
+        .eq("twilio_sid", sid)
+        .not("status", "in", `(${FINAL.join(",")})`);
+      if (producerError) console.error("[twilio/sms] producer status", producerError.message);
     }
     return new NextResponse(null, { status: 204 });
   }

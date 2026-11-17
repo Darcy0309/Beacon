@@ -322,6 +322,8 @@ export const schemas = {
       [`producer_last_${n}`, [max(40)]],
       [`producer_email_${n}`, [mailbox, max(254)]],
       [`producer_leads_${n}`, [oneOf(["", "on"])]],
+      [`producer_mobile_${n}`, [phone]],
+      [`producer_texts_${n}`, [oneOf(["", "on"])]],
     ])),
     personal_lines: [oneOf(["yes", "no"])],
     min_employees: [int({ min: 0, max: MIN_EMPLOYEES_MAX })],
@@ -658,6 +660,10 @@ export const cross = {
     for (let n = 1; n <= MAX_PRODUCERS; n++) {
       if (values[`producer_leads_${n}`] === "on" && !str(values[`producer_email_${n}`]) && !errors[`producer_email_${n}`]) {
         errors[`producer_email_${n}`] = "Add their email to send them leads";
+      }
+      // Texts (Sean, Nov 2026): a mobile number to send them to.
+      if (values[`producer_texts_${n}`] === "on" && !str(values[`producer_mobile_${n}`]) && !errors[`producer_mobile_${n}`]) {
+        errors[`producer_mobile_${n}`] = "Add their mobile to text them";
       }
     }
   },
