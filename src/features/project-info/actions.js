@@ -17,7 +17,7 @@ import { mailServer, sendMail } from "@/lib/server/mail";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
-import { carrierNames, infoByLink, keptCarriers, loadProjectInfo, readInfoForm, resolveInfoProject, setOwnInfo, writeProjectInfo } from "./server";
+import { carrierNames, copyInfo, infoByLink, infoSources, keptCarriers, loadProjectInfo, readInfoForm, resolveInfoProject, setOwnInfo, writeProjectInfo } from "./server";
 
 const NOT_YOURS = "Only an administrator or the client can change Project Info.";
 
@@ -215,4 +215,46 @@ export async function setProjectInfoOwn(formData) {
   refresh(project.id);
   revalidatePath("/projects", "layout");
   return ok({ own });
+}
+
+/**
+ * "Copy from…" (Sean, Nov 2026): the Project Info sheets an administrator can copy onto this
+ * project's (`project_id`; a DB dev project's is its appointment project's, as it shows).
+ */
+export async function listProjectInfoSources(formData) {
+  const projectId = idFrom(formData, "project_id");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me || me.status !== "active" || me.role !== "admin") return fail("Only an administrator can copy Project Info.");
+  const target = projectId ? await resolveInfoProject(supabase, projectId) : null;
+  if (!target) return fail("That project no longer exists.");
+  const admin = createAdminClient();
+  if (!admin) return fail(ADMIN_UNAVAILABLE);
+  return ok({ sources: await infoSources(admin, target.id) });
+}
+
+/**
+ * Copy another project's Project Info (`from_id`) onto this one's (`project_id`), all but the
+ * contacts: the agent's mobile and email, the producers and the office stay this project's own.
+ * Administrators.
+ */
+export async function copyProjectInfo(formData) {
+  const projectId = idFrom(formData, "project_id");
+  const fromId = idFrom(formData, "from_id");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me || me.status !== "active" || me.role !== "admin") return fail("Only an administrator can copy Project Info.");
+  const [target, source] = await Promise.all([
+    projectId ? resolveInfoProject(supabase, projectId) : null,
+    fromId ? resolveInfoProject(supabase, fromId) : null,
+  ]);
+  if (!target) return fail("That project no longer exists.");
+  if (!source) return fail("The project to copy from no longer exists.");
+  const admin = createAdminClient();
+  if (!admin) return fail(ADMIN_UNAVAILABLE);
+  const problem = await copyInfo(admin, source.id, target.id, { userId: me.id });
+  if (problem) return fail(problem);
+  await logActivity(supabase, "project.info_copied", { entity: "project", entityId: target.id, detail: `${target.name} ← ${source.name}`, userId: me.id });
+  refresh(target.id);
+  return ok({ from: source.name });
 }

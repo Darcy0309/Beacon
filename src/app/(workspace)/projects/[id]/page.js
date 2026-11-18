@@ -1,6 +1,6 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download, ClipboardList, Pencil, Send, TrendingUp } from "lucide-react";
+import { ArrowLeft, Target, CalendarCheck, ListChecks, PhoneCall, CalendarSearch, ArrowRight, Percent, Download, ClipboardList, Copy, Pencil, Send, TrendingUp } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import ResultBadge from "@/components/shared/result-badge";
@@ -28,6 +28,7 @@ import ProjectInfoView from "@/features/project-info/components/project-info-vie
 import { ProjectInfoDialog } from "@/features/project-info/components/project-info-form";
 import InfoLinkDialog from "@/features/project-info/components/info-link-dialog";
 import OwnInfoSwitch from "@/features/project-info/components/own-info-switch";
+import CopyInfoDialog from "@/features/project-info/components/copy-info-dialog";
 import { getProjectInfo } from "@/features/project-info/queries";
 import { getCarrierNames } from "@/features/insurance/queries";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -373,6 +374,9 @@ export default async function ProjectDetail({ params, searchParams }) {
                 <div className="flex flex-wrap items-center gap-2">
                   {/* Tied to an appointment project: one sheet for them all, or its own (Sean, Oct 2026). */}
                   {info.tied_id ? <OwnInfoSwitch projectId={p.id} own={info.own} tiedName={info.tied_name} /> : null}
+                  {/* One client's many projects on the same sheet (Sean, Nov 2026): copied from another, all but the contacts. */}
+                  <CopyInfoDialog projectId={info.project_id} projectName={info.project_name}
+                    trigger={<Button size="sm" variant="outline" data-copy-project-info><Copy /> Copy from…</Button>} />
                   <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""} defaultName={info.contact_name ?? ""}
                     trigger={<Button size="sm" variant="outline" data-send-project-info><Send /> Send to client</Button>} />
                   <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />

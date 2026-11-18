@@ -260,3 +260,55 @@ export async function carryInfoOnTie(admin, dbdevId, apptId) {
   const { error } = await admin.from("project_profiles").upsert({ project_id: apptId, ...sheetOf(mine) }, { onConflict: "project_id" });
   if (error) console.error("[project info] not carried over", dbdevId, apptId, error.message);
 }
+
+/**
+ * What "Copy from…" takes from another project's Project Info (Sean, Nov 2026: one client's 15 or 35
+ * projects, all on the same sheet): everything but the contacts. The agent's mobile and email, the
+ * producers (who gets each lead by email) and the office stay the project's own.
+ */
+export const COPIED = SHEET.filter((k) => !["agent_mobile", "agent_email", "producers"].includes(k));
+const copiedFilled = (row) => COPIED.some((k) => row?.[k] != null && !(Array.isArray(row[k]) && row[k].length === 0));
+
+/**
+ * The Project Info sheets there are to copy from, for the project whose sheet is `toId`: each
+ * { id, name, client, states, carriers }, filled in and in use (not a DB dev project's set aside
+ * while it shares its appointment project's), the same client's first, then by client and name.
+ * With the server's role.
+ */
+export async function infoSources(admin, toId) {
+  const [{ data: rows, error }, { data: to }] = await Promise.all([
+    admin.from("project_profiles").select(`project_id, own, ${COPIED.join(", ")}, project:projects!inner(id, name, appt_project_id, deleted_at, company_id, company:companies(name))`)
+      .is("project.deleted_at", null),
+    admin.from("projects").select("company_id").eq("id", toId).maybeSingle(),
+  ]);
+  if (error) throw error;
+  return (rows ?? [])
+    .map((r) => ({ r, p: one(r.project) }))
+    .filter(({ r, p }) => p && p.id !== toId && (!p.appt_project_id || r.own) && copiedFilled(r))
+    .map(({ r, p }) => ({
+      id: p.id, name: p.name, client: one(p.company)?.name ?? null, same: Boolean(to?.company_id) && p.company_id === to.company_id,
+      states: r.states_licensed ?? [], carriers: (r.top_carriers ?? []).length,
+    }))
+    .sort((a, b) => Number(b.same) - Number(a.same) || String(a.client ?? "").localeCompare(String(b.client ?? "")) || a.name.localeCompare(b.name))
+    .map(({ same, ...s }) => ({ ...s, sameClient: same }));
+}
+
+/**
+ * Copy another project's Project Info onto `toId`'s (both the projects whose sheets they are): the
+ * COPIED fields, exactly as there (blank where blank), the contacts left as they were. With the
+ * server's role, `userId` who did it. Returns what went wrong, or null.
+ */
+export async function copyInfo(admin, fromId, toId, { userId = null } = {}) {
+  if (fromId === toId) return "That's this project's own Project Info.";
+  const { data: from, error } = await admin.from("project_profiles").select(COPIED.join(", ")).eq("project_id", fromId).maybeSingle();
+  if (error) return error.message;
+  if (!copiedFilled(from)) return "That project has no Project Info to copy.";
+  const sheet = Object.fromEntries(COPIED.map((k) => [k, from[k] ?? null]));
+  // Arrays are kept empty, not blank (as the form saves them).
+  for (const k of ["states_licensed", "top_carriers", "avoid_carriers", "avoid_days"]) sheet[k] ??= [];
+  const { error: copyError } = await admin.from("project_profiles").upsert(
+    { project_id: toId, ...sheet, updated_at: new Date().toISOString(), updated_by: userId, updated_via: "app" },
+    { onConflict: "project_id" }
+  );
+  return copyError?.message ?? null;
+}
