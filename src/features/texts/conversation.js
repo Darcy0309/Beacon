@@ -10,7 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUser } from "@/lib/server/session";
 import { twilioConfig } from "@/lib/server/twilio";
 import { fullName } from "@/lib/format";
-import { e164, leadTextNumbers } from "@/lib/texts";
+import { leadTextNumbers } from "@/lib/texts";
 import { catchUpCallTranscripts } from "@/lib/server/call-transcripts";
 
 const NUMBERS = "id, phone, contact_name, contact_phone, contact_mobile, decision_maker, dm_phone, dm_mobile, contact2_name, contact2_phone, contact2_mobile";
@@ -33,16 +33,16 @@ export async function getLeadConversation(leadId) {
   const ourNumber = twilioConfig()?.callerId ?? null;
   if (!admin) return { items: [], numbers, ourNumber };
 
-  const tels = numbers.map((n) => e164(n.digits));
   const LEG = "call_sid, parent_sid, user_id, direction, number, started_at, answered_at, ended_at, talk_seconds";
-  const [{ data: texts }, { data: own }, older] = await Promise.all([
+  const [{ data: texts }, { data: own }] = await Promise.all([
     admin.from("lead_texts").select("id, user_id, direction, from_number, to_number, body, media, status, error, created_at").eq("lead_id", lead.id).order("created_at").limit(500),
-    // Its calls: the ones made from it (Sean, Nov 2026: a recording on the lead and project it was called
-    // for, never on another lead with the same number), and calls in on them.
+    // Its calls: only the ones made from it, and calls in on them (Sean, Nov 2026: a recording on the lead
+    // and project it was called for, never on another lead with the same number). A call with no lead (its
+    // lead deleted, or from before calls kept their lead) is on no lead's Conversation: guessing it by number
+    // put a deleted lead's calls on a new lead with the same number. The Call Log still has every call.
     admin.from("phone_calls").select(LEG).eq("lead_id", lead.id).order("started_at").limit(500),
-    olderCalls(admin, lead.id, tels, LEG),
   ]);
-  const legs = [...(own ?? []), ...older].sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)));
+  const legs = [...(own ?? [])].sort((a, b) => String(a.started_at).localeCompare(String(b.started_at)));
 
   // The calls: one out per leg dialed; one in per call (its legs, one for each browser it rang, under it).
   const calls = [];
@@ -99,20 +99,3 @@ export async function getLeadConversation(leadId) {
   return { items, numbers, ourNumber };
 }
 
-/**
- * Calls from before each kept its lead (phone_calls.lead_id, Nov 2026) that none could be found for:
- * on this lead only where the number is on no other lead.
- */
-async function olderCalls(admin, leadId, tels, columns) {
-  if (!tels.length) return [];
-  const { data: legs } = await admin.from("phone_calls").select(columns).is("lead_id", null).in("number", tels).order("started_at").limit(500);
-  if (!legs?.length) return [];
-  const mine = [];
-  for (const tel of new Set(legs.map((l) => l.number))) {
-    const digits = String(tel).replace(/\D/g, "").slice(-10);
-    if (digits.length < 10) continue;
-    const { data: others } = await admin.from("leads").select("id").is("deleted_at", null).neq("id", leadId).ilike("search_text", `%${digits}%`).limit(1);
-    if (!others?.length) mine.push(tel);
-  }
-  return legs.filter((l) => mine.includes(l.number));
-}

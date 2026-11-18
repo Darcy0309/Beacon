@@ -70,8 +70,8 @@ const lead = Number(sql(`insert into public.leads (company_name, contact_name, c
   values (${lit(`${TAG} Coastline Auto`)}, 'Marco Ruiz', ${lit(`(480) 555-${tail}`)}, ${SEAN}) returning id`));
 const call = () => {
   const parent = `CA${hex(32)}`;
-  sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, answered_at, ended_at, talk_seconds)
-    values (${lit(`CA${hex(32)}`)}, ${lit(parent)}, ${SEAN}, 'out', '+1${MOBILE}', 'completed', now() - interval '2 minutes', now(), 95)`);
+  sql(`insert into public.phone_calls (call_sid, parent_sid, user_id, direction, number, status, answered_at, ended_at, talk_seconds, lead_id)
+    values (${lit(`CA${hex(32)}`)}, ${lit(parent)}, ${SEAN}, 'out', '+1${MOBILE}', 'completed', now() - interval '2 minutes', now(), 95, ${lead})`);
   return parent;
 };
 const PARENTS = [call(), call(), call()];
