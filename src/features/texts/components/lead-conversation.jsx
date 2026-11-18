@@ -4,9 +4,9 @@ import { useActionState, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from "sonner";
 import { AlarmClock, AlertCircle, ChevronDown, CircleDot, ClipboardCheck, Loader2, MessageSquare, PhoneCall, PhoneIncoming, PhoneOutgoing, RotateCw, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/field";
+import DatePicker from "@/components/shared/date-picker";
 import { RecordingPlayer } from "@/features/notifications/components/call-recording-card";
 import { sendLeadText } from "@/features/texts/actions";
 import { formatDial } from "@/lib/phone";
@@ -136,12 +136,17 @@ export default function LeadConversation({ leadId, initial = [], log = [], numbe
     <div ref={box} data-lead-conversation className="flex flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b border-[var(--panel-border)] px-4 py-2.5 text-xs text-muted-foreground">
         <span>Filter by date:</span>
-        <label className="flex items-center gap-1.5">From
-          <Input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="h-8 w-[9.5rem] text-xs" data-conversation-from aria-label="From date" />
-        </label>
-        <label className="flex items-center gap-1.5">To
-          <Input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className="h-8 w-[9.5rem] text-xs" data-conversation-to aria-label="To date" />
-        </label>
+        {/* The app's own date picker (Nov 2026: the browser's own calendar opened here, unlike everywhere else). */}
+        <span className="flex items-center gap-1.5">From
+          <span data-conversation-from={from || ""}>
+            <DatePicker value={from} max={to || undefined} onChange={setFrom} display="numeric" placeholder="Any day" aria-label="From date" className="w-[10.5rem]" />
+          </span>
+        </span>
+        <span className="flex items-center gap-1.5">To
+          <span data-conversation-to={to || ""}>
+            <DatePicker value={to} min={from || undefined} onChange={setTo} display="numeric" placeholder="Any day" aria-label="To date" className="w-[10.5rem]" />
+          </span>
+        </span>
         {from || to ? (
           <button type="button" onClick={() => { setFrom(""); setTo(""); }} className="inline-flex items-center gap-1 rounded px-1.5 py-1 hover:text-foreground" data-conversation-clear>
             <X className="size-3.5" /> Clear

@@ -110,12 +110,25 @@ try {
   if (SHOTS) await sean.screenshot(`${SHOTS}/conversation.png`);
 
   section("The date filter");
+  // The app's own date picker, not the browser's (Nov 2026): typed into as a person would (M/D/YY).
+  const typeDate = async (which, iso) => {
+    const [yy, mm, dd] = iso.split("-");
+    await sean.fill(`[data-conversation-${which}] input[aria-label="${which === "from" ? "From" : "To"} date"]`, `${Number(mm)}/${Number(dd)}/${yy.slice(2)}`);
+    await sean.ev("document.activeElement?.blur()");
+    await until(() => sean.ev(`document.querySelector('[data-conversation-${which}]')?.dataset.conversation${which === "from" ? "From" : "To"} === ${JSON.stringify(iso)}`), { timeout: 5000 });
+  };
+  check("the app's date picker, not the browser's", !(await sean.ev(`!!document.querySelector('[data-lead-conversation] input[type="date"]')`))
+    && (await sean.ev(`!!document.querySelector('[data-conversation-from] button')`)));
+  await sean.ev(`document.querySelector('[data-conversation-from] button').click()`);
+  check("…its calendar opens", Boolean(await until(() => sean.ev(`!!document.querySelector('[data-iso]')`), { timeout: 5000 })));
+  await sean.ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);
+  await sleep(200);
   const tomorrow = sql("select to_char(now() + interval '2 days', 'YYYY-MM-DD')");
-  await sean.fill("[data-conversation-from]", tomorrow);
+  await typeDate("from", tomorrow);
   await sleep(300);
   check("nothing from a later day", (await thread(sean)).length === 0 && /Nothing between those dates/.test(await sean.ev("document.querySelector('[data-conversation-thread]').innerText")));
   const today = sql("select to_char(now() at time zone public.business_tz(), 'YYYY-MM-DD')");
-  await sean.fill("[data-conversation-from]", today);
+  await typeDate("from", today);
   await sleep(300);
   seen = await thread(sean);
   check("…today's only: the reply", seen.length === 1 && seen[0].kind === "text:in", JSON.stringify(seen.map((i) => i.kind)));
