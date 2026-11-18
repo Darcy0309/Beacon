@@ -5,9 +5,17 @@
 // retry() loads the page from the server again; reset() would only re-render
 // the failure the browser already has.
 // reach.js imports nothing, so it keeps this page dependency-free.
-import { REACH_ERROR, isNetworkError } from "@/lib/reach";
+import { useEffect, useState } from "react";
+import { REACH_ERROR, UPDATED_NOTICE, isNetworkError, isStaleDeploy, reloadForUpdate } from "@/lib/reach";
 
 export default function GlobalError({ error, retry, reset }) {
+  // A page from before a new deployment (Nov 2026: "Server Action … was not found" on signing out): loaded
+  // again by itself, once; its button loads it again too.
+  const stale = isStaleDeploy(error);
+  const [updating, setUpdating] = useState(false);
+  useEffect(() => {
+    if (stale) setUpdating(reloadForUpdate());
+  }, [stale]);
   return (
     <html lang="en">
       <body
@@ -34,11 +42,12 @@ export default function GlobalError({ error, retry, reset }) {
           }}
         >
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#fbbf24" }}>
-            Lighthouse could not start
+            {stale ? "Lighthouse was updated" : "Lighthouse could not start"}
           </div>
           <p style={{ marginTop: 10, fontSize: 14, color: "rgba(230,237,247,0.75)", lineHeight: 1.5 }}>
             {/* Not reaching the server says so, as route-error.jsx does (Oct 2026). */}
-            {isNetworkError(error) ? REACH_ERROR : error?.message || "An unexpected error occurred while loading the application."}
+            {stale ? (updating ? UPDATED_NOTICE : "A newer version of Lighthouse is out. Load the page again to carry on.")
+              : isNetworkError(error) ? REACH_ERROR : error?.message || "An unexpected error occurred while loading the application."}
           </p>
           {error?.digest ? (
             <p style={{ marginTop: 8, fontSize: 11, fontFamily: "ui-monospace, monospace", color: "rgba(230,237,247,0.45)" }}>
@@ -46,7 +55,7 @@ export default function GlobalError({ error, retry, reset }) {
             </p>
           ) : null}
           <button
-            onClick={() => (retry ?? reset)()}
+            onClick={() => (stale ? window.location.reload() : (retry ?? reset)())}
             style={{
               marginTop: 18,
               padding: "0.6rem 1.1rem",
@@ -61,7 +70,7 @@ export default function GlobalError({ error, retry, reset }) {
               cursor: "pointer",
             }}
           >
-            Try again
+            {stale ? "Load it again" : "Try again"}
           </button>
         </div>
       </body>

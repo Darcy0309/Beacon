@@ -12,7 +12,6 @@ import SignatureLogo from "@/components/brand/signature-logo";
 import LighthouseMark from "@/components/brand/logo-mark";
 import { navGroups, ROLES, showsItem } from "@/lib/nav";
 import { useRole } from "@/components/layout/role-provider";
-import { signOut } from "@/features/auth/actions";
 import { forgetPushThenSubmit } from "@/features/notifications/desktop";
 import { useSidebar } from "@/components/layout/sidebar-provider";
 import { cn } from "@/lib/utils";
@@ -238,7 +237,8 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
           </button>
           <ConfirmDialog open={leaving} onOpenChange={setLeaving} title="Sign out of Lighthouse?"
             description="You will need your password, and your authenticator code if you use one, to sign back in.">
-            <form action={signOut} onSubmit={forgetPushThenSubmit}>
+            {/* A plain form post (/auth/sign-out), not a Server Action: it works from a page opened before a deploy (Nov 2026). */}
+            <form action="/auth/sign-out" method="post" onSubmit={forgetPushThenSubmit}>
               <Button type="submit" data-confirm><LogOut /> Sign out</Button>
             </form>
           </ConfirmDialog>

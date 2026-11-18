@@ -3,9 +3,7 @@
 /** Signing in and out, two-factor, and changing your password. */
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { IDLE_CHOICES, IDLE_COOKIE } from "@/lib/idle";
 import { check, currentAppUser, fail, logActivity, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -203,31 +201,8 @@ export async function disableTwoFactor() {
   return ok({ enabled: false });
 }
 
-export async function signOut() {
-  const supabase = await createClient();
-  await logActivity(supabase, "sign_out");
-  await supabase.auth.signOut();
-  (await cookies()).delete(IDLE_COOKIE);
-  revalidatePath("/", "layout");
-  redirect("/login");
-}
-
-/**
- * Signed out after 30 minutes without activity (IdleGuard): this browser's
- * session only, not the person's others. The sign-in page says why, and
- * brings them back to `next` (where they were) once they sign in again.
- */
-export async function signOutIdle(next = "/", minutes = null) {
-  const supabase = await createClient();
-  await logActivity(supabase, "sign_out.idle");
-  await supabase.auth.signOut({ scope: "local" });
-  (await cookies()).delete(IDLE_COOKIE);
-  revalidatePath("/", "layout");
-  const back = safeInternalPath(next, "/");
-  // The time it was, for the sign-in page to say.
-  const after = IDLE_CHOICES.some(([v]) => v && v === Number(minutes)) ? `&after=${Number(minutes)}` : "";
-  redirect(`/login?error=idle${after}${back !== "/" ? `&next=${encodeURIComponent(back)}` : ""}`);
-}
+// Signing out is a plain form post now, /auth/sign-out (app/auth/sign-out/route.js): it works from a page
+// opened before a deploy, which a Server Action's id does not (Nov 2026).
 
 /**
  * "Forgot your password?": email a link that signs the person in and opens

@@ -6,7 +6,6 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { signOutIdle } from "@/features/auth/actions";
 import { IDLE_MINUTES, IDLE_WARNING_MINUTES, idleSpan } from "@/lib/idle";
 import { isNetworkError } from "@/lib/reach";
 
@@ -56,10 +55,16 @@ export default function IdleGuard() {
     writeShared(SIGNED_OUT_KEY, Date.now());
     startLeaving(async () => {
       try {
-        await signOutIdle(path, limitRef.current);
+        // A plain post to /auth/sign-out, not a Server Action: it works from a page opened before a deploy
+        // (Nov 2026). It answers with the sign-in page saying why, gone to in full.
+        const body = new FormData();
+        body.set("idle", "1");
+        body.set("next", path);
+        body.set("minutes", String(limitRef.current ?? ""));
+        const res = await fetch("/auth/sign-out", { method: "POST", body, credentials: "same-origin" });
+        window.location.assign(res.redirected ? res.url : "/login?error=idle");
       } catch (e) {
-        // Signing out ends in a redirect, which Next.js handles; only a call
-        // that never got there is a failure: say so, and try again shortly.
+        // Only a call that never got there is a failure: say so, and try again shortly.
         if (!isNetworkError(e)) throw e;
         toast.error("Couldn't sign you out: Lighthouse can't be reached. Trying again shortly.", { id: "idle-sign-out" });
         setTimeout(() => { done.current = false; }, 15_000);

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertTriangle, RotateCcw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { isNetworkError } from "@/lib/reach";
+import { UPDATED_NOTICE, isNetworkError, isStaleDeploy, reloadForUpdate } from "@/lib/reach";
 
 // Most failures here are a slow first call to the database, which succeeds on
 // a second try. Rather than leave the reader looking at an error and expecting
@@ -26,12 +26,18 @@ export default function RouteError({ error, retry, reset }) {
   const again = retry ?? reset;
   // Not reaching the server says so, not "something went wrong".
   const network = isNetworkError(error);
+  // A page from before a new deployment (Nov 2026): loaded again, once, by itself.
+  const stale = isStaleDeploy(error);
+  const [updating, setUpdating] = useState(false);
+  useEffect(() => {
+    if (stale) setUpdating(reloadForUpdate());
+  }, [stale]);
 
   useEffect(() => {
     console.error(error);
     // Told to the server (client_errors), so a failure on one person's screen can be read and fixed.
     // A failure to reach it is the error itself: nothing to tell.
-    if (network) return;
+    if (network || stale) return;
     try {
       fetch("/api/client-errors", {
         method: "POST",
@@ -50,6 +56,7 @@ export default function RouteError({ error, retry, reset }) {
   }, [error, network]);
 
   useEffect(() => {
+    if (stale) return;
     const now = Date.now();
     if (now - lastAutoRetry < RETRY_COOLDOWN_MS) return;
     lastAutoRetry = now;
@@ -60,7 +67,18 @@ export default function RouteError({ error, retry, reset }) {
       clearTimeout(start);
       clearTimeout(giveUp);
     };
-  }, [again]);
+  }, [again, stale]);
+
+  if (updating) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6" aria-live="polite" data-updating>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin text-primary" />
+          {UPDATED_NOTICE}
+        </div>
+      </div>
+    );
+  }
 
   if (retrying) {
     return (
@@ -89,7 +107,7 @@ export default function RouteError({ error, retry, reset }) {
               Reference: {error.digest}
             </p>
           ) : null}
-          <Button onClick={() => { setRetrying(true); again(); }} className="mt-5">
+          <Button onClick={() => { if (stale) { window.location.reload(); return; } setRetrying(true); again(); }} className="mt-5">
             <RotateCcw /> Try again
           </Button>
         </CardContent>

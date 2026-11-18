@@ -28,8 +28,14 @@ async function connect(url) {
   });
   let id = 0;
   const pending = new Map();
+  // The browser's own events (Fetch.requestPaused…), for a test that listens (on()).
+  const listeners = new Map();
   ws.onmessage = (m) => {
     const msg = JSON.parse(m.data);
+    if (!msg.id && msg.method) {
+      for (const fn of listeners.get(msg.method) ?? []) fn(msg.params);
+      return;
+    }
     if (!msg.id || !pending.has(msg.id)) return;
     const { resolve, reject } = pending.get(msg.id);
     pending.delete(msg.id);
@@ -43,6 +49,12 @@ async function connect(url) {
         pending.set(n, { resolve, reject });
         ws.send(JSON.stringify({ id: n, method, params }));
       }),
+    /** Listen for a browser event; returns a function that stops listening. */
+    on: (method, fn) => {
+      if (!listeners.has(method)) listeners.set(method, new Set());
+      listeners.get(method).add(fn);
+      return () => listeners.get(method)?.delete(fn);
+    },
     close: () => ws.close(),
   };
 }
@@ -62,6 +74,7 @@ async function openPage(browser, port, browserContextId, { width = 1440, height 
 
   const page = {
     send: cdp.send,
+    on: cdp.on,
     /** Evaluate an expression in the page and return its value. */
     ev,
     /** Navigate to an app path (or full URL) and give the page time to settle. */
