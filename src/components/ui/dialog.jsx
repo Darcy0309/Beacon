@@ -102,6 +102,30 @@ const MOTION = {
 // Whether an event outside a dialog came from the phone's window, which floats over it.
 const onPhone = (e) => Boolean(e?.target?.closest?.("[data-phone-window]") || e?.detail?.originalEvent?.target?.closest?.("[data-phone-window]"));
 
+/**
+ * A dropdown's open list scrolls with the mouse wheel inside a dialog (Nov 2026: "Calls through the day",
+ * its list of people). Chrome draws a styled <select>'s list outside the page, so the dialog's scroll
+ * lock (Radix) found nothing there that scrolls and cancelled the wheel; the scrollbar still dragged.
+ * A wheel over an open list goes no further than the dialog, and the browser scrolls the list itself.
+ */
+const openList = (select) => {
+  try {
+    return select.matches(":open");
+  } catch {
+    return false; // no :open, no styled list: the system's own, which the lock never touches
+  }
+};
+const onListWheel = (e) => {
+  const select = e.target?.closest?.("select");
+  if (select && openList(select)) e.stopPropagation();
+};
+// A ref, so the listener is the browser's own and runs before the lock's (on the document).
+const passWheelToLists = (node) => {
+  if (!node) return undefined;
+  node.addEventListener("wheel", onListWheel, { passive: true });
+  return () => node.removeEventListener("wheel", onListWheel);
+};
+
 function DialogContent({ className, children, veil = 1, veilBlur = 3, side = false, ...props }) {
   const { open, setOpen } = useContext(DialogState);
   const reduced = useReducedMotion();
@@ -132,6 +156,7 @@ function DialogContent({ className, children, veil = 1, veilBlur = 3, side = fal
               onInteractOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onInteractOutside?.(e))}
               onFocusOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onFocusOutside?.(e))}>
               <motion.div
+                ref={passWheelToLists}
                 data-dialog-content
                 {...moves}
                 // A phone's sheet follows the handle down, and goes when let go far or fast enough.
