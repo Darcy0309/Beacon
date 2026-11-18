@@ -24,12 +24,9 @@ function workedBucket(iso, tz) {
   return "Over a week ago";
 }
 
-/** My Projects: what the signed-in person is assigned to (everything, for an administrator). Cached per request. */
-export const getWorkProjects = cache(async function getWorkProjects() {
-  const supabase = await createClient();
-  const [{ data, error }, tz] = await Promise.all([supabase.rpc("work_projects"), getBusinessTimeZone()]);
-  if (error) throw error;
-  return (data ?? []).map((p) => ({
+/** A work_projects() row as the pages use it. */
+function toWorkProject(p, tz) {
+  return {
     id: p.id,
     name: p.name,
     client: p.client ?? "—",
@@ -45,13 +42,32 @@ export const getWorkProjects = cache(async function getWorkProjects() {
     lastWorkedAt: p.last_worked,
     lastWorked: p.last_worked ? timeAgo(p.last_worked) : "Never",
     worked: workedBucket(p.last_worked, tz),
-  }));
+  };
+}
+
+/** My Projects: what the signed-in person is assigned to (everything, for an administrator). Cached per request. */
+export const getWorkProjects = cache(async function getWorkProjects() {
+  const supabase = await createClient();
+  const [{ data, error }, tz] = await Promise.all([supabase.rpc("work_projects"), getBusinessTimeZone()]);
+  if (error) throw error;
+  return (data ?? []).map((p) => toWorkProject(p, tz));
 });
 
-/** One project from My Projects, or null when it is not the caller's. */
-export async function getWorkProject(id) {
-  return (await getWorkProjects()).find((p) => p.id === Number(id)) ?? null;
-}
+/**
+ * One project from My Projects, or null when it is not the caller's. Only that one is worked out (Nov 2026:
+ * a lead sheet and a call list worked out every project of theirs to find it). Cached per request.
+ */
+export const getWorkProject = cache(async function getWorkProject(id) {
+  const projectId = Number(id);
+  if (!Number.isSafeInteger(projectId) || projectId <= 0) return null;
+  const supabase = await createClient();
+  const [{ data, error }, tz] = await Promise.all([supabase.rpc("work_projects", { p_project_id: projectId }), getBusinessTimeZone()]);
+  // Before the database has work_projects(p_project_id) (20270220100000_page_speed.sql): every project, as before.
+  if (error?.code === "PGRST202") return (await getWorkProjects()).find((p) => p.id === projectId) ?? null;
+  if (error) throw error;
+  const row = (data ?? []).find((p) => p.id === projectId);
+  return row ? toWorkProject(row, tz) : null;
+});
 
 /** One page of a rep's call list, in the order they should call it. */
 export async function getCallList(projectId, { page = 1, perPage = 50, q = "", rep = null, filtered = true } = {}) {
