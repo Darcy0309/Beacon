@@ -44,9 +44,10 @@ export default async function PayReport({ searchParams }) {
   const [me, rules, today] = await Promise.all([getCurrentUser(), getPayRules(), getBusinessToday()]);
   const admin = me?.role === "admin";
   const range = readPayPeriod(sp, today, rules.time);
-  const people = await getPayReport({ from: range.from, to: range.to });
   // An administrator opens anyone's days; everyone else always sees their own.
   const openId = admin ? idParam(sp?.user) : me?.id ?? null;
+  // One manager asked for alone: only their pay worked out (a year of everyone's is the slow part).
+  const people = await getPayReport({ from: range.from, to: range.to, userId: admin && openId && sp?.only === "1" ? openId : null });
   const open = people.find((p) => p.id === openId) ?? null;
   // Opened from Daily Production's Pay & Hours link (Sean, Nov 2026): that manager alone, list and totals.
   const only = Boolean(admin && open && sp?.only === "1");
