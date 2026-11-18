@@ -1,7 +1,7 @@
 /**
  * A recorded call's AI summary (client, Nov 2026), end to end in a real browser, with a stand-in for
  * Anthropic's API run by this test: "AI summary" under a transcribed call sends its transcript to
- * Claude (the model, structured output, fallbacks, each side named), shows the summary, keeps it (no
+ * Claude (the model, structured output, each side named), shows the summary, keeps it (no
  * second request when opened again), writes it afresh on "Again", says plainly when the AI fails, and
  * is only for whoever may play the recording.
  *
@@ -30,7 +30,7 @@ const stand = createServer(async (req, res) => {
   asked.push({ body: JSON.parse(raw), key: req.headers["x-api-key"] ?? String(req.headers.authorization ?? "").replace(/^Bearer /, ""), beta: req.headers["anthropic-beta"] ?? "" });
   if (typeof next === "number") return json(next, { type: "error", error: { type: "invalid_request_error", message: "stand-in says no" } });
   json(200, {
-    id: `msg_${hex(24)}`, type: "message", role: "assistant", model: "claude-opus-5-5",
+    id: `msg_${hex(24)}`, type: "message", role: "assistant", model: "claude-haiku-5-5",
     content: [{ type: "text", text: JSON.stringify(next) }],
     stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 120, output_tokens: 60 },
   });
@@ -71,13 +71,13 @@ try {
   check("the summary shown: overview, points, next step", /renews in March/.test(shown ?? "") && /With Progressive now/.test(shown ?? "") && /Next step:\s*Meeting Friday at 10 AM/.test(shown ?? ""), shown);
   const first = asked[0];
   check("Claude asked once, with the server's key", asked.length === 1 && first.key === "sk-ant-test", `${asked.length} ${first?.key}`);
-  check("…Opus 5.5, low effort, answer as JSON to the schema", first.body.model === "claude-opus-5-5" && first.body.output_config?.effort === "low" && first.body.output_config?.format?.type === "json_schema"
+  check("…Haiku 5.5, low effort, answer as JSON to the schema", first.body.model === "claude-haiku-5-5" && first.body.output_config?.effort === "low" && first.body.output_config?.format?.type === "json_schema"
     && first.body.output_config.format.schema.required.join() === "overview,points,next_step", JSON.stringify(first.body.output_config));
-  check("…with the fallback on", first.body.fallbacks === "default" && first.beta.includes("server-side-fallback-2026-07-01"), `${first.body.fallbacks} ${first.beta}`);
+  check("…on the plain Messages API (Haiku has no server-side fallback)", first.body.fallbacks === undefined && !first.beta.includes("server-side-fallback"), `${first.body.fallbacks} ${first.beta}`);
   const said = first.body.messages?.[0]?.content ?? "";
   check("…the transcript, each side named", /0:00 Sean Fitzgerald \(our caller\): Hi, this is Sean/.test(said) && /0:07 Marco Ruiz \(prospect\): March\./.test(said), said);
   const row = kept();
-  check("kept with the recording", row?.summary?.next_step === "Meeting Friday at 10 AM" && row.summary_model === "claude-opus-5-5" && row.at, JSON.stringify(row));
+  check("kept with the recording", row?.summary?.next_step === "Meeting Friday at 10 AM" && row.summary_model === "claude-haiku-5-5" && row.at, JSON.stringify(row));
   if (SHOTS) await sean.screenshot(`${SHOTS}/call-summary.png`);
 
   section("Kept: not written twice");

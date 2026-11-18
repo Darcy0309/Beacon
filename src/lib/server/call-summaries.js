@@ -10,7 +10,8 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { SUMMARY_SCHEMA, readSummary, transcriptText } from "@/lib/call-summary";
 
-export const SUMMARY_MODEL = "claude-opus-5-5";
+// Haiku: about 40x cheaper than Opus a summary (client's choice, Nov 2026), plenty for a call recap.
+export const SUMMARY_MODEL = "claude-haiku-5-5";
 
 const SYSTEM = `You summarize recorded sales calls for Lighthouse, a CRM used by an insurance marketing team that calls businesses to set appointments and learn when their commercial insurance renews (the "X-date").
 
@@ -35,12 +36,9 @@ export async function summarizeCall(lines, { ours, theirs } = {}) {
 
   let response;
   try {
-    response = await anthropic().beta.messages.create({
+    response = await anthropic().messages.create({
       model: SUMMARY_MODEL,
       max_tokens: 8000,
-      // If the model declines, the API answers with its fallback model in the same call.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
       output_config: { effort: "low", format: { type: "json_schema", schema: SUMMARY_SCHEMA } },
       system: SYSTEM,
       messages: [{ role: "user", content: `<transcript>\n${text}\n</transcript>\n\nSummarize this call.` }],
