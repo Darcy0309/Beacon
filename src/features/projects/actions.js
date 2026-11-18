@@ -205,3 +205,26 @@ async function saveFunding(supabase, projectId, formData) {
   });
   return error ? error.message : null;
 }
+
+/**
+ * "Use a project's details" on the project form (Sean, Nov 2026: a lead project's details are most often
+ * its appointment project's, typed twice): what another project's form would hold, for this one to
+ * start from. Everything but its name and type; its Program Funding too, for whoever may see it. As the
+ * signed-in person reads it (Row Level Security decides whose).
+ */
+export async function projectTemplate(formData) {
+  const id = idFrom(formData, "project_id");
+  if (!id) return fail("Choose a project.");
+  const supabase = await createClient();
+  const { data: p, error } = await supabase.from("projects")
+    .select(`id, name, company_id, status_id, amount_paid, start_date, end_date, lead_goal, appt_goal, lead_goal_month, appt_goal_month,
+      projected_conversion, bill_lead_rate, bill_appointment_rate, description, email, delivery_link_only, appt_texts,
+      contact_name, contact_title, phone, address, city, state, zip, timezone_id, type:project_types(code)`)
+    .eq("id", id).is("deleted_at", null).maybeSingle();
+  if (error) return fail(error);
+  if (!p) return fail("That project isn't there any more.");
+  const { data: sees } = await supabase.rpc("sees_project_funding", { p_project: id });
+  const { data: plan } = sees === true ? await supabase.from("project_funding").select("*").eq("project_id", id).maybeSingle() : { data: null };
+  const { type, ...fields } = p;
+  return ok({ ...fields, type: (Array.isArray(type) ? type[0] : type)?.code ?? null, funding: plan ?? null });
+}

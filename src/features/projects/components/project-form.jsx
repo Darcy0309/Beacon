@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Building2, Plus, Pencil } from "lucide-react";
+import { Building2, Copy, Loader2, Plus, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +11,8 @@ import { Field, Select, formHelpers } from "@/components/ui/field";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { saveProject } from "@/features/projects/actions";
+import { projectTemplate, saveProject } from "@/features/projects/actions";
+import { reach } from "@/lib/reach";
 import DatePicker from "@/components/shared/date-picker";
 import { monthlyFromGoal, projectDays } from "@/lib/project-goals";
 import { useDialogOpen } from "@/components/shared/row-edit-context";
@@ -55,7 +56,13 @@ export default function ProjectForm({ project, options, trigger, funding = null,
         bill_appointment_rate: project.bill_appointment_rate ?? "",
       }
     : null;
-  const { fe, invalid, dv } = formHelpers(state, record);
+  // What the form starts from: the project (or nothing, for a new one), or another project's details
+  // picked under "Use a project's details" (Sean, Nov 2026). `filled` redraws the fields it fills.
+  const [base, setBase] = useState(record);
+  const [filled, setFilled] = useState(0);
+  const [fundingPlan, setFundingPlan] = useState(funding);
+  const formRef = useRef(null);
+  const { fe, invalid, dv } = formHelpers(state, base);
   // A DBDev project promotes its leads to one of the same client's Appt projects.
   const [companyId, setCompanyId] = useState(String(dv("company_id") ?? ""));
   const [typeId, setTypeId] = useState(String(dv("project_type_id") ?? ""));
@@ -101,11 +108,61 @@ export default function ProjectForm({ project, options, trigger, funding = null,
   const startOffice = () => Object.fromEntries(OFFICE.map((k) => [k, String(dv(k) ?? "")]));
   const [office, setOffice] = useState(startOffice);
   useEffect(() => {
-    if (open) setOffice(startOffice());
+    if (!open) return;
+    setBase(record);
+    setFundingPlan(funding);
+    setCompanyId(String(record?.company_id ?? ""));
+    setTypeId(String(record?.project_type_id ?? ""));
+    setGoals(Object.fromEntries(GOAL_KEYS.map((k) => [k, String(record?.[k] ?? "")])));
+    setTyped({ lead: false, appt: false });
+    setRates({ lead: String(record?.bill_lead_rate ?? ""), appt: String(record?.bill_appointment_rate ?? "") });
+    setFromId("");
+    setFilled((n) => n + 1);
+    setOffice(Object.fromEntries(OFFICE.map((k) => [k, String(record?.[k] ?? "")])));
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const clientOffice = clientOffices[companyId];
   const useClient = () => setOffice(Object.fromEntries(OFFICE.map((k) => [k, String(clientOffice?.[k] ?? "")])));
   const setO = (k) => (e) => setOffice((o) => ({ ...o, [k]: e.target.value }));
+
+  // "Use a project's details": everything but the name and type from the project picked (its client too,
+  // when none is chosen yet); a lead project picks the appointment project it was filled from to promote to.
+  const [fromId, setFromId] = useState("");
+  const [fetching, startFetching] = useTransition();
+  const others = projects.filter((p) => p.id !== project?.id)
+    .map((p) => ({ ...p, same: Boolean(companyId) && String(p.company_id ?? "") === companyId }))
+    .sort((a, b) => Number(b.same) - Number(a.same) || a.name.localeCompare(b.name));
+  const fillFrom = (id) => {
+    setFromId(id);
+    if (!id) return;
+    startFetching(async () => {
+      const f = new FormData();
+      f.set("project_id", id);
+      const result = await reach(() => projectTemplate(f));
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+      const t = result.data;
+      const now = formRef.current ? new FormData(formRef.current) : new FormData();
+      const name = String(now.get("name") ?? "");
+      const company = companyId || String(t.company_id ?? "");
+      const promotesTo = isDbdev && t.type === "APPT" && String(t.company_id ?? "") === company ? String(t.id) : String(now.get("appt_project_id") ?? "");
+      const str = (v) => (v == null ? "" : String(v));
+      setBase({
+        ...record, ...t, id: project?.id, name, company_id: company, project_type_id: typeId, appt_project_id: promotesTo,
+        status_id: str(t.status_id), amount_paid: str(t.amount_paid),
+      });
+      setCompanyId(company);
+      setGoals(Object.fromEntries(GOAL_KEYS.map((k) => [k, str(t[k])])));
+      setTyped({ lead: false, appt: false });
+      setRates({ lead: str(t.bill_lead_rate), appt: str(t.bill_appointment_rate) });
+      setOffice(Object.fromEntries(OFFICE.map((k) => [k, str(t[k])])));
+      setFundingPlan(t.funding);
+      setFilled((n) => n + 1);
+      const from = projects.find((p) => String(p.id) === id)?.name ?? "that project";
+      toast.success(`Filled in from ${from}`, { description: "Check it over and change what's different for this project." });
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -121,22 +178,22 @@ export default function ProjectForm({ project, options, trigger, funding = null,
           <DialogTitle>{isEdit ? `Edit ${project.name}` : "New project"}</DialogTitle>
         </DialogHeader>
 
-        <form action={formAction} noValidate className="flex flex-col gap-4">
+        <form ref={formRef} action={formAction} noValidate className="flex flex-col gap-4">
           {isEdit && <input type="hidden" name="id" value={project.id} />}
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div key={filled} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Project name" required error={fe("name")} className="sm:col-span-2">
               <Input name="name" defaultValue={dv("name")} maxLength={120} required aria-invalid={invalid("name")} autoFocus />
             </Field>
 
             <Field label="Client" error={fe("company_id")}>
-              <Select name="company_id" defaultValue={dv("company_id")} onChange={(e) => setCompanyId(e.target.value)} aria-invalid={invalid("company_id")}>
+              <Select name="company_id" value={companyId} onChange={(e) => setCompanyId(e.target.value)} aria-invalid={invalid("company_id")}>
                 <option value="">—</option>
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </Field>
             <Field label="Type" error={fe("project_type_id")}>
-              <Select name="project_type_id" defaultValue={dv("project_type_id")} onChange={(e) => setTypeId(e.target.value)} aria-invalid={invalid("project_type_id")}>
+              <Select name="project_type_id" value={typeId} onChange={(e) => setTypeId(e.target.value)} aria-invalid={invalid("project_type_id")}>
                 <option value="">—</option>
                 {projectTypes.map((t) => <option key={t.id} value={t.id}>{t.description}</option>)}
               </Select>
@@ -146,6 +203,28 @@ export default function ProjectForm({ project, options, trigger, funding = null,
                 {names ? `This project's ${names.toLocaleString()} name${names === 1 ? "" : "s"}` : "Its names"} move to the {newType?.description?.toLowerCase() ?? "new"} stage
                 and are called with its results. A result from the other list starts again at {newType?.code === "APPT" ? "Lead-No Contact" : "Viable-CallBack"}.
               </p>
+            ) : null}
+
+            {/* Another project's details to start from (Sean, Nov 2026): a lead project's are most often its appointment project's. */}
+            {others.length ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-xs sm:col-span-2" data-use-project>
+                <Copy className="size-3.5 shrink-0 text-primary" aria-hidden />
+                <span className="font-semibold text-primary">Use a project&apos;s details</span>
+                <Select value={fromId} onChange={(e) => fillFrom(e.target.value)} disabled={fetching} aria-label="Use a project's details"
+                  className="h-8 min-w-0 flex-1 text-xs" data-use-project-pick>
+                  <option value="">Pick a project to fill this in from…</option>
+                  {others.some((p) => p.same) ? (
+                    <optgroup label="This client">
+                      {others.filter((p) => p.same).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </optgroup>
+                  ) : null}
+                  <optgroup label={others.some((p) => p.same) ? "Other clients" : "Projects"}>
+                    {others.filter((p) => !p.same).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </optgroup>
+                </Select>
+                {fetching ? <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-hidden /> : null}
+                <span className="w-full text-muted-foreground">Fills in everything below but the name and type: the office, dates, goals, billing, Program Funding and delivery.</span>
+              </div>
             ) : null}
 
             {isDbdev ? (
@@ -253,7 +332,7 @@ export default function ProjectForm({ project, options, trigger, funding = null,
 
             {/* How the client pays for the program (client, Nov 2026): administrators, on a project's own page. */}
             {canFund ? (
-              <FundingFields plan={funding} rates={rates}
+              <FundingFields key={filled} plan={fundingPlan} rates={rates}
                 goals={{ leads: goals.lead_goal, appts: goals.appt_goal, leadsMonth: goals.lead_goal_month, start: goals.start_date }} />
             ) : null}
 
@@ -268,13 +347,13 @@ export default function ProjectForm({ project, options, trigger, funding = null,
             </Field>
             <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
               <input type="hidden" name="delivery_link_only" value="off" />
-              <input type="checkbox" name="delivery_link_only" value="on" defaultChecked={Boolean(record?.delivery_link_only)} className="mt-0.5 size-4 accent-[var(--primary)]" />
+              <input type="checkbox" name="delivery_link_only" value="on" defaultChecked={Boolean(base?.delivery_link_only)} className="mt-0.5 size-4 accent-[var(--primary)]" />
               <span>Send a link to the lead sheet instead of the sheet itself<span className="block text-xs text-muted-foreground">The link opens the sheet without signing in, for 90 days.</span></span>
             </label>
             {/* Appointment reminder texts (client, Nov 2026): off for clients who confirm their own. */}
             <label className="flex cursor-pointer items-start gap-2 text-sm sm:col-span-2">
               <input type="hidden" name="appt_texts" value="off" />
-              <input type="checkbox" name="appt_texts" value="on" defaultChecked={Boolean(record?.appt_texts)} className="mt-0.5 size-4 accent-[var(--primary)]" data-project-appt-texts />
+              <input type="checkbox" name="appt_texts" value="on" defaultChecked={Boolean(base?.appt_texts)} className="mt-0.5 size-4 accent-[var(--primary)]" data-project-appt-texts />
               <span>Text appointment reminders<span className="block text-xs text-muted-foreground">The prospect is texted a reminder the day before, as set in Settings › Appointment Reminder Texts. Leave it off for clients who confirm their own appointments.</span></span>
             </label>
           </div>

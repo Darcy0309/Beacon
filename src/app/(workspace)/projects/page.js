@@ -113,7 +113,8 @@ export default async function ProjectsPage({ searchParams }) {
           <SectionHeader
             label="All Projects"
             icon={FolderKanban}
-            action={client ? null : <ProjectForm options={options} />}
+            // Program Funding filled in as the project is made (Sean, Nov 2026), not only once it is saved.
+            action={client ? null : <ProjectForm options={options} canFund={me?.role === "admin"} />}
           />
           <FilterTable
             columns={["Project", "Client", "Type", "Leads", "To call", "Status", ...(client ? [] : ["Manager"]), { label: "Action", className: "text-right" }]}
