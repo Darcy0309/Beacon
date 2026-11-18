@@ -69,6 +69,16 @@ export const getWorkProject = cache(async function getWorkProject(id) {
   return row ? toWorkProject(row, tz) : null;
 });
 
+/** The projects the signed-in person is assigned to (project_assignments), as a set of ids. Cached per request. */
+export const getMyAssignedProjectIds = cache(async function getMyAssignedProjectIds() {
+  const me = await getCurrentUser();
+  if (!me?.id) return new Set();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("project_assignments").select("project_id").eq("ae_user_id", me.id);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.project_id));
+});
+
 /** One page of a rep's call list, in the order they should call it. */
 export async function getCallList(projectId, { page = 1, perPage = 50, q = "", rep = null, filtered = true } = {}) {
   const supabase = await createClient();

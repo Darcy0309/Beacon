@@ -188,8 +188,11 @@ try {
   await shot(client, "role-client-appointments");
 
   // --- Administrator: the whole picture ----------------------------------------------------------
+  // My Projects: the projects they are assigned to, as a manager's (Sean, Nov 2026: every project showed); every one is under Projects.
+  const ADMIN_ID = Number(sql("select id from public.users where email = 'admin@beacon.test'"));
+  sql(`insert into public.project_assignments (project_id, ae_user_id) values (${APPT}, ${ADMIN_ID})`);
   t = await open(admin, "/work");
-  check("admin: My Projects shows every project, with names left across all reps", t.includes(`${TAG} DBDev`) && t.includes(`${TAG} Appointments`) && /Left \(all reps\)/i.test(t));
+  check("admin: My Projects shows the projects they are assigned to, not every project", t.includes(`${TAG} Appointments`) && !t.includes(`${TAG} DBDev`) && /Names left/i.test(t) && !/Left \(all reps\)/i.test(t));
   t = await open(admin, `/work/${DBDV}?rep=${SEAN}`);
   check("admin: can open Sean's list, with call counts", /\bcalls\b/i.test(await admin.ev(`document.querySelector('thead')?.innerText ?? ''`)));
   t = await open(admin, "/qa");

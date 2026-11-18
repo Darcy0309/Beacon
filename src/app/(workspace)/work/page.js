@@ -7,7 +7,7 @@ import ToneBadge from "@/components/shared/tone-badge";
 import FilterTable from "@/components/shared/filter-table";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
-import { getWorkProjects, getFollowUps } from "@/features/work/queries";
+import { getWorkProjects, getFollowUps, getMyAssignedProjectIds } from "@/features/work/queries";
 import { getCurrentUser } from "@/lib/server/session";
 import ProjectInfoGlance from "@/features/project-info/components/project-info-glance";
 
@@ -18,19 +18,24 @@ const typeTone = { DBDV: "cyan", APPT: "violet" };
 /**
  * My Projects: where an account manager starts the day. Their projects, with
  * how many names they have left and when they last worked each one, filtered
- * by state, time zone, type or last worked; then into a call list.
+ * by state, time zone, type or last worked; then into a call list. An
+ * administrator's too are the projects they are assigned to (Sean, Nov 2026:
+ * every project showed, the new ones with no list or manager among them);
+ * every project is under Projects.
  */
 export default async function WorkPage() {
-  const [me, projects, followUps] = await Promise.all([getCurrentUser(), getWorkProjects(), getFollowUps()]);
+  const [me, everyOne, followUps, assigned] = await Promise.all([getCurrentUser(), getWorkProjects(), getFollowUps(), getMyAssignedProjectIds()]);
   const admin = me?.role === "admin";
-  const namesLeft = projects.reduce((s, p) => s + (admin ? p.namesLeftAll : p.namesLeft), 0);
+  // An administrator sees every project in work_projects(): here, only those they are assigned to, as a manager does.
+  const projects = admin ? everyOne.filter((p) => assigned.has(p.id)) : everyOne;
+  const namesLeft = projects.reduce((s, p) => s + p.namesLeft, 0);
   const workedToday = projects.filter((p) => p.worked === "Today").length;
 
   const tiles = [
-    { label: admin ? "Projects" : "My Projects", value: String(projects.length), note: admin ? "every project" : "assigned to you",
+    { label: "My Projects", value: String(projects.length), note: "assigned to you",
       icon: FolderKanban, accent: "var(--neon-cyan)", series: projects.map((p) => p.namesLeft) },
-    { label: "Names Left", value: namesLeft.toLocaleString(), note: admin ? "still to call, all reps" : "still to call on your lists",
-      icon: ListChecks, accent: "var(--neon-emerald)", series: projects.map((p) => (admin ? p.namesLeftAll : p.namesLeft)) },
+    { label: "Names Left", value: namesLeft.toLocaleString(), note: "still to call on your lists",
+      icon: ListChecks, accent: "var(--neon-emerald)", series: projects.map((p) => p.namesLeft) },
     { label: "To Confirm", value: String(followUps.length), note: "appointments you set",
       icon: CalendarCheck, accent: "var(--neon-amber)", series: followUps.map((_, i) => i + 1) },
     { label: "Worked Today", value: String(workedToday), note: `of ${projects.length} projects`,
@@ -45,7 +50,7 @@ export default async function WorkPage() {
 
   return (
     <>
-      <Topbar title="My Projects" sub={admin ? "Every project, and the lists being worked" : "Pick a project to start calling"} />
+      <Topbar title="My Projects" sub="Pick a project to start calling" />
       <div className="flex-1 space-y-4 p-4 sm:p-6">
         <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
           {tiles.map((t, i) => (
@@ -90,7 +95,7 @@ export default async function WorkPage() {
         <Card>
           <SectionHeader label="Projects" icon={FolderKanban} />
           <FilterTable
-            columns={["Project", "Client", "Type", "Time zone", "State", "Last worked", "Project Info", { label: admin ? "Left (all reps)" : "Names left", className: "text-right" }, { label: "", className: "text-right" }]}
+            columns={["Project", "Client", "Type", "Time zone", "State", "Last worked", "Project Info", { label: "Names left", className: "text-right" }, { label: "", className: "text-right" }]}
             filters={[
               { key: "state", label: "State" },
               { key: "timezone", label: "Time zone" },
@@ -98,7 +103,7 @@ export default async function WorkPage() {
               { key: "worked", label: "Last worked" },
             ]}
             placeholder="Search projects or clients…"
-            empty={admin ? "No projects yet." : "You are not assigned to any projects yet. An administrator assigns them."}
+            empty={admin ? "You aren't assigned to any projects. Every project is under Projects." : "You are not assigned to any projects yet. An administrator assigns them."}
             rows={ordered.map((p) => ({
               id: p.id,
               search: `${p.name} ${p.client}`,
@@ -117,7 +122,7 @@ export default async function WorkPage() {
                   {/* A quick look at what the client wants, before filtering the list (Sean, Oct 2026). */}
                   <TableCell><ProjectInfoGlance projectId={p.id} name={p.name} /></TableCell>
                   <TableCell className="text-right font-semibold tabular-nums">
-                    {(admin ? p.namesLeftAll : p.namesLeft).toLocaleString()}
+                    {p.namesLeft.toLocaleString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <Link
