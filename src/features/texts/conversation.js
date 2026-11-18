@@ -19,7 +19,7 @@ const NUMBERS = "id, phone, contact_name, contact_phone, contact_mobile, decisio
  * { items, numbers, ourNumber } for a lead its viewer can see, or null (not staff, or not theirs to see).
  * items: { key, kind: "call" | "text", dir: "out" | "in", at, ... }:
  *   a call: { seconds, answered, userId, by, them, from, to, recording: { sid, seconds, canPlay, transcript } | null }
- *     transcript (only for whoever may play it): { status: none|transcribing|done|failed, lines, error } | null (Nov 2026)
+ *     transcript (only for whoever may play it): { status: none|transcribing|done|failed, lines, error, summary } | null (Nov 2026)
  *   a text: { body, media, status, error, by, from, to }
  */
 export async function getLeadConversation(leadId) {
@@ -55,9 +55,14 @@ export async function getLeadConversation(leadId) {
     }
   }
   const recordedOn = calls.map((c) => c.recordedOn).filter(Boolean);
-  const { data: recordings } = recordedOn.length
-    ? await admin.from("phone_recordings").select("recording_sid, call_sid, user_id, seconds, created_at, transcript_status, transcript_error, transcript_updated_at, transcript_sid, transcript").in("call_sid", recordedOn).order("created_at")
-    : { data: [] };
+  const REC_COLS = "recording_sid, call_sid, user_id, seconds, created_at, transcript_status, transcript_error, transcript_updated_at, transcript_sid, transcript";
+  const readRecordings = (cols) => admin.from("phone_recordings").select(cols).in("call_sid", recordedOn).order("created_at");
+  let recordings = [];
+  if (recordedOn.length) {
+    // With its AI summary (Nov 2026); before that column's migration has run, without it.
+    const withSummary = await readRecordings(`${REC_COLS}, summary`);
+    recordings = withSummary.error ? (await readRecordings(REC_COLS)).data : withSummary.data;
+  }
 
   // Transcripts left waiting: looked at again once this is answered.
   const waiting = (recordings ?? []).filter((r) => r.transcript_status === "transcribing");
@@ -81,7 +86,7 @@ export async function getLeadConversation(leadId) {
         recording: rec ? {
           sid: rec.recording_sid, seconds: rec.seconds, canPlay,
           // Every one that can be played has its transcript, or a way to ask for it ("none": never sent).
-          transcript: canPlay ? { status: rec.transcript_status ?? "none", lines: rec.transcript ?? [], error: rec.transcript_error } : null,
+          transcript: canPlay ? { status: rec.transcript_status ?? "none", lines: rec.transcript ?? [], error: rec.transcript_error, summary: rec.summary ?? null } : null,
         } : null,
       };
     }),
