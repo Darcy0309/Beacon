@@ -147,3 +147,11 @@ export async function getClientsOverview({ leads, appts }, companies = null) {
     leads: shape(a.data), appts: shape((b ?? a).data),
   };
 }
+
+/** Whether `userId` is the Sales Rep of any client: their own clients and projects are where those lists start (Nov 2026). */
+export async function ownsClients(userId) {
+  if (!userId) return false;
+  const supabase = await createClient();
+  const { count } = await supabase.from("companies").select("id", { count: "exact", head: true }).eq("sales_rep_id", userId);
+  return (count ?? 0) > 0;
+}

@@ -78,6 +78,9 @@ export async function listProjects(params) {
             projectSelect({ company: Boolean(p.filters?.client || p.filters?.group || p.filters?.rep), type: Boolean(p.filters?.type), status: Boolean(p.filters?.status) }),
             { count: "exact" }
           )
+          // A to Z by client, then by project (Sean, Nov 2026); projects with no client last.
+          .order("company(name)", { ascending: true, nullsFirst: false })
+          .order("name")
           .order("id"),
         p,
         { search: ["name", "client_name"], alsoOr, columns: { status: "status.name", type: "type.code", client: "company.name", group: "company.agency_group_id",

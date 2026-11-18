@@ -179,7 +179,8 @@ try {
     && (await tile("leads")).startsWith(`Leads ${repLeads} `), { timeout: 8000 })), `${repActive} active, ${repLeads} leads: ${await tile("leads")}`);
   check("…the list still offers every rep", Number(await admin.ev(`document.querySelector('select[aria-label="Filter by Sales Rep"]').options.length`)) > 2);
   await admin.fill('select[aria-label="Filter by Sales Rep"]', "");
-  check("All again: every active client's", Boolean(await until(async () => /active clients/.test(await tile("leads")) && !new URL(await admin.ev("location.href")).searchParams.get("rep"))), await tile("leads"));
+  // All says so in the address (Nov 2026): without it the list starts on the signed-in Sales Rep's own clients.
+  check("All again: every active client's", Boolean(await until(async () => /active clients/.test(await tile("leads")) && new URL(await admin.ev("location.href")).searchParams.get("rep") === "all")), await tile("leads"));
 
   section("Agency Group in Production & Pay");
   // A call today on a project of each client.

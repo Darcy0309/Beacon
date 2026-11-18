@@ -52,6 +52,10 @@ import { useReportPending } from "@/components/layout/navigation-progress";
  * the rows as filtered just then, each row's `csv` cells under `header`.
  * `urlFacets` (client mode): facets also kept in the URL, for a page whose
  * other parts follow them; their starting values come in `selected`.
+ *
+ * `allValues` ({ key: "all" }): a facet whose page starts on a choice of its own (Nov 2026: the Clients
+ * and Projects pages start on the signed-in Sales Rep's own) says All in the URL when All is chosen, so
+ * the page shows everything rather than going back to where it started.
  */
 const CHIP_LIMIT = 6;
 // Between the values picked in a "multi" filter on a list filtered here (names may hold commas).
@@ -71,6 +75,7 @@ export default function FilterTable({
   searchable = true,
   exportCsv = null,
   urlFacets = [],
+  allValues = {},
 }) {
   const server = Boolean(paging);
   const router = useRouter();
@@ -108,6 +113,7 @@ export default function FilterTable({
     else params.delete("q");
     for (const f of filters) {
       if (nextPicked[f.key]) params.set(f.key, nextPicked[f.key]);
+      else if (allValues[f.key]) params.set(f.key, allValues[f.key]);
       else params.delete(f.key);
     }
     const qs = params.toString();
@@ -137,6 +143,7 @@ export default function FilterTable({
     const params = new URLSearchParams(searchParams.toString());
     for (const key of urlFacets) {
       if (next[key]) params.set(key, next[key]);
+      else if (allValues[key]) params.set(key, allValues[key]);
       else params.delete(key);
     }
     const qs = params.toString();
@@ -153,7 +160,7 @@ export default function FilterTable({
   const reset = () => {
     setQ("");
     setPicked({});
-    if (!server && urlFacets.some((key) => picked[key])) writeUrlFacets({});
+    if (!server && urlFacets.some((key) => picked[key] || allValues[key])) writeUrlFacets({});
     if (!server) return;
     clearTimeout(timer.current);
     navigate("", {});

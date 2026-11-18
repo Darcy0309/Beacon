@@ -13,6 +13,7 @@ import { clientSlug } from "@/lib/format";
 import { chartRange } from "@/lib/production-chart";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getAgencyGroups, getClients, getClientsOverview, getTimeZones } from "@/features/clients/queries";
+import { getCurrentUser } from "@/lib/server/session";
 import ClientForm from "@/features/clients/components/client-form";
 import { getSalesReps } from "@/features/users/queries";
 import TrendTile from "@/features/clients/components/trend-tile";
@@ -42,12 +43,14 @@ export default async function ClientsPage({ searchParams }) {
   // ?lr= and ?ar=: the range of the Leads chart and of the Appointments chart (a month to begin with).
   const range = (v) => chartRange(typeof v === "string" && v !== "custom" ? v : "1M", today);
   const ranges = { leads: range(sp?.lr), appts: range(sp?.ar) };
-  // ?rep=: the Sales Rep picked on the list below (Oct 2026); the tiles count that rep's clients.
-  const rep = typeof sp?.rep === "string" && sp.rep.trim() ? sp.rep.trim() : "";
-  const [all, groups, zones, everyone, reps] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(),
-    rep ? null : getClientsOverview(ranges), getSalesReps()]);
+  // ?rep=: the Sales Rep picked on the list below (Oct 2026); the tiles count that rep's clients. With none
+  // picked, a Sales Rep starts on their own clients (Sean, Nov 2026); ?rep=all is everyone's.
+  const asked = typeof sp?.rep === "string" ? sp.rep.trim() : "";
+  const [all, groups, zones, reps, me] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getSalesReps(), getCurrentUser()]);
+  const mine = asked ? null : all.find((c) => me?.id && c.salesRepId === me.id);
+  const rep = asked === "all" ? "" : asked || (mine?.salesRep ?? "");
   const clients = rep ? all.filter((c) => (c.salesRep ?? "Not set") === rep) : all;
-  const overview = everyone ?? await getClientsOverview(ranges, clients.map((c) => c.id));
+  const overview = await getClientsOverview(ranges, rep ? clients.map((c) => c.id) : undefined);
   const whose = rep ? (rep === "Not set" ? "clients with no Sales Rep" : `${rep}'s clients`) : "active clients";
 
   const active = clients.filter((c) => c.status === "Active");
@@ -107,7 +110,9 @@ export default async function ClientsPage({ searchParams }) {
             // The Sales Rep picked is in the URL too, so the tiles above follow it.
             selected={rep ? { rep } : undefined}
             urlFacets={["rep"]}
-            rows={all.map((c) => ({
+            // All picked says so in the URL: without it the list starts on the Sales Rep's own again.
+            allValues={{ rep: "all" }}
+            rows={[...all].sort((a, b) => a.name.localeCompare(b.name, "en", { sensitivity: "base" })).map((c) => ({
               id: c.id,
               search: [c.name, c.contact, c.city, c.state, c.zone, c.group, c.manager, c.salesRep, c.email, c.phone].filter((v) => v && v !== "—").join(" "),
               facets: { status: c.status, state: c.state ?? "", zone: c.zone ?? "", group: c.group ?? "", manager: c.manager, rep: c.salesRep ?? "Not set" },

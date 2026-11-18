@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
 import { listProjects, getFilteredClients, getProjectStats, getOfficeOptions, getSentNames } from "@/features/projects/queries";
-import { getClientGroups } from "@/features/clients/queries";
+import { getClientGroups, ownsClients } from "@/features/clients/queries";
 import { getLookups } from "@/lib/server/lookups";
 import { readListParams, pageInfo } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
@@ -26,7 +26,8 @@ const statusTone = { Active: "emerald", Paused: "amber", Draft: "slate", Complet
 export default async function ProjectsPage({ searchParams }) {
   // 100 to a page to begin with (Sean, Nov 2026): each client has a DB dev and an appointment project, so 10 showed only 5 clients.
   const params = readListParams(await searchParams, ["status", "type", "client", "group", "rep"], { defaultPer: 100 });
-  // ?rep=<user id>: the projects of the clients that Sales Rep owns (Sean, Oct 2026).
+  // ?rep=<user id>: the projects of the clients that Sales Rep owns (Sean, Oct 2026); ?rep=all, everyone's.
+  const allReps = params.filters.rep === "all";
   if (params.filters.rep && !/^[1-9]\d{0,17}$/.test(params.filters.rep)) delete params.filters.rep;
   // ?group=<insurance company id>: the projects of the clients in that agency group.
   if (params.filters.group && !/^[1-9]\d{0,17}$/.test(params.filters.group)) delete params.filters.group;
@@ -38,6 +39,9 @@ export default async function ProjectsPage({ searchParams }) {
     delete params.filters.client;
     delete params.filters.group;
     delete params.filters.rep;
+  } else if (!allReps && !params.filters.rep && await ownsClients(me?.id)) {
+    // A Sales Rep starts on their own clients' projects (Sean, Nov 2026); All is a pick away.
+    params.filters.rep = String(me.id);
   }
   // Administrators and account managers change a project's manager from the list (client, Nov 2026).
   const canManage = ["admin", "manager"].includes(me?.role);
@@ -124,6 +128,8 @@ export default async function ProjectsPage({ searchParams }) {
             empty="No projects yet."
             query={params.q}
             selected={params.filters}
+            // All picked says so in the URL: without it the list starts on the Sales Rep's own again.
+            allValues={client ? {} : { rep: "all" }}
             paging={pageInfo(total, params.page, params.perPage, params.defaultPer)}
             rows={rows.map((p) => ({
               id: p.id,
