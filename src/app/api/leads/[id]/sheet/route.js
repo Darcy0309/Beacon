@@ -22,6 +22,8 @@ export async function GET(request, { params }) {
   const { id } = await params;
   const me = await getCurrentUser();
   if (!me) return page(401, "<p>Sign in to print a lead.</p>");
+  // Administrators and the client's own people print leads; account managers and agents don't (Sean, Nov 2026).
+  if (!["admin", "client"].includes(me.role)) return page(403, "<p>Printing leads is turned off for your account.</p>");
   if (!/^[1-9]\d{0,17}$/.test(id)) return page(404, "<p>No such lead.</p>");
   const supabase = await createClient();
   // A read that fails says so in the tab it opened, not a bare error page (Oct 2026).

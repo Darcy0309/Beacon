@@ -276,6 +276,8 @@ export default async function LeadSheet({ params, searchParams }) {
   const origin = publicOrigin(await headers());
   const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates, conversation, specialPay] = rest;
   const client = me?.role === "client";
+  // Printing a lead: administrators and the client's own people, not account managers or agents (Sean, Nov 2026).
+  const canPrint = admin || client;
   // A client's Call Result: the lead's latest appointment, as their Appointments list has it.
   const latestAppt = leadAppts[0] ?? null;
   // Who a manager can send this lead to: anyone on the team but themselves.
@@ -389,6 +391,13 @@ export default async function LeadSheet({ params, searchParams }) {
 
   return (
     <>
+      {/* The browser's own Print (Ctrl+P) too: an account manager or agent prints a page that only says so. */}
+      {canPrint ? null : (
+        <style data-no-print>{`@media print {
+  body > * { display: none !important; }
+  body::after { content: "Printing leads is turned off for your account."; display: block; padding: 2rem; font: 14px Arial, sans-serif; color: #111; }
+}`}</style>
+      )}
       {/* The weather where the business is (Sean, Nov 2026), in the top bar beside it: a storm or a flood there
           makes a poor day to call. The lead's own ZIP (Nov 2026: it showed the project office's, another town),
           the project's only when the lead has none. Google's in a new tab; a forecast card as it is hovered. */}
@@ -461,10 +470,13 @@ export default async function LeadSheet({ params, searchParams }) {
               <span className="text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">Prospect Info</span>
               <span className="ml-auto flex items-center gap-0.5">
                 {staff ? <ProspectForm lead={r} trigger={<Button size="sm" variant="ghost" className="px-2" data-edit-prospect><Pencil /> Edit</Button>} /> : null}
-                {/* The lead as the client gets it, to print: not a picture of this screen. */}
-                <Button asChild size="sm" variant="ghost" className="px-2">
-                  <a href={`/api/leads/${lead.id}/sheet`} target="_blank" rel="noreferrer" data-print-sheet><Printer /> Print</a>
-                </Button>
+                {/* The lead as the client gets it, to print: not a picture of this screen. Not for account managers or
+                    agents (Sean, Nov 2026: "I don't want them to have the ability to print off leads"). */}
+                {canPrint ? (
+                  <Button asChild size="sm" variant="ghost" className="px-2">
+                    <a href={`/api/leads/${lead.id}/sheet`} target="_blank" rel="noreferrer" data-print-sheet><Printer /> Print</a>
+                  </Button>
+                ) : null}
               </span>
             </div>
 

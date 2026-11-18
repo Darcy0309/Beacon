@@ -41,6 +41,8 @@ writeFileSync(cargoFile, `Cargo\n${TAG} Lumber\n"${TAG} Steel, coiled"\n\n${TAG}
 
 const browser = await launchBrowser();
 const cookie = cookieHeader(await sessionCookies("sean@beacon.test"));
+// Printing a lead is an administrator's (or the client's), not an account manager's (Sean, Nov 2026).
+const adminCookie = cookieHeader(await sessionCookies("admin@beacon.test"));
 try {
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1500, height: 1000 });
   const shot = (name) => (SHOTS ? sean.screenshot(`${SHOTS}/${name}.png`) : null);
@@ -129,11 +131,13 @@ try {
   await shot("lead-page");
 
   section("Print");
-  const printed = await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie } });
+  const printed = await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie: adminCookie } });
   const html = await printed.text();
   check("Print gives the lead sheet the client gets, and opens the print dialog", printed.status === 200 && /Lead sheet/i.test(html) && html.includes(`${TAG} Medford Knife and Tool`)
     && html.includes("print()") && html.includes("20 (15 full-time, 5 part-time)") && html.includes("1234567") && html.includes("Claims last 3 yrs") && html.includes("8 drivers") && /XMOD[\s\S]{0,200}0\.85/.test(html), `${printed.status} ${html.slice(0, 120)}`);
   check("…not to someone signed out", (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { redirect: "manual" })).status !== 200);
+  const managerPrint = await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie } });
+  check("…nor to an account manager (Sean, Nov 2026)", managerPrint.status === 403 && /turned off/i.test(await managerPrint.text()), String(managerPrint.status));
 
   section("The middle tile, in the team's order (Nov 2026)");
   await sean.go(`/leads/${lead}`, 5000);
@@ -170,7 +174,7 @@ try {
   await sean.click(`${viewer} button`, "Close");
   check("…and closes back to the lead", Boolean(await until(() => sean.ev(`!document.querySelector('${viewer}')`))));
   check("the download button downloads it", (await sean.ev(`document.querySelector('[data-file="${fileId}"] [data-file-download]')?.getAttribute('href')`)) === `/api/files/${fileId}?download=1`);
-  const printedAgain = await (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie } })).text();
+  const printedAgain = await (await fetch(`${APP_URL}/api/leads/${lead}/sheet`, { headers: { cookie: adminCookie } })).text();
   const sheetFile = printedAgain.match(new RegExp(`https?://[^"]+/sheet/[^"]+/files/${fileId}`))?.[0];
   check("…and in the sheet the client gets, as a link", /Policy files/i.test(printedAgain) && Boolean(sheetFile));
   const fromSheet = sheetFile ? await fetch(sheetFile.replace(/^https?:\/\/[^/]+/, APP_URL), { redirect: "manual" }) : null;

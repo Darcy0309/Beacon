@@ -68,9 +68,16 @@ try {
     ["Contact", "2px", ["Contact Email", "Contact Phone", "Contact Mobile"]],
     ["Secondary contact", "2px", ["2nd Contact Email", "2nd Contact Phone", "2nd Contact Mobile"]],
   ]), JSON.stringify(boxes));
-  check("…with Edit and Print, and no Appointment button (appointments come from the call results)",
-    prospect.buttons.some((b) => /^edit$/i.test(b)) && prospect.buttons.some((b) => /^print$/i.test(b)) && !prospect.buttons.some((b) => /appointment/i.test(b)) && prospect.print === `/api/leads/${lead}/sheet`,
+  // No Print for an account manager (Sean, Nov 2026: "I don't want them to have the ability to print off leads").
+  check("…with Edit, no Print for an account manager, and no Appointment button (appointments come from the call results)",
+    prospect.buttons.some((b) => /^edit$/i.test(b)) && !prospect.buttons.some((b) => /^print$/i.test(b)) && !prospect.buttons.some((b) => /appointment/i.test(b)) && prospect.print === null,
     JSON.stringify(prospect.buttons));
+  // As the page is printed (Ctrl+P): the lead hidden, only the notice.
+  await sean.send("Emulation.setEmulatedMedia", { media: "print" });
+  const printedView = await sean.ev(`(() => ({ shown: [...document.body.children].filter((e) => getComputedStyle(e).display !== 'none').length,
+    note: getComputedStyle(document.body, '::after').content }))()`);
+  await sean.send("Emulation.setEmulatedMedia", { media: "" });
+  check("…and the browser's own Print prints only that it's turned off", printedView.shown === 0 && /Printing leads is turned off/.test(printedView.note), JSON.stringify(printedView));
   check("laid out as the client's example: the contact card on the left, tabs in the middle, results on the right",
     await sean.ev(`(() => { const card = document.querySelector('[data-contact-card]').getBoundingClientRect(), tabs = document.querySelector('[role=tablist]').getBoundingClientRect(),
       results = [...document.querySelectorAll('button[aria-pressed]')][0]?.getBoundingClientRect();
@@ -111,6 +118,9 @@ try {
   section("Searching and editing");
   // The Leads list is the administrator's; account managers work from their call lists.
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage();
+  await admin.go(`/leads/${lead}`, 5000);
+  check("an administrator has Print, its sheet's link, and their own browser Print", Boolean(await until(() => admin.ev(`document.querySelector('[data-prospect-info] [data-print-sheet]')?.getAttribute('href') === '/api/leads/${lead}/sheet'`), { timeout: 15000 }))
+    && !(await admin.ev(`!!document.querySelector('style[data-no-print]')`)));
   await admin.go(`/leads?q=${encodeURIComponent(MOBILE)}`, 4000);
   check("searching the contact's mobile finds the name", (await admin.text()).includes(`${TAG} AGSI Business`));
   await admin.go(`/leads?q=${encodeURIComponent(MOBILE.replace(/\D/g, ""))}`, 4000);
