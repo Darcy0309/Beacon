@@ -111,8 +111,11 @@ try {
     check("leads: “Drain, LLC” finds the company", leads.includes("Drain, LLC") && totalOf(leads) === 1, String(totalOf(leads)));
     const phone = await get(`/leads?q=${encodeURIComponent(`${PHONE_AREA}-851-8511`)}`);
     check("leads: a phone written with dashes", phone.includes("Drain, LLC"));
-    const projects = await get(`/projects?q=${encodeURIComponent(`${TAG} insurance group`)}`);
-    check("projects: found by the client's name", projects.includes(`${TAG} Plumbers Campaign`) && totalOf(projects) === 1, String(totalOf(projects)));
+    // Every Sales Rep's (the list starts on the admin's own clients, Nov 2026), searched where it is shown: the projects listed.
+    const projectsPage = await (await browser.newContext({ as: "admin@beacon.test" })).newPage();
+    await projectsPage.go(`/projects?rep=all&q=${encodeURIComponent(`${TAG} insurance group`)}`, 5000);
+    const listed = await until(() => projectsPage.ev("(() => { const l = [...document.querySelectorAll('[data-project-link]')].map((a) => a.textContent); return l.length ? l : null; })()"), { timeout: 15000 });
+    check("projects: found by the client's name", JSON.stringify(listed) === JSON.stringify([`${TAG} Plumbers Campaign`]), JSON.stringify(listed));
   }
 
   section("Users: the two-factor filter counts every account");

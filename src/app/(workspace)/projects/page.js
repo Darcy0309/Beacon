@@ -9,10 +9,10 @@ import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import FilterTable from "@/components/shared/filter-table";
-import { listProjects, getFilteredClients, getProjectStats, getOfficeOptions, getSentNames } from "@/features/projects/queries";
+import { listAllProjects, getFilteredClients, getProjectStats, getOfficeOptions, getSentNames } from "@/features/projects/queries";
 import { getClientGroups, ownsClients } from "@/features/clients/queries";
 import { getLookups } from "@/lib/server/lookups";
-import { readListParams, pageInfo } from "@/lib/paging";
+import { readListParams } from "@/lib/paging";
 import { deleteProject } from "@/features/projects/actions";
 import { getCurrentUser } from "@/lib/server/session";
 import { getAssignableStaff, getSalesReps } from "@/features/users/queries";
@@ -45,9 +45,10 @@ export default async function ProjectsPage({ searchParams }) {
   }
   // Administrators and account managers change a project's manager from the list (client, Nov 2026).
   const canManage = ["admin", "manager"].includes(me?.role);
-  const [{ rows, total }, stats, lookups, offices, clientGroups, reps, staff] = await Promise.all([
-    // The tiles follow the list's client filters (Oct 2026: a Sales Rep's clients, as on the Clients page).
-    listProjects(params), (client ? Promise.resolve(null) : getFilteredClients(params.filters)).then(getProjectStats), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(), client ? [] : getSalesReps(),
+  const [rows, stats, lookups, offices, clientGroups, reps, staff] = await Promise.all([
+    // Every project of the clients picked: Status, Type and the search filter it where it is shown (Nov 2026:
+    // changing Status reloaded the whole page). The tiles follow the client filters (Oct 2026).
+    listAllProjects(params.filters), (client ? Promise.resolve(null) : getFilteredClients(params.filters)).then(getProjectStats), getLookups(), client ? {} : getOfficeOptions(), client ? {} : getClientGroups(), client ? [] : getSalesReps(),
     canManage ? getAssignableStaff() : [],
   ]);
   // Who can manage a project: its account managers and administrators.
@@ -119,8 +120,8 @@ export default async function ProjectsPage({ searchParams }) {
           <FilterTable
             columns={["Project", "Client", "Type", "Leads", "To call", "Status", ...(client ? [] : ["Manager"]), { label: "Action", className: "text-right" }]}
             filters={[
-              { key: "status", label: "Status", options: options.projectStatuses.map((s) => ({ value: s.name, label: s.name })) },
-              { key: "type", label: "Type", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
+              { key: "status", label: "Status", kind: "chips", options: options.projectStatuses.map((s) => ({ value: s.name, label: s.name })) },
+              { key: "type", label: "Type", kind: "chips", options: options.projectTypes.map((t) => ({ value: t.code, label: t.code })) },
               ...(client ? [] : [{ key: "client", label: "Client", kind: "select", options: options.companies.map((c) => ({ value: c.name, label: c.name })) }]),
               ...(!client && groupOptions.length ? [{ key: "group", label: "Agency group", kind: "select", options: groupOptions }] : []),
               ...(client ? [] : [{ key: "rep", label: "Sales Rep", kind: "select", options: reps.map((r) => ({ value: String(r.id), label: r.name })) }]),
@@ -128,12 +129,16 @@ export default async function ProjectsPage({ searchParams }) {
             placeholder="Search projects…"
             empty="No projects yet."
             query={params.q}
+            // Status, Type and the search filter the list where it is; a Client, Agency group or Sales Rep goes to
+            // the address too, as the tiles above follow it.
             selected={params.filters}
+            urlFacets={client ? [] : ["client", "group", "rep"]}
             // All picked says so in the URL: without it the list starts on the Sales Rep's own again.
             allValues={client ? {} : { rep: "all" }}
-            paging={pageInfo(total, params.page, params.perPage, params.defaultPer)}
             rows={rows.map((p) => ({
               id: p.id,
+              search: [p.name, p.client, p.group, p.manager, p.salesRep].filter((v) => v && v !== "—").join(" "),
+              facets: { status: p.status, type: p.type, client: p.client, group: p.groupId ? String(p.groupId) : "", rep: p.salesRepId ? String(p.salesRepId) : "" },
               node: (
                 <TableRow>
                   <TableCell>

@@ -2,7 +2,7 @@
 
 import "server-only";
 import { colorFor, fullName, shortDate, shortName, timeAgo } from "@/lib/format";
-import { inner, one, paged, runPaged, searchWords } from "@/lib/server/query-helpers";
+import { inner, one, paged, readAll, runPaged, searchWords } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 
 const projectSelect = ({ company = false, type = false, status = false } = {}) => `
@@ -28,6 +28,7 @@ function toProjectView(p) {
     clientId: company?.id ?? null,
     // The carrier group its client belongs to, if any.
     group: one(company?.group)?.name ?? null,
+    groupId: one(company?.group)?.id ?? null,
     // Its client's Sales Rep (Sean, Oct 2026): the client's, for every project of it.
     salesRep: one(company?.sales_rep) ? shortName(one(company.sales_rep)) : null,
     salesRepId: company?.sales_rep_id ?? null,
@@ -90,6 +91,24 @@ export async function listProjects(params) {
     params
   );
   return { rows: rows.map(toProjectView), total };
+}
+
+/**
+ * Every project of the clients picked (Client, Agency group, Sales Rep), A to Z by client then name: the
+ * Projects page filters these by status, type and words where they are shown (Nov 2026: changing Status
+ * reloaded the whole page; now only the list changes). Read as the signed-in person.
+ */
+export async function listAllProjects(filters = {}) {
+  const supabase = await createClient();
+  const scoped = Boolean(filters.client || filters.group || filters.rep);
+  const rows = await readAll((from, to) => {
+    let q = supabase.from("projects").select(projectSelect({ company: scoped }));
+    if (filters.client) q = q.eq("company.name", filters.client);
+    if (filters.group) q = q.eq("company.agency_group_id", filters.group);
+    if (filters.rep) q = q.eq("company.sales_rep_id", filters.rep);
+    return q.order("company(name)", { ascending: true, nullsFirst: false }).order("name").order("id").range(from, to);
+  });
+  return rows.map(toProjectView);
 }
 
 /**
