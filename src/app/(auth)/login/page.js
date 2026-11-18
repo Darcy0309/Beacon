@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 
 const NOTICES = {
   link: "That sign-in link has expired or was already used. Ask an administrator for a new invitation.",
+  reset: "That password reset link has expired or was already used. Ask for a new one with Forgot your password? below.",
   disabled: "This account has been disabled. Contact an administrator.",
   idle: "You were signed out after {after} without activity, to keep your account safe. Sign in to carry on.",
 };

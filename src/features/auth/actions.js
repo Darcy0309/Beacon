@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { check, currentAppUser, fail, logActivity, ok, requestOrigin, s } from "@/lib/server/action-helpers";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { mailServer, sendMail } from "@/lib/server/mail";
+import { mailFailure, oneLine } from "@/lib/email";
 import { createClient } from "@/lib/supabase/server";
 import { cross, rules, safeInternalPath, schemas } from "@/lib/validate";
 import { birthdayOf } from "@/lib/team";
@@ -205,21 +207,70 @@ export async function disableTwoFactor() {
 // opened before a deploy, which a Server Action's id does not (Nov 2026).
 
 /**
- * "Forgot your password?": email a link that signs the person in and opens
- * My Security to set a new password. The answer is the same whether or not
- * the address has an account, so nobody can find out who has one. Supabase
- * Auth sends the email and limits how often.
+ * "Forgot your password?": email a link that signs the person in and opens My Security to set a new
+ * password. The answer is the same whether or not the address has an account, so nobody can find out who
+ * has one.
+ *
+ * The link is made here (Nov 2026: Sean's reset link went to the error page): Supabase's own reset email
+ * carried a code that only the browser that asked could finish, so a link opened on a phone, in another
+ * browser or by the email app's own failed. This one carries a one-time token that works in any browser,
+ * and opens /auth/reset, where a button (not the opening, which an email scanner may do) uses it. Sent from
+ * the company's address; at most three an address in fifteen minutes. Without a mail server or a From
+ * address set, Supabase sends its own, as before.
  */
 export async function requestPasswordReset(prevState, formData) {
   const email = s(formData, "email")?.toLowerCase() ?? "";
   if (!email || rules.email(email)) return fail("Enter the email you sign in with.", { email: "Enter the email you sign in with" }, { email });
-  const supabase = await createClient();
   const origin = await requestOrigin();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/security?reset=1")}`,
-  });
-  if (error?.status === 429) return fail("Too many requests. Wait a few minutes, then try again.", null, { email });
-  if (error) console.error("[auth] password reset", error.message);
+  const admin = createAdminClient();
+  const { data: settings } = admin ? await admin.from("app_settings").select("key, value").in("key", ["mail", "organization"]) : { data: null };
+  const setting = (k) => settings?.find((x) => x.key === k)?.value ?? {};
+  const from = setting("mail").from;
+
+  if (!admin || !mailServer() || !from) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/security?reset=1")}`,
+    });
+    if (error?.status === 429) return fail("Too many requests. Wait a few minutes, then try again.", null, { email });
+    if (error) console.error("[auth] password reset", error.message);
+    return ok({ email });
+  }
+
+  // Asked for too often (an account or not, the same): wait a while.
+  const since = new Date(Date.now() - 15 * 60_000).toISOString();
+  const { count } = await admin.from("activity_log").select("id", { count: "exact", head: true })
+    .eq("action", "password.reset_link").eq("detail", email).gte("created_at", since);
+  if ((count ?? 0) >= 3) return fail("Too many requests. Wait a few minutes, then try again.", null, { email });
+
+  const { data: link, error } = await admin.auth.admin.generateLink({ type: "recovery", email });
+  const token = link?.properties?.hashed_token;
+  const { data: person } = token ? await admin.from("users").select("id, first_name").eq("auth_id", link.user?.id ?? "").maybeSingle() : { data: null };
+  await admin.from("activity_log").insert({ action: "password.reset_link", entity: "user", entity_id: person?.id ?? null, user_id: person?.id ?? null, detail: email });
+  // No such account (or not one we could make a link for): said the same as one sent.
+  if (error || !token) {
+    if (error && !/not found|no user/i.test(error.message ?? "")) console.error("[auth] password reset link", error.message);
+    return ok({ email });
+  }
+
+  const org = setting("organization").name || "Signature Marketing";
+  const url = `${origin}/auth/reset?token_hash=${encodeURIComponent(token)}`;
+  const esc = (v) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const greeting = `Hi${person?.first_name ? ` ${oneLine(person.first_name)}` : ""},`;
+  const ask = "Someone asked to reset the password for your Lighthouse account. To choose a new one, open this link and press Set a new password:";
+  const after = "The link works once, for a limited time, in any browser. If you didn't ask for this, you can ignore this email: your password stays as it is.";
+  const text = `${greeting}\n\n${ask}\n\n${url}\n\n${after}\n\n${org}`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#111827;line-height:1.5">
+<p>${esc(greeting)}</p><p>${esc(ask)}</p>
+<p><a href="${esc(url)}" style="display:inline-block;background:#0891b2;color:#fff;text-decoration:none;padding:10px 16px;border-radius:6px">Reset your password</a></p>
+<p style="color:#374151;font-size:14px">${esc(after)}</p>
+<p style="color:#6b7280;font-size:13px">${esc(org)}</p></div>`;
+  try {
+    await sendMail({ from: { name: org, address: from }, to: email, subject: "Reset your Lighthouse password", text, html });
+  } catch (err) {
+    console.error("[auth] password reset email", mailFailure(err));
+    return fail(`The reset email couldn't be sent: ${mailFailure(err)}`, null, { email });
+  }
   return ok({ email });
 }
 

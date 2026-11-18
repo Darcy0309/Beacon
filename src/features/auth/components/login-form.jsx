@@ -109,8 +109,8 @@ function ForgotPassword({ onBack }) {
       </div>
       {state?.ok ? (
         <p role="status" className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-          If {state.data.email} has a Lighthouse account, a link to set a new password is on its way. It works once, for a short time;
-          open it in this browser.
+          If {state.data.email} has a Lighthouse account, a link to set a new password is on its way. It works once, for a short time,
+          on any device.
         </p>
       ) : (
         <div className="space-y-1.5">
