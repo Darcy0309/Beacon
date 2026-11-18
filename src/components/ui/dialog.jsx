@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, isValidElement, useCallback, useContext, useState, useSyncExternalStore } from "react";
+import { createContext, isValidElement, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion, useDragControls, useReducedMotion } from "motion/react";
 import { X } from "lucide-react";
@@ -126,12 +126,31 @@ const passWheelToLists = (node) => {
   return () => node.removeEventListener("wheel", onListWheel);
 };
 
+// Typing, not a slider or a switch moved (the Appearance window's still closes on a click outside).
+const typedInto = (el) => el?.tagName === "TEXTAREA" || el?.isContentEditable
+  || (el?.tagName === "INPUT" && !["range", "checkbox", "radio", "color", "button", "submit", "reset", "file"].includes(el.type));
+
 function DialogContent({ className, children, veil = 1, veilBlur = 3, side = false, ...props }) {
   const { open, setOpen } = useContext(DialogState);
   const reduced = useReducedMotion();
   const phone = usePhone();
   const drag = useDragControls();
   const moves = reduced ? MOTION.reduced : phone ? MOTION.phone : MOTION.desktop;
+
+  // A form being filled in stays open when the pointer slips outside it (Sean, Nov 2026: a New project
+  // sheet half filled in went with a stray click, to start over). It closes with its own buttons, the ×
+  // or Escape. One that only shows something (a chart, a file) still closes on a click outside.
+  const box = useRef(null);
+  const typed = useRef(false);
+  useEffect(() => {
+    if (open) typed.current = false;
+  }, [open]);
+  const contentRef = useCallback((node) => {
+    box.current = node;
+    return passWheelToLists(node);
+  }, []);
+  const holding = () => typed.current || Boolean(box.current?.querySelector('form:not([method="get" i])'));
+  const outside = (e, own) => (onPhone(e) || holding() ? e.preventDefault() : own?.(e));
 
   return (
     <AnimatePresence>
@@ -152,11 +171,12 @@ function DialogContent({ className, children, veil = 1, veilBlur = 3, side = fal
           <div className={cn("pointer-events-none fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4", side && "sm:justify-end sm:pr-6")}>
             <DialogPrimitive.Content forceMount asChild {...props}
               // The phone floats over a dialog (a call from an appointment's window): pressing it leaves the dialog open.
-              onPointerDownOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onPointerDownOutside?.(e))}
-              onInteractOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onInteractOutside?.(e))}
+              onPointerDownOutside={(e) => outside(e, props.onPointerDownOutside)}
+              onInteractOutside={(e) => outside(e, props.onInteractOutside)}
               onFocusOutside={(e) => (onPhone(e) ? e.preventDefault() : props.onFocusOutside?.(e))}>
               <motion.div
-                ref={passWheelToLists}
+                ref={contentRef}
+                onInputCapture={(e) => { if (typedInto(e.target)) typed.current = true; }}
                 data-dialog-content
                 {...moves}
                 // A phone's sheet follows the handle down, and goes when let go far or fast enough.
