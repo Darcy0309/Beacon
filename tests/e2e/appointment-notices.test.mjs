@@ -88,6 +88,48 @@ try {
   await admin.click('[role=tab][data-tab="deliveries"]');
   await admin.click("[data-resend-delivery]");
   check("“Send to client again” sends the latest: cancelled", Boolean(await until(() => sent().length === 3, { timeout: 15000 })) && sent()[2]?.headers.subject === `Appointment - ${COMPANY} (CANCELLED)`, sent()[2]?.headers.subject);
+
+  // Appointment-Rescheduled (Sean, Nov 2026): the invalid one set again on another day.
+  section("Rescheduled, after it was cancelled");
+  await sean.go(`/leads/${lead}`, 4000);
+  check("the invalid appointment still has its follow-up, marked so", Boolean(await until(() => sean.ev(`!!document.querySelector('[data-follow-up-invalid]')`))));
+  const followUps = (page) => page.ev(`[...document.querySelectorAll('[data-follow-up] button[aria-pressed]')].map((b) => b.textContent.trim())`);
+  const offered = await followUps(sean);
+  check("…offering only Appointment-Rescheduled", JSON.stringify(offered) === JSON.stringify(["Appointment-Rescheduled"]), JSON.stringify(offered));
+  await pick(sean, "Appointment-Rescheduled");
+  await until(() => sean.ev(`!!document.querySelector('[data-appt-fields="reschedule"] input[name="appt_date"]')`));
+  const rhint = await sean.ev(`document.querySelector('[data-client-note]').closest('div').parentElement.innerText`);
+  check("it asks for the new day and time, from where it was, the client told RESCHEDULED",
+    /Was set for/.test(await sean.ev(`document.querySelector('[data-current-appt]')?.textContent ?? ''`)) && /RESCHEDULED/.test(rhint ?? ""), rhint);
+  // Typed into the date box, as a person would (M/D/YY).
+  const [yy, mm, dd] = inDays(9).split("-");
+  await sean.fill('[data-appt-fields] input[aria-label="Appointment date"]', `${Number(mm)}/${Number(dd)}/${yy.slice(2)}`);
+  await sean.ev("document.activeElement?.blur()");
+  await sean.fill('[data-appt-fields] select[name="appt_time"]', "1:30 PM");
+  await sean.fill("[data-client-note]", "Moved: Dana is traveling that week");
+  await sean.click("button", "Save:");
+  check("the client is emailed again", Boolean(await until(() => sent().length === 4, { timeout: 15000 })),
+    await sean.ev(`[...document.querySelectorAll('[role=alert], [data-sonner-toast]')].map((e) => e.textContent).join(' | ')`));
+  const moved = sent()[3];
+  check("…as “Appointment - <company> (RESCHEDULED)”", moved?.headers.subject === `Appointment - ${COMPANY} (RESCHEDULED)`, moved?.headers.subject);
+  const mbody = moved ? plain(moved) : "";
+  check("…marked rescheduled, the new time to add to a calendar, and why",
+    mbody.includes("APPOINTMENT RESCHEDULED") && /1:30 PM \(RESCHEDULED\)/.test(mbody) && /Add to calendar/.test(mbody) && mbody.includes("Dana is traveling that week"), mbody.slice(0, 400));
+  check("…straight away: nothing waiting in QA", held() === 0, String(held()));
+  check("the appointment is on its new day, an appointment again, its pay back",
+    sql(`select appt_date::text || ' ' || appt_time || ' ' || (invalid_at is null) from public.appointments where lead_id = ${lead}`) === `${inDays(9)} 1:30 PM true`,
+    sql(`select appt_date::text || ' ' || appt_time || ' ' || (invalid_at is null) from public.appointments where lead_id = ${lead}`));
+  await sean.go(`/leads/${lead}`, 4000);
+  const now = await until(async () => {
+    const o = await followUps(sean);
+    return o?.includes("Appointment-Confirmed") ? o : null;
+  });
+  check("…to be confirmed again", JSON.stringify(now) === JSON.stringify(["Appointment-Confirmed", "Appointment-Rescheduled", "Appointment-Invalid"]), JSON.stringify(now));
+
+  section("Daily Production counts it against Sean");
+  await admin.go("/", 8000);
+  const count = await until(() => admin.ev(`document.querySelector('[data-production-row="${SEAN}"] [data-rescheduled]')?.textContent ?? null`), { timeout: 15000 });
+  check("a Rescheduled column, Sean's at 1 or more", Number(count) >= 1, count);
 } finally {
   browser.close();
   await mail.close();

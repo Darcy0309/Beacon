@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for lead delivery: a project's delivery addresses, and the lead sheet emailed. */
-import { deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet, sendsSheet } from "../../src/lib/delivery.js";
+import { APPOINTMENT_NOTICES, deliverySubject, leadSheetNotes, parseDeliveryAddresses, renderLeadLink, renderLeadSheet, sendsSheet } from "../../src/lib/delivery.js";
 import { schemas, validate } from "../../src/lib/validate.js";
 
 let failures = 0;
@@ -22,6 +22,9 @@ check("the subject reads “<result> - <company>”", deliverySubject("Lead-Hot 
 check("…news of an appointment: “Appointment - <company> (CONFIRMED)” or “(CANCELLED)”",
   deliverySubject("Appointment-Confirmed", "Delta Door and Components LLC", "CONFIRMED") === "Appointment - Delta Door and Components LLC (CONFIRMED)"
   && deliverySubject("Appointment-Invalid", "Delta Door", "CANCELLED") === "Appointment - Delta Door (CANCELLED)");
+check("…or “(RESCHEDULED)” (Sean, Nov 2026), by Appointment-Rescheduled, which sends the sheet",
+  APPOINTMENT_NOTICES.reschedule === "RESCHEDULED" && sendsSheet({ effect: "reschedule" })
+  && deliverySubject("Appointment-Rescheduled", "Delta Door", APPOINTMENT_NOTICES.reschedule) === "Appointment - Delta Door (RESCHEDULED)");
 check("a lead or an appointment sends the sheet, and so do confirmed and invalid; other results do not",
   sendsSheet({ delivers: true }) && sendsSheet({ effect: "confirm" }) && sendsSheet({ effect: "appointment_invalid" }) && !sendsSheet({ effect: "none" }) && !sendsSheet({ effect: "lead_invalid" }) && !sendsSheet(null));
 

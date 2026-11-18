@@ -209,15 +209,21 @@ export async function getManagerDashboard({ userId, today, ranges }) {
  */
 export async function getProduction({ from, to }) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("production_days", { p_from: from, p_to: to });
+  const [{ data, error }, moved] = await Promise.all([
+    supabase.rpc("production_days", { p_from: from, p_to: to }),
+    // Their appointments set again on another day (Appointment-Rescheduled, Sean, Nov 2026): the trend to watch.
+    supabase.rpc("rescheduled_appointments", { p_from: from, p_to: to }),
+  ]);
   if (error) throw error;
+  if (moved.error) console.error("[production] rescheduled not read", moved.error.message);
+  const rescheduled = new Map((moved.data ?? []).map((r) => [r.user_id, Number(r.rescheduled ?? 0)]));
   const people = new Map();
   for (const r of data ?? []) {
     let p = people.get(r.user_id);
     if (!p) {
       const first = toProduction(r);
       p = { userId: first.userId, name: first.name, role: first.role, calls: 0, leads: 0, appts: 0, workedMinutes: 0,
-        leadsGoal: null, apptsGoal: null, daysWorked: 0, starts: [], days: [] };
+        rescheduled: rescheduled.get(r.user_id) ?? 0, leadsGoal: null, apptsGoal: null, daysWorked: 0, starts: [], days: [] };
       people.set(r.user_id, p);
     }
     if (!r.day) continue;

@@ -8,7 +8,7 @@
 
 const SHEET = {
   APPT: [
-    "Appointment", "Appointment-Phone", "Appointment-Confirmed", "Appointment-Invalid",
+    "Appointment", "Appointment-Phone", "Appointment-Confirmed", "Appointment-Rescheduled", "Appointment-Invalid",
     "Lead-No Contact", "Lead-Viable", "Lead-Left Message", "Lead-Email", "Lead-ClientList", "Lead-Not Shopping", "Lead-Corrected",
     "Lead-Never Shops", "Lead-Removed", "Lead-Moved", "Lead-DoNotCall", "Lead-Out of Business", "Lead-Branch", "Lead-Duplicate", "Lead-Not Qualified",
     "Lead-CurrentClient", "Lead-Invalid", "Lead-Disco#",

@@ -33,8 +33,8 @@ export function deliverySettings(value) {
 /** Whether a kind ("lead" or "appointment") waits in QA rather than going straight to the client. */
 export const holds = (settings, kind) => (kind === "appointment" ? settings.appointments : settings.leads) === "hold";
 
-// News of an appointment already sent (call result effects): confirmed, or cancelled (marked invalid).
-const NEWS = new Set(["confirm", "appointment_invalid"]);
+// News of an appointment already sent (call result effects): confirmed, cancelled (marked invalid), or rescheduled.
+const NEWS = new Set(["confirm", "appointment_invalid", "reschedule"]);
 
 /**
  * Whether a call result's sheet waits in QA. News of an appointment the client already has (Confirmed,

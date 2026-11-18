@@ -202,6 +202,26 @@ export async function getOpenAppointment(leadId) {
   return data;
 }
 
+/**
+ * The name's latest appointment, one marked invalid too (never one that failed QA): what
+ * Appointment-Rescheduled sets again on another day (Sean, Nov 2026), as record_call_result() picks it.
+ */
+export async function getLatestAppointment(leadId) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("appointments")
+    .select("id, appt_date, appt_time, duration_min, rep_name, user_id, follow_up_user_id, set_stage, qa_status, confirmed_at, invalid_at")
+    .eq("lead_id", Number(leadId))
+    .is("deleted_at", null)
+    .or("qa_status.is.null,qa_status.neq.failed")
+    .order("appt_create_date", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 /** The people assigned to a project, for an administrator choosing whose list to look at. */
 export async function getProjectReps(projectId) {
   const supabase = await createClient();

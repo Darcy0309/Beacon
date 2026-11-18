@@ -43,8 +43,8 @@ export default function DailyProductionCard({ rows, view, switcher, nav, picker,
     const m = isDay ? minuteOfDay(r.starts[0], timeZone) : Math.round(r.starts.reduce((n, s) => n + minuteOfDay(s, timeZone), 0) / r.starts.length);
     return clockOf(m);
   };
-  const total = (key) => rows.reduce((n, r) => n + r[key], 0);
-  const cols = isDay ? 6 : 7;
+  const total = (key) => rows.reduce((n, r) => n + (r[key] ?? 0), 0);
+  const cols = isDay ? 7 : 8;
   return (
     <Card data-daily-production>
       <SectionHeader wrap label="Daily Production" icon={Gauge} action={switcher} />
@@ -61,6 +61,7 @@ export default function DailyProductionCard({ rows, view, switcher, nav, picker,
               <TableHead className="text-right">Calls</TableHead>
               <TableHead className="text-right">Leads</TableHead>
               <TableHead className="text-right">Appointments</TableHead>
+              <TableHead className="text-right" title="Their appointments set again on another day (Appointment-Rescheduled)">Rescheduled</TableHead>
               <TableHead className="text-right">Hours worked</TableHead>
             </TableRow>
           </TableHeader>
@@ -88,15 +89,17 @@ export default function DailyProductionCard({ rows, view, switcher, nav, picker,
                 <TableCell className="text-right tabular-nums">{r.calls}</TableCell>
                 <TableCell className="text-right"><AgainstGoal done={r.leads} goal={r.leadsGoal} /></TableCell>
                 <TableCell className="text-right"><AgainstGoal done={r.appts} goal={r.apptsGoal} /></TableCell>
+                <TableCell className={cn("text-right tabular-nums", !r.rescheduled && "text-muted-foreground")} data-rescheduled>{r.rescheduled ?? 0}</TableCell>
                 <TableCell className="text-right tabular-nums">{r.workedMinutes ? hoursLabel(r.workedMinutes) : <span className="text-muted-foreground">—</span>}</TableCell>
               </TableRow>
             ))}
             {rows.length ? (
               <TableRow className="font-semibold hover:bg-transparent">
-                <TableCell colSpan={cols - 4} className="text-xs uppercase tracking-[0.1em] text-muted-foreground">{isToday ? "Team today" : "Team"}</TableCell>
+                <TableCell colSpan={cols - 5} className="text-xs uppercase tracking-[0.1em] text-muted-foreground">{isToday ? "Team today" : "Team"}</TableCell>
                 <TableCell className="text-right tabular-nums">{total("calls")}</TableCell>
                 <TableCell className="text-right tabular-nums">{total("leads")}</TableCell>
                 <TableCell className="text-right tabular-nums">{total("appts")}</TableCell>
+                <TableCell className="text-right tabular-nums">{total("rescheduled")}</TableCell>
                 <TableCell className="text-right tabular-nums">{hoursLabel(total("workedMinutes"))}</TableCell>
               </TableRow>
             ) : (

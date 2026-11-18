@@ -12,6 +12,8 @@ import { formatPhone } from "./format.js";
  */
 export function producerTextKind({ effect, ownCall = false, moved = false }) {
   if (effect === "confirm") return "confirmed";
+  // Appointment-Rescheduled (Sean, Nov 2026): set again on another day.
+  if (effect === "reschedule") return "rescheduled";
   if (effect !== "appointment") return null;
   if (moved) return "rescheduled";
   return ownCall ? "new" : null;

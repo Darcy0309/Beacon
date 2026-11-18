@@ -59,10 +59,13 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
   const followUpResults = useMemo(() => {
     if (!followUp) return [];
     const type = followUp.setStage === "dbdev" ? "DBDV" : "APPT";
+    // One marked invalid can only be set again (Appointment-Rescheduled, Sean, Nov 2026).
     return results.filter((r) => r.applies_to === "appointment" && r.project_type === type
-      && (r.effect !== "confirm" || !followUp.confirmed));
+      && (followUp.invalid ? r.effect === "reschedule" : r.effect !== "confirm" || !followUp.confirmed));
   }, [results, followUp]);
   const picked = [...onSheet, ...followUpResults].find((r) => r.id === chosen) ?? null;
+  // The appointment the date fields start from: the one an Appointment moves, or the one Appointment-Rescheduled sets again.
+  const shownAppt = picked?.effect === "reschedule" ? followUp?.appt ?? null : currentAppt;
   // What each result does, in the client's words: shown over its button on a short hover.
   const descriptions = useMemo(() => Object.fromEntries(results.map((r) => [r.id, r.action])), [results]);
 
@@ -82,7 +85,9 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
         return;
       }
       const d = result.data;
-      const where = d.rescheduled
+      const where = picked?.effect === "reschedule"
+        ? " — moved to the new day, and the client told"
+        : d.rescheduled
         ? " — the appointment is moved, not booked twice"
         : d.promoted
           ? " — promoted to the appointment project"
@@ -137,9 +142,10 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
         {listId ? <input type="hidden" name="project_id" value={listId} /> : null}
 
         {followUpResults.length ? (
-          <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3">
+          <div className="rounded-lg border border-amber-400/40 bg-amber-400/5 p-3" data-follow-up>
             <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-amber-300">
               <CalendarCheck className="size-3.5" /> Appointment {followUp.when}
+              {followUp.invalid ? <span className="font-normal text-rose-400" data-follow-up-invalid>· marked invalid</span> : null}
               {followUp.qa === "pending" ? <span className="font-normal text-muted-foreground">· waiting for QA</span> : null}
             </div>
             <TipLayer tips={descriptions} delay={500} className="flex flex-wrap gap-1.5">{followUpResults.map(button)}</TipLayer>
@@ -172,34 +178,34 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
                 </Field>
               ) : null}
 
-              {picked.effect === "appointment" ? (
-                <div className="grid grid-cols-2 gap-3">
+              {picked.effect === "appointment" || picked.effect === "reschedule" ? (
+                <div className="grid grid-cols-2 gap-3" data-appt-fields={picked.effect}>
                   {/* An appointment already set is moved, not booked twice: it starts from where it stands. */}
-                  {currentAppt ? (
+                  {shownAppt ? (
                     <p data-current-appt className="col-span-2 rounded-md border border-amber-400/40 bg-amber-400/5 px-3 py-2 text-xs">
-                      <span className="font-semibold text-amber-300">Set for {currentAppt.when}.</span>{" "}
-                      <span className="text-muted-foreground">Change the date or time to move it.</span>
+                      <span className="font-semibold text-amber-300">{followUp?.invalid && picked.effect === "reschedule" ? "Was set for" : "Set for"} {shownAppt.when}.</span>{" "}
+                      <span className="text-muted-foreground">{picked.effect === "reschedule" ? "Choose the new date and time." : "Change the date or time to move it."}</span>
                     </p>
                   ) : null}
                   {/* Full width: the panel is narrow, and the date reads in words. Set from a call, so today or later. */}
                   <Field label="Date" required error={fe("appt_date")} className="col-span-2">
-                    <DatePicker name="appt_date" required defaultValue={dv("appt_date", currentAppt?.date ?? "")} invalid={invalid("appt_date")} aria-label="Appointment date"
+                    <DatePicker name="appt_date" required defaultValue={dv("appt_date", picked.effect === "reschedule" ? "" : currentAppt?.date ?? "")} invalid={invalid("appt_date")} aria-label="Appointment date"
                       min="today" presets={["today", "tomorrow", "nextMonday", "nextWeek"]} marks="appointments" calendarProject={calendarProjectId} future onChange={(date) => tellSlot({ date })} />
                   </Field>
                   <Field label="Time" required error={fe("appt_time")}>
-                    <Select name="appt_time" defaultValue={dv("appt_time", currentAppt?.time ?? "")} aria-invalid={invalid("appt_time")} onChange={(e) => tellSlot({ time: e.target.value })}>
+                    <Select name="appt_time" defaultValue={dv("appt_time", picked.effect === "reschedule" ? "" : currentAppt?.time ?? "")} aria-invalid={invalid("appt_time")} onChange={(e) => tellSlot({ time: e.target.value })}>
                       <option value="">Choose a time</option>
                       {APPOINTMENT_TIMES.map((t) => <option key={t} value={t}>{t}</option>)}
                     </Select>
                   </Field>
                   <Field label="Duration" error={fe("duration_min")}>
-                    <Select name="duration_min" defaultValue={String(dv("duration_min", String(currentAppt?.duration ?? 30)))} aria-invalid={invalid("duration_min")} onChange={(e) => tellSlot({ duration: Number(e.target.value) })}>
+                    <Select name="duration_min" defaultValue={String(dv("duration_min", String(shownAppt?.duration ?? 30)))} aria-invalid={invalid("duration_min")} onChange={(e) => tellSlot({ duration: Number(e.target.value) })}>
                       {DURATIONS.map((d) => <option key={d} value={d}>{d} minutes</option>)}
                     </Select>
                   </Field>
-                  <SlotWarning projectId={calendarProjectId} control={slotControl} initial={currentAppt} exceptId={currentAppt?.id ?? null} className="col-span-2" />
+                  <SlotWarning projectId={calendarProjectId} control={slotControl} initial={picked.effect === "reschedule" ? null : currentAppt} exceptId={shownAppt?.id ?? null} className="col-span-2" />
                   <Field label="Meeting with" hint="The client's producer" error={fe("rep_name")}>
-                    <Input name="rep_name" maxLength={80} defaultValue={dv("rep_name", currentAppt?.repName ?? "")} aria-invalid={invalid("rep_name")} />
+                    <Input name="rep_name" maxLength={80} defaultValue={dv("rep_name", shownAppt?.repName ?? "")} aria-invalid={invalid("rep_name")} />
                   </Field>
                 </div>
               ) : null}
@@ -232,12 +238,10 @@ export default function CallResultPanel({ leadId, listId, projectType, results, 
             {sendsSheet(picked) ? (
               <Field label="Client notes" error={fe("client_note")}
                 hint={picked.effect === "appointment_invalid" ? "The client is emailed the lead sheet, marked CANCELLED, with these: say why. Earlier notes stay, a trail of what took place."
+                  : picked.effect === "reschedule" ? "The client is emailed the lead sheet, marked RESCHEDULED, with the new day and these: say why it moved. Earlier notes stay."
                   : picked.effect === "confirm" ? "The client is emailed the lead sheet, marked CONFIRMED, with these: add anything they need to know. Earlier notes stay."
                   : "The client sees these, with the lead sheet. Add to them: earlier ones stay, a trail of what took place."}>
-                <StampedTextarea dictation name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")}
-                  placeholder={picked.effect === "appointment_invalid" ? "e.g. Cancelled: the owner is out of town until next month"
-                    : picked.effect === "confirm" ? "e.g. Confirmed with Daniel; bring the current dec pages"
-                    : "e.g. Appt set with Daniel and Henry, both owners – Fri 10/9 @ 10am"} data-client-note />
+                <StampedTextarea dictation name="client_note" rows={4} maxLength={2000} defaultValue={dv("client_note", clientNote ?? "")} aria-invalid={invalid("client_note")} data-client-note />
               </Field>
             ) : null}
 

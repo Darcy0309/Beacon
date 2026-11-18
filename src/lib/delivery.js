@@ -35,10 +35,11 @@ export function parseDeliveryAddresses(text, linkOnly = false) {
 
 /**
  * What a follow-up on an appointment tells the client, in the subject and on
- * the sheet (Sean, Oct 2026): confirmed, or cancelled (marked invalid). By
- * the call result's effect.
+ * the sheet (Sean, Oct 2026): confirmed, cancelled (marked invalid), or
+ * rescheduled (Nov 2026: set again on another day). By the call result's effect.
  */
-export const APPOINTMENT_NOTICES = { confirm: "CONFIRMED", appointment_invalid: "CANCELLED" };
+export const APPOINTMENT_NOTICES = { confirm: "CONFIRMED", appointment_invalid: "CANCELLED", reschedule: "RESCHEDULED" };
+const NOTICE_COLOR = { CANCELLED: "#b91c1c", RESCHEDULED: "#b45309" };
 
 /** Whether a call result ({ delivers, effect }) emails the client the lead sheet: a lead or an appointment, or news of one. */
 export const sendsSheet = (result) => Boolean(result?.delivers || APPOINTMENT_NOTICES[result?.effect]);
@@ -153,7 +154,7 @@ export function renderLeadSheet(s) {
 ${logoHtml(s.logo)}<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;">Lead sheet</div>
 <div style="font-size:20px;font-weight:bold;margin-top:4px;">${esc(s.company)}</div>
 <div style="font-size:14px;color:#0e7490;margin-top:2px;">${esc(s.result)}</div>
-${s.notice ? `<div data-notice style="display:inline-block;margin-top:10px;padding:4px 10px;border-radius:4px;font-size:13px;font-weight:bold;letter-spacing:.08em;color:#ffffff;background:${s.notice === "CANCELLED" ? "#b91c1c" : "#047857"};">APPOINTMENT ${esc(s.notice)}</div>` : ""}
+${s.notice ? `<div data-notice style="display:inline-block;margin-top:10px;padding:4px 10px;border-radius:4px;font-size:13px;font-weight:bold;letter-spacing:.08em;color:#ffffff;background:${NOTICE_COLOR[s.notice] ?? "#047857"};">APPOINTMENT ${esc(s.notice)}</div>` : ""}
 </td></tr>
 ${shown.map(([title, pairs]) => `<tr><td style="padding:14px 10px 4px;">
 <div style="font-size:11px;font-weight:bold;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;padding:0 10px 6px;">${esc(title)}</div>

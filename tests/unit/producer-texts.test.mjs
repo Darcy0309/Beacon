@@ -23,6 +23,7 @@ assert.equal(producerTextKind({ effect: "appointment", ownCall: true }), "new");
 assert.equal(producerTextKind({ effect: "appointment", ownCall: false, moved: true }), "rescheduled");
 assert.equal(producerTextKind({ effect: "appointment", ownCall: false }), null, "set again, unchanged: nothing");
 assert.equal(producerTextKind({ effect: "confirm" }), "confirmed");
+assert.equal(producerTextKind({ effect: "reschedule" }), "rescheduled", "Appointment-Rescheduled (Sean, Nov 2026)");
 assert.equal(producerTextKind({ effect: "appointment_invalid" }), null);
 assert.equal(producerTextKind({ effect: null }), null, "a lead: email only");
 

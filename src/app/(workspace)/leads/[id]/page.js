@@ -35,7 +35,7 @@ import { getEmailSender } from "@/features/email/queries";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getLead, getLeadActivity } from "@/features/leads/queries";
-import { getCallResults, getNextOnList, getOpenAppointment, getWorkProject } from "@/features/work/queries";
+import { getCallResults, getLatestAppointment, getNextOnList, getOpenAppointment, getWorkProject } from "@/features/work/queries";
 import { getCurrentUser } from "@/lib/server/session";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { addMonths, daysBetween, monthGrid, monthStart, todayIn } from "@/lib/dates";
@@ -260,8 +260,8 @@ export default async function LeadSheet({ params, searchParams }) {
       staff ? getLeadSpecialPay(lead.id, me) : [],
     ]);
   });
-  const [lead, activity, me, results, openAppt, today, tz, rest] = await Promise.all([
-    leadP, getLeadActivity(id), meP, getCallResults(), getOpenAppointment(id), todayP, getBusinessTimeZone(), restP,
+  const [lead, activity, me, results, openAppt, latestAnyAppt, today, tz, rest] = await Promise.all([
+    leadP, getLeadActivity(id), meP, getCallResults(), getOpenAppointment(id), getLatestAppointment(id), todayP, getBusinessTimeZone(), restP,
   ]);
   if (!lead) notFound();
 
@@ -281,14 +281,27 @@ export default async function LeadSheet({ params, searchParams }) {
   // Who a manager can send this lead to: anyone on the team but themselves.
   const people = staffList.filter((p) => p.id !== me?.id);
 
-  // The confirmation follow-up belongs to whoever set the appointment, or was handed it (Oct 2026).
-  const followUp = openAppt && (admin || (openAppt.follow_up_user_id ?? openAppt.user_id) === me?.id)
+  // The confirmation follow-up belongs to whoever set the appointment, or was handed it (Oct 2026). Its latest
+  // appointment marked invalid has one too (Sean, Nov 2026): Appointment-Rescheduled, to set it again.
+  const invalidAppt = latestAnyAppt?.invalid_at ? latestAnyAppt : null;
+  const followAppt = invalidAppt ?? openAppt;
+  const followUp = followAppt && (admin || (followAppt.follow_up_user_id ?? followAppt.user_id) === me?.id)
     ? {
-        id: openAppt.id,
-        setStage: openAppt.set_stage ?? r.stage,
-        confirmed: Boolean(openAppt.confirmed_at),
-        qa: openAppt.qa_status,
-        when: apptWhen(openAppt.appt_date, openAppt.appt_time),
+        id: followAppt.id,
+        setStage: followAppt.set_stage ?? r.stage,
+        confirmed: Boolean(followAppt.confirmed_at),
+        invalid: Boolean(invalidAppt),
+        qa: followAppt.qa_status,
+        when: apptWhen(followAppt.appt_date, followAppt.appt_time),
+        // Where Appointment-Rescheduled starts from.
+        appt: {
+          id: followAppt.id,
+          date: String(followAppt.appt_date).slice(0, 10),
+          time: followAppt.appt_time ?? "",
+          duration: followAppt.duration_min ?? 30,
+          repName: followAppt.rep_name ?? "",
+          when: apptWhen(followAppt.appt_date, followAppt.appt_time),
+        },
       }
     : null;
 

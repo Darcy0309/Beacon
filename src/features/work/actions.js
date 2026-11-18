@@ -33,6 +33,11 @@ const NEEDS = {
     ["appt_date", "the appointment date", "Choose the date"],
     ["appt_time", "the appointment time", "Choose the time"],
   ],
+  // Appointment-Rescheduled (Sean, Nov 2026): the new day and time.
+  reschedule: [
+    ["appt_date", "the new appointment date", "Choose the new date"],
+    ["appt_time", "the new appointment time", "Choose the new time"],
+  ],
 };
 
 const listed = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`);
