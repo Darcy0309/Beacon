@@ -32,6 +32,10 @@ const L = Number(sql(`insert into public.leads (company_name, project_id, stage)
 sql(`update public.users set bio = ${lit(`${TAG} Ten years on the phones`)}, birthday = make_date(2000, extract(month from '${today}'::date)::int, extract(day from '${today}'::date)::int) where id = ${AGENT}`);
 sql(`insert into public.pay_events (user_id, project_id, lead_id, kind, amount) values (${AGENT}, ${P}, ${L}, 'lead', 0), (${AGENT}, ${P}, ${L}, 'appointment', 0)`);
 sql(`insert into public.call_records (user_id, project_id, lead_id, call_date, notes) values (${AGENT}, ${P}, ${L}, now() - interval '2 minutes', ${lit(TAG)})`);
+// Sean's week on another client's project (Nov 2026): more appointments, none of them for this client.
+const OTHER_CO = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Other Client`)}) returning id`));
+const OTHER_P = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Other`)}, ${OTHER_CO}, ${typeId("APPT")}, 1) returning id`));
+sql(`insert into public.pay_events (user_id, project_id, kind, amount) values (${SEAN}, ${OTHER_P}, 'appointment', 0), (${SEAN}, ${OTHER_P}, 'appointment', 0), (${SEAN}, ${OTHER_P}, 'appointment', 0)`);
 
 const browser = await launchBrowser();
 const when = (page, expr, timeout = 20000) => until(() => page.ev(expr), { timeout });
@@ -53,7 +57,10 @@ try {
   check("only their team: the agent on their project and Mike, their Sales Rep", JSON.stringify([...new Set(shown)].sort()) === JSON.stringify([AGENT, MIKE].sort()), JSON.stringify(shown));
   check("…not Sean (not on their projects) nor the administrator, and no \"rest of the team\"", !shown.includes(SEAN) && !shown.includes(ADMIN) && !(await client.ev("!!document.querySelector('[data-team-group=rest]')")));
   check("…Mike says Sales Rep", /Sales Rep/.test(await card(client, MIKE)), await card(client, MIKE));
-  check("no spotlight for a client: it names the team's top people", !(await client.ev("!!document.querySelector('[data-team-spotlight]')")));
+  // The Spotlight on their own projects (Sean, Nov 2026): not a manager's week across every client.
+  const spot = await client.ev("Object.fromEntries([...document.querySelectorAll('[data-spotlight]')].map((e) => [e.dataset.spotlight, e.innerText.replace(/\\s+/g, ' ')]))");
+  check("the week's spotlight, on their projects: their agent's appointments, not Sean's three for another client",
+    /Tyler|Nguyen/.test(spot?.appointments ?? "") && /1 this week/.test(spot?.appointments ?? "") && !/Sean/.test(JSON.stringify(spot)), JSON.stringify(spot));
   check("a message only to those who work their projects", Boolean(await client.ev(`!!document.querySelector('[data-message-button="${AGENT}"]')`))
     && (await client.ev("[...document.querySelectorAll('[data-team-group=rest] [data-message-button]')].length")) === 0);
 
@@ -135,6 +142,9 @@ try {
   sql(`delete from public.app_settings where key = 'team'`);
   sql(`delete from public.call_records where notes = ${lit(TAG)}`);
   sql(`delete from public.pay_events where lead_id = ${L}`);
+  sql(`delete from public.pay_events where project_id = ${OTHER_P}`);
+  sql(`delete from public.projects where id = ${OTHER_P}`);
+  sql(`delete from public.companies where id = ${OTHER_CO}`);
   sql(`delete from public.leads where id = ${L}`);
   sql(`delete from public.project_assignments where project_id = ${P}`);
   sql(`delete from public.notifications where user_id = ${MIKE} and body like ${lit(`${TAG}%`)}`);
