@@ -108,8 +108,21 @@ try {
   await page.fill('input[name="last_name"]', "Reyes");
   await page.fill('input[name="email"]', email);
   await page.fill('select[name="role"]', "agent");
+  // Nothing emailed to begin with (Sean, Nov 2026: clients set up before go-live got the invitation).
+  check("a new account starts on Don't email them yet", (await page.ev(`document.querySelector('[data-access-choice="later"]')?.getAttribute('aria-checked')`)) === "true");
   await submitUserForm();
-  const inviteToast = await page.waitToast(/Invitation sent/, 8000);
+  const laterToast = await page.waitToast(/Nothing was emailed/, 8000);
+  check("…set up, and says nothing was emailed", /Nothing was emailed/.test(laterToast ?? ""), laterToast);
+  check("…a directory row, invited, with no sign-in made (so no invitation sent)",
+    sql(`select status || '|' || coalesce(auth_id::text,'') from public.users where email=${lit(email)}`) === "invited|" && sql(`select count(*) from auth.users where email=${lit(email)}`) === "0");
+  await page.go("/users?q=" + encodeURIComponent(email));
+  check("…listed as Not sent yet", Boolean(await until(async () => /Not sent yet/.test(await page.text()), { timeout: 8000 })));
+
+  // When it's time: Send invitation from the row.
+  check("row menu opens for them", await openRowMenu("Nova Reyes"));
+  await sleep(600);
+  check("Send invitation offered (not Resend)", await page.menuItem("Send invitation"));
+  const inviteToast = await page.waitToast(/Invitation sent to/, 8000);
   const invitedRow = sql(`select status || '|' || coalesce(auth_id::text,'') from public.users where email=${lit(email)}`);
   check("invite creates a directory row with an auth id", /^invited\|[0-9a-f-]{36}$/.test(invitedRow), invitedRow);
   check("invite creates the auth account", sql(`select count(*) from auth.users where email=${lit(email)}`) === "1");

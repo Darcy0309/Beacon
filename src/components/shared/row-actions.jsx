@@ -38,7 +38,7 @@ const DEFAULT_WARNING = "It is taken out of Lighthouse for everyone. Nothing is 
  *                       (<KeyRound />): a server page cannot pass a component
  */
 export default function RowActions({
-  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, deleteOption = null, deletedHref = null, onResetTwoFactor, onResendInvite, forms = [],
+  name = "record", href, id, edit, onDelete, warning = DEFAULT_WARNING, deleteOption = null, deletedHref = null, onResetTwoFactor, onResendInvite, inviteSent = true, forms = [],
 }) {
   const [ticked, setTicked] = useState(false);
   const router = useRouter();
@@ -99,9 +99,10 @@ export default function RowActions({
           {onResendInvite ? (
             <DropdownMenuItem
               disabled={pending}
-              onSelect={() => run(onResendInvite, `Invitation sent again to ${name}`)}
+              onSelect={() => run(onResendInvite, inviteSent ? `Invitation sent again to ${name}` : `Invitation sent to ${name}`)}
+              data-send-invitation={inviteSent ? "again" : "first"}
             >
-              <MailPlus /> Resend invitation
+              <MailPlus /> {inviteSent ? "Resend invitation" : "Send invitation"}
             </DropdownMenuItem>
           ) : null}
           {forms.map((f) => (

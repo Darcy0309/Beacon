@@ -32,13 +32,16 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
   const [role, setRole] = useState(user?.role ?? "agent");
   const [payModel, setPayModel] = useState(pay?.model ?? "commission");
   // A new account: an emailed invitation, or a temporary password given to them.
-  const [access, setAccess] = useState("invite");
+  // Nothing emailed to begin with (Sean, Nov 2026: setting up clients' accounts before go-live, the
+  // invitations went out): Send invitation from their row when it's time.
+  const [access, setAccess] = useState("later");
   const [temp, setTemp] = useState("");
 
   useEffect(() => {
     if (state?.ok) {
       toast.success(
         isEdit ? "User updated"
+          : state.data?.later ? `${state.data.email} is set up. Nothing was emailed: Send invitation from their row when it's time.`
           : state.data?.temporary ? `Account created for ${state.data.email}. Give them their temporary password.`
           : `Invitation sent to ${state.data?.email ?? "them"}`,
         state.data?.emailed ? { description: state.data.emailed } : undefined
@@ -86,7 +89,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
           <DialogDescription>
             {isEdit
               ? "Changing the role or client account takes effect on their next request. Disabled accounts cannot sign in or read anything."
-              : "Email them an invitation link, or give them a temporary password. Either way they choose their own password when they first sign in."}
+              : "Set them up now and email them nothing yet, email them an invitation link, or give them a temporary password. Either way they choose their own password when they first sign in."}
           </DialogDescription>
         </DialogHeader>
 
@@ -110,7 +113,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
                 <legend className="px-1 text-xs font-medium text-muted-foreground">How they get in</legend>
                 <input type="hidden" name="access" value={access} />
                 <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="How they get in">
-                  {[["invite", "Email an invitation link"], ["password", "Set a temporary password"]].map(([key, label]) => (
+                  {[["later", "Don't email them yet"], ["invite", "Email an invitation link"], ["password", "Set a temporary password"]].map(([key, label]) => (
                     <button key={key} type="button" role="radio" aria-checked={access === key} data-access-choice={key}
                       onClick={() => { setAccess(key); if (key === "password" && !temp) setTemp(generateTempPassword()); }}
                       className={access === key
@@ -120,6 +123,11 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
                     </button>
                   ))}
                 </div>
+                {access === "later" ? (
+                  <p className="text-xs text-muted-foreground" data-access-later>
+                    Nothing is emailed. When it&apos;s time, Send invitation from their row in Users emails them the link.
+                  </p>
+                ) : null}
                 {access === "password" ? (
                   <>
                     <Field label="Temporary password" required error={fe("temp_password")}
@@ -133,7 +141,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
                       </div>
                     </Field>
                     <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" name="send_link" defaultChecked className="size-4 accent-[var(--primary)]" />
+                      <input type="checkbox" name="send_link" className="size-4 accent-[var(--primary)]" />
                       Email them a sign-in link (without the password)
                     </label>
                   </>
@@ -252,7 +260,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" disabled={pending}>
-              {pending ? (isEdit ? "Saving…" : "Working…") : isEdit ? "Save changes" : access === "password" ? "Create account" : "Send invitation"}
+              {pending ? (isEdit ? "Saving…" : "Working…") : isEdit ? "Save changes" : access === "invite" ? "Send invitation" : "Create account"}
             </Button>
           </DialogFooter>
         </form>

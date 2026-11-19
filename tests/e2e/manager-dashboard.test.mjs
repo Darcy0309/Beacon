@@ -91,7 +91,8 @@ try {
   await admin.click('[data-access-choice="password"]');
   const temp = await until(() => admin.ev(`document.querySelector('[role=dialog] input[name="temp_password"]')?.value || null`));
   check("choosing a temporary password suggests one, easy to read out", /^[A-Za-z2-9]{4}-[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$/.test(temp ?? ""), temp);
-  await admin.ev(`document.querySelector('[role=dialog] input[name="send_link"]').click()`); // no email in this test
+  // No email in this test: "Email them a sign-in link" starts unticked (Nov 2026).
+  check("…and emailing them a sign-in link starts unticked", !(await admin.ev(`document.querySelector('[role=dialog] input[name="send_link"]').checked`)));
   await admin.click("[role=dialog] button[type=submit]", "Create account");
   check("the account is made at once, waiting for them to choose their own password",
     Boolean(await until(() => sql(`select status || '|' || must_change_password from public.users where email = ${lit(NEW_EMAIL)}`) === "invited|true")),

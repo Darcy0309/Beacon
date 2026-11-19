@@ -108,7 +108,10 @@ export default async function UsersPage({ searchParams }) {
                     <ToneBadge tone={u.mfa ? "emerald" : "slate"}>{u.mfa ? "On" : "Off"}</ToneBadge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{u.last}</TableCell>
-                  <TableCell><ToneBadge tone={statusTone[u.status] ?? "slate"}>{u.status}</ToneBadge></TableCell>
+                  {/* Set up, emailed nothing yet (Nov 2026): no sign-in until Send invitation. */}
+                  <TableCell>{u.raw.status === "invited" && !u.raw.auth_id
+                    ? <ToneBadge tone="slate">Not sent yet</ToneBadge>
+                    : <ToneBadge tone={statusTone[u.status] ?? "slate"}>{u.status}</ToneBadge>}</TableCell>
                   <TableCell className="text-right">
                     <RowActions
                       name={u.name}
@@ -116,6 +119,7 @@ export default async function UsersPage({ searchParams }) {
                       edit={<UserForm user={{ ...u.raw, company: u.company }} options={options} pay={payProfiles.get(u.id)} hourly={hourly} />}
                       onResetTwoFactor={u.mfa ? resetUserTwoFactor : undefined}
                       onResendInvite={awaitingInvite(u.raw) ? resendInvitation : undefined}
+                      inviteSent={Boolean(u.raw.auth_id)}
                       forms={[
                         ...(u.id === me?.id || u.raw.status === "disabled" ? [] : [{ key: "temp", label: "Set temporary password", icon: <KeyRound />, element: <TempPasswordForm user={{ id: u.id, name: u.name }} /> }]),
                         // A member of staff's work to another, when they leave (Sean, Oct 2026): disabled already, or about to be.

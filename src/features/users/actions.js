@@ -184,6 +184,21 @@ export async function saveUser(prevState, formData) {
     return ok({ email: payload.email, temporary: true, emailed });
   }
 
+  // Set up now, emailed nothing (Sean, Nov 2026: clients' accounts made before go-live): no sign-in yet, Send
+  // invitation from their row in Users makes it and emails them.
+  if (s(formData, "access") === "later") {
+    const row = { ...payload, email: payload.email, status: "invited" };
+    const { data: saved, error } = existing
+      ? await supabase.from("users").update(row).eq("id", existing.id).select("id").single()
+      : await supabase.from("users").insert(row).select("id").single();
+    if (error) return back(error);
+    const payFailed = await savePay(supabase, saved.id, payload.role, formData, values);
+    if (payFailed) return { ...payFailed, error: `Account created, but their pay was not saved: ${payFailed.error}` };
+    await logActivity(supabase, "user.create", { entity: "user", entityId: saved.id, detail: payload.email });
+    revalidatePath("/users");
+    return ok({ email: payload.email, later: true });
+  }
+
   const sent = await sendInvitation(supabase, payload.email, payload, existing);
   if (sent.error) return back(sent.error);
   const payFailed = await savePay(supabase, sent.id, payload.role, formData, values);
@@ -335,7 +350,7 @@ export async function setTemporaryPassword(prevState, formData) {
   return ok({ email: target.email, emailed });
 }
 
-/** "Resend invitation" from the row menu: for anyone who has not set a password yet. */
+/** "Send invitation" / "Resend invitation" from the row menu: for anyone who has not set a password yet. */
 export async function resendInvitation(formData) {
   const id = idFrom(formData);
   if (!id) return fail("Missing id.");
@@ -361,7 +376,8 @@ export async function resendInvitation(formData) {
   );
   if (sent.error) return fail(sent.error);
 
-  await logActivity(supabase, "user.reinvite", { entity: "user", entityId: id, detail: target.email });
+  // The first one for an account set up without one (Nov 2026) is an invitation, not a re-send.
+  await logActivity(supabase, target.auth_id ? "user.reinvite" : "user.invite", { entity: "user", entityId: id, detail: target.email });
   revalidatePath("/users");
   return ok({ id });
 }

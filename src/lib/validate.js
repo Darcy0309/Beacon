@@ -393,7 +393,7 @@ export const schemas = {
     confirmation_rate: [num({ min: 0, max: 1000 })],
     bonus_plan: [oneOf(["", "lead", "appointment"], "Choose a bonus plan")],
     // A new account: an emailed invitation link, or a temporary password the administrator gives them.
-    access: [oneOf(["invite", "password"])],
+    access: [oneOf(["later", "invite", "password"])],
     temp_password: [rules.custom((v) => (v && (String(v).length < 10 || String(v).length > 72) ? "A temporary password is 10 to 72 characters" : null))],
     send_link: [],
   },
