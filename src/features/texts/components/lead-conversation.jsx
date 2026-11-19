@@ -129,7 +129,7 @@ export default function LeadConversation({ leadId, initial = [], log = [], numbe
     : !canText
       ? "Only someone working this name can text it."
       : !numbers.length
-        ? "There's no number on this lead to text."
+        ? "There's no mobile number on this lead to text."
         : null;
 
   return (

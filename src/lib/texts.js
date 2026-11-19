@@ -18,8 +18,8 @@ export function textDigits(value) {
 export const e164 = (digits) => (digits ? `+1${digits}` : null);
 
 /**
- * The lead's numbers a text can go to, mobiles first (a business line seldom takes texts), each once:
- * [{ digits, label }]. `r`: the lead's record.
+ * The lead's numbers a text can go to: its people's mobiles, each once (Sean, Nov 2026: not the business or
+ * office phones, landlines managers texted by mistake): [{ digits, label }]. `r`: the lead's record.
  */
 export function leadTextNumbers(r) {
   const people = [
@@ -27,11 +27,8 @@ export function leadTextNumbers(r) {
     [r?.decision_maker || "Decision maker", r?.dm_mobile, r?.dm_phone],
     [r?.contact2_name || "2nd contact", r?.contact2_mobile, r?.contact2_phone],
   ];
-  const list = [
-    ...people.map(([who, mobile]) => [mobile, `${who} · mobile`]),
-    [r?.phone, "Business phone"],
-    ...people.map(([who, , phone]) => [phone, `${who} · phone`]),
-  ];
+  // Mobiles only (Sean, Nov 2026): the business and office phones are landlines, texted by mistake.
+  const list = people.map(([who, mobile]) => [mobile, `${who} · mobile`]);
   const seen = new Set();
   const out = [];
   for (const [value, label] of list) {

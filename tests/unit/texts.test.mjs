@@ -16,11 +16,12 @@ const numbers = leadTextNumbers({
   phone: "602-555-0100", contact_name: "Dana Reyes", contact_phone: "602-555-0100", contact_mobile: "(480) 555-0111",
   decision_maker: "Sam Lee", dm_mobile: "480-555-0122", contact2_phone: "bad",
 });
-check("a lead's numbers, mobiles first, each once", JSON.stringify(numbers) === JSON.stringify([
+// Mobiles only (Sean, Nov 2026): the business and office phones are landlines, texted by mistake.
+check("a lead's numbers to text: its people's mobiles, each once, not the business or office phones", JSON.stringify(numbers) === JSON.stringify([
   { digits: "4805550111", label: "Dana Reyes · mobile" },
   { digits: "4805550122", label: "Sam Lee · mobile" },
-  { digits: "6025550100", label: "Business phone" },
 ]), JSON.stringify(numbers));
+check("…a lead with only landlines: nothing to text", leadTextNumbers({ phone: "602-555-0100", contact_phone: "602-555-0101", dm_phone: "602-555-0102" }).length === 0);
 check("…none when it has none", leadTextNumbers({}).length === 0 && leadTextNumbers(null).length === 0);
 
 check("one text up to 160 plain characters", textParts("a".repeat(160)) === 1 && textParts("a".repeat(161)) === 2 && textParts("") === 0);

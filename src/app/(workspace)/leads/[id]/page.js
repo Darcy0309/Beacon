@@ -84,7 +84,8 @@ function CallButton({ tel, leadId, company, label }) {
 
 /**
  * A number's buttons: Call, and beside it Text (client, Nov 2026), when this person may text the lead
- * from its Conversation (`texting`) and the number is one a text can go to.
+ * from its Conversation (`texting`) and the number is one a text can go to: mobiles only (Sean, Nov 2026:
+ * managers texted office landlines by mistake), so the business and office phones pass texting={false}.
  */
 function Dial({ number, leadId, company, label, texting }) {
   const tel = telHref(number);
@@ -130,7 +131,7 @@ function Person({ who, called = who, phone, mobile, email: address, leadId, comp
         </Line>
       ) : null}
       {phone || allLines ? (
-        <Line kind="Business" label={`${called} Phone`} action={<Dial number={phone} leadId={leadId} company={company} label={`${label}, business`} texting={texting} />}>
+        <Line kind="Business" label={`${called} Phone`} action={<Dial number={phone} leadId={leadId} company={company} label={`${label}, business`} texting={false} />}>
           {phone || none}
         </Line>
       ) : null}
@@ -497,7 +498,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 <div key={who} className={`mt-3 px-3 pb-1 pt-2.5 ${SECTION_LINE}`} data-person-box={who}>
                   {who === "Decision maker" ? (
                     <div className="mb-3 [&>[data-contact-line]:first-child]:border-t-0 [&>[data-contact-line]:first-child]:pt-0">
-                      <Line kind="Business phone" action={<Dial number={r.phone} leadId={lead.id} company={lead.co} label="the business" texting={texting} />}>
+                      <Line kind="Business phone" action={<Dial number={r.phone} leadId={lead.id} company={lead.co} label="the business" texting={false} />}>
                         {r.phone || <span className="text-muted-foreground">None on file</span>}
                       </Line>
                       {r.fax ? <Line kind="Fax">{r.fax}</Line> : null}

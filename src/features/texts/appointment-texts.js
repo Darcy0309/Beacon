@@ -66,7 +66,7 @@ export async function sendAppointmentTexts(admin, origin) {
     }
     const to = leadTextNumbers(lead)[0];
     if (!to) {
-      await finish({ error: "There's no number on the lead to text." });
+      await finish({ error: "There's no mobile number on the lead to text." });
       failed++;
       continue;
     }
