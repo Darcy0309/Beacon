@@ -43,6 +43,8 @@ export default function WorkspaceShell({ children }) {
   // The database already refuses a disabled account everything. This just
   // says so, with a way out, instead of a workspace full of empty tables.
   if (user?.status === "disabled") return <AccountDisabled email={user.email} />;
+  // A client whose Signature Select has ended (Sean, Nov 2026): the database shows them nothing now; this says why.
+  if (user?.role === "client" && user?.signatureSelect?.ended) return <SelectEnded endsOn={user.signatureSelect.endsOn} />;
 
   // A page this role cannot open — reached by typing the URL or following an
   // old link. Row Level Security already keeps the data out of reach; this
@@ -70,6 +72,33 @@ export default function WorkspaceShell({ children }) {
     </div>
   );
   return calls ? <PhoneProvider tracked={tracked}>{shell}</PhoneProvider> : shell;
+}
+
+/** A client's Signature Select over, not renewed: their access to Lighthouse stops until it is. */
+function SelectEnded({ endsOn }) {
+  const ended = endsOn ? new Date(`${endsOn}T12:00:00`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
+  return (
+    <div className="flex min-h-svh flex-1 items-center justify-center p-6" data-select-ended>
+      <Card className="max-w-md p-8 text-center">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-xl border border-[var(--panel-border)] text-muted-foreground">
+          <ShieldOff className="size-5" />
+        </span>
+        <h2 className="mt-4 text-base font-semibold">Your Signature Select subscription has ended</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {ended ? <>It ended on {ended}. </> : null}
+          Contact your Sales Rep to renew it, and your access to Lighthouse comes back right away.
+        </p>
+        <form action="/auth/sign-out" method="post" onSubmit={forgetPushThenSubmit} className="mt-5">
+          <button
+            type="submit"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-colors hover:border-primary/40"
+          >
+            <LogOut className="size-3.5" /> Sign out
+          </button>
+        </form>
+      </Card>
+    </div>
+  );
 }
 
 function AccountDisabled({ email }) {

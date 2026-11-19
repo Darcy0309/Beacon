@@ -9,7 +9,8 @@ import LinkRow from "@/components/shared/link-row";
 import ToneBadge from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { TableCell } from "@/components/ui/table";
-import { clientSlug } from "@/lib/format";
+import { clientSlug, mediumDate } from "@/lib/format";
+import { selectBrief } from "@/lib/signature-select";
 import { chartRange } from "@/lib/production-chart";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getAgencyGroups, getClients, getClientsOverview, getTimeZones } from "@/features/clients/queries";
@@ -93,9 +94,9 @@ export default async function ClientsPage({ searchParams }) {
         </div>
 
         <Card>
-          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} reps={reps} />} />
+          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} reps={reps} canSelect={me?.role === "admin"} today={today} />} />
           <FilterTable
-            columns={["Client", "Contact", "State", "Time zone", "Start date", "End date", "Sales Rep", "Status"]}
+            columns={["Client", "Contact", "State", "Time zone", "Client since", "Signature Select", "Sales Rep", "Status"]}
             filters={[
               { key: "status", label: "Status", kind: "chips" },
               { key: "state", label: "State", kind: "select" },
@@ -131,7 +132,17 @@ export default async function ClientsPage({ searchParams }) {
                   <TableCell>{c.state ?? "—"}</TableCell>
                   <TableCell>{c.zone ?? "—"}</TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{c.start ?? "—"}</TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{c.end ?? "—"}</TableCell>
+                  {/* Signature Select (Nov 2026): an administrator's and the client's Sales Rep's to see. */}
+                  <TableCell className="whitespace-nowrap" data-select-cell>{(() => {
+                    const b = selectBrief(c.selectTerms, today);
+                    if (!b) return <span className="text-muted-foreground">—</span>;
+                    return (
+                      <span className="flex flex-col">
+                        <ToneBadge tone={b.tone}>{b.label.startsWith("Starts ") ? `Starts ${mediumDate(b.term.starts_on)}` : b.label}</ToneBadge>
+                        {b.term?.ends_on && b.tone === "emerald" ? <span className="mt-0.5 text-[11px] text-muted-foreground">ends {mediumDate(b.term.ends_on)}</span> : null}
+                      </span>
+                    );
+                  })()}</TableCell>
                   <TableCell className={c.salesRep ? "whitespace-nowrap" : "text-muted-foreground"} data-sales-rep-cell>{c.salesRep ?? "—"}</TableCell>
                   <TableCell><ToneBadge tone={statusTone[c.status] ?? "slate"}>{c.status}</ToneBadge></TableCell>
                 </LinkRow>

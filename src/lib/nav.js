@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, Combine, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall, PhoneForwarded,
-  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet, Crown,
 } from "lucide-react";
 
 export const ROLES = {
@@ -119,6 +119,8 @@ export const navGroups = [
       // Each project against its lead and appointment goals: owed, ahead, days to go.
       { href: "/reports/goals", label: "Project Goals", icon: Goal, roles: ["admin", "manager"] },
       // Every update clients make to their appointments, as they come in.
+      // What Signature Select subscriptions bring in, by client and time (Sean, Nov 2026).
+      { href: "/reports/select", label: "Signature Select", icon: Crown, roles: ["admin"] },
       { href: "/reports/appointment-updates", label: "Appointment Updates", icon: ClipboardPen, roles: ["admin"] },
       { href: "/alerts", label: "Alert Engine", icon: BellRing, roles: ["admin"] },
     ],

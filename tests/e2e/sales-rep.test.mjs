@@ -23,7 +23,7 @@ const ADMIN = Number(sql("select id from public.users where email='admin@beacon.
 const CLIENT = Number(sql("select id from public.users where email='client@beacon.test'"));
 const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT}`);
 const typeId = (c) => sql(`select id from public.project_types where code=${lit(c)}`);
-const company = Number(sql(`insert into public.companies (name, subscription_end) values (${lit(`${TAG} Insurance`)}, current_date + 90) returning id`));
+const company = Number(sql(`insert into public.companies (name, subscription_start) values (${lit(`${TAG} Insurance`)}, current_date - 90) returning id`));
 const P = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Churches`)}, ${company}, ${typeId("APPT")}, 1) returning id`));
 const lead = (name) => Number(sql(`insert into public.leads (company_name, project_id, stage) values (${lit(`${TAG} ${name}`)}, ${P}, 'appt') returning id`));
 const book = (l) => sql(`insert into public.appointments (lead_id, project_id, set_project_id, appt_date, appt_time, qa_status) values (${l}, ${P}, ${P}, current_date + 3, '10:00 AM', 'passed')`);
@@ -42,8 +42,8 @@ try {
   await when(admin, "!!document.querySelector('[data-edit-client]')");
   await admin.click("[data-edit-client]");
   await when(admin, "!!document.querySelector('[data-client-form] [data-sales-rep]')");
-  check("the Sales Rep sits between End date and Status", await admin.ev(`(() => { const labels = [...document.querySelectorAll('[data-client-form] label, [data-client-form] .text-xs')].map((l) => l.textContent.trim());
-    const i = labels.findIndex((t) => /^End date/.test(t)), j = labels.findIndex((t) => /^Sales Rep/.test(t)), k = labels.findIndex((t) => /^Status/.test(t)); return i >= 0 && i < j && j < k; })()`));
+  check("the Sales Rep sits between Client since and Status", await admin.ev(`(() => { const labels = [...document.querySelectorAll('[data-client-form] label, [data-client-form] .text-xs')].map((l) => l.textContent.trim());
+    const i = labels.findIndex((t) => /^Client since/.test(t)), j = labels.findIndex((t) => /^Sales Rep/.test(t)), k = labels.findIndex((t) => /^Status/.test(t)); return i >= 0 && i < j && j < k; })()`));
   check("…an administrator or manager to pick", (await admin.ev(`[...document.querySelectorAll('[data-sales-rep] option')].some((o) => o.value === '${MIKE}')`)) === true);
   await admin.fill("[data-client-form] [data-sales-rep]", String(MIKE));
   await admin.click(`[data-watcher="${ADMIN}"] input[type=checkbox]`);

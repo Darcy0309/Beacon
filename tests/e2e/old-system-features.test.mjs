@@ -22,7 +22,10 @@ const clientCompany = sql(`select coalesce(company_id::text, 'null') from public
 const agentBefore = JSON.parse(sql(`select json_build_object('photo', photo_path, 'bio', bio)::text from public.users where id=${AGENT}`));
 const typeId = (c) => sql(`select id from public.project_types where code=${lit(c)}`);
 const today = sql("select (now() at time zone public.business_tz())::date");
-const company = Number(sql(`insert into public.companies (name, subscription_end) values (${lit(`${TAG} Insurance`)}, '${today}'::date + 10) returning id`));
+const company = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Insurance`)}) returning id`));
+// Its subscription: Signature Select, a year ending in ten days (Nov 2026: the client's End date gave way to it).
+sql(`insert into public.select_terms (company_id, plan, amount, starts_on, ends_on) values (${company}, 'annual', 1200, '${today}'::date - 355, '${today}'::date + 10)`);
+const setEnd = (days) => sql(`update public.select_terms set ends_on = '${today}'::date + ${days}, starts_on = least(starts_on, '${today}'::date + ${days}) where company_id = ${company}`);
 const P = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id, start_date, end_date, lead_goal, appt_goal)
   values (${lit(`${TAG} Churches`)}, ${company}, ${typeId("APPT")}, 1, '${today}'::date - 9, '${today}'::date + 20, 40, 10) returning id`));
 sql(`update public.users set company_id = ${company} where id = ${CLIENT}`);
@@ -105,12 +108,12 @@ try {
   await client.go("/", 5000);
   const notice = (await when(client, "document.querySelector('[data-subscription-notice]')?.innerText")) ?? "";
   check("the client's dashboard warns them, ten days out", /subscription ends in 10 days/i.test(notice), notice);
-  sql(`update public.companies set subscription_end = '${today}'::date + 60 where id = ${company}`);
+  setEnd(60);
   await client.go("/", 5000);
   check("…not two months out", !(await client.ev("!!document.querySelector('[data-subscription-notice]')")));
-  sql(`update public.companies set subscription_end = '${today}'::date - 3 where id = ${company}`);
+  setEnd(-3);
   await client.go("/", 5000);
-  check("…and says when it has ended", /ended 3 days ago/i.test((await when(client, "document.querySelector('[data-subscription-notice]')?.innerText")) ?? ""));
+  check("…and once it has ended, their access stops and they're told why", /subscription has ended/i.test((await when(client, "document.querySelector('[data-select-ended]')?.innerText")) ?? ""));
 
   section("The client's page, for an administrator");
   await admin.go("/clients", 3000);
@@ -122,6 +125,7 @@ try {
   const pipe = await admin.ev("(() => { const s = document.querySelector('[data-sale-pipeline]'); return s ? { height: Math.round(s.getBoundingClientRect().height), ticks: s.querySelectorAll('[data-axis-tick]').length } : null; })()");
   check("…the Sale Pipeline its own height, its dollars up the left", pipe && pipe.height < 520 && pipe.ticks >= 3, JSON.stringify(pipe));
   check("…and its subscription's end is flagged", /Subscription ended 3 days ago/i.test((await when(admin, "document.querySelector('[data-subscription-notice]')?.innerText")) ?? ""));
+  setEnd(10); // renewed: the client's access is back for what follows
 
   section("Project goals");
   await admin.go(`/projects/${P}`, 5000);

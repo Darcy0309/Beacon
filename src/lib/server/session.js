@@ -41,9 +41,16 @@ export const getCurrentUser = cache(async function getCurrentUser() {
     ? Boolean((await supabase.rpc("is_sales_rep", { p_user: data.id })).data)
     : false;
 
+  // A client's Signature Select (Sean, Nov 2026): the term now and when it ends; `ended` when their access
+  // has stopped (their last term over, none since).
+  const select = data.role === "client"
+    ? ((await supabase.rpc("my_select")).data?.[0] ?? null)
+    : null;
+
   return {
     ...data,
     salesRep,
+    signatureSelect: select ? { plan: select.plan, startsOn: select.starts_on, endsOn: select.ends_on, ended: Boolean(select.ended) } : null,
     company: one(data.company),
     name: fullName(data),
     short: shortName(data),

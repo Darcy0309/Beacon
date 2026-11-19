@@ -72,14 +72,14 @@ try {
   await admin.click("[data-edit-client]");
   await until(() => admin.ev(`!!document.querySelector('[data-client-form] select[name="timezone_id"]')`));
   const statuses = await admin.ev(`[...document.querySelectorAll('[data-client-form] select[name="status"] option')].map((o) => o.textContent)`);
-  check("the form has a time zone, start and end dates, and a status of Active, Paused or Completed", JSON.stringify(statuses) === JSON.stringify(["Active", "Paused", "Completed"])
-    && (await admin.ev(`!!document.querySelector('[data-client-form] input[name="subscription_start"]') && !!document.querySelector('[data-client-form] input[name="subscription_end"]')`)), JSON.stringify(statuses));
+  check("the form has a time zone, a Client since date (no End date: Signature Select keeps that), and a status of Active, Paused or Completed", JSON.stringify(statuses) === JSON.stringify(["Active", "Paused", "Completed"])
+    && (await admin.ev(`!!document.querySelector('[data-client-form] input[name="subscription_start"]') && !document.querySelector('[data-client-form] input[name="subscription_end"]')`)), JSON.stringify(statuses));
   const MST = sql("select id from public.timezones where name = 'MST'");
   await admin.fill('[data-client-form] select[name="timezone_id"]', MST);
-  await admin.ev(`(() => { const set = (n, v) => { const i = document.querySelector('[data-client-form] input[name="' + n + '"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }; set('subscription_start', '2026-01-26'); set('subscription_end', '2026-12-31'); })()`);
+  await admin.ev(`(() => { const set = (n, v) => { const i = document.querySelector('[data-client-form] input[name="' + n + '"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, v); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }; set('subscription_start', '2026-01-26'); })()`);
   await admin.click("[data-client-form] button[type=submit]");
-  const saved = () => sql(`select timezone_id || '|' || coalesce(subscription_start::text, '') || '|' || coalesce(subscription_end::text, '') || '|' || status from public.companies where name = ${lit(NAME)}`);
-  check("they are saved on the client", Boolean(await until(() => saved() === `${MST}|2026-01-26|2026-12-31|active`)), saved());
+  const saved = () => sql(`select timezone_id || '|' || coalesce(subscription_start::text, '') || '|' || status from public.companies where name = ${lit(NAME)}`);
+  check("they are saved on the client", Boolean(await until(() => saved() === `${MST}|2026-01-26|active`)), saved());
   sql(`update public.companies set status = 'paused', state = 'CA' where id = ${otherClient}`);
 
   section("The Clients page: its figures count up");
@@ -104,10 +104,10 @@ try {
   section("The Clients page: clients in rows");
   await admin.go("/clients", 5000);
   const heads = await until(() => admin.ev(`[...document.querySelectorAll('thead th')].map((h) => h.textContent.trim())`).then((h) => h.length && h));
-  check("a table: client, contact, state, time zone, start date, end date, Sales Rep, status", JSON.stringify(heads) === JSON.stringify(["Client", "Contact", "State", "Time zone", "Start date", "End date", "Sales Rep", "Status"]), JSON.stringify(heads));
+  check("a table: client, contact, state, time zone, client since, Signature Select, Sales Rep, status", JSON.stringify(heads) === JSON.stringify(["Client", "Contact", "State", "Time zone", "Client since", "Signature Select", "Sales Rep", "Status"]), JSON.stringify(heads));
   const rowOf = (name) => admin.ev(`(() => { const r = [...document.querySelectorAll('tr[data-client-row]')].find((x) => x.querySelector('[data-client-link]')?.textContent === ${JSON.stringify(name)}); return r ? [...r.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim()) : null; })()`);
   const myRow = await rowOf(NAME);
-  check("the client's row has them all, its agency group under its name", myRow?.[1] === "Bret Godsey" && myRow[2] === "AZ" && myRow[3] === "MST" && myRow[4] === "Jan 26, 2026" && myRow[5] === "Dec 31, 2026"
+  check("the client's row has them all, its agency group under its name", myRow?.[1] === "Bret Godsey" && myRow[2] === "AZ" && myRow[3] === "MST" && myRow[4] === "Jan 26, 2026" && myRow[5] === "—"
     && myRow[6] === "—" && /^active$/i.test(myRow[7]) && myRow[0].includes(NAME) && myRow[0].includes(GROUP), JSON.stringify(myRow));
   const names = () => admin.ev(`[...document.querySelectorAll('tr[data-client-row] [data-client-link]')].map((a) => a.textContent)`);
   const pick = (label, value) => admin.ev(`(() => { const sel = document.querySelector('select[aria-label="Filter by ${label}"]'); if (!sel) return false; Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(sel, ${JSON.stringify(value)}); sel.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
@@ -124,7 +124,7 @@ try {
   check("…and searches by contact", Boolean(await until(async () => { const n = await names(); return n.length === 1 && n[0] === NAME; })), JSON.stringify(await names()));
   await admin.ev(`[...document.querySelectorAll('tr[data-client-row]')].find((x) => x.querySelector('[data-client-link]')?.textContent === ${JSON.stringify(NAME)}).cells[2].click()`);
   check("clicking anywhere on a row opens the client", Boolean(await until(async () => (await admin.path()) === `/clients/${slug}`)), await admin.path());
-  check("…whose page shows its time zone and dates", Boolean(await until(async () => { const t = await admin.text(); return /MST/.test(t) && /Jan 26, 2026 – Dec 31, 2026/.test(t); })),
+  check("…whose page shows its time zone and dates", Boolean(await until(async () => { const t = await admin.text(); return /MST/.test(t) && /Client since\s*Jan 26, 2026/.test(t); })),
     ((await admin.text()) ?? "").match(/Time zone[^\n]*\n?[^\n]*/)?.[0]);
 
   section("The Clients page: tiles");

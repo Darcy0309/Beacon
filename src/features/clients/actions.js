@@ -7,9 +7,57 @@ import { check, currentAppUser, deleteRow, fail, idFrom, logActivity, n, ok, s }
 import { createClient } from "@/lib/supabase/server";
 import { cross, schemas } from "@/lib/validate";
 
+/**
+ * Signature Select from the client form (Sean, Nov 2026), checked before anything is saved: null when the form
+ * has none to save, { failed } when it is wrong, else { mode, termId, row }.
+ */
+function readSelect(formData, values) {
+  const mode = String(formData.get("select_mode") ?? "");
+  if (mode !== "edit" && mode !== "new") return null;
+  const plan = String(formData.get("select_plan") ?? "");
+  const amount = Number(String(formData.get("select_amount") ?? "").replace(/[$,\s]/g, ""));
+  const starts = String(formData.get("select_starts") ?? "");
+  const ends = String(formData.get("select_ends") ?? "");
+  const iso = /^\d{4}-\d{2}-\d{2}$/;
+  const errors = {};
+  if (!["monthly", "annual"].includes(plan)) {
+    if (mode === "new" && !plan) return null; // not on Signature Select
+    errors.select_plan = "Choose Monthly or Annual";
+  }
+  if (!(amount > 0 && amount < 1_000_000)) errors.select_amount = "Enter the amount";
+  if (!iso.test(starts)) errors.select_starts = "Choose when it starts";
+  if (ends && !iso.test(ends)) errors.select_ends = "Choose a day";
+  else if (plan === "annual" && !ends) errors.select_ends = "An annual term needs its end";
+  else if (ends && iso.test(starts) && ends < starts) errors.select_ends = "It ends after it starts";
+  const echo = { ...values, select_plan: plan, select_amount: formData.get("select_amount"), select_starts: starts, select_ends: ends };
+  if (Object.keys(errors).length) return { failed: fail(Object.values(errors)[0], errors, echo) };
+  const termId = /^[1-9]\d{0,17}$/.test(String(formData.get("select_term_id") ?? "")) ? Number(formData.get("select_term_id")) : null;
+  return { mode: mode === "edit" && termId ? "edit" : "new", termId, row: { plan, amount: Math.round(amount * 100) / 100, starts_on: starts, ends_on: ends || null } };
+}
+
+/** A client's Signature Select term saved: changed, or a new one (a monthly one still running ends the day before). */
+async function saveSelect(supabase, companyId, select, userId) {
+  if (select.mode === "edit") {
+    const { data, error } = await supabase.from("select_terms").update({ ...select.row, updated_at: new Date().toISOString(), reminded_at: null })
+      .eq("id", select.termId).eq("company_id", companyId).select("id");
+    if (error) return error.message;
+    return data?.length ? null : "Only an administrator or the client's Sales Rep can change Signature Select.";
+  }
+  const before = new Date(`${select.row.starts_on}T00:00:00Z`);
+  before.setUTCDate(before.getUTCDate() - 1);
+  const { error: closeError } = await supabase.from("select_terms").update({ ends_on: before.toISOString().slice(0, 10), updated_at: new Date().toISOString() })
+    .eq("company_id", companyId).eq("plan", "monthly").is("ends_on", null).lt("starts_on", select.row.starts_on);
+  if (closeError) return closeError.message;
+  const { error } = await supabase.from("select_terms").insert({ company_id: companyId, ...select.row, created_by: userId ?? null });
+  if (error) return /row-level security|permission/i.test(error.message) ? "Only an administrator or the client's Sales Rep can change Signature Select." : error.message;
+  return null;
+}
+
 export async function saveCompany(prevState, formData) {
   const { values, failed } = check(formData, schemas.company, cross.company);
   if (failed) return failed;
+  const select = readSelect(formData, values);
+  if (select?.failed) return select.failed;
 
   const supabase = await createClient();
   const id = idFrom(formData);
@@ -27,8 +75,8 @@ export async function saveCompany(prevState, formData) {
     status: s(formData, "status") || "active",
     // Where it is on the clock, and when its work with us starts and ends.
     timezone_id: n(formData, "timezone_id"),
+    // When they started with us ("Client since"); their Signature Select terms keep when access ends (Nov 2026).
     subscription_start: s(formData, "subscription_start"),
-    subscription_end: s(formData, "subscription_end"),
     // The carrier group it belongs to (an insurance company), or none.
     agency_group_id: n(formData, "agency_group_id"),
     // Who owns it (Sean, Oct 2026), and so all its projects.
@@ -42,6 +90,14 @@ export async function saveCompany(prevState, formData) {
   if (error) return fail(error, null, values);
   // Row Level Security answers an update it refuses with no row, not an error (Oct 2026: said, not "Client updated").
   if (id && !saved) return fail("Nothing was saved: that client may have been deleted, or isn't yours to change.", null, values);
+
+  // Signature Select (Nov 2026).
+  if (select && saved?.id) {
+    const me = await currentAppUser(supabase);
+    const problem = await saveSelect(supabase, saved.id, select, me?.id);
+    if (problem) return fail(`The client was saved, but not its Signature Select: ${problem}`, null, values);
+    revalidatePath("/reports/select");
+  }
 
   // Who hears about it (Sean, Oct 2026): the people ticked, each by notification or by email too.
   if (saved?.id && formData.get("watchers_shown") === "1") {
@@ -112,4 +168,26 @@ export async function saveCompanyWebsite(prevState, formData) {
 export async function setClientLogo(companyId, path) {
   const supabase = await createClient();
   return brand(supabase, Number(companyId), { logo_path: path ? String(path) : null });
+}
+
+/**
+ * Signature Select on its own (Sean, Nov 2026: "it's the sales rep job to go into their client and turn off
+ * access"): a client's term changed or a new one, from Payments Due, where a Sales Rep who is a manager has
+ * their clients (the client's page is the administrators'). The database keeps it to an administrator and
+ * the client's Sales Rep.
+ */
+export async function saveSelectTerm(prevState, formData) {
+  const companyId = idFrom(formData, "company_id");
+  if (!companyId) return fail("Choose the client");
+  const select = readSelect(formData, {});
+  if (!select) return fail("Choose Monthly or Annual", { select_plan: "Choose Monthly or Annual" });
+  if (select.failed) return select.failed;
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  const problem = await saveSelect(supabase, companyId, select, me?.id);
+  if (problem) return fail(problem);
+  revalidatePath("/payments");
+  revalidatePath("/clients", "layout");
+  revalidatePath("/reports/select");
+  return ok({ id: companyId });
 }

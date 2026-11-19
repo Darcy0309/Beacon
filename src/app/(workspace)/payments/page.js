@@ -1,5 +1,5 @@
 import Link from "@/components/shared/intent-link";
-import { AlarmClock, CalendarClock, CheckCheck, Wallet } from "lucide-react";
+import { AlarmClock, CalendarClock, CheckCheck, Crown, Wallet } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,11 @@ import { getPaymentsDue } from "@/features/funding/queries";
 import { fundingTotals, usd } from "@/lib/funding";
 import { getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
+import ToneBadge from "@/components/shared/tone-badge";
+import SelectDialog from "@/features/clients/components/select-dialog";
+import { getRepSelectClients } from "@/features/clients/select-queries";
+import { mediumDate } from "@/lib/format";
+import { dollars, selectBrief, termSummary } from "@/lib/signature-select";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +29,7 @@ const addDays = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 864000
  */
 export default async function PaymentsPage() {
   const [me, today] = await Promise.all([getCurrentUser(), getBusinessToday()]);
-  const all = await getPaymentsDue(today);
+  const [all, selectClients] = await Promise.all([getPaymentsDue(today), getRepSelectClients(me?.id)]);
   const admin = me?.role === "admin";
   const rep = all.some((p) => p.salesRepId === me?.id);
   const soon = addDays(today, 30);
@@ -61,6 +66,28 @@ export default async function PaymentsPage() {
             <PaymentList payments={g.rows} today={today} reminders={(p) => p.reminders} extra={extra} />
           </Card>
         ))}
+        {/* Their clients' Signature Select (Sean, Nov 2026): the Sales Rep's to keep, and to end when a client stops paying. */}
+        {selectClients.length ? (
+          <Card id="select" data-select-clients>
+            <SectionHeader label={`Signature Select · your clients · ${selectClients.length}`} icon={Crown} />
+            <ul className="divide-y divide-[var(--panel-border)] text-sm">
+              {selectClients.map((c) => {
+                const b = selectBrief(c.terms, today);
+                const now = b?.term;
+                const sum = now ? termSummary(now, today) : null;
+                return (
+                  <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5" data-select-client={c.id}>
+                    <span className="font-medium">{c.name}</span>
+                    {b ? <ToneBadge tone={b.tone}>{b.label.startsWith("Starts ") ? `Starts ${mediumDate(now.starts_on)}` : b.label}</ToneBadge> : <span className="text-xs text-muted-foreground">Not on Signature Select</span>}
+                    {now?.ends_on && b.tone === "emerald" ? <span className="text-xs text-muted-foreground">ends {mediumDate(now.ends_on)}</span> : null}
+                    {sum?.months ? <span className="text-xs text-muted-foreground">{sum.months} month{sum.months === 1 ? "" : "s"} · {dollars(sum.charged)} so far</span> : null}
+                    <span className="ml-auto"><SelectDialog client={{ id: c.id, name: c.name }} terms={c.terms} today={today} /></span>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        ) : null}
       </div>
     </>
   );

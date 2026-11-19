@@ -12,6 +12,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { saveCompany } from "@/features/clients/actions";
+import SelectFields from "@/features/clients/components/select-fields";
 import { clientSlug } from "@/lib/format";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -30,7 +31,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * notifications about the client and its projects, by notification or by
  * email too; with nobody ticked, its Sales Rep does.
  */
-export default function ClientForm({ client, groups = [], zones = [], reps = [] }) {
+export default function ClientForm({ client, groups = [], zones = [], reps = [], selectTerms = [], canSelect = false, today = null }) {
   const isEdit = Boolean(client?.id);
   const router = useNavigationRouter();
   const [open, setOpen] = useState(false);
@@ -120,11 +121,9 @@ export default function ClientForm({ client, groups = [], zones = [], reps = [] 
                 {zones.map((z) => <option key={z.id} value={z.id}>{z.name}</option>)}
               </Select>
             </Field>
-            <Field label="Start date" error={fe("subscription_start")}>
-              <DatePicker name="subscription_start" defaultValue={dv("subscription_start")} invalid={invalid("subscription_start")} aria-label="Start date" presets={["today"]} />
-            </Field>
-            <Field label="End date" error={fe("subscription_end")}>
-              <DatePicker name="subscription_end" defaultValue={dv("subscription_end")} invalid={invalid("subscription_end")} aria-label="End date" presets={["nextMonth", "nextYear"]} />
+            {/* When the client started with us (Sean, Nov 2026); Signature Select's terms are below. */}
+            <Field label="Client since" error={fe("subscription_start")}>
+              <DatePicker name="subscription_start" defaultValue={dv("subscription_start")} invalid={invalid("subscription_start")} aria-label="Client since" presets={["today"]} />
             </Field>
             {/* Who owns the client, and so all its projects (Sean, Oct 2026). */}
             <Field label="Sales Rep" error={fe("sales_rep_id")} className="sm:col-span-2">
@@ -140,6 +139,7 @@ export default function ClientForm({ client, groups = [], zones = [], reps = [] 
                 <option value="completed">Completed</option>
               </Select>
             </Field>
+            {canSelect && today ? <SelectFields terms={selectTerms} today={today} open={open} fe={fe} invalid={invalid} /> : null}
           </div>
           {reps.length ? (
             <fieldset className="rounded-lg border border-[var(--panel-border)] p-3" data-client-watchers>

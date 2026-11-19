@@ -466,7 +466,9 @@ export default async function Dashboard({ searchParams }) {
     </>
   );
 
-  const notice = client ? subscriptionNotice(me?.company?.subscription_end, businessToday) : null;
+  // Their Signature Select's end (Sean, Nov 2026), not the client's old End date.
+  const selectEnds = me?.signatureSelect?.endsOn ?? null;
+  const notice = client ? subscriptionNotice(selectEnds, businessToday) : null;
 
   return (
     <>
@@ -499,7 +501,7 @@ export default async function Dashboard({ searchParams }) {
           <div data-subscription-notice={notice.ended ? "ended" : notice.daysLeft}
             className={`flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-sm ${notice.ended ? "border-rose-400/45 bg-rose-400/8" : "border-amber-400/45 bg-amber-400/8"}`}>
             <CalendarX2 className={`size-4 ${notice.ended ? "text-rose-400" : "text-amber-400"}`} />
-            <span>Your Lighthouse subscription <strong>{notice.text}</strong>{me?.company?.subscription_end ? ` (${mediumDate(me.company.subscription_end)})` : ""}. Contact your account manager to renew.</span>
+            <span>Your Signature Select subscription <strong>{notice.text}</strong>{selectEnds ? ` (${mediumDate(selectEnds)})` : ""}. Contact your Sales Rep to renew.</span>
           </div>
         ) : null}
 

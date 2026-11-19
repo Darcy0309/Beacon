@@ -40,7 +40,8 @@ export async function getClients() {
   const supabase = await createClient();
   const [{ data, error }, roll] = await Promise.all([
     supabase.from("companies").select(`*, group:agencies(id, name), zone:timezones(id, name),
-      sales_rep:users!companies_sales_rep_id_fkey(id, first_name, last_name), watchers:client_watchers(user_id, by_email)`).order("name"),
+      sales_rep:users!companies_sales_rep_id_fkey(id, first_name, last_name), watchers:client_watchers(user_id, by_email),
+      select_terms(id, plan, amount, starts_on, ends_on)`).order("name"),
     companyRollups(supabase),
   ]);
   if (error) throw error;
@@ -66,6 +67,8 @@ export async function getClients() {
     start: c.subscription_start ? mediumDate(c.subscription_start) : null,
     end: c.subscription_end ? mediumDate(c.subscription_end) : null,
     endsOn: c.subscription_end ?? null,
+    // Its Signature Select terms (Sean, Nov 2026), newest first: an administrator's and its Sales Rep's to see.
+    selectTerms: [...(c.select_terms ?? [])].map((t) => ({ ...t, amount: Number(t.amount) })).sort((a, b) => b.starts_on.localeCompare(a.starts_on)),
     // Its branding: the logo (a path in the public-images bucket) and website.
     logoPath: c.logo_path ?? null,
     website: c.website ?? null,
@@ -76,7 +79,7 @@ export async function getClients() {
     salesRepId: one(c.sales_rep)?.id ?? null,
     salesRep: one(c.sales_rep) ? shortName(one(c.sales_rep)) : null,
     // As saved, for the edit form.
-    raw: { ...c, group: undefined, zone: undefined, sales_rep: undefined, watchers: (c.watchers ?? []).map((w) => ({ id: w.user_id, email: w.by_email })),
+    raw: { ...c, group: undefined, zone: undefined, sales_rep: undefined, select_terms: undefined, watchers: (c.watchers ?? []).map((w) => ({ id: w.user_id, email: w.by_email })),
       status: c.status === "inactive" ? "paused" : c.status },
   }));
 }
