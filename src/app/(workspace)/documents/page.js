@@ -19,8 +19,8 @@ export const dynamic = "force-dynamic";
 const typeTone = { PDF: "rose", DOCX: "cyan", CSV: "emerald", PNG: "violet" };
 
 export default async function DocumentsPage({ searchParams }) {
-  const params = readListParams(await searchParams, ["type", "client"]);
-  const [{ rows, total, stats: documents, types, clients: clientNames }, me] = await Promise.all([
+  const params = readListParams(await searchParams, ["type", "client", "project"]);
+  const [{ rows, total, stats: documents, types, clients: clientNames, projects: projectNames }, me] = await Promise.all([
     listDocuments(params),
     getCurrentUser(),
   ]);
@@ -63,6 +63,8 @@ export default async function DocumentsPage({ searchParams }) {
             filters={[
               { key: "type", label: "Type", options: types.map((t) => ({ value: t, label: t })) },
               ...(client ? [] : [{ key: "client", label: "Client", kind: "select", options: clientNames.map((c) => ({ value: c, label: c })) }]),
+              // Every file added for a project (Sean, Nov 2026), its list deleted or not.
+              { key: "project", label: "Project", kind: "select", options: projectNames.map((p) => ({ value: p, label: p })) },
             ]}
             placeholder="Search documents…"
             empty="No documents yet."
@@ -88,7 +90,8 @@ export default async function DocumentsPage({ searchParams }) {
                     </TableCell>
                     {/* What it is attached to: the business (opening its lead sheet), the project and its agent. */}
                     <TableCell data-document-business>
-                      {d.leadId ? <Link href={`/leads/${d.leadId}`} className="font-medium hover:text-primary hover:underline">{d.business ?? "Lead"}</Link> : dash}
+                      {d.leadId ? <Link href={`/leads/${d.leadId}`} className="font-medium hover:text-primary hover:underline">{d.business ?? "Lead"}</Link>
+                        : d.business ? <span className="font-medium" title="Its lead is no longer on Lighthouse" data-document-business-kept>{d.business}</span> : dash}
                     </TableCell>
                     <TableCell className="max-w-56 truncate" title={d.project ?? undefined} data-document-project>{d.project ?? dash}</TableCell>
                     <TableCell data-document-agent>{d.agent ?? dash}</TableCell>
