@@ -18,11 +18,9 @@ export const dynamic = "force-dynamic";
 export default async function TeamPage() {
   const [me, team, spotlight, today, tz] = await Promise.all([getCurrentUser(), getTeam(), getTeamSpotlight(), getBusinessToday(), getBusinessTimeZone()]);
   const client = me?.role === "client";
+  // A client sees only their own team (Sean, Nov 2026): team_directory() gives them no one else.
   const groups = client
-    ? [
-        { key: "mine", label: "Working on your projects", people: team.filter((m) => m.mine) },
-        { key: "rest", label: "The rest of the team", people: team.filter((m) => !m.mine) },
-      ]
+    ? [{ key: "mine", label: "Your team", people: team }]
     : [{ key: "all", label: null, people: team }];
   const calling = team.filter((m) => m.status === "calling").length;
 
@@ -36,7 +34,7 @@ export default async function TeamPage() {
             {team.length ? (
               <TeamGrid groups={groups} me={{ id: me?.id, role: me?.role }} spotlight={spotlight} spotlightOn={spotlight !== null}
                 today={today} timeZone={tz} />
-            ) : <p className="py-10 text-center text-sm text-muted-foreground">Nobody on the team yet.</p>}
+            ) : <p className="py-10 text-center text-sm text-muted-foreground">{client ? "Nobody is assigned to your projects yet." : "Nobody on the team yet."}</p>}
           </div>
         </Card>
       </div>

@@ -15,13 +15,18 @@ const TAG = `TEAM-TEST ${Date.now()}`;
 const AGENT = Number(sql("select id from public.users where email='agent@beacon.test'"));
 const CLIENT = Number(sql("select id from public.users where email='client@beacon.test'"));
 const ADMIN = Number(sql("select id from public.users where email='admin@beacon.test'"));
+const MIKE = Number(sql("select id from public.users where email='mike@beacon.test'"));
+const SEAN = Number(sql("select id from public.users where email='sean@beacon.test'"));
 const clientCompany = sql(`select coalesce(company_id::text, 'null') from public.users where id=${CLIENT}`);
 const before = JSON.parse(sql(`select json_build_object('bio', bio, 'birthday', birthday)::text from public.users where id=${AGENT}`));
 const today = sql("select (now() at time zone public.business_tz())::date");
 const typeId = (c) => sql(`select id from public.project_types where code=${lit(c)}`);
-const company = Number(sql(`insert into public.companies (name) values (${lit(`${TAG} Insurance`)}) returning id`));
+// Mike is its Sales Rep (Nov 2026: on the client's team with those on their projects).
+const company = Number(sql(`insert into public.companies (name, sales_rep_id) values (${lit(`${TAG} Insurance`)}, ${MIKE}) returning id`));
 const P = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Churches`)}, ${company}, ${typeId("APPT")}, 1) returning id`));
 sql(`update public.users set company_id = ${company} where id = ${CLIENT}`);
+// A client's team is those assigned to their projects (Sean, Nov 2026): the agent is.
+sql(`insert into public.project_assignments (project_id, ae_user_id) values (${P}, ${AGENT})`);
 const L = Number(sql(`insert into public.leads (company_name, project_id, stage) values (${lit(`${TAG} Fusion Air`)}, ${P}, 'appt') returning id`));
 // The agent: a birthday today, a line, a lead and an appointment for this client, and a call just now.
 sql(`update public.users set bio = ${lit(`${TAG} Ten years on the phones`)}, birthday = make_date(2000, extract(month from '${today}'::date)::int, extract(day from '${today}'::date)::int) where id = ${AGENT}`);
@@ -43,7 +48,12 @@ try {
   check("…what they developed for them", /For you: 1 lead · 1 appointment this month/.test(c), c);
   check("…and their birthday: flowers, confetti and a gift to send", /Happy birthday/.test(c) && Boolean(await client.ev(`!!document.querySelector('[data-team-member="${AGENT}"] .bday-confetti') && !!document.querySelector('[data-gift-button="${AGENT}"]')`)));
   check("today's birthdays at the top of the page", /Happy birthday/.test((await client.ev("document.querySelector('[data-birthday-banner]')?.innerText")) ?? ""));
-  check("the week's spotlight", Boolean(await client.ev("!!document.querySelector('[data-team-spotlight]')")));
+  // Only their own team (Sean, Nov 2026): not how many callers there are, nor managers off their projects.
+  const shown = await client.ev("[...document.querySelectorAll('[data-team-member]')].map((e) => Number(e.dataset.teamMember))");
+  check("only their team: the agent on their project and Mike, their Sales Rep", JSON.stringify([...new Set(shown)].sort()) === JSON.stringify([AGENT, MIKE].sort()), JSON.stringify(shown));
+  check("…not Sean (not on their projects) nor the administrator, and no \"rest of the team\"", !shown.includes(SEAN) && !shown.includes(ADMIN) && !(await client.ev("!!document.querySelector('[data-team-group=rest]')")));
+  check("…Mike says Sales Rep", /Sales Rep/.test(await card(client, MIKE)), await card(client, MIKE));
+  check("no spotlight for a client: it names the team's top people", !(await client.ev("!!document.querySelector('[data-team-spotlight]')")));
   check("a message only to those who work their projects", Boolean(await client.ev(`!!document.querySelector('[data-message-button="${AGENT}"]')`))
     && (await client.ev("[...document.querySelectorAll('[data-team-group=rest] [data-message-button]')].length")) === 0);
 
@@ -85,17 +95,20 @@ try {
   section("Filters");
   await client.ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })), true");
   await client.go("/team", 5000);
-  await when(client, "!!document.querySelector('[data-team-filter=admins]')");
-  await client.click("[data-team-filter=admins]");
-  check("Administrators: only administrators", Boolean(await when(client, `!document.querySelector('[data-team-member="${AGENT}"]') && !!document.querySelector('[data-team-member="${ADMIN}"]')`)));
+  await when(client, "!!document.querySelector('[data-team-filter=rep]')");
+  check("a client's filters: Everyone, Lead developers, Appointment setters, Sales Rep (no Administrators)",
+    JSON.stringify(await client.ev("[...document.querySelectorAll('[data-team-filter]')].map((b) => b.dataset.teamFilter)")) === JSON.stringify(["all", "leads", "appts", "rep"]));
+  await client.click("[data-team-filter=rep]");
+  check("Sales Rep: their Sales Rep only", Boolean(await when(client, `!document.querySelector('[data-team-member="${AGENT}"]') && !!document.querySelector('[data-team-member="${MIKE}"]')`)));
+  check("…whom they can message", /ok|^$|null/i.test(asClient(`select public.message_team_member(${MIKE}, ${lit(`${TAG} hello Mike`)})`)) || sql(`select count(*) from public.notifications where user_id = ${MIKE} and body = ${lit(`${TAG} hello Mike`)}`) === "1");
 
   section("The spotlight, an administrator's to hide");
   await admin.go("/team", 6000);
   await when(admin, "!!document.querySelector('[data-spotlight-switch=hide]')");
   await admin.click("[data-spotlight-switch=hide]");
   check("hidden", Boolean(await until(() => sql("select coalesce(value->>'spotlight', '') from public.app_settings where key = 'team'") === "false" || null, { timeout: 10000 })));
-  await client.go("/team", 5000);
-  check("…for everyone", Boolean(await when(client, `!!document.querySelector('[data-team-member="${AGENT}"]') && !document.querySelector('[data-team-spotlight]')`)));
+  await admin.go("/team", 5000);
+  check("…for everyone", Boolean(await when(admin, `!!document.querySelector('[data-spotlight-switch=show]') && !document.querySelector('[data-team-spotlight] [data-team-member]')`)));
   await admin.go("/team", 5000);
   await when(admin, "!!document.querySelector('[data-spotlight-switch=show]')");
   await admin.click("[data-spotlight-switch=show]");
@@ -123,6 +136,8 @@ try {
   sql(`delete from public.call_records where notes = ${lit(TAG)}`);
   sql(`delete from public.pay_events where lead_id = ${L}`);
   sql(`delete from public.leads where id = ${L}`);
+  sql(`delete from public.project_assignments where project_id = ${P}`);
+  sql(`delete from public.notifications where user_id = ${MIKE} and body like ${lit(`${TAG}%`)}`);
   sql(`delete from public.projects where id = ${P}`);
   sql(`delete from public.companies where id = ${company}`);
 }

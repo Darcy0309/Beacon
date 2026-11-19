@@ -13,7 +13,7 @@ import { loadMemberRecent, setTeamSpotlight } from "@/features/team/actions";
 import { imageUrl, initialsOf } from "@/lib/images";
 import { reach } from "@/lib/reach";
 import { ROLES } from "@/lib/nav";
-import { TEAM_FILTERS, tenure } from "@/lib/team";
+import { CLIENT_TEAM_FILTERS, TEAM_FILTERS, tenure } from "@/lib/team";
 import { cn } from "@/lib/utils";
 
 const STATUS = {
@@ -71,7 +71,8 @@ export default function TeamGrid({ groups, me, spotlight, spotlightOn, today, ti
   const [filter, setFilter] = useState("all");
   const [open, setOpen] = useState(null); // { kind: "profile" | "message" | "thanks" | "gift", member }
   const client = me.role === "client";
-  const test = TEAM_FILTERS.find(([k]) => k === filter)?.[2] ?? (() => true);
+  const filters = client ? CLIENT_TEAM_FILTERS : TEAM_FILTERS;
+  const test = filters.find(([k]) => k === filter)?.[2] ?? (() => true);
   const match = (m) => (!q.trim() || m.name.toLowerCase().includes(q.trim().toLowerCase())) && (!photos || m.photo) && test(m);
   const shown = groups.map((g) => ({ ...g, people: g.people.filter(match) }));
   const none = shown.every((g) => g.people.length === 0);
@@ -131,7 +132,7 @@ export default function TeamGrid({ groups, me, spotlight, spotlightOn, today, ti
 
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Show">
-          {TEAM_FILTERS.map(([key, label]) => (
+          {filters.map(([key, label]) => (
             <button key={key} type="button" onClick={() => setFilter(key)} aria-pressed={filter === key} data-team-filter={key}
               className={cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 filter === key ? "border-primary bg-primary/12 text-primary" : "border-[var(--panel-border)] text-muted-foreground hover:text-foreground")}>

@@ -21,6 +21,14 @@ export const TEAM_FILTERS = [
   ["admins", "Administrators", (m) => m.role === "admin"],
 ];
 
+/** A client's filters (Sean, Nov 2026): their own team's kinds and their Sales Rep, not Administrators. */
+export const CLIENT_TEAM_FILTERS = [
+  ["all", "Everyone", () => true],
+  ["leads", "Lead developers", (m) => /Lead development/.test(m.does ?? "")],
+  ["appts", "Appointment setters", (m) => /ppointment setting/.test(m.does ?? "")],
+  ["rep", "Sales Rep", (m) => /Sales Rep/.test(m.does ?? "")],
+];
+
 export const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** A birthday from its month and day (1-based): "2000-MM-DD", null when either is missing; throws on a day the month lacks. */

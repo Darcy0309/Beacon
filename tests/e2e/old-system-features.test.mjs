@@ -65,7 +65,8 @@ try {
   const mine = (await when(client, "document.querySelector('[data-team-group=mine]')?.innerText")) ?? "";
   check("a client sees first those who work their projects, photo and line", mine.includes("Ten years on the phones")
     && Boolean(await client.ev(`!!document.querySelector('[data-team-group=mine] [data-team-member="${AGENT}"] img')`)), mine.slice(0, 200));
-  check("…the rest of the team after", Boolean(await client.ev("!!document.querySelector('[data-team-group=rest] [data-team-member]')")));
+  // Only their own team (Sean, Nov 2026): no "rest of the team".
+  check("…and no one else: not the rest of the team", !(await client.ev("!!document.querySelector('[data-team-group=rest]')")));
   check("…no emails or phone numbers", !/@beacon\.test/.test(await client.ev("document.querySelector('main')?.innerText ?? document.body.innerText")));
   await client.fill("[data-team-search]", "zzzz-nobody");
   check("a name to look for narrows it", Boolean(await until(() => client.ev("!document.querySelector('[data-team-member]')"))));
