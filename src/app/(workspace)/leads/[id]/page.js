@@ -1,7 +1,7 @@
 import Link from "@/components/shared/intent-link";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { ArrowLeft, ArrowRight, BadgeDollarSign, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, Printer, Repeat } from "lucide-react";
+import { ArrowLeft, ArrowRight, BadgeDollarSign, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, Printer, Repeat, Reply } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
 import Tabs from "@/components/shared/tabs";
@@ -791,7 +791,7 @@ export default async function LeadSheet({ params, searchParams }) {
           <Tabs
             label="History"
             // From an update's notification (?tab=updates): its history open.
-            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : undefined}
+            initial={sp?.tab === "updates" && (seesInternal || client) ? "updates" : sp?.tab === "emails" ? "emails" : undefined}
             panelClassName="min-h-44"
             tabs={[
               // The calls (on the Lighthouse phone or logged with a result), the texts, and the call-back
@@ -923,20 +923,20 @@ export default async function LeadSheet({ params, searchParams }) {
                     content: (
                       <div className="divide-y divide-[var(--panel-border)]">
                         {activity.emails.map((e) => (
-                          <details key={e.id} data-list-row data-email-row className="group px-4 py-2.5">
+                          <details key={e.id} data-list-row data-email-row={e.reply ? "reply" : "sent"} className={cn("group px-4 py-2.5", e.reply && "bg-primary/[0.04]")}>
                             <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                               <div className="flex items-center justify-between gap-3 text-sm">
                                 <span className="flex min-w-0 items-center gap-2">
-                                  <Mail className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                  {e.reply ? <Reply className="size-3.5 shrink-0 text-primary" aria-hidden /> : <Mail className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />}
                                   <span className="truncate font-medium">{e.subject}</span>
                                 </span>
                                 <span className="flex shrink-0 items-center gap-2">
-                                  {e.sent ? null : <ToneBadge tone="rose">Not sent</ToneBadge>}
+                                  {e.reply ? <ToneBadge tone="cyan">Reply</ToneBadge> : e.sent ? null : <ToneBadge tone="rose">Not sent</ToneBadge>}
                                   <span className="text-xs tabular-nums text-muted-foreground">{stamp(e.at)}</span>
                                 </span>
                               </div>
                               <p className="flex items-center gap-1 pl-5 text-[0.7rem] text-muted-foreground">
-                                <span className="min-w-0 truncate">To {e.to} · {e.by}</span>
+                                <span className="min-w-0 truncate">{e.reply ? `From ${e.from ?? "them"} · to ${e.by}` : `To ${e.to} · ${e.by}`}</span>
                                 <ChevronDown className="size-3 shrink-0 transition-transform group-open:rotate-180" aria-hidden />
                               </p>
                             </summary>

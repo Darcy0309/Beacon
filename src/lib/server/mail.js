@@ -17,7 +17,8 @@ import "server-only";
 import nodemailer from "nodemailer";
 import { mailboxHeader, resendFailure } from "@/lib/email";
 
-const RESEND = "https://api.resend.com/emails";
+// Resend's API (RESEND_API_URL only for the tests' stand-in).
+const resendBase = () => (process.env.RESEND_API_URL?.trim() || "https://api.resend.com").replace(/\/+$/, "");
 
 /** How mail goes out, with its login, or null when the environment names nothing. */
 export function mailServer() {
@@ -54,7 +55,7 @@ export async function sendMail(message) {
 async function sendWithResend(key, { from, replyTo, to, subject, text, html, attachments }) {
   let res;
   try {
-    res = await fetch(RESEND, {
+    res = await fetch(`${resendBase()}/emails`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({

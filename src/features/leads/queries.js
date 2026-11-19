@@ -248,10 +248,10 @@ export async function getLeadActivity(leadId) {
       .limit(20),
     supabase
       .from("lead_emails")
-      .select("id, to_address, subject, body, status, error, created_at, attachments, user:users(first_name, last_name)")
+      .select("id, to_address, subject, body, status, error, created_at, attachments, direction, from_address, user:users(first_name, last_name)")
       .eq("lead_id", leadId)
       .order("created_at", { ascending: false })
-      .limit(20),
+      .limit(30),
     // Row Level Security: my own reminders (an administrator's: everyone's).
     supabase
       .from("reminders")
@@ -324,6 +324,9 @@ export async function getLeadActivity(leadId) {
       when: timeAgo(e.created_at),
       at: e.created_at,
       by: fullName(one(e.user)) || "—",
+      // A reply to one sent from the lead (Nov 2026): who it is from.
+      reply: e.direction === "in",
+      from: e.from_address ?? null,
       // The files it carried (an email template's; Nov 2026).
       attachments: e.attachments ?? [],
     })),

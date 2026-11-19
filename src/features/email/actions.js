@@ -4,6 +4,7 @@
 
 import { check, currentAppUser, fail, logActivity, ok } from "@/lib/server/action-helpers";
 import { mailServer, sendMail } from "@/lib/server/mail";
+import { newReplyAddress } from "@/lib/server/inbound-email";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { EMAIL_LIMITS, isReservedAddress, mailFailure, oneLine } from "@/lib/email";
@@ -48,7 +49,8 @@ export async function sendLeadEmail(prevState, formData) {
 
   const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const [{ count, error: countError }, { data: settings }, { data: profile }] = await Promise.all([
-    admin.from("lead_emails").select("id", { count: "exact", head: true }).eq("user_id", me.id).gte("created_at", hourAgo),
+    // Emails they sent (not replies to them, kept under them too).
+    admin.from("lead_emails").select("id", { count: "exact", head: true }).eq("user_id", me.id).eq("direction", "out").gte("created_at", hourAgo),
     supabase.from("app_settings").select("key, value").in("key", ["mail", "organization"]),
     supabase.from("users").select("first_name, last_name, email").eq("id", me.id).single(),
   ]);
@@ -78,14 +80,17 @@ export async function sendLeadEmail(prevState, formData) {
     }
   }
 
+  // Replies come back to Lighthouse, onto this lead, when that is set up (Nov 2026): an address of this
+  // email's own, the sender told and sent a copy. Otherwise to the sender, unless their sign-in is a test
+  // address no mail reaches: then to the From address.
+  const reply = newReplyAddress();
   let messageId = null;
   let problem = null;
   try {
     ({ messageId } = await sendMail({
       from: { name, address: from },
-      // Replies come back to the sender, unless their sign-in is a test
-      // address no mail reaches: then to the From address.
-      replyTo: isReservedAddress(profile?.email ?? me.email) ? undefined : { name, address: profile?.email ?? me.email },
+      replyTo: reply ? { name, address: reply.address }
+        : isReservedAddress(profile?.email ?? me.email) ? undefined : { name, address: profile?.email ?? me.email },
       to: values.to,
       subject,
       text: values.body,
@@ -107,6 +112,7 @@ export async function sendLeadEmail(prevState, formData) {
     message_id: messageId ? String(messageId).slice(0, 300) : null,
     template_id: templateId,
     attachments: files.map((f) => f.filename),
+    reply_token: reply?.token ?? null,
   });
   if (keepError) console.error("[email] not kept on the lead's history", leadId, keepError.message);
 
