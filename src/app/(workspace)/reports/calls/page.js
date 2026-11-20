@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Search } from "lucide-react";
 import Link from "@/components/shared/intent-link";
@@ -11,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RecordingPlayer } from "@/features/notifications/components/call-recording-card";
 import { getCallLog } from "@/features/phone/queries";
+import CallLogTranscript from "@/features/phone/components/call-log-transcript";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
@@ -49,7 +51,7 @@ export default async function CallLog({ searchParams }) {
   const to = all ? null : chosen ? (sp.from <= sp.to ? sp.to : sp.from) : today;
   const page = /^[1-9]\d{0,4}$/.test(sp?.page ?? "") ? Number(sp.page) : 1;
 
-  const log = await getCallLog({ from, to, user, kind, digits, limit: PER_PAGE, offset: (page - 1) * PER_PAGE });
+  const log = await getCallLog({ from, to, user, kind, digits, limit: PER_PAGE, offset: (page - 1) * PER_PAGE, viewer: me });
   const counts = log.counts ?? { all: 0, out_handled: 0, out_cancelled: 0, in_handled: 0, missed: 0 };
   const pages = Math.max(1, Math.ceil(log.total / PER_PAGE));
 
@@ -125,8 +127,11 @@ export default async function CallLog({ searchParams }) {
               <TableBody>
                 {log.rows.map((c) => {
                   const Icon = KIND_ICON[c.kind] ?? PhoneCall;
+                  // A recorded call's transcription opens beneath it (Nov 2026): the two rows read as one.
+                  const transcript = c.recording?.transcript ?? null;
                   return (
-                    <TableRow key={`${c.callSid}`} data-call={c.callSid} data-kind={c.kind}>
+                    <Fragment key={c.callSid}>
+                    <TableRow data-call={c.callSid} data-kind={c.kind} className={cn(transcript && "border-b-0")}>
                       <TableCell className="whitespace-nowrap tabular-nums">{clock(c.startedAt)}</TableCell>
                       {admin ? <TableCell className={cn(!c.name && "text-muted-foreground")}>{c.name ?? "No one online"}</TableCell> : null}
                       <TableCell className="whitespace-nowrap">
@@ -153,6 +158,8 @@ export default async function CallLog({ searchParams }) {
                         {c.recording ? <RecordingPlayer src={`/api/phone/recordings/${c.recording.sid}`} seconds={c.recording.seconds} /> : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                     </TableRow>
+                    {transcript ? <CallLogTranscript sid={c.recording.sid} transcript={transcript} ours={c.name} theirs={c.leadCompany} colSpan={admin ? 7 : 6} /> : null}
+                    </Fragment>
                   );
                 })}
                 {log.rows.length === 0 ? (

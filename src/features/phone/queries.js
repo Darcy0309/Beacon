@@ -1,7 +1,10 @@
 /** Call Activity: the calls made and taken on the phone's Twilio line, by person. */
 
 import "server-only";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { catchUpCallTranscripts } from "@/lib/server/call-transcripts";
 
 /**
  * Each person's calls over the business's days from..to (phone_call_report),
@@ -55,7 +58,7 @@ export async function getCallTimes(day, { scope = "all", userId = null } = {}) {
  * `kind`: out, in, out_handled, out_cancelled, in_handled, missed or null; `digits`: part of the number;
  * from..to the business's days (null: all time). { rows, total, counts { all, out_handled, … } }.
  */
-export async function getCallLog({ from = null, to = null, user = null, kind = null, digits = null, limit = 100, offset = 0 }) {
+export async function getCallLog({ from = null, to = null, user = null, kind = null, digits = null, limit = 100, offset = 0, viewer = null }) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("phone_call_log", {
     p_from: from, p_to: to, p_user: user === "none" ? 0 : user, p_kind: kind, p_number: digits, p_limit: limit, p_offset: offset,
@@ -70,6 +73,7 @@ export async function getCallLog({ from = null, to = null, user = null, kind = n
     });
     first = any?.[0] ? { ...any[0], total: 0 } : null;
   }
+  const transcripts = await callTranscripts((data ?? []).map((r) => r.recording_sid).filter(Boolean), viewer);
   return {
     rows: (data ?? []).map((r) => ({
       callSid: r.call_sid,
@@ -83,11 +87,34 @@ export async function getCallLog({ from = null, to = null, user = null, kind = n
       leadId: r.lead_id,
       leadCompany: r.lead_company,
       leadByNumber: Boolean(r.lead_by_number),
-      recording: r.recording_sid ? { sid: r.recording_sid, seconds: n(r.recording_seconds) } : null,
+      recording: r.recording_sid ? { sid: r.recording_sid, seconds: n(r.recording_seconds), transcript: transcripts.get(r.recording_sid) ?? null } : null,
     })),
     total: n(first?.total),
     counts: first
       ? { all: n(first.n_all), out_handled: n(first.n_out_handled), out_cancelled: n(first.n_out_cancelled), in_handled: n(first.n_in_handled), missed: n(first.n_missed) }
       : null,
   };
+}
+
+/**
+ * The Call Log's transcripts (Nov 2026: "Show transcription"), for the recordings `viewer` may play (an
+ * administrator's every one, anyone else's their own): sid → { status, lines, error, summary }, as the
+ * lead's Conversation has them. Those still being transcribed are looked at again once the page is sent.
+ */
+async function callTranscripts(sids, viewer) {
+  const out = new Map();
+  const admin = sids.length && viewer ? createAdminClient() : null;
+  if (!admin) return out;
+  const COLS = "recording_sid, user_id, transcript_status, transcript_error, transcript_updated_at, transcript_sid, transcript";
+  const read = (cols) => admin.from("phone_recordings").select(cols).in("recording_sid", sids);
+  // With its AI summary; before that column's migration has run, without it.
+  const withSummary = await read(`${COLS}, summary`);
+  const recs = (withSummary.error ? (await read(COLS)).data : withSummary.data) ?? [];
+  const mine = recs.filter((r) => viewer.role === "admin" || r.user_id === viewer.id);
+  for (const r of mine) {
+    out.set(r.recording_sid, { status: r.transcript_status ?? "none", lines: r.transcript ?? [], error: r.transcript_error ?? null, summary: r.summary ?? null });
+  }
+  const waiting = mine.filter((r) => r.transcript_status === "transcribing");
+  if (waiting.length) after(() => catchUpCallTranscripts(admin, waiting).catch((err) => console.error("[call log] catch-up", err?.message ?? err)));
+  return out;
 }
