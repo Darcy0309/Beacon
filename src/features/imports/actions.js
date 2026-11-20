@@ -13,6 +13,9 @@ import { sicCode, sicMatcher } from "@/lib/sic";
 import { POLICY_LINES, carrierMatcher } from "@/lib/coverage";
 import { fillPlaces } from "@/lib/server/zip-places";
 
+// A DB Dev result that makes a name a lead or an appointment (it goes on to the appointment project).
+const LEAD_EFFECTS = new Set(["promote", "appointment", "confirm", "reschedule", "appointment_invalid"]);
+
 const MAX_CSV_BYTES = MAX_IMPORT_MB * 1024 * 1024;
 // Leads per insert: each one is a round trip, and each is one statement the
 // database must finish inside its time limit.
@@ -182,7 +185,7 @@ export async function importLeadsCsv(prevState, formData) {
   // and new result names both work (call_results.aliases holds the old ones).
   const [me, { data: project }, { data: statusRows }, { data: resultRows }, { data: apptStatus }, { data: staff }, { data: invalidStatus }] = await Promise.all([
     currentAppUser(supabase),
-    supabase.from("projects").select("id, company_id, appt_project_id, type:project_types(code)").eq("id", projectId).maybeSingle(),
+    supabase.from("projects").select("id, company_id, appt_project_id, contact_name, type:project_types(code)").eq("id", projectId).maybeSingle(),
     supabase.from("lead_statuses").select("id, code"),
     supabase.from("call_results").select("id, project_type, name, aliases, viable, effect, status_code"),
     supabase.from("appointment_statuses").select("id").eq("name", "Scheduled").maybeSingle(),
@@ -192,6 +195,17 @@ export async function importLeadsCsv(prevState, formData) {
   ]);
   if (!project) return fail("That project no longer exists.", { project_id: "Choose another project" });
   const projectType = (Array.isArray(project.type) ? project.type[0] : project.type)?.code === "APPT" ? "APPT" : "DBDV";
+  // A list loaded onto an appointment project whose names the old system had only on DB Dev (Sean, Nov 2026: a
+  // "Call 1" with renewal dates came in as Lead-No Contact): those go to its DB Dev project, when it has one.
+  let feeder = null;
+  // The appointment project's Agent, for names that go on to it.
+  const apptAgent = project.appt_project_id
+    ? (await supabase.from("projects").select("contact_name").eq("id", project.appt_project_id).maybeSingle()).data?.contact_name ?? null
+    : null;
+  if (projectType === "APPT") {
+    const { data: feeders } = await supabase.from("projects").select("id, name, contact_name").eq("appt_project_id", projectId).is("deleted_at", null).limit(2);
+    if (feeders?.length === 1) feeder = feeders[0];
+  }
 
   // Names the client has taken off before don't come back on a new list, and names already on the
   // project's family aren't loaded twice (the preview left them out; this makes sure).
@@ -241,7 +255,15 @@ export async function importLeadsCsv(prevState, formData) {
   const apptSaid = (text) => (["promote", "appointment"].includes(resultFor("DBDV", text)?.effect) && !resultFor("APPT", text) ? null : text);
   const byName = (type, name) => (resultRows ?? []).find((r) => r.project_type === type && r.name === name);
   // A new name's first result on each stage, found once rather than per row.
-  const firstResult = { DBDV: byName("DBDV", "Viable-CallBack"), APPT: byName("APPT", "Lead-No Contact") };
+  const firstResult = { DBDV: byName("DBDV", "Viable-CallBack") ?? resultFor("DBDV", "Viable-No Contact"), APPT: byName("APPT", "Lead-No Contact") ?? resultFor("APPT", "Lead No Contact") };
+  // The producer on each name (Sean, Nov 2026: "It should be replacing whatever name we have assigned to the Project
+  // Agent name on the new projects"): the project's Agent / producer name, not the old system's; the appointment
+  // project's own when a name goes on to it. The file's only where the project names none.
+  const agentOf = (target) => {
+    return (target === project.appt_project_id ? apptAgent?.trim() : null)
+      || (feeder && target === feeder.id ? feeder.contact_name?.trim() : null)
+      || project.contact_name?.trim() || null;
+  };
 
   // SIC: a code and a description in separate columns, either one missing. A
   // description finds its code in the SIC list; a code with a description
@@ -328,6 +350,8 @@ export async function importLeadsCsv(prevState, formData) {
   let appointments = 0;
   // Appointment results with no appointment date, brought in as Lead-No Contact.
   let noDateAppts = 0;
+  // Names an appointment list had only on DB Dev, put on its DB Dev project.
+  let toDbDev = 0;
   // The business's clock, for an invalid appointment's date and time.
   const businessTz = (await supabase.rpc("business_tz")).data || "America/Phoenix";
   const childInserts = [];
@@ -353,8 +377,16 @@ export async function importLeadsCsv(prevState, formData) {
       const { lead, status, history } = parsedRow;
       let target = projectId;
       let stageType = projectType;
-      const said = projectType === "DBDV" ? lead.call_result_dbdv : apptSaid(lead.call_result_appt);
-      let result = resultFor(projectType, said);
+      const dbdvWas = resultFor("DBDV", lead.call_result_dbdv);
+      const apptWas = resultFor("APPT", apptSaid(lead.call_result_appt));
+      // Only a DB Dev result, and not a lead or appointment: a DB Dev name, on the DB Dev project.
+      if (feeder && dbdvWas && !apptWas && !LEAD_EFFECTS.has(dbdvWas.effect)) {
+        target = feeder.id;
+        stageType = "DBDV";
+        toDbDev += 1;
+      }
+      const said = stageType === "DBDV" ? lead.call_result_dbdv : apptSaid(lead.call_result_appt);
+      let result = resultFor(stageType, said);
       // A result the system does not know: the name starts at the stage's first; the import says which.
       if (said && !result) unknownResults.set(said.trim(), (unknownResults.get(said.trim()) ?? 0) + 1);
       let source = null;
@@ -383,8 +415,17 @@ export async function importLeadsCsv(prevState, formData) {
         || (stageType === "DBDV" && resultFor("APPT", apptSaid(lead.call_result_appt))?.effect === "appointment_invalid");
       // When it was developed and by whom, as the old system says: the reports count it then, to them.
       const developedBy = whoIs(history?.developed_by);
+      // Each result column in the new system's names, not the old system's (Sean, Nov 2026: "Call 1", "X-Date Hot
+      // Lead" came through as they were): the stage it is on, its result; the other, the old one's new name.
+      const resultText = stageType === "APPT"
+        ? { call_result_appt: result?.name ?? null, call_result_dbdv: dbdvWas?.name ?? (lead.call_result_dbdv || null) }
+        : { call_result_dbdv: result?.name ?? null, call_result_appt: apptWas?.name ?? (lead.call_result_appt || null) };
+      const producer = agentOf(target) ?? lead.producer_name ?? null;
+      parsedRow.producer = producer;
       return {
         ...lead,
+        ...resultText,
+        producer_name: producer,
         project_id: target,
         ...(source ? { source_project_id: source, promoted_at: dayAt(history?.developed_at) ?? now } : {}),
         // Loaded onto an appointment project, a lead the old system says was developed.
@@ -438,7 +479,7 @@ export async function importLeadsCsv(prevState, formData) {
               ?? dayAt(source.appointment?.appt_date) ?? setAt;
             return { invalid_at: at, status_update_date: at };
           })() : {}),
-          rep_name: source.lead.producer_name ?? null,
+          rep_name: source.producer ?? source.lead.producer_name ?? null,
           list_source: source.lead.list_source || listSource,
           appt_create_date: setAt,
           // Set by whom the old system says; else by whoever developed the lead.
@@ -478,7 +519,7 @@ export async function importLeadsCsv(prevState, formData) {
   // Share the new names out across each project's account managers (each
   // project on its own, so both at once), and record the batch meanwhile.
   const [splits, { error: batchError }] = await Promise.all([
-    Promise.all([...new Set([projectId, project.appt_project_id].filter(Boolean))].map(async (id) => {
+    Promise.all([...new Set([projectId, project.appt_project_id, toDbDev ? feeder?.id : null].filter(Boolean))].map(async (id) => {
       const { data: split, error: splitError } = await supabase.rpc("distribute_project_names", { p_project_id: id });
       if (splitError) console.error("[import] distribution failed:", splitError.message);
       return { id, reps: splitError ? 0 : split?.reps ?? 0 };
@@ -513,5 +554,5 @@ export async function importLeadsCsv(prevState, formData) {
   const people = [...unknownPeople].sort((a, b) => b[1] - a[1]).map(([text, n]) => ({ text, n }));
   const carriers = [...unmatchedCarriers].sort((a, b) => b[1] - a[1]).slice(0, 50).map(([text, n]) => ({ text, n }));
   const carriersBlank = [...unmatchedCarriers.values()].reduce((sum, n) => sum + n, 0);
-  return ok({ people, carriers, carriersBlank, imported, errors, details, appointments, noDateAppts, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
+  return ok({ toDbDev, dbDevProject: toDbDev ? feeder?.name : null, people, carriers, carriersBlank, imported, errors, details, appointments, noDateAppts, assigned, total: rows.length - 1 + duplicates, unknown, duplicates, deletions, removed: removedBefore, existing, others: onOthers, places });
 }

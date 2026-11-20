@@ -144,7 +144,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
 
   useEffect(() => {
     if (state?.ok) {
-      const { imported, errors, total, assigned, unknown = [], people = [], carriers = [], carriersBlank = 0, noDateAppts = 0, duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
+      const { imported, errors, total, assigned, toDbDev = 0, dbDevProject = null, unknown = [], people = [], carriers = [], carriersBlank = 0, noDateAppts = 0, duplicates = 0, removed = 0, existing = 0, others = 0, places = {} } = state.data ?? {};
       const left = [duplicates ? `${duplicates} duplicate${duplicates === 1 ? "" : "s"} left off` : "", removed ? `${removed} taken off before` : "",
         existing ? `${existing} already on the project` : "", others ? `${others} on other clients' lists` : ""].filter(Boolean).join(" · ");
       // What the list left out of a place and the rest said for certain (a ZIP's county, a city's ZIP…; Oct 2026).
@@ -159,6 +159,10 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
           description: unknown.slice(0, 6).map((u) => `“${u.text}” (${u.n})`).join(", ") + (unknown.length > 6 ? ", …" : ""),
           duration: 20000,
         });
+      }
+      // Names the old system had only on DB Dev, loaded with an appointment list (Nov 2026): on its DB Dev project.
+      if (toDbDev) {
+        toast.info(`${toDbDev.toLocaleString()} row${toDbDev === 1 ? " was a DB Dev name" : "s were DB Dev names"} (a DB Dev result, not a lead), so ${toDbDev === 1 ? "it went" : "they went"} on ${dbDevProject ?? "the DB Dev project"}`, { duration: 15000 });
       }
       // Appointment results with no appointment date (Sean, Nov 2026): brought in as Lead-No Contact.
       if (noDateAppts) {
