@@ -8,7 +8,20 @@ export async function getMatchSummary() {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("match_summary");
   if (error) throw error;
-  return (data ?? []).map((r) => ({ ...r, leads: Number(r.leads), developed: Number(r.developed), matched: Number(r.matched), matches: Number(r.matches) }));
+  // Each project's client's Sales Rep (Sean, Nov 2026: the list filtered by Sales Rep).
+  const ids = (data ?? []).map((r) => r.project_id);
+  const rep = new Map();
+  for (let i = 0; i < ids.length; i += 500) {
+    const { data: projects } = await supabase.from("projects")
+      .select("id, company:companies(sales_rep:users!companies_sales_rep_id_fkey(first_name, last_name))").in("id", ids.slice(i, i + 500));
+    for (const p of projects ?? []) {
+      const c = Array.isArray(p.company) ? p.company[0] : p.company;
+      const u = Array.isArray(c?.sales_rep) ? c.sales_rep[0] : c?.sales_rep;
+      if (u) rep.set(p.id, [u.first_name, u.last_name].filter(Boolean).join(" ") || null);
+    }
+  }
+  return (data ?? []).map((r) => ({ ...r, leads: Number(r.leads), developed: Number(r.developed), matched: Number(r.matched), matches: Number(r.matches),
+    sales_rep: rep.get(r.project_id) ?? null }));
 }
 
 /** project_matches(): a project's names we have elsewhere with a renewal date, the record matched, soonest renewal first. */
