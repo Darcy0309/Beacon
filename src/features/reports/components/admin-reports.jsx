@@ -16,6 +16,9 @@ import { monthBarTips } from "@/lib/chart-tips";
 import { formatRange, isIsoDate, monthStart } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
+/** A long name with places to break after its "_" and "-" (project names have no spaces). */
+const breakable = (name) => String(name ?? "").split(/(?<=[_-])/).flatMap((part, i) => (i ? [<wbr key={i} />, part] : [part]));
+
 const BAR_COLORS = ["var(--neon-cyan)", "var(--neon-emerald)", "var(--neon-amber)", "var(--neon-violet)", "var(--neon-magenta)"];
 const usd = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US", { style: "currency", currency: "USD" }));
 const pct = (n, of) => (of ? Math.round((n / of) * 100) : 0);
@@ -236,7 +239,11 @@ export default async function AdminReports({ sp, today }) {
               {bill.map((r) => (
                 <TableRow key={r.project_id} data-billing-row={r.project_id}>
                   <TableCell className="max-w-36 truncate" title={r.client}>{r.client}</TableCell>
-                  <TableCell className="max-w-52 truncate font-medium" title={r.project}><Link href={`/projects/${r.project_id}`} className="hover:text-primary">{r.project}</Link></TableCell>
+                  {/* The whole name, on two lines if it needs them (Sean, Nov 2026: "…_CA-AZ-Tr…" should read Trucking),
+                      broken after its "_" and "-" rather than widening the table past its card. */}
+                  <TableCell className="min-w-44 max-w-64 whitespace-normal font-medium leading-snug" title={r.project} data-billing-project>
+                    <Link href={`/projects/${r.project_id}`} className="line-clamp-3 hover:text-primary">{breakable(r.project)}</Link>
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{figure(r, "leads", r.leads)}</TableCell>
                   <TableCell className="text-right tabular-nums">{usd(r.leadBilling)}</TableCell>
                   <TableCell className="text-right tabular-nums">{figure(r, "appts", r.appts)}</TableCell>
