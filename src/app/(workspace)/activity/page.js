@@ -8,6 +8,7 @@ import FilterTable from "@/components/shared/filter-table";
 import { Card } from "@/components/ui/card";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { listActivity, getActivitySummary, getActivityActions } from "@/features/activity/queries";
+import UsageTable from "@/features/activity/components/usage-table";
 import { readListParams, pageInfo } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
@@ -15,18 +16,6 @@ export const dynamic = "force-dynamic";
 const roleTone = { Administrator: "amber", Manager: "cyan", Agent: "emerald", Client: "violet" };
 // The pages an entry can open: what it was done to.
 const ENTITY_PAGE = { lead: "/leads", project: "/projects" };
-
-/** How busy an account is, relative to the busiest one, as a bar width. */
-function Bar({ value, max, color }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className="h-1.5 w-20 overflow-hidden rounded-full bg-secondary">
-        <div className="h-full rounded-full" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} />
-      </div>
-      <span className="tabular-nums">{value}</span>
-    </div>
-  );
-}
 
 export default async function ActivityPage({ searchParams }) {
   const params = readListParams(await searchParams, ["action", "user"]);
@@ -40,8 +29,6 @@ export default async function ActivityPage({ searchParams }) {
   const activeUsers = summary.filter((u) => u.logins30d > 0).length;
   const actions30d = summary.reduce((s, u) => s + u.actions30d, 0);
   const quietest = summary.filter((u) => u.logins30d === 0).length;
-  const maxLogins = Math.max(1, ...summary.map((u) => u.loginsMonth));
-  const maxActions = Math.max(1, ...summary.map((u) => u.actions30d));
 
   const tiles = [
     { label: "Sign-Ins This Month", value: String(loginsMonth), note: "across every account",
@@ -66,42 +53,7 @@ export default async function ActivityPage({ searchParams }) {
 
         <Card>
           <SectionHeader label="Usage by Account" icon={Users} />
-          <div className="overflow-x-auto">
-            <table className="w-full caption-bottom text-sm">
-              <thead className="[&_tr]:border-b [&_tr]:border-[var(--panel-border)]">
-                <tr>
-                  {["User", "Role", "Sign-ins this month", "Last 30 days", "Changes (30d)", "Last active"].map((h) => (
-                    <th key={h} className="h-10 whitespace-nowrap px-4 text-left align-middle text-[0.66rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="[&_tr:last-child]:border-0">
-                {summary.map((u) => (
-                  <tr key={u.id} className="border-b border-[var(--panel-border)]">
-                    <td className="px-4 py-3.5 align-middle">
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: u.color }}>{u.initials}</span>
-                        <div>
-                          <div className="font-medium">{u.name}</div>
-                          <div className="text-xs text-muted-foreground">{u.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3.5 align-middle"><ToneBadge tone={roleTone[u.role] ?? "slate"}>{u.role}</ToneBadge></td>
-                    <td className="px-4 py-3.5 align-middle"><Bar value={u.loginsMonth} max={maxLogins} color="var(--neon-cyan)" /></td>
-                    <td className="px-4 py-3.5 align-middle tabular-nums text-muted-foreground">{u.logins30d}</td>
-                    <td className="px-4 py-3.5 align-middle"><Bar value={u.actions30d} max={maxActions} color="var(--neon-violet)" /></td>
-                    <td className={`px-4 py-3.5 align-middle ${u.lastActive === "Never" ? "text-muted-foreground" : ""}`}>{u.lastActive}</td>
-                  </tr>
-                ))}
-                {summary.length === 0 && (
-                  <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">Nothing recorded yet.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <UsageTable rows={summary} />
         </Card>
 
         <Card>

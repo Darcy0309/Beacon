@@ -99,14 +99,37 @@ const ACTION_LABEL = {
 /** An action in words: its label, or its code read as words ("project.rates" -> "Project rates") until it has one. */
 const actionLabel = (a) => ACTION_LABEL[a] ?? String(a ?? "").replace(/[._]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 
+/**
+ * Each account's client and which of its projects it sees (Sean, Nov 2026: the usage filtered by Client, Agent or
+ * Manager), by user id. Before the migration that adds project_scope (20270226) has run, without it.
+ */
+async function loginKinds(supabase) {
+  const read = (cols) => supabase.from("users").select(cols).limit(5000);
+  let res = await read("id, project_scope, company:companies!users_company_id_fkey(name)");
+  if (res.error) {
+    console.error("[activity] logins without their projects:", res.error.message);
+    res = await read("id, company:companies!users_company_id_fkey(name)");
+  }
+  const out = new Map();
+  for (const u of res.data ?? []) {
+    const c = Array.isArray(u.company) ? u.company[0] : u.company;
+    out.set(u.id, { scope: u.project_scope ?? "all", client: c?.name ?? null });
+  }
+  return out;
+}
+
 /** How active each account has been — the activity_summary() SQL function. */
 export async function getActivitySummary() {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("activity_summary");
+  const [{ data, error }, extra] = await Promise.all([supabase.rpc("activity_summary"), loginKinds(supabase)]);
   if (error) throw error;
   return (data ?? []).map((r) => {
     const name = fullName(r) || r.email;
+    const more = extra.get(r.user_id) ?? {};
     return {
+      // A client's own login or one of its agents (kept to some of its projects), and which client (Nov 2026).
+      kind: r.role === "client" ? (more.scope === "only" ? "client_agent" : "client") : r.role,
+      client: more.client ?? null,
       id: r.user_id,
       name,
       email: r.email,

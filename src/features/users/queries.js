@@ -49,9 +49,9 @@ export async function listUsers(params) {
   const enabled = new Set((mfa ?? []).filter((m) => m.enabled).map((m) => m.user_id));
   const ids = [...enabled];
 
-  const { rows, total } = await runPaged((p) => {
+  const list = (cols) => runPaged((p) => {
     // A to Z by name, whatever role is shown (Sean, Nov 2026: the clients' people will run into the hundreds).
-    let query = supabase.from("users").select("*, company:companies!users_company_id_fkey(id, name), picks:client_user_projects(project_id)", { count: "exact" })
+    let query = supabase.from("users").select(cols, { count: "exact" })
       .order("first_name").order("last_name").order("email").order("id");
     if (mfaFilter === "true") query = query.in("id", ids);
     else if (mfaFilter === "false" && ids.length) query = query.not("id", "in", `(${ids.join(",")})`);
@@ -60,6 +60,14 @@ export async function listUsers(params) {
       columns: { role: "role", status: "status" },
     });
   }, { ...params, filters });
+  const BASE = "*, company:companies!users_company_id_fkey(id, name)";
+  // With each client login's projects (Nov 2026); before that migration (20270226) has run, without them,
+  // so Users still opens (Sean, Nov 2026: the page failed on live until it had).
+  const { rows, total } = await list(`${BASE}, picks:client_user_projects(project_id)`).catch((err) => {
+    if (!/client_user_projects|relationship|schema cache/i.test(String(err?.message ?? ""))) throw err;
+    console.error("[users] without client logins' projects:", err.message);
+    return list(BASE);
+  });
 
   return { rows: rows.map((u) => toUserView({ ...u, mfa: enabled.has(u.id) })), total };
 }
