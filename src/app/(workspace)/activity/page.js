@@ -58,9 +58,14 @@ export default async function ActivityPage({ searchParams }) {
 
         <Card>
           <SectionHeader label="Everything That Happened" icon={History} />
+          <span id="everything" className="sr-only" />
           <FilterTable
             columns={["Who", "Role", "Action", "Detail", "When"]}
-            filters={[{ key: "action", label: "Action", kind: "select", options: actions }]}
+            // A person's own (Sean, Nov 2026: "How do we make this section show the usage details for a specific user?").
+            filters={[
+              { key: "user", label: "Person", kind: "select", options: summary.filter((u) => u.email).map((u) => ({ value: u.email, label: `${u.name}${u.client ? ` · ${u.client}` : ""}` })) },
+              { key: "action", label: "Action", kind: "select", options: actions },
+            ]}
             placeholder="Search the detail…"
             empty="Nothing recorded yet."
             query={params.q}

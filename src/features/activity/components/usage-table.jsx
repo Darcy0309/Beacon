@@ -38,7 +38,10 @@ export default function UsageTable({ rows }) {
   const kinds = KINDS.filter(([k]) => rows.some((r) => r.kind === k));
   const clientKinds = kind === "" || kind === "client" || kind === "client_agent";
   const clients = useMemo(() => [...new Set(rows.filter((r) => r.client && r.kind.startsWith("client")).map((r) => r.client))].sort((a, b) => a.localeCompare(b)), [rows]);
-  const shown = rows.filter((r) => (!kind || r.kind === kind) && (!client || !clientKinds || r.client === client));
+  const picked = rows.filter((r) => (!kind || r.kind === kind) && (!client || !clientKinds || r.client === client));
+  // One client: its own login first, its agents under it.
+  const nested = Boolean(client && clientKinds);
+  const shown = nested ? [...picked].sort((a, b) => (a.kind === "client_agent") - (b.kind === "client_agent")) : picked;
   const maxLogins = Math.max(1, ...shown.map((u) => u.loginsMonth));
   const maxActions = Math.max(1, ...shown.map((u) => u.actions30d));
   const chip = (on) => cn("rounded-full border px-3 py-1 text-xs font-medium transition-colors",
@@ -78,15 +81,17 @@ export default function UsageTable({ rows }) {
             </tr>
           </thead>
           <tbody className="[&_tr:last-child]:border-0">
+            {/* A client's own login first, then its agents (Sean, Nov 2026: "Jeff's usage … and any of his agents below him"). */}
             {shown.map((u) => {
               const role = u.kind === "client_agent" ? "Client agent" : u.role;
               return (
                 <tr key={u.id} className="border-b border-[var(--panel-border)]" data-usage-row={u.id} data-kind={u.kind}>
                   <td className="px-4 py-3.5 align-middle">
-                    <div className="flex items-center gap-3">
+                    <div className={cn("flex items-center gap-3", nested && u.kind === "client_agent" && "pl-8")} data-nested={nested && u.kind === "client_agent" ? "" : undefined}>
                       <span className="flex size-8 items-center justify-center rounded-full text-xs font-bold text-white" style={{ background: u.color }}>{u.initials}</span>
                       <div>
-                        <div className="font-medium">{u.name}</div>
+                        {/* Their own activity, below (Nov 2026). */}
+                        <a href={`/activity?user=${encodeURIComponent(u.email)}#everything`} className="font-medium hover:text-primary hover:underline" data-usage-person>{u.name}</a>
                         <div className="text-xs text-muted-foreground">{u.email}</div>
                       </div>
                     </div>

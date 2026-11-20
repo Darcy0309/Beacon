@@ -44,12 +44,28 @@ try {
   await admin.fill("[data-usage-client]", `${TAG} Capital Ins`);
   ids = await shown();
   check("its logins, the owner's and its agent's, only", ids.length === 2 && ids.includes(OWNER) && ids.includes(PRODUCER), JSON.stringify(ids));
+  check("…the client's own login first, its agent under it", ids[0] === OWNER && ids[1] === PRODUCER
+    && (await admin.ev(`!!document.querySelector('[data-usage-row="${PRODUCER}"] [data-nested]')`)), JSON.stringify(ids));
+
+  section("A person's own activity");
+  const email = sql(`select email from public.users where id = ${SEAN}`);
+  sql(`insert into public.activity_log (user_id, action, detail) values (${SEAN}, 'lead.update', ${lit(`${TAG} by Sean`)}), (${OWNER}, 'lead.update', ${lit(`${TAG} by the owner`)})`);
+  await admin.go("/activity", 6000);
+  check("Everything That Happened has a Person to choose", Boolean(await until(() => admin.ev(`!!document.querySelector('select[aria-label="Filter by Person"]')`))));
+  await admin.click(`[data-usage-row="${SEAN}"] [data-usage-person]`);
+  const theirs = await until(async () => {
+    const t = await admin.ev(`[...document.querySelectorAll('tbody tr')].map((r) => r.innerText).join('\\n')`);
+    return (await admin.url()).includes("user=") && t.includes(`${TAG} by Sean`) ? t : null;
+  }, { timeout: 15000 });
+  check("a name in Usage by Account opens that person's activity, no one else's", Boolean(theirs) && !theirs.includes(`${TAG} by the owner`), await admin.url());
+  check("…the Person filter showing them", (await admin.ev(`document.querySelector('select[aria-label="Filter by Person"]')?.value`)) === email);
 
   section("Users & Access opens");
   await admin.go("/users", 6000);
   check("the Users list, no error", Boolean(await until(() => admin.ev(`!!document.querySelector('tbody tr') && !/Something went wrong/.test(document.body.innerText)`), { timeout: 15000 })));
 } finally {
   browser.close();
+  sql(`delete from public.activity_log where detail like ${lit(`${TAG}%`)}`);
   sql(`delete from public.users where id in (${OWNER}, ${PRODUCER})`);
   sql(`delete from public.companies where id = ${co}`);
 }

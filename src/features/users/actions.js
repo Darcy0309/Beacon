@@ -92,6 +92,14 @@ export async function saveUser(prevState, formData) {
     project_scope: s(formData, "role") === "client" && s(formData, "project_scope") === "only" ? "only" : "all",
   };
 
+  // Which projects a client login sees needs migration 20270226 (Nov 2026): until it has run on a database, the
+  // account saves without it (a client login sees all its client's projects, as before), rather than not at all.
+  const { error: noScope } = await supabase.from("users").select("project_scope").limit(1);
+  if (noScope) {
+    if (payload.project_scope === "only") return back("Only these projects needs a database update that hasn't been applied yet. Choose All of the client's projects for now.", { project_ids: "Not available until the database update" });
+    delete payload.project_scope;
+  }
+
   // An extension rings one person (Sean, Nov 2026: the managers' line): nobody else active may have it.
   if (payload.phone_ext) {
     let others = supabase.from("users").select("first_name, last_name").eq("phone_ext", payload.phone_ext).neq("status", "disabled").is("deleted_at", null).limit(1);
@@ -225,6 +233,8 @@ export async function saveUser(prevState, formData) {
  * isn't a client's). An error message, or null.
  */
 async function saveClientProjects(supabase, userId, payload, formData) {
+  // Before migration 20270226: nothing to keep (the account sees all its client's projects).
+  if (!("project_scope" in payload)) return null;
   const ids = payload.project_scope === "only"
     ? [...new Set(formData.getAll("project_ids").map(Number).filter((v) => Number.isInteger(v) && v > 0))]
     : [];
