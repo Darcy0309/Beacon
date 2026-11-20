@@ -1,6 +1,6 @@
 /**
- * Call Log: "Show transcription" (Nov 2026): a recorded call's transcript opens beneath it like a drop-down,
- * with its AI summary button, as on the lead's Conversation; a call not recorded has none.
+ * Call Log: round "Show transcription" and "AI summary" buttons beside a recorded call's player (Nov 2026);
+ * the transcription opens in a panel above its button and closes on a second press or its X; a call not recorded has none.
  *
  *   node tests/run.mjs tests/e2e/call-log-transcript.test.mjs
  */
@@ -37,19 +37,25 @@ try {
   await admin.go(`/reports/calls?user=${SEAN}&from=${today}&to=${today}`, 6000);
 
   section("A recorded call");
-  const row = await until(() => admin.ev(`document.querySelector('[data-call-transcript-row="${REC}"]')?.innerText ?? null`), { timeout: 15000 });
-  check("beneath it: Show transcription, and AI summary", Boolean(row?.includes("Show transcription") && row.includes("AI summary")), row);
-  check("…right under its call", await admin.ev(`document.querySelector('tr[data-call="${RECORDED}"]')?.nextElementSibling?.dataset.callTranscriptRow === ${JSON.stringify(REC)}`));
-  check("…the transcript hidden to begin with", !(await admin.ev(`!!document.querySelector('[data-call-transcript-row="${REC}"] [data-call-transcript]')`)));
-  await admin.click(`[data-call-transcript-row="${REC}"] [data-call-transcript-toggle]`);
-  const shown = await until(() => admin.ev(`document.querySelector('[data-call-transcript-row="${REC}"] [data-call-transcript]')?.innerText ?? null`));
-  check("Show transcription opens it: each line, who said it and when", Boolean(shown?.includes("Sean Fitzgerald: Hi, this is Sean") && shown.includes(`${TAG} Gardner Electric: Hi Sean`) && shown.includes("0:03")), shown);
-  check("…and the button says Hide transcription", (await admin.ev(`document.querySelector('[data-call-transcript-row="${REC}"] [data-call-transcript-toggle]')?.textContent.trim()`)) === "Hide transcription");
-  await admin.click(`[data-call-transcript-row="${REC}"] [data-call-transcript-toggle]`);
-  check("…which closes it", Boolean(await until(async () => !(await admin.ev(`!!document.querySelector('[data-call-transcript-row="${REC}"] [data-call-transcript]')`)))));
+  const buttons = await until(() => admin.ev(`(() => { const box = document.querySelector('tr[data-call="${RECORDED}"] [data-call-recording="${REC}"]'); return box ? [...box.querySelectorAll('button[aria-label]')].map((b) => b.getAttribute('aria-label')) : null; })()`), { timeout: 15000 });
+  check("beside its player: round Show transcription and AI summary buttons", JSON.stringify(buttons?.slice(-2)) === JSON.stringify(["Show transcription", "AI summary"]), JSON.stringify(buttons));
+  check("…nothing open to begin with", !(await admin.ev(`!!document.querySelector('[data-call-panel]')`)));
+  await admin.click(`[data-call-recording="${REC}"] [data-call-transcript-toggle]`);
+  const shown = await until(() => admin.ev(`document.querySelector('[data-call-panel="transcript"] [data-call-transcript]')?.innerText ?? null`));
+  check("Show transcription opens it in a panel: each line, who said it and when", Boolean(shown?.includes("Sean Fitzgerald: Hi, this is Sean") && shown.includes(`${TAG} Gardner Electric: Hi Sean`) && shown.includes("0:03")), shown);
+  const place = await admin.ev(`(() => { const p = document.querySelector('[data-call-panel="transcript"]').getBoundingClientRect(); const b = document.querySelector('[data-call-recording="${REC}"] [data-call-transcript-toggle]').getBoundingClientRect(); return { above: p.bottom <= b.top + 1, rightEdge: Math.round(p.right - b.right) }; })()`);
+  check("…above its button, lined up with its right edge", place?.above && Math.abs(place.rightEdge) <= 2, JSON.stringify(place));
+  check("…no row opened in the table", !(await admin.ev(`!!document.querySelector('[data-call-transcript-row]')`)));
+  check("…the button now Hide transcription", (await admin.ev(`document.querySelector('[data-call-recording="${REC}"] [data-call-transcript-toggle]')?.getAttribute('aria-label')`)) === "Hide transcription");
+  await admin.click(`[data-call-recording="${REC}"] [data-call-transcript-toggle]`);
+  check("…pressed again, it closes", Boolean(await until(async () => !(await admin.ev(`!!document.querySelector('[data-call-panel]')`)))));
+  await admin.click(`[data-call-recording="${REC}"] [data-call-transcript-toggle]`);
+  await until(() => admin.ev(`!!document.querySelector('[data-call-panel="transcript"]')`));
+  await admin.click("[data-call-panel-close]");
+  check("…and its X closes it", Boolean(await until(async () => !(await admin.ev(`!!document.querySelector('[data-call-panel]')`)))));
 
   section("A call not recorded");
-  check("no transcription under it", await admin.ev(`!document.querySelector('tr[data-call="${PLAIN}"]')?.nextElementSibling?.dataset.callTranscriptRow`));
+  check("no buttons, nothing beneath it", await admin.ev(`!document.querySelector('tr[data-call="${PLAIN}"] [data-call-transcript-toggle]') && !document.querySelector('tr[data-call="${PLAIN}"]')?.nextElementSibling?.dataset.callTranscriptRow`));
 } finally {
   browser.close();
   sql(`delete from public.phone_recordings where recording_sid = ${lit(REC)}`);

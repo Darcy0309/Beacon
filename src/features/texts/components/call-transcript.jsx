@@ -6,27 +6,21 @@ import { atClock } from "@/lib/call-transcript";
 import { cn } from "@/lib/utils";
 
 /**
- * A recorded call's transcript, hidden until "Show transcript" (Nov 2026). One never transcribed (recorded
- * before transcripts were set up) is asked for on that click, and one that failed can be tried again;
- * while it is on its way it says so, and the Conversation asks again every so often (`onChanged` at once).
- *
- * `noun`: what the toggle calls it ("transcript"; the Call Log, "transcription").
- *
- * Beside it, "AI summary" (client, Nov 2026): Claude's short summary of the transcript, written on the
- * first click and kept. Pressed before the call is transcribed, it asks for the transcript and writes
- * the summary once that is in.
+ * A recorded call's transcript and its AI summary, as state (Nov 2026): what the server has, asking for the
+ * transcript (one never sent, or failed), and writing the summary (`requestSummary`: written at once when
+ * the call is transcribed; asked for with the transcript otherwise, and written once that is in).
+ * `onAsked` after the transcript was asked for; `onSummary` once a summary is written.
+ * Shared by the lead's Conversation (CallTranscript) and the Call Log's row (its round buttons).
  */
-export default function CallTranscript({ sid, transcript, ours, theirs, onChanged, noun = "transcript" }) {
-  const [open, setOpen] = useState(false);
+export function useCallTranscript({ sid, transcript, ours, theirs, onChanged, onAsked, onSummary }) {
   const [asking, setAsking] = useState(false);
-  // What asking said, until the Conversation itself has moved on from where it was then.
+  // What asking said, until the page itself has moved on from where it was then.
   const [asked, setAsked] = useState(null);
   const t = asked && asked.from === transcript.status ? asked : transcript;
   const lines = t.lines ?? [];
 
   const [written, setWritten] = useState(null);
   const summary = written ?? transcript.summary ?? null;
-  const [summaryOpen, setSummaryOpen] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
   // "AI summary" pressed before the transcript was in: written as soon as it is.
@@ -39,7 +33,7 @@ export default function CallTranscript({ sid, transcript, ours, theirs, onChange
       const data = await res.json().catch(() => ({}));
       setAsked({ from: transcript.status, status: res.ok ? data.status : "failed", lines: [], error: res.ok ? data.error : data.error || "The transcript couldn't be asked for." });
       if (res.ok) {
-        setOpen(true);
+        onAsked?.();
         onChanged?.();
       }
       return res.ok;
@@ -63,7 +57,7 @@ export default function CallTranscript({ sid, transcript, ours, theirs, onChange
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.summary) {
         setWritten(data.summary);
-        setSummaryOpen(true);
+        onSummary?.();
       } else {
         setSummaryError(data.error || "The summary couldn't be written. Try again in a moment.");
       }
@@ -72,7 +66,7 @@ export default function CallTranscript({ sid, transcript, ours, theirs, onChange
     } finally {
       setSummarizing(false);
     }
-  }, [sid, ours, theirs]);
+  }, [sid, ours, theirs, onSummary]);
 
   const transcribed = t.status === "done" && lines.length > 0;
   useEffect(() => {
@@ -86,39 +80,45 @@ export default function CallTranscript({ sid, transcript, ours, theirs, onChange
     if (wantSummary && (t.status === "failed" || (t.status === "done" && !lines.length))) setWantSummary(false);
   }, [wantSummary, t.status, lines.length]);
 
-  const pressSummary = async () => {
-    if (summary) return setSummaryOpen((o) => !o);
+  const requestSummary = async () => {
+    if (summary || summarizing) return;
     if (transcribed) return summarize();
     setSummaryError(null);
     setWantSummary(true);
     if (t.status === "none" && !(await ask())) setWantSummary(false);
   };
 
-  const toggle = (label, onClick, extra) => (
-    <button type="button" onClick={onClick} disabled={asking} aria-expanded={extra?.expanded} data-call-transcript-toggle
-      className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-60">
-      {asking ? <Loader2 className="size-3.5 animate-spin" /> : <ChevronDown className={cn("size-3.5 transition-transform", extra?.expanded && "rotate-180")} />}
-      {label}
-    </button>
-  );
+  return { t, lines, asking, ask, transcribed, summary, summarizing, summaryError, wantSummary, summarize, requestSummary };
+}
 
-  const summaryButton = (
-    <button type="button" onClick={pressSummary} disabled={summarizing || asking || wantSummary} aria-expanded={summary ? summaryOpen : undefined} data-call-summary-toggle
-      className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-2 transition-colors hover:underline disabled:opacity-60">
-      {summarizing || wantSummary ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
-      {summarizing ? "Writing summary…" : summary && summaryOpen ? "Hide AI summary" : "AI summary"}
-    </button>
+/** The transcript's lines: when, who, what. */
+export function TranscriptLines({ lines, ours, theirs, className }) {
+  return (
+    <ol className={cn("max-h-72 space-y-1.5 overflow-y-auto rounded-lg border border-[var(--panel-border)] bg-background/60 p-2.5 text-xs", className)} data-call-transcript>
+      {lines.map((l, i) => (
+        <li key={i} className="grid grid-cols-[2.5rem_1fr] gap-2">
+          <span className="tabular-nums text-muted-foreground">{atClock(l.at)}</span>
+          <span>
+            <span className={cn("font-semibold", l.side === 2 ? "text-foreground" : "text-primary")}>{l.side === 2 ? theirs || "Contact" : ours || "Caller"}: </span>
+            {l.text}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
+}
 
-  const summaryBox = (
+/** The AI summary written (with Again), or why it couldn't be. */
+export function SummaryPanel({ summary, summaryError, summarizing, summarize, className }) {
+  return (
     <>
       {summaryError ? (
-        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-destructive" data-call-summary-error>
+        <p className={cn("flex items-center gap-1.5 text-xs text-destructive", className)} data-call-summary-error>
           <AlertCircle className="size-3.5 shrink-0" /> {summaryError}
         </p>
       ) : null}
-      {summary && summaryOpen ? (
-        <div className="mt-1.5 rounded-lg border border-primary/25 bg-primary/5 p-2.5 text-xs" data-call-summary>
+      {summary ? (
+        <div className={cn("rounded-lg border border-primary/25 bg-primary/5 p-2.5 text-xs", className)} data-call-summary>
           <div className="flex items-center justify-between gap-2">
             <p className="flex items-center gap-1 font-semibold text-primary"><Sparkles className="size-3.5" aria-hidden /> AI summary</p>
             <button type="button" onClick={() => summarize(true)} disabled={summarizing} title="Write the summary again"
@@ -138,11 +138,48 @@ export default function CallTranscript({ sid, transcript, ours, theirs, onChange
       ) : null}
     </>
   );
+}
+
+/**
+ * A recorded call's transcript, hidden until "Show transcript" (Nov 2026). One never transcribed (recorded
+ * before transcripts were set up) is asked for on that click, and one that failed can be tried again;
+ * while it is on its way it says so, and the Conversation asks again every so often (`onChanged` at once).
+ *
+ * Beside it, "AI summary" (client, Nov 2026): Claude's short summary of the transcript, written on the
+ * first click and kept. Pressed before the call is transcribed, it asks for the transcript and writes
+ * the summary once that is in.
+ */
+export default function CallTranscript({ sid, transcript, ours, theirs, onChanged }) {
+  const [open, setOpen] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const openSummary = useCallback(() => setSummaryOpen(true), []);
+  const c = useCallTranscript({ sid, transcript, ours, theirs, onChanged, onAsked: () => setOpen(true), onSummary: openSummary });
+  const { t, lines, asking, ask, summary, summarizing, summaryError, wantSummary } = c;
+
+  const pressSummary = () => (summary ? setSummaryOpen((o) => !o) : c.requestSummary());
+
+  const toggle = (label, onClick, extra) => (
+    <button type="button" onClick={onClick} disabled={asking} aria-expanded={extra?.expanded} data-call-transcript-toggle
+      className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline disabled:opacity-60">
+      {asking ? <Loader2 className="size-3.5 animate-spin" /> : <ChevronDown className={cn("size-3.5 transition-transform", extra?.expanded && "rotate-180")} />}
+      {label}
+    </button>
+  );
+
+  const summaryButton = (
+    <button type="button" onClick={pressSummary} disabled={summarizing || asking || wantSummary} aria-expanded={summary ? summaryOpen : undefined} data-call-summary-toggle
+      className="inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-2 transition-colors hover:underline disabled:opacity-60">
+      {summarizing || wantSummary ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+      {summarizing ? "Writing summary…" : summary && summaryOpen ? "Hide AI summary" : "AI summary"}
+    </button>
+  );
+
+  const summaryBox = <SummaryPanel summary={summaryOpen ? summary : null} summaryError={summaryError} summarizing={summarizing} summarize={c.summarize} className="mt-1.5" />;
 
   if (t.status === "none") {
     return (
       <div className="mt-2" data-call-transcript-status="none">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">{toggle(`Show ${noun}`, ask)}{summaryButton}</div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">{toggle("Show transcript", ask)}{summaryButton}</div>
         {summaryBox}
       </div>
     );
@@ -165,23 +202,11 @@ export default function CallTranscript({ sid, transcript, ours, theirs, onChange
   return (
     <div className="mt-2" data-call-transcript-status="done">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        {toggle(open ? `Hide ${noun}` : `Show ${noun}`, () => setOpen((o) => !o), { expanded: open })}
+        {toggle(open ? "Hide transcript" : "Show transcript", () => setOpen((o) => !o), { expanded: open })}
         {summaryButton}
       </div>
       {summaryBox}
-      {open ? (
-        <ol className="mt-1.5 max-h-72 space-y-1.5 overflow-y-auto rounded-lg border border-[var(--panel-border)] bg-background/60 p-2.5 text-xs" data-call-transcript>
-          {lines.map((l, i) => (
-            <li key={i} className="grid grid-cols-[2.5rem_1fr] gap-2">
-              <span className="tabular-nums text-muted-foreground">{atClock(l.at)}</span>
-              <span>
-                <span className={cn("font-semibold", l.side === 2 ? "text-foreground" : "text-primary")}>{l.side === 2 ? theirs || "Contact" : ours || "Caller"}: </span>
-                {l.text}
-              </span>
-            </li>
-          ))}
-        </ol>
-      ) : null}
+      {open ? <TranscriptLines lines={lines} ours={ours} theirs={theirs} className="mt-1.5" /> : null}
     </div>
   );
 }

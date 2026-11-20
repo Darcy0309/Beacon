@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, PhoneCall, PhoneIncoming, PhoneMissed, PhoneOff, PhoneOutgoing, Search } from "lucide-react";
 import Link from "@/components/shared/intent-link";
@@ -10,9 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RecordingPlayer } from "@/features/notifications/components/call-recording-card";
 import { getCallLog } from "@/features/phone/queries";
-import CallLogTranscript from "@/features/phone/components/call-log-transcript";
+import CallLogRow from "@/features/phone/components/call-log-transcript";
 import { getAssignableStaff } from "@/features/users/queries";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { getCurrentUser } from "@/lib/server/session";
@@ -127,11 +125,10 @@ export default async function CallLog({ searchParams }) {
               <TableBody>
                 {log.rows.map((c) => {
                   const Icon = KIND_ICON[c.kind] ?? PhoneCall;
-                  // A recorded call's transcription opens beneath it (Nov 2026): the two rows read as one.
-                  const transcript = c.recording?.transcript ?? null;
+                  // Its recording, with round buttons beside the player for its transcription and AI summary (Nov 2026).
                   return (
-                    <Fragment key={c.callSid}>
-                    <TableRow data-call={c.callSid} data-kind={c.kind} className={cn(transcript && "border-b-0")}>
+                    <CallLogRow key={c.callSid} rowProps={{ "data-call": c.callSid, "data-kind": c.kind }} recording={c.recording}
+                      ours={c.name} theirs={c.leadCompany} colSpan={admin ? 7 : 6}>
                       <TableCell className="whitespace-nowrap tabular-nums">{clock(c.startedAt)}</TableCell>
                       {admin ? <TableCell className={cn(!c.name && "text-muted-foreground")}>{c.name ?? "No one online"}</TableCell> : null}
                       <TableCell className="whitespace-nowrap">
@@ -154,12 +151,7 @@ export default async function CallLog({ searchParams }) {
                         ) : <span className="text-xs text-muted-foreground">Not on a lead</span>}
                       </TableCell>
                       <TableCell className={cn("text-right tabular-nums", !c.talk && "text-muted-foreground")}>{talkClock(c.talk)}</TableCell>
-                      <TableCell className="min-w-44">
-                        {c.recording ? <RecordingPlayer src={`/api/phone/recordings/${c.recording.sid}`} seconds={c.recording.seconds} /> : <span className="text-xs text-muted-foreground">—</span>}
-                      </TableCell>
-                    </TableRow>
-                    {transcript ? <CallLogTranscript sid={c.recording.sid} transcript={transcript} ours={c.name} theirs={c.leadCompany} colSpan={admin ? 7 : 6} /> : null}
-                    </Fragment>
+                    </CallLogRow>
                   );
                 })}
                 {log.rows.length === 0 ? (
