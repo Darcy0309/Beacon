@@ -88,6 +88,8 @@ export async function saveUser(prevState, formData) {
     role: s(formData, "role") || "agent",
     company_id: n(formData, "company_id"),
     username: s(formData, "username"),
+    // A client login: all its client's projects, or only those ticked (Sean, Nov 2026).
+    project_scope: s(formData, "role") === "client" && s(formData, "project_scope") === "only" ? "only" : "all",
   };
 
   // An extension rings one person (Sean, Nov 2026: the managers' line): nobody else active may have it.
@@ -142,6 +144,8 @@ export async function saveUser(prevState, formData) {
       if (movedSignIn) await createAdminClient()?.auth.admin.updateUserById(before.auth_id, { email: before.email, email_confirm: true });
       return back(error ?? "You don't have permission to change that account.");
     }
+    const projectsFailed = await saveClientProjects(supabase, id, payload, formData);
+    if (projectsFailed) return back(projectsFailed, { project_ids: projectsFailed });
     if (movedSignIn) await logActivity(supabase, "user.email", { entity: "user", entityId: id, detail: `${before.email} → ${payload.email}` });
 
     if (before.status !== status && before.auth_id) {
@@ -178,6 +182,8 @@ export async function saveUser(prevState, formData) {
     if (made.error) return back(made.error);
     const payFailed = await savePay(supabase, made.id, payload.role, formData, values);
     if (payFailed) return { ...payFailed, error: `Account created, but their pay was not saved: ${payFailed.error}` };
+    const projectsFailed = await saveClientProjects(supabase, made.id, payload, formData);
+    if (projectsFailed) return back(`Account created, but not which projects they see: ${projectsFailed}`);
     const emailed = formData.get("send_link") ? await sendSignInLink(supabase, me, payload) : null;
     await logActivity(supabase, "user.create", { entity: "user", entityId: made.id, detail: payload.email });
     revalidatePath("/users");
@@ -194,6 +200,8 @@ export async function saveUser(prevState, formData) {
     if (error) return back(error);
     const payFailed = await savePay(supabase, saved.id, payload.role, formData, values);
     if (payFailed) return { ...payFailed, error: `Account created, but their pay was not saved: ${payFailed.error}` };
+    const projectsFailed = await saveClientProjects(supabase, saved.id, payload, formData);
+    if (projectsFailed) return back(`Account created, but not which projects they see: ${projectsFailed}`);
     await logActivity(supabase, "user.create", { entity: "user", entityId: saved.id, detail: payload.email });
     revalidatePath("/users");
     return ok({ email: payload.email, later: true });
@@ -203,10 +211,39 @@ export async function saveUser(prevState, formData) {
   if (sent.error) return back(sent.error);
   const payFailed = await savePay(supabase, sent.id, payload.role, formData, values);
   if (payFailed) return { ...payFailed, error: `Invitation sent, but their pay was not saved: ${payFailed.error}` };
+  const projectsFailed = await saveClientProjects(supabase, sent.id, payload, formData);
+  if (projectsFailed) return back(`Invitation sent, but not which projects they see: ${projectsFailed}`);
 
   await logActivity(supabase, existing?.auth_id ? "user.reinvite" : "user.invite", { entity: "user", entityId: sent.id, detail: payload.email });
   revalidatePath("/users");
   return ok({ email: payload.email, resent: Boolean(existing?.auth_id) });
+}
+
+/**
+ * The projects a client login kept to some sees (Sean, Nov 2026: the client's producers, each on the projects
+ * the client buys for them): those ticked, of its client's. Cleared for a login that sees all of them (or
+ * isn't a client's). An error message, or null.
+ */
+async function saveClientProjects(supabase, userId, payload, formData) {
+  const ids = payload.project_scope === "only"
+    ? [...new Set(formData.getAll("project_ids").map(Number).filter((v) => Number.isInteger(v) && v > 0))]
+    : [];
+  let keep = ids;
+  if (ids.length) {
+    const { data, error } = await supabase.from("projects").select("id").in("id", ids).eq("company_id", payload.company_id ?? -1);
+    if (error) return error.message;
+    keep = (data ?? []).map((p) => p.id);
+    if (!keep.length) return "Tick the projects they should see, of their client's";
+  }
+  let gone = supabase.from("client_user_projects").delete().eq("user_id", userId);
+  if (keep.length) gone = gone.not("project_id", "in", `(${keep.join(",")})`);
+  const { error: delError } = await gone;
+  if (delError) return delError.message;
+  if (keep.length) {
+    const { error } = await supabase.from("client_user_projects").upsert(keep.map((project_id) => ({ user_id: userId, project_id })), { onConflict: "user_id,project_id", ignoreDuplicates: true });
+    if (error) return error.message;
+  }
+  return null;
 }
 
 /**

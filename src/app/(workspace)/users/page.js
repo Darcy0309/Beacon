@@ -100,6 +100,12 @@ export default async function UsersPage({ searchParams }) {
                   </TableCell>
                   <TableCell>
                     <ToneBadge tone={roleTone[u.roleTone] ?? "slate"}>{u.role}</ToneBadge>
+                    {/* A client login kept to some of its client's projects (Nov 2026). */}
+                    {u.raw.role === "client" && u.raw.project_scope === "only" ? (
+                      <div className="mt-1 text-xs text-muted-foreground" data-project-scope={u.id}>
+                        Only {(u.raw.picks ?? []).length} project{(u.raw.picks ?? []).length === 1 ? "" : "s"}
+                      </div>
+                    ) : null}
                     {payProfiles.get(u.id)?.model === "hybrid" ? (
                       <div className="mt-1 text-xs text-muted-foreground" data-pay={u.id}>Hybrid · {usd(payProfiles.get(u.id).rate)}/hr</div>
                     ) : null}

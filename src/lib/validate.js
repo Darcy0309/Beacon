@@ -385,6 +385,10 @@ export const schemas = {
     status: [oneOf(USER_STATUSES)],
     username: [username],
     company_id: [id],
+    // A client login: all its client's projects, or only those ticked (Sean, Nov 2026: the client's producers).
+    project_scope: [oneOf(["all", "only"], "Choose which projects they see")],
+    // …those ticked (each a project_ids; checked against their client's when saved).
+    project_ids: [],
     // How an account manager or agent is paid. The hourly range is the one in Settings, checked by the database.
     pay_model: [oneOf(PAY_MODEL_KEYS, "Choose how they are paid")],
     hourly_rate: [num({ min: 0, max: 1000 })],
@@ -677,6 +681,9 @@ export const cross = {
     // Client-portal users are scoped to a company by RLS; without one they see nothing.
     if (!errors.company_id && values.role === "client" && !values.company_id) {
       errors.company_id = "Choose the client this person belongs to (add the client on the Clients page first)";
+    }
+    if (values.role === "client" && values.project_scope === "only" && !values.project_ids) {
+      errors.project_ids = "Tick the projects they should see";
     }
     // Hybrid pay compares the hourly pay with the commission, so it needs a rate.
     if (!errors.hourly_rate && values.pay_model === "hybrid" && str(values.hourly_rate) === "") {

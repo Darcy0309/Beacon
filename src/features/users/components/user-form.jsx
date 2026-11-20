@@ -35,6 +35,18 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
   // Nothing emailed to begin with (Sean, Nov 2026: setting up clients' accounts before go-live, the
   // invitations went out): Send invitation from their row when it's time.
   const [access, setAccess] = useState("later");
+  // A client login: its client, and all of its projects or only those ticked (Sean, Nov 2026: a client's
+  // producers each see the projects the client buys for them).
+  const savedPicks = (user?.picks ?? []).map((p) => String(p.project_id));
+  const [companyId, setCompanyId] = useState(String(user?.company?.id ?? ""));
+  const [scope, setScope] = useState(user?.project_scope ?? "all");
+  const [picks, setPicks] = useState(savedPicks);
+  useEffect(() => {
+    if (!open) return;
+    setCompanyId(String(user?.company?.id ?? ""));
+    setScope(user?.project_scope ?? "all");
+    setPicks(savedPicks);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [temp, setTemp] = useState("");
 
   useEffect(() => {
@@ -59,10 +71,12 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
   useEffect(() => {
     if (state === EMPTY) return;
     setRole(state?.values?.role || user?.role || "agent");
+    if (state?.values?.company_id !== undefined) setCompanyId(String(state.values.company_id ?? ""));
     setPayModel(state?.values?.pay_model || pay?.model || "commission");
   }, [state, user?.role, pay?.model]);
 
-  const { companies = [] } = options ?? {};
+  const { companies = [], projects = [] } = options ?? {};
+  const theirProjects = projects.filter((p) => String(p.company_id) === companyId);
   const record = {
     ...(user ? { ...user, company_id: user.company?.id ?? "" } : { role: "agent", status: "invited" }),
     pay_model: pay?.model ?? "commission",
@@ -207,7 +221,7 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
                 ? (companies.length ? "Client users only see this account's projects." : null)
                 : "Leave blank for internal staff."}
             >
-              <Select name="company_id" defaultValue={dv("company_id")} aria-invalid={invalid("company_id")}>
+              <Select name="company_id" defaultValue={dv("company_id")} onChange={(e) => { setCompanyId(e.target.value); setPicks([]); }} aria-invalid={invalid("company_id")}>
                 <option value="">{role === "client" ? "Choose the client…" : "Internal staff — no client"}</option>
                 {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
@@ -220,6 +234,43 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               ) : null}
             </Field>
 
+            {/* Which of the client's projects this login sees (Sean, Nov 2026): the client (the parent account)
+                all of them; a producer of theirs only the projects bought for them. */}
+            {role === "client" ? (
+              <fieldset className="space-y-2 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-project-scope-field>
+                <legend className="px-1 text-xs font-semibold">Which projects they see</legend>
+                <input type="hidden" name="project_scope" value={scope} />
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Which projects they see">
+                  {[["all", "All of the client's projects"], ["only", "Only these projects"]].map(([key, label]) => (
+                    <button key={key} type="button" role="radio" aria-checked={scope === key} data-scope={key} onClick={() => setScope(key)}
+                      className={scope === key ? "rounded-md border border-primary bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary"
+                        : "rounded-md border border-[var(--panel-border)] px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {scope === "all" ? "The client's own login: every project the client is paying for, new ones too."
+                    : "One of the client's agents (producers): only the projects ticked. New projects aren't added until you tick them."}
+                </p>
+                {scope === "only" ? (
+                  !companyId ? <p className="text-xs text-muted-foreground">Choose the client account first.</p>
+                  : !theirProjects.length ? <p className="text-xs text-amber-600 dark:text-amber-400">This client has no projects yet.</p>
+                  : (
+                    <div className="max-h-48 space-y-1 overflow-y-auto rounded-md bg-muted/30 p-2" data-project-picks>
+                      {theirProjects.map((p) => (
+                        <label key={p.id} className="flex items-center gap-2 text-sm">
+                          <input type="checkbox" name="project_ids" value={p.id} checked={picks.includes(String(p.id))} className="size-4 accent-[var(--primary)]"
+                            onChange={(e) => setPicks((x) => (e.target.checked ? [...x, String(p.id)] : x.filter((v) => v !== String(p.id))))} />
+                          <span className="truncate">{p.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )
+                ) : null}
+                {fe("project_ids") ? <p className="text-xs text-destructive" role="alert">{fe("project_ids")}</p> : null}
+              </fieldset>
+            ) : null}
 
             {paid ? (
               <>

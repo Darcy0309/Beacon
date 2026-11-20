@@ -51,7 +51,7 @@ export async function listUsers(params) {
 
   const { rows, total } = await runPaged((p) => {
     // A to Z by name, whatever role is shown (Sean, Nov 2026: the clients' people will run into the hundreds).
-    let query = supabase.from("users").select("*, company:companies!users_company_id_fkey(id, name)", { count: "exact" })
+    let query = supabase.from("users").select("*, company:companies!users_company_id_fkey(id, name), picks:client_user_projects(project_id)", { count: "exact" })
       .order("first_name").order("last_name").order("email").order("id");
     if (mfaFilter === "true") query = query.in("id", ids);
     else if (mfaFilter === "false" && ids.length) query = query.not("id", "in", `(${ids.join(",")})`);
