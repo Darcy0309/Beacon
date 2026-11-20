@@ -30,6 +30,7 @@ import DevelopedCard from "@/features/dashboard/components/developed-card";
 import RecentDevelopedCard, { RECENT_KINDS } from "@/features/dashboard/components/recent-developed-card";
 import MySchedule from "@/features/dashboard/components/my-schedule";
 import PeriodSwitch from "@/features/dashboard/components/period-switch";
+import TileMenu from "@/features/dashboard/components/tile-menu";
 import ProductionCard from "@/features/dashboard/components/production-card";
 import TeamProductionCard from "@/features/dashboard/components/team-production";
 import ViewNav from "@/features/dashboard/components/view-nav";
@@ -41,7 +42,7 @@ import { getRecentLeads } from "@/features/leads/queries";
 import { getProjects } from "@/features/projects/queries";
 import { getMyWorkload } from "@/features/users/queries";
 import { getCurrentUser } from "@/lib/server/session";
-import { getClientActivity, getClientCampaigns, getClientDashboard, getClientPipeline, getClientSales } from "@/features/dashboard/queries";
+import { getClientActivity, getClientCampaigns, getClientDashboard, getClientPipeline, getClientSales, getRenewalConversion } from "@/features/dashboard/queries";
 import ClientActivity from "@/features/dashboard/components/client-activity";
 import SalePipeline from "@/features/dashboard/components/sale-pipeline";
 import { CLIENT_PERIODS, PIPELINE_PERIODS, appointmentsTile, clientPeriod, clientPeriodFrom, leadsTile, pipelineMonths, pipelineTile, resultsTile } from "@/features/dashboard/client-tiles";
@@ -130,6 +131,11 @@ export default async function Dashboard({ searchParams }) {
     const v = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
     // And the top tiles: what the managers developed over a day, the pay period (to begin with), a week or a month.
     const tp = { tl: VIEW_KEYS.includes(sp?.tl) ? sp.tl : "period", ta: VIEW_KEYS.includes(sp?.ta) ? sp.ta : "period" };
+    // A Sales Rep's clients only (?tr=; Sean, Nov 2026), and Conversion's renewal month and year (?rm=, ?ry=; this month to begin with).
+    const tileRep = typeof sp?.tr === "string" && /^[1-9]\d{0,17}$/.test(sp.tr) ? Number(sp.tr) : null;
+    const thisYear = Number(businessToday.slice(0, 4));
+    const rm = /^(?:[1-9]|1[0-2])$/.test(String(sp?.rm ?? "")) ? Number(sp.rm) : Number(businessToday.slice(5, 7));
+    const ry = /^\d{4}$/.test(String(sp?.ry ?? "")) && Math.abs(Number(sp.ry) - thisYear) <= 5 ? Number(sp.ry) : thisYear;
     // The calendar in place of Today's Schedule, as a manager's dashboard has it: every manager's
     // appointments (an administrator who is a Sales Rep, their own clients'), and the administrator's own
     // reminders and messages (Sean, Oct 2026).
@@ -152,7 +158,10 @@ export default async function Dashboard({ searchParams }) {
     }
     const [rows, tiles, schedule, data, goals, options, developed] = await Promise.all([
       getProduction(v.range),
-      getTeamTiles({ today: businessToday, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
+      Promise.all([
+        getTeamTiles({ today: businessToday, rep: tileRep, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
+        getRenewalConversion({ year: ry, month: rm, rep: tileRep }),
+      ]).then(([t, conversion]) => ({ ...t, conversion, rep: tileRep, thisYear })),
       // An administrator who is a client's Sales Rep: their own clients' (Sean, Nov 2026).
       getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true, salesRep: Boolean(me.salesRep) }),
       getProductionChart({ from: range.from, to: range.to, ...selected }),
@@ -311,10 +320,10 @@ export default async function Dashboard({ searchParams }) {
     tiles = [
       // An administrator: what the managers developed, over the period chosen on each (not the names imported).
       ...(team ? [
-        { label: "Leads", value: team.leads.total.toLocaleString(), note: "By managers",
+        { label: "Leads", value: team.leads.total.toLocaleString(), note: team.rep ? "On their clients" : "By managers",
           icon: Target, accent: "var(--neon-cyan)", series: team.leads.series, seriesLabels: team.leads.labels, seriesTitles: team.leads.titles,
           action: <PeriodSwitch param="tl" current={team.periods.tl} params={otherParams(sp, "tl")} options={VIEW_PERIODS} /> },
-        { label: "Appointments", value: team.appts.total.toLocaleString(), note: "By managers",
+        { label: "Appointments", value: team.appts.total.toLocaleString(), note: team.rep ? "On their clients" : "By managers",
           icon: CalendarCheck, accent: "var(--neon-emerald)", series: team.appts.series, seriesLabels: team.appts.labels, seriesTitles: team.appts.titles,
           action: <PeriodSwitch param="ta" current={team.periods.ta} params={otherParams(sp, "ta")} options={VIEW_PERIODS} /> },
       ] : []),
@@ -331,9 +340,10 @@ export default async function Dashboard({ searchParams }) {
         ? { label: "My Appointments", value: String(mine?.appts ?? 0),
             note: `${mine?.leads ?? 0} leads assigned to me`,
             icon: UserCheck, accent: "var(--neon-violet)", series: s.series.appts, seriesLabels: weekLabels }
-        : { label: "Active Clients", value: String(s.activeClients), note: "Leads per campaign",
-            icon: Users, accent: "var(--neon-violet)", series: s.series.clients, seriesCaption: "Each bar: a campaign's leads" },
-      { label: "Conversion Rate", value: `${s.conversion}%`,
+        : { label: "Active Clients", value: String(team?.clients ? team.clients.active : s.activeClients),
+            note: team?.clients ? "Their clients · leads per campaign" : "Leads per campaign",
+            icon: Users, accent: "var(--neon-violet)", series: team?.clients ? team.clients.projectLeads : s.series.clients, seriesCaption: "Each bar: a campaign's leads" },
+      team?.conversion ? conversionTile(team, sp) : { label: "Conversion Rate", value: `${s.conversion}%`,
         note: `${s.apptToday} booked today`,
         icon: Percent, accent: "var(--neon-amber)", series: s.series.conversion, seriesLabels: weekLabels },
     ];
@@ -505,6 +515,13 @@ export default async function Dashboard({ searchParams }) {
           </div>
         ) : null}
 
+        {/* The top tiles for one Sales Rep's clients (Sean, Nov 2026), an administrator's choice. */}
+        {team?.reps?.length ? (
+          <div className="-mb-1 flex justify-end" data-tile-rep>
+            <ParamSelect name="tr" label="Sales Rep" placeholder="Everyone" value={team.rep ? String(team.rep) : ""}
+              options={team.reps.map((r) => ({ value: String(r.id), label: r.name }))} clears={[]} />
+          </div>
+        ) : null}
         {/* metric tiles */}
         <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
           {tiles.map((t, i) => (
@@ -654,4 +671,35 @@ export default async function Dashboard({ searchParams }) {
       </div>
     </>
   );
+}
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * The administrator's Conversion Rate (Sean, Nov 2026): by renewal month, this year against last. Of the leads in
+ * the pipeline for a renewal month (on appointment projects, renewing that month), the share with an appointment
+ * set in its calling window (the four months before, and the month itself); a Sales Rep's clients' when one is chosen.
+ */
+function conversionTile(team, sp) {
+  const c = team.conversion;
+  const params = otherParams(sp, "rm");
+  const yearParams = otherParams(sp, "ry");
+  const pct = (r) => (r == null ? "—" : `${r}%`);
+  return {
+    label: "Conversion Rate",
+    value: pct(c.now.rate),
+    // Short, to share its line with the month and year: of the leads renewing then, those set; last year's rate.
+    note: `${c.now.appts.toLocaleString()} of ${c.now.leads.toLocaleString()} · ${c.year - 1}: ${pct(c.before.rate)}`,
+    icon: Percent, accent: "var(--neon-amber)",
+    series: c.series, seriesLabels: MONTH_SHORT,
+    // No caption under the bars (the tile would stand taller than the rest): each bar says which it is when pointed at.
+    seriesTitles: MONTH_SHORT.map((m, i) => `${m} ${c.year} renewals: ${c.series[i]}%`),
+    action: (
+      <span className="inline-flex items-center gap-1" data-conversion-pick>
+        <TileMenu param="rm" current={c.month} label="Renewal month" params={params} options={MONTH_SHORT.map((m, i) => [i + 1, m])} />
+        <TileMenu param="ry" current={c.year} label="Year" params={yearParams}
+          options={[team.thisYear + 1, team.thisYear, team.thisYear - 1, team.thisYear - 2].map((y) => [y, String(y)])} />
+      </span>
+    ),
+  };
 }

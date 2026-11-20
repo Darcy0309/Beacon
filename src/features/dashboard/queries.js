@@ -149,16 +149,50 @@ function tallyOf(rows, key, range, today, hours = null) {
  * as the production report counts them: not names or leads imported. Each
  * { total, series }.
  */
-export async function getTeamTiles({ today, ranges }) {
+export async function getTeamTiles({ today, ranges, rep = null }) {
   const supabase = await createClient();
   const report = (r) => supabase.rpc("production_report", { p_from: r.from, p_to: r.to, p_project_id: null, p_user_id: null });
-  // A day by the hour (client, Nov 2026).
-  const hourly = (r) => (r.from === r.to ? supabase.rpc("production_hours", { p_day: r.from }) : Promise.resolve({ data: null }));
-  const [leads, appts, leadHours, apptHours] = await Promise.all([report(ranges.leads), report(ranges.appts), hourly(ranges.leads), hourly(ranges.appts)]);
-  for (const r of [leads, appts, leadHours, apptHours]) if (r.error) throw r.error;
+  // A day by the hour (client, Nov 2026); a Sales Rep's clients' only when one is chosen.
+  const hourly = (r) => (r.from === r.to ? supabase.rpc("production_hours", { p_day: r.from, ...(rep ? { p_rep: rep } : {}) }) : Promise.resolve({ data: null }));
+  const [leads, appts, leadHours, apptHours, clients, repStats, repRows] = await Promise.all([report(ranges.leads), report(ranges.appts), hourly(ranges.leads), hourly(ranges.appts),
+    rep ? supabase.from("companies").select("id").eq("sales_rep_id", rep) : Promise.resolve({ data: null }),
+    rep ? supabase.rpc("rep_client_stats", { p_rep: rep }) : Promise.resolve({ data: null }),
+    // The Sales Reps to choose from: those who have clients.
+    supabase.from("companies").select("sales_rep:users!companies_sales_rep_id_fkey(id, first_name, last_name)").not("sales_rep_id", "is", null).is("deleted_at", null)]);
+  for (const r of [leads, appts, leadHours, apptHours, clients, repStats, repRows]) if (r.error) throw r.error;
+  const reps = [...new Map((repRows.data ?? []).map((c) => one(c.sales_rep)).filter(Boolean)
+    .map((u) => [u.id, { id: u.id, name: [u.first_name, u.last_name].filter(Boolean).join(" ") || `User ${u.id}` }])).values()]
+    .sort((a, b) => a.name.localeCompare(b.name));
+  // A Sales Rep chosen (Sean, Nov 2026): what was developed on their clients' projects.
+  const theirs = clients.data ? new Set(clients.data.map((c) => c.id)) : null;
+  const keep = (rows) => (theirs ? (rows ?? []).filter((r) => theirs.has(r.client_id)) : rows);
   return {
-    leads: tallyOf(leads.data, "leads", ranges.leads, today, leadHours.data),
-    appts: tallyOf(appts.data, "appointments", ranges.appts, today, apptHours.data),
+    leads: tallyOf(keep(leads.data), "leads", ranges.leads, today, leadHours.data),
+    appts: tallyOf(keep(appts.data), "appointments", ranges.appts, today, apptHours.data),
+    // Their clients, for Active Clients: how many are active, and each project's leads.
+    clients: repStats.data ? { active: Number(repStats.data.active_clients ?? 0), projectLeads: repStats.data.project_leads ?? [] } : null,
+    reps,
+  };
+}
+
+/**
+ * Conversion by renewal month (Sean, Nov 2026: "how many appts did we set vs leads that have/had a Jan renewal
+ * month … this year vs last year … all or by sales rep clients"): for the renewal `month` (1–12) of `year` and the
+ * year before, the leads in the pipeline for it and those with an appointment set in its calling window
+ * (renewal_conversion()). { month, year, now: { leads, appts, rate }, before: { … }, series (each month of `year`) }.
+ */
+export async function getRenewalConversion({ year, month, rep = null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("renewal_conversion", { p_year: year, ...(rep ? { p_rep: rep } : {}) });
+  if (error) throw error;
+  const rate = (r) => (r && Number(r.leads) ? Math.round((Number(r.appointments) / Number(r.leads)) * 1000) / 10 : null);
+  const at = (y, m) => (data ?? []).find((r) => r.year === y && r.month === m);
+  const of = (r) => ({ leads: Number(r?.leads ?? 0), appts: Number(r?.appointments ?? 0), rate: rate(r) });
+  return {
+    month, year,
+    now: of(at(year, month)),
+    before: of(at(year - 1, month)),
+    series: Array.from({ length: 12 }, (_, i) => rate(at(year, i + 1)) ?? 0),
   };
 }
 
