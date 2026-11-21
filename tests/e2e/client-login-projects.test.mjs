@@ -48,11 +48,12 @@ try {
   await sleep(300);
   await admin.menuItem("Edit");
   await until(() => admin.ev(`!!document.querySelector('[data-project-scope-field]')`));
-  check("a client login: which projects they see, all of the client's to begin with",
-    await admin.ev(`document.querySelector('[data-scope="all"]')?.getAttribute('aria-checked') === 'true'`));
-  await admin.click('[data-scope="only"]');
+  check("a client login: a Client, all of the client's projects, to begin with",
+    await admin.ev(`document.querySelector('[data-role-select]')?.value === 'client' && !document.querySelector('[data-project-scope-field]')`));
+  // An Agent (Sean, Nov 2026): one of the client's agents, kept to the projects ticked.
+  await admin.fill("[data-role-select]", "client_agent");
   const offered = await until(() => admin.ev(`[...document.querySelectorAll('[data-project-picks] label')].map((l) => l.textContent.trim())`).then((x) => (x?.length ? x : null)));
-  check("…only these: the client's projects to tick", JSON.stringify(offered) === JSON.stringify([`${TAG} Churches`, `${TAG} Trucking`]), JSON.stringify(offered));
+  check("…made an Agent: the client's projects to tick", JSON.stringify(offered) === JSON.stringify([`${TAG} Churches`, `${TAG} Trucking`]), JSON.stringify(offered));
   // None ticked: refused.
   await admin.click("[role=dialog] button[type=submit]");
   check("…none ticked: refused", Boolean(await until(() => admin.ev(`document.querySelector('[data-project-scope-field] [role=alert]')?.textContent ?? null`))));
@@ -82,9 +83,9 @@ try {
   await admin.pointer(`button[aria-label="Actions for ${NAME}"]`);
   await sleep(300);
   await admin.menuItem("Edit");
-  await until(() => admin.ev(`document.querySelector('[data-scope="only"]')?.getAttribute('aria-checked') === 'true'`));
+  await until(() => admin.ev(`document.querySelector('[data-role-select]')?.value === 'client_agent'`));
   check("the ticked project is kept on Edit", await admin.ev(`document.querySelector('[data-project-picks] input[value="${P1}"]')?.checked === true && document.querySelector('[data-project-picks] input[value="${P2}"]')?.checked === false`));
-  await admin.click('[data-scope="all"]');
+  await admin.fill("[data-role-select]", "client");
   await admin.click("[role=dialog] button[type=submit]");
   const back = await until(() => sql(`select project_scope || '|' || (select count(*) from public.client_user_projects where user_id = ${CLIENT}) from public.users where id = ${CLIENT}`) === "all|0" || null, { timeout: 15000 });
   check("all of the client's projects again", Boolean(back) && sees().projects === `${P1},${P2}`, JSON.stringify(sees()));

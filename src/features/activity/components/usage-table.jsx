@@ -5,14 +5,14 @@ import ToneBadge from "@/components/shared/tone-badge";
 import { Select } from "@/components/ui/field";
 import { cn } from "@/lib/utils";
 
-const roleTone = { Administrator: "amber", Manager: "cyan", Agent: "emerald", Client: "violet", "Client agent": "violet" };
+const roleTone = { Administrator: "amber", Manager: "cyan", Agent: "violet", Client: "violet", "Agent (staff)": "emerald" };
 // The kinds of account, in this order (Sean, Nov 2026: "select Client, Agent, or Manager"). A client's agents are
 // its logins kept to some of its projects (its producers); Lighthouse's own Agents are staff.
 const KINDS = [
   ["client", "Clients"],
-  ["client_agent", "Client agents"],
+  ["client_agent", "Agents"],
   ["manager", "Managers"],
-  ["agent", "Agents"],
+  ["agent", "Agents (old staff role)"],
   ["admin", "Administrators"],
 ];
 
@@ -83,7 +83,8 @@ export default function UsageTable({ rows }) {
           <tbody className="[&_tr:last-child]:border-0">
             {/* A client's own login first, then its agents (Sean, Nov 2026: "Jeff's usage … and any of his agents below him"). */}
             {shown.map((u) => {
-              const role = u.kind === "client_agent" ? "Client agent" : u.role;
+              // A client's agent is an Agent (Sean, Nov 2026); the old staff role says so.
+              const role = u.kind === "client_agent" ? "Agent" : u.kind === "agent" ? "Agent (staff)" : u.role;
               return (
                 <tr key={u.id} className="border-b border-[var(--panel-border)]" data-usage-row={u.id} data-kind={u.kind}>
                   <td className="px-4 py-3.5 align-middle">

@@ -99,7 +99,8 @@ export default async function UsersPage({ searchParams }) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <ToneBadge tone={roleTone[u.roleTone] ?? "slate"}>{u.role}</ToneBadge>
+                    {/* A client's agent (Nov 2026): a Client login kept to some projects. */}
+                    <ToneBadge tone={roleTone[u.roleTone] ?? "slate"}>{u.raw.role === "client" && u.raw.project_scope === "only" ? "Agent" : u.role}</ToneBadge>
                     {/* A client login kept to some of its client's projects (Nov 2026). */}
                     {u.raw.role === "client" && u.raw.project_scope === "only" ? (
                       <div className="mt-1 text-xs text-muted-foreground" data-project-scope={u.id}>

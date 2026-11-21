@@ -29,7 +29,13 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
 
   // Track role locally so the company field can be marked required for clients,
   // and pay shows only for the people who are paid (account managers and agents).
-  const [role, setRole] = useState(user?.role ?? "agent");
+  // The role picked (Sean, Nov 2026: "Signature will never have agents"): Administrator, Account Manager, Client (a
+  // client's own login: all its projects) or Agent (one of a client's agents: a Client login kept to the projects
+  // ticked). An account still on the old staff Agent role keeps it until it is changed.
+  const choiceOf = (r, scope) => (r === "client" && scope === "only" ? "client_agent" : r || "manager");
+  const [choice, setChoice] = useState(choiceOf(user?.role, user?.project_scope));
+  const role = choice === "client_agent" ? "client" : choice;
+  const scope = choice === "client_agent" ? "only" : "all";
   const [payModel, setPayModel] = useState(pay?.model ?? "commission");
   // A new account: an emailed invitation, or a temporary password given to them.
   // Nothing emailed to begin with (Sean, Nov 2026: setting up clients' accounts before go-live, the
@@ -39,12 +45,11 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
   // producers each see the projects the client buys for them).
   const savedPicks = (user?.picks ?? []).map((p) => String(p.project_id));
   const [companyId, setCompanyId] = useState(String(user?.company?.id ?? ""));
-  const [scope, setScope] = useState(user?.project_scope ?? "all");
   const [picks, setPicks] = useState(savedPicks);
   useEffect(() => {
     if (!open) return;
     setCompanyId(String(user?.company?.id ?? ""));
-    setScope(user?.project_scope ?? "all");
+    setChoice(choiceOf(user?.role, user?.project_scope));
     setPicks(savedPicks);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   const [temp, setTemp] = useState("");
@@ -70,15 +75,15 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
   // the fields, so the form never shows hybrid fields under "Commission only".
   useEffect(() => {
     if (state === EMPTY) return;
-    setRole(state?.values?.role || user?.role || "agent");
+    setChoice(state?.values?.role ? choiceOf(state.values.role, state.values.project_scope) : choiceOf(user?.role, user?.project_scope));
     if (state?.values?.company_id !== undefined) setCompanyId(String(state.values.company_id ?? ""));
     setPayModel(state?.values?.pay_model || pay?.model || "commission");
-  }, [state, user?.role, pay?.model]);
+  }, [state, user?.role, user?.project_scope, pay?.model]);
 
   const { companies = [], projects = [] } = options ?? {};
   const theirProjects = projects.filter((p) => String(p.company_id) === companyId);
   const record = {
-    ...(user ? { ...user, company_id: user.company?.id ?? "" } : { role: "agent", status: "invited" }),
+    ...(user ? { ...user, company_id: user.company?.id ?? "" } : { role: "manager", status: "invited" }),
     pay_model: pay?.model ?? "commission",
     hourly_rate: pay?.rate == null ? "" : Number(pay.rate).toFixed(2),
     bonus_plan: pay?.plan ?? "",
@@ -163,9 +168,19 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               </fieldset>
             ) : null}
 
-            <Field label="Role" required error={fe("role")}>
-              <Select name="role" defaultValue={dv("role", "agent")} onChange={(e) => setRole(e.target.value)} aria-invalid={invalid("role")}>
-                {Object.entries(ROLES).map(([key, r]) => <option key={key} value={key}>{r.label}</option>)}
+            {/* Agents are always a client's (Sean, Nov 2026): Agent saves as a Client login kept to the projects ticked. */}
+            <Field label="Role" required error={fe("role")}
+              hint={choice === "client" ? "The client's own login: every project the client is paying for, new ones too."
+                : choice === "client_agent" ? "One of a client's agents: only the projects you tick below."
+                : choice === "agent" ? "The old staff Agent role, no longer used: choose another." : undefined}>
+              <input type="hidden" name="role" value={role} />
+              <input type="hidden" name="project_scope" value={scope} />
+              <Select value={choice} onChange={(e) => setChoice(e.target.value)} aria-invalid={invalid("role")} aria-label="Role" data-role-select>
+                <option value="admin">{ROLES.admin.label}</option>
+                <option value="manager">{ROLES.manager.label}</option>
+                <option value="client">Client</option>
+                <option value="client_agent">Agent</option>
+                {user?.role === "agent" ? <option value="agent">Agent (old staff role)</option> : null}
               </Select>
             </Field>
             <Field label="Status" error={fe("status")} hint={isEdit ? "Disabled: signed out and locked out until re-enabled." : "New accounts start as Invited."}>
@@ -236,23 +251,10 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
 
             {/* Which of the client's projects this login sees (Sean, Nov 2026): the client (the parent account)
                 all of them; a producer of theirs only the projects bought for them. */}
-            {role === "client" ? (
+            {choice === "client_agent" ? (
               <fieldset className="space-y-2 rounded-lg border border-[var(--panel-border)] p-3 sm:col-span-2" data-project-scope-field>
-                <legend className="px-1 text-xs font-semibold">Which projects they see</legend>
-                <input type="hidden" name="project_scope" value={scope} />
-                <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Which projects they see">
-                  {[["all", "All of the client's projects"], ["only", "Only these projects"]].map(([key, label]) => (
-                    <button key={key} type="button" role="radio" aria-checked={scope === key} data-scope={key} onClick={() => setScope(key)}
-                      className={scope === key ? "rounded-md border border-primary bg-primary/15 px-3 py-1.5 text-xs font-medium text-primary"
-                        : "rounded-md border border-[var(--panel-border)] px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {scope === "all" ? "The client's own login: every project the client is paying for, new ones too."
-                    : "One of the client's agents (producers): only the projects ticked. New projects aren't added until you tick them."}
-                </p>
+                <legend className="px-1 text-xs font-semibold">Projects they see</legend>
+                <p className="text-xs text-muted-foreground">Only the projects ticked. A new project of the client&apos;s isn&apos;t added until you tick it.</p>
                 {scope === "only" ? (
                   !companyId ? <p className="text-xs text-muted-foreground">Choose the client account first.</p>
                   : !theirProjects.length ? <p className="text-xs text-amber-600 dark:text-amber-400">This client has no projects yet.</p>

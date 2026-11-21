@@ -107,7 +107,8 @@ try {
   await page.fill('input[name="first_name"]', "Nova");
   await page.fill('input[name="last_name"]', "Reyes");
   await page.fill('input[name="email"]', email);
-  await page.fill('select[name="role"]', "agent");
+  // Agents are a client's (Nov 2026): staff are added as Account Managers.
+  await page.fill("[data-role-select]", "manager");
   // Nothing emailed to begin with (Sean, Nov 2026: clients set up before go-live got the invitation).
   check("a new account starts on Don't email them yet", (await page.ev(`document.querySelector('[data-access-choice="later"]')?.getAttribute('aria-checked')`)) === "true");
   await submitUserForm();
@@ -150,7 +151,7 @@ try {
   await invitee.ev(`document.querySelector('input[name="password"]').form.requestSubmit()`);
   check("account becomes active after setting the password", await until(() => sql(`select status from public.users where email=${lit(email)}`) === "active", { timeout: 8000 }));
   const newcomer = await signIn(email, NEW_PASSWORD);
-  check("invitee can sign in with the new password", !newcomer.error && newcomer.me?.role === "agent", newcomer.error?.message);
+  check("invitee can sign in with the new password", !newcomer.error && newcomer.me?.role === "manager", newcomer.error?.message);
   const { data: agentLeads } = await newcomer.sb.from("leads").select("id").limit(1);
   check("…and has agent access", (agentLeads ?? []).length === 1);
   check("password change logged in activity", sql(`select count(*) from public.activity_log a join public.users u on u.id=a.user_id where u.email=${lit(email)} and a.action='password.change'`) === "1");

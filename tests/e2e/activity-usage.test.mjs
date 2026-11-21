@@ -26,15 +26,15 @@ try {
 
   section("Kinds of account");
   const chips = await admin.ev(`[...document.querySelectorAll('[data-usage-kind]')].map((b) => b.textContent.split(' · ')[0])`);
-  check("All, Clients, Client agents, Managers… to choose", chips[0] === "All" && chips.includes("Clients") && chips.includes("Client agents") && chips.includes("Managers"), JSON.stringify(chips));
+  check("All, Clients, Agents, Managers… to choose", chips[0] === "All" && chips.includes("Clients") && chips.includes("Agents") && chips.includes("Managers"), JSON.stringify(chips));
   await admin.click('[data-usage-kind="client"]');
   let ids = await shown();
   check("Clients: the client's own login, not its agent nor a manager", ids.includes(OWNER) && !ids.includes(PRODUCER) && !ids.includes(SEAN), JSON.stringify(ids));
   await admin.click('[data-usage-kind="client_agent"]');
   ids = await shown();
-  check("Client agents: the login kept to some projects", ids.includes(PRODUCER) && !ids.includes(OWNER), JSON.stringify(ids));
+  check("Agents: the client's login kept to some projects", ids.includes(PRODUCER) && !ids.includes(OWNER), JSON.stringify(ids));
   const named = await admin.ev(`(() => { const c = document.querySelector('[data-usage-row="${PRODUCER}"] td:nth-child(2)'); return c ? [c.querySelector('[data-badge]')?.textContent.trim(), c.querySelector('div')?.textContent.trim()] : null; })()`);
-  check("…named Client agent, with its client", named?.[0] === "Client agent" && named?.[1] === `${TAG} Capital Ins`, JSON.stringify(named));
+  check("…named Agent, with its client", named?.[0] === "Agent" && named?.[1] === `${TAG} Capital Ins`, JSON.stringify(named));
   await admin.click('[data-usage-kind="manager"]');
   ids = await shown();
   check("Managers: only managers", ids.includes(SEAN) && !ids.includes(OWNER) && !ids.includes(PRODUCER), JSON.stringify(ids));
