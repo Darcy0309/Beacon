@@ -81,6 +81,9 @@ export async function saveCompany(prevState, formData) {
     agency_group_id: n(formData, "agency_group_id"),
     // Who owns it (Sean, Oct 2026), and so all its projects.
     sales_rep_id: n(formData, "sales_rep_id"),
+    // How its leads are laid out (Campaign Types, Nov 2026): only when the form offers it (none to choose, or the
+    // database without them yet, leaves it as it is).
+    ...(formData.has("campaign_type_id") ? { campaign_type_id: n(formData, "campaign_type_id") } : {}),
   };
   // A state as its two letters ("az" -> "AZ").
   if (payload.state) payload.state = payload.state.toUpperCase();

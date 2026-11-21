@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { clientSlug, mediumDate } from "@/lib/format";
 import { getClientBySlug, getAgencyGroups, getTimeZones } from "@/features/clients/queries";
 import ClientForm from "@/features/clients/components/client-form";
+import { getCampaignTypes } from "@/features/campaign-types/queries";
 import RowActions from "@/components/shared/row-actions";
 import { deleteCompany } from "@/features/clients/actions";
 import { getSalesReps } from "@/features/users/queries";
@@ -51,7 +52,7 @@ export default async function ClientProfile({ params, searchParams }) {
   const { slug } = await params;
   const sp = await searchParams;
   const up = pipelineMonths(sp?.up);
-  const [c, projects, today, groups, zones, reps, me] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups(), getTimeZones(), getSalesReps(), getCurrentUser()]);
+  const [c, projects, today, groups, zones, reps, me, campaignTypes] = await Promise.all([getClientBySlug(slug), getProjects(), getBusinessToday(), getAgencyGroups(), getTimeZones(), getSalesReps(), getCurrentUser(), getCampaignTypes()]);
   if (!c) notFound();
   // Signature Select (Sean, Nov 2026): an administrator's and the client's Sales Rep's to see and change.
   const canSelect = me?.role === "admin" || (Boolean(me?.id) && c.salesRepId === me.id);
@@ -126,7 +127,7 @@ export default async function ClientProfile({ params, searchParams }) {
                 <ToneBadge tone={{ Active: "emerald", Paused: "amber", Completed: "sky" }[c.status] ?? "slate"}>{c.status}</ToneBadge>
                 {/* Its subscription near its end, or past it (the old client bulletin's warning). */}
                 {notice ? <span data-subscription-notice><ToneBadge tone={notice.ended ? "rose" : "amber"}>Subscription {notice.text}</ToneBadge></span> : null}
-                <ClientForm client={c.raw} groups={groups} zones={zones} reps={reps} selectTerms={c.selectTerms} canSelect={canSelect} today={today} />
+                <ClientForm client={c.raw} groups={groups} zones={zones} reps={reps} campaignTypes={campaignTypes} selectTerms={c.selectTerms} canSelect={canSelect} today={today} />
                 {/* Delete the client (Sean, Nov 2026): with its projects, names and its people's logins; restorable. */}
                 <RowActions name={c.name} id={c.id} onDelete={deleteCompany} deletedHref="/clients"
                   warning={`The client comes off Lighthouse for everyone, with its ${clientProjects.length.toLocaleString()} project${clientProjects.length === 1 ? "" : "s"}, their names and appointments, and its people's logins (they can no longer sign in). Nothing is erased: an administrator can restore all of it under Settings › Deleted records.`} />

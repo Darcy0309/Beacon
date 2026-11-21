@@ -31,7 +31,7 @@ const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: n
  * notifications about the client and its projects, by notification or by
  * email too; with nobody ticked, its Sales Rep does.
  */
-export default function ClientForm({ client, groups = [], zones = [], reps = [], selectTerms = [], canSelect = false, today = null }) {
+export default function ClientForm({ client, groups = [], zones = [], reps = [], selectTerms = [], canSelect = false, today = null, campaignTypes = [] }) {
   const isEdit = Boolean(client?.id);
   const router = useNavigationRouter();
   const [open, setOpen] = useState(false);
@@ -92,6 +92,15 @@ export default function ClientForm({ client, groups = [], zones = [], reps = [],
                 {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
               </Select>
             </Field>
+            {/* Its leads' layout (Sean, Nov 2026: Campaign Types, from Settings); none is Insurance. */}
+            {campaignTypes.length ? (
+              <Field label="Campaign type" error={fe("campaign_type_id")} className="sm:col-span-2" hint="How its leads are laid out. Build campaign types in Settings.">
+                <Select name="campaign_type_id" defaultValue={String(dv("campaign_type_id", "") ?? "")} aria-invalid={invalid("campaign_type_id")} data-campaign-type-select>
+                  <option value="">Insurance</option>
+                  {campaignTypes.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </Select>
+              </Field>
+            ) : null}
             <Field label="Phone" error={fe("phone")}>
               <Input name="phone" type="tel" defaultValue={dv("phone")} aria-invalid={invalid("phone")} />
             </Field>

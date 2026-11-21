@@ -16,6 +16,7 @@ import { getBusinessToday } from "@/lib/server/business-day";
 import { getAgencyGroups, getClients, getClientsOverview, getTimeZones } from "@/features/clients/queries";
 import { getCurrentUser } from "@/lib/server/session";
 import ClientForm from "@/features/clients/components/client-form";
+import { getCampaignTypes } from "@/features/campaign-types/queries";
 import { getSalesReps } from "@/features/users/queries";
 import TrendTile from "@/features/clients/components/trend-tile";
 import BreakdownTile from "@/features/clients/components/breakdown-tile";
@@ -47,7 +48,7 @@ export default async function ClientsPage({ searchParams }) {
   // ?rep=: the Sales Rep picked on the list below (Oct 2026); the tiles count that rep's clients. With none
   // picked, a Sales Rep starts on their own clients (Sean, Nov 2026); ?rep=all is everyone's.
   const asked = typeof sp?.rep === "string" ? sp.rep.trim() : "";
-  const [all, groups, zones, reps, me] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getSalesReps(), getCurrentUser()]);
+  const [all, groups, zones, reps, me, campaignTypes] = await Promise.all([getClients(), getAgencyGroups(), getTimeZones(), getSalesReps(), getCurrentUser(), getCampaignTypes()]);
   const mine = asked ? null : all.find((c) => me?.id && c.salesRepId === me.id);
   const rep = asked === "all" ? "" : asked || (mine?.salesRep ?? "");
   const clients = rep ? all.filter((c) => (c.salesRep ?? "Not set") === rep) : all;
@@ -94,7 +95,7 @@ export default async function ClientsPage({ searchParams }) {
         </div>
 
         <Card>
-          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} reps={reps} canSelect={me?.role === "admin"} today={today} />} />
+          <SectionHeader wrap label="Client Accounts" icon={Building2} action={<ClientForm groups={groups} zones={zones} reps={reps} campaignTypes={campaignTypes} canSelect={me?.role === "admin"} today={today} />} />
           <FilterTable
             columns={["Client", "Contact", "State", "Time zone", "Client since", "Signature Select", "Sales Rep", "Status"]}
             filters={[

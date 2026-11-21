@@ -13,6 +13,8 @@ import PhoneInput from "@/components/shared/phone-input";
 import { SECTION_BOX, SECTION_LEGEND } from "@/features/leads/form-section";
 import { AUTO_TYPES, TRAVEL_RADII, xmodText } from "@/lib/business";
 import { sicLookup } from "@/lib/sic";
+import DatePicker from "@/components/shared/date-picker";
+import { campaignView } from "@/lib/campaign-types";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 
@@ -42,7 +44,12 @@ async function loadSic() {
  * means from the SIC list. Only these fields are sent, so nothing else on
  * the lead changes.
  */
-export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
+export default function BusinessForm({ lead, cargoTypes = [], trigger, campaign = null, custom = {} }) {
+  // The client's campaign type (Nov 2026): its names for the fields, those it turns off (left off the form, so
+  // what they hold is kept), and its own questions.
+  const view = campaignView(campaign);
+  const show = (key) => !view.hidden(key);
+  const L = view.label;
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(updateLead, EMPTY);
@@ -91,8 +98,9 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
             </p>
           ) : null}
           <div className="-mr-1 grid min-h-0 grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+            {show("sic") ? (<>
             {/* What kind of business it is, first (Oct 2026); the description comes from the SIC list. */}
-            <Field label="SIC code" error={fe("sic_code")} hint="Type a code or what the business does, and pick from the list">
+            <Field label={L("sic")} error={fe("sic_code")} hint="Type a code or what the business does, and pick from the list">
               <Input name="sic_code" list="sic-codes" value={code} onChange={(e) => setCode(e.target.value)} maxLength={12} aria-invalid={invalid("sic_code")} autoComplete="off" />
             </Field>
             <Field label="SIC description">
@@ -101,6 +109,7 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
             <datalist id="sic-codes">
               {sic.map((s) => <option key={s.code} value={s.code}>{s.description}</option>)}
             </datalist>
+            </>) : null}
             <Field label="Company name" required error={fe("company_name")}>
               <Input name="company_name" defaultValue={dv("company_name")} maxLength={120} required aria-invalid={invalid("company_name")} />
             </Field>
@@ -108,8 +117,9 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
               <PhoneInput name="phone" defaultValue={dv("phone") ?? ""} invalid={invalid("phone")} />
             </Field>
 
+            {show("locations") ? (
             <fieldset className={`grid grid-cols-2 gap-3 ${SECTION_BOX} sm:col-span-2 sm:grid-cols-5`} data-group="locations">
-              <legend className={SECTION_LEGEND}>Locations</legend>
+              <legend className={SECTION_LEGEND}>{L("locations")}</legend>
               <Field label="Locations" error={fe("location")}>
                 <Input name="location" defaultValue={dv("location")} maxLength={60} aria-invalid={invalid("location")} />
               </Field>
@@ -124,18 +134,21 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
               {num("building_stories", "Stories", { max: 3 })}
               {num("building_acres", "Acres", { decimal: true, max: 8 })}
             </fieldset>
+            ) : null}
 
+            {show("employees") || show("subcontractors") ? (
             <fieldset className={`grid grid-cols-2 gap-3 ${SECTION_BOX} sm:col-span-2 sm:grid-cols-4`} data-group="employees">
-              <legend className={SECTION_LEGEND}>Employees</legend>
-              {num("employees", "Total")}
-              {num("employees_full_time", "Full-time")}
-              {num("employees_part_time", "Part-time")}
-              {num("subcontractors_pct", "Sub-contractors %", { decimal: true, max: 6 })}
+              <legend className={SECTION_LEGEND}>{show("employees") ? L("employees") : L("subcontractors")}</legend>
+              {show("employees") ? <>{num("employees", "Total")}{num("employees_full_time", "Full-time")}{num("employees_part_time", "Part-time")}</> : null}
+              {show("subcontractors") ? num("subcontractors_pct", `${L("subcontractors")} %`, { decimal: true, max: 6 }) : null}
             </fieldset>
+            ) : null}
 
+            {show("autos") || show("dot_number") || show("cargo") ? (
             <fieldset className={`grid grid-cols-2 gap-3 ${SECTION_BOX} sm:col-span-2`} data-group="autos">
-              <legend className={SECTION_LEGEND}>Autos</legend>
-              {num("autos", "Autos", { max: 6 })}
+              <legend className={SECTION_LEGEND}>{show("autos") ? L("autos") : [show("dot_number") && L("dot_number"), show("cargo") && L("cargo")].filter(Boolean).join(" & ")}</legend>
+              {show("autos") ? <>
+              {num("autos", L("autos"), { max: 6 })}
               {num("drivers", "Drivers", { max: 6 })}
               <Field label="Travel radius" error={fe("travel_radius")}>
                 <Select name="travel_radius" defaultValue={dv("travel_radius", "") ?? ""} aria-invalid={invalid("travel_radius")}>
@@ -143,15 +156,21 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
                   {TRAVEL_RADII.map((r) => <option key={r} value={r}>{r} miles</option>)}
                 </Select>
               </Field>
-              <Field label="DOT#" error={fe("dot_number")}>
+              </> : null}
+              {show("dot_number") ? (
+              <Field label={L("dot_number")} error={fe("dot_number")}>
                 <Input name="dot_number" inputMode="numeric" defaultValue={dv("dot_number")} maxLength={14} aria-invalid={invalid("dot_number")} />
               </Field>
-              <Field label="Cargo" error={fe("cargo")} hint={cargoTypes.length ? null : "An administrator loads the cargo list in Settings"}>
+              ) : null}
+              {show("cargo") ? (
+              <Field label={L("cargo")} error={fe("cargo")} hint={cargoTypes.length ? null : "An administrator loads the cargo list in Settings"}>
                 <Select name="cargo" defaultValue={cargo} aria-invalid={invalid("cargo")}>
                   <option value="">—</option>
                   {cargoOptions.map((t) => <option key={t.id} value={t.name}>{t.name}</option>)}
                 </Select>
               </Field>
+              ) : null}
+              {show("autos") ? (
               <div className="sm:col-span-2" role="group" aria-label="Kinds of vehicles">
                 <div className="mb-1.5 text-xs font-medium">Kinds of vehicles</div>
                 {/* Sent even when none is ticked, so taking every one off clears them. */}
@@ -165,33 +184,77 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger }) {
                   ))}
                 </div>
               </div>
+              ) : null}
             </fieldset>
+            ) : null}
 
-            <Field label="XMOD" error={fe("xmod")} hint="e.g. .85 or 1.50">
+            {show("xmod") ? (
+            <Field label={L("xmod")} error={fe("xmod")} hint="e.g. .85 or 1.50">
               <Input name="xmod" inputMode="decimal" defaultValue={state?.values ? dv("xmod") : xmodText(lead.xmod) ?? ""} maxLength={4} aria-invalid={invalid("xmod")} />
             </Field>
-            <Field label="Sales volume" error={fe("sales_volume")} hint="e.g. $12.4M">
+            ) : null}
+            {show("sales_volume") ? (
+            <Field label={L("sales_volume")} error={fe("sales_volume")} hint="e.g. $12.4M">
               <Input name="sales_volume" defaultValue={dv("sales_volume")} maxLength={30} aria-invalid={invalid("sales_volume")} />
             </Field>
-            <Field label="Annual payroll" error={fe("annual_payroll")} hint="e.g. $1.2M">
+            ) : null}
+            {show("annual_payroll") ? (
+            <Field label={L("annual_payroll")} error={fe("annual_payroll")} hint="e.g. $1.2M">
               <Input name="annual_payroll" defaultValue={dv("annual_payroll")} maxLength={30} aria-invalid={invalid("annual_payroll")} />
             </Field>
-            <Field label="EIN" error={fe("ein")} hint="Federal employer ID, 9 digits">
+            ) : null}
+            {show("ein") ? (
+            <Field label={L("ein")} error={fe("ein")} hint="Federal employer ID, 9 digits">
               <Input name="ein" inputMode="numeric" defaultValue={dv("ein")} maxLength={12} aria-invalid={invalid("ein")} />
             </Field>
-            {num("years_in_business", "Years in business", { max: 3 })}
-            <Field label="Est. annual premium" error={fe("estimated_annual_premium")}>
+            ) : null}
+            {show("years_in_business") ? num("years_in_business", L("years_in_business"), { max: 3 }) : null}
+            {show("estimated_annual_premium") ? (
+            <Field label={L("estimated_annual_premium")} error={fe("estimated_annual_premium")}>
               <Input name="estimated_annual_premium" defaultValue={dv("estimated_annual_premium")} maxLength={30} aria-invalid={invalid("estimated_annual_premium")} />
             </Field>
-            <Field label="Claims last 3 yrs" error={fe("claims_3yrs")}>
+            ) : null}
+            {show("claims_3yrs") ? (
+            <Field label={L("claims_3yrs")} error={fe("claims_3yrs")}>
               <Select name="claims_3yrs" defaultValue={claims} aria-invalid={invalid("claims_3yrs")}>
                 <option value="">—</option>
                 <option value="yes">Yes</option>
                 <option value="no">No</option>
               </Select>
             </Field>
-            {num("professionals", "Professionals")}
-            {num("covered_employees", "Covered employees")}
+            ) : null}
+            {show("professionals") ? num("professionals", L("professionals")) : null}
+            {show("covered_employees") ? num("covered_employees", L("covered_employees")) : null}
+
+            {/* The campaign type's own questions (Nov 2026). */}
+            {view.custom.length ? (
+              <fieldset className={`grid grid-cols-1 gap-3 ${SECTION_BOX} sm:col-span-2 sm:grid-cols-2`} data-group="custom">
+                <legend className={SECTION_LEGEND}>{view.name}</legend>
+                {view.custom.map((f) => {
+                  const name = `custom.${f.id}`;
+                  const was = state?.values && name in state.values ? state.values[name] : custom?.[f.id];
+                  const text = was === true ? "yes" : was === false ? "no" : was ?? "";
+                  return (
+                    <Field key={f.id} label={f.label} error={fe(name)}>
+                      {f.type === "date" ? <DatePicker name={name} defaultValue={String(text)} aria-label={f.label} invalid={invalid(name)} />
+                        : f.type === "yesno" ? (
+                          <Select name={name} defaultValue={String(text)} aria-invalid={invalid(name)} data-custom-input={f.id}>
+                            <option value="">—</option><option value="yes">Yes</option><option value="no">No</option>
+                          </Select>
+                        ) : f.type === "select" ? (
+                          <Select name={name} defaultValue={String(text)} aria-invalid={invalid(name)} data-custom-input={f.id}>
+                            <option value="">—</option>
+                            {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
+                          </Select>
+                        ) : (
+                          <Input name={name} defaultValue={String(text)} inputMode={f.type === "number" ? "decimal" : undefined} maxLength={f.type === "number" ? 20 : 500}
+                            aria-invalid={invalid(name)} data-custom-input={f.id} />
+                        )}
+                    </Field>
+                  );
+                })}
+              </fieldset>
+            ) : null}
 
           </div>
           <DialogFooter>

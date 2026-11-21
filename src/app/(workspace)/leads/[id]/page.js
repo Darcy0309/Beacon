@@ -4,6 +4,8 @@ import { headers } from "next/headers";
 import { ArrowLeft, ArrowRight, BadgeDollarSign, CalendarClock, ClipboardList, Send, ChevronDown, Mail, Paperclip, Pencil, Phone, Printer, Repeat, Reply } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import ToneBadge from "@/components/shared/tone-badge";
+import { campaignView, customText } from "@/lib/campaign-types";
+import { getLeadCampaign } from "@/features/campaign-types/queries";
 import Tabs from "@/components/shared/tabs";
 import ProspectForm from "@/features/leads/components/prospect-form";
 import BusinessForm from "@/features/leads/components/business-form";
@@ -159,8 +161,8 @@ function Fact({ label, children }) {
 function Rows({ rows }) {
   return (
     <div className="divide-y divide-[var(--panel-border)]">
-      {rows.map(([label, value]) => (
-        <div key={label} className="grid grid-cols-[minmax(8rem,40%)_1fr] gap-3 px-4 py-2.5 text-sm odd:bg-muted/30">
+      {rows.map(([label, value], i) => (
+        <div key={`${i}-${label}`} className="grid grid-cols-[minmax(8rem,40%)_1fr] gap-3 px-4 py-2.5 text-sm odd:bg-muted/30">
           <span className="text-muted-foreground">{label}</span>
           <span className="min-w-0 break-words">{value == null || value === "" ? <span className="text-muted-foreground">—</span> : value}</span>
         </div>
@@ -259,6 +261,8 @@ export default async function LeadSheet({ params, searchParams }) {
       staff ? getLeadConversation(lead.id) : null,
       // Special Pay asked for on it (Sean, Nov 2026): the asker's, the Sales Rep's to decide, an administrator's.
       staff ? getLeadSpecialPay(lead.id, me) : [],
+      // Its client's campaign type, laying out Business and Coverage, and the answers to its own fields (Nov 2026).
+      getLeadCampaign(lead.id),
     ]);
   });
   const [lead, activity, me, results, openAppt, latestAnyAppt, today, tz, rest] = await Promise.all([
@@ -275,7 +279,10 @@ export default async function LeadSheet({ params, searchParams }) {
   const seesInternal = ["admin", "manager"].includes(me?.role);
 
   const origin = publicOrigin(await headers());
-  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates, conversation, specialPay] = rest;
+  const [list, listProject, inProject, sender, carriers, staffList, files, cargoTypes, info, hold, calendar, leadAppts, apptUpdates, conversation, specialPay, campaign] = rest;
+  // Campaign Types (Sean, Nov 2026): Insurance unless the client has another.
+  const view = campaignView(campaign?.type);
+  const custom = campaign?.custom ?? {};
   const client = me?.role === "client";
   // Printing a lead: administrators and the client's own people, not account managers or agents (Sean, Nov 2026).
   const canPrint = admin || client;
@@ -352,7 +359,8 @@ export default async function LeadSheet({ params, searchParams }) {
   const apptManager = r.stage === "appt" ? r.assigned : null;
 
   // The policy lines the client always wants listed, and any other with something in it.
-  const lines = POLICY_LINES.filter((l) => l.always || ins?.[l.date] || ins?.[l.carrier]);
+  const lines = POLICY_LINES.filter((l) => (l.always || ins?.[l.date] || ins?.[l.carrier]) && !view.hidden(`line_${l.key}`))
+    .map((l) => ({ ...l, label: view.label(`line_${l.key}`) }));
   const coverage = Object.fromEntries([
     ["ultimate_xdate", ins?.ultimate_xdate ?? ""],
     ["agency_name", ins?.agency_name ?? ""],
@@ -569,59 +577,61 @@ export default async function LeadSheet({ params, searchParams }) {
                 },
                 {
                   id: "business",
-                  label: "Business",
+                  label: view.label("tab_business"),
                   content: (
                     <div>
                       {staff ? (
                         <div className="flex justify-end border-b border-[var(--panel-border)] px-4 py-2">
-                          <BusinessForm lead={r} cargoTypes={cargoTypes} trigger={<Button size="sm" variant="outline" data-edit-business><Pencil /> Edit</Button>} />
+                          <BusinessForm lead={r} cargoTypes={cargoTypes} campaign={campaign?.type ?? null} custom={custom} trigger={<Button size="sm" variant="outline" data-edit-business><Pencil /> Edit</Button>} />
                         </div>
                       ) : null}
                       <Rows
                         rows={[
                           // What kind of business it is, first (Oct 2026: the caller sees it without opening Edit).
-                          ["SIC code", r.sic_code ? <span className="tabular-nums" data-sic-code>{r.sic_code}</span> : null],
-                          ["SIC description", r.sic_description ? <span className="font-medium" data-sic-description>{r.sic_description}</span>
+                          ["sic", view.label("sic"), r.sic_code ? <span className="tabular-nums" data-sic-code>{r.sic_code}</span> : null],
+                          ["sic", "SIC description", r.sic_description ? <span className="font-medium" data-sic-description>{r.sic_description}</span>
                             : r.sic_code ? <span className="text-muted-foreground">Not on the SIC list</span> : null],
-                          ["Company", lead.co],
-                          ["Phone", r.phone],
-                          ["Locations", locationsLine(r)],
-                          ["Employees", employeesLine(r)],
-                          ["Sub-contractors", subcontractorsLine(r)],
-                          ["Autos", autosLine(r)],
-                          ["DOT#", r.dot_number ? <span className="tabular-nums">{r.dot_number}</span> : null],
-                          ["Cargo", r.cargo],
-                          ["XMOD", r.xmod != null ? <span className="tabular-nums">{xmodText(r.xmod)}</span> : null],
-                          ["Sales volume", r.sales_volume],
-                          ["Annual payroll", r.annual_payroll],
-                          ["EIN", r.ein ? <span className="tabular-nums">{r.ein}</span> : null],
-                          ["Years in business", r.years_in_business],
-                          ["Est. annual premium", r.estimated_annual_premium],
-                          ["Claims last 3 yrs", yesNo(r.claims_3yrs)],
-                          ["Professionals", r.professionals],
-                          ["Covered employees", r.covered_employees],
-                        ]}
+                          [null, "Company", lead.co],
+                          [null, "Phone", r.phone],
+                          ["locations", view.label("locations"), locationsLine(r)],
+                          ["employees", view.label("employees"), employeesLine(r)],
+                          ["subcontractors", view.label("subcontractors"), subcontractorsLine(r)],
+                          ["autos", view.label("autos"), autosLine(r)],
+                          ["dot_number", view.label("dot_number"), r.dot_number ? <span className="tabular-nums">{r.dot_number}</span> : null],
+                          ["cargo", view.label("cargo"), r.cargo],
+                          ["xmod", view.label("xmod"), r.xmod != null ? <span className="tabular-nums">{xmodText(r.xmod)}</span> : null],
+                          ["sales_volume", view.label("sales_volume"), r.sales_volume],
+                          ["annual_payroll", view.label("annual_payroll"), r.annual_payroll],
+                          ["ein", view.label("ein"), r.ein ? <span className="tabular-nums">{r.ein}</span> : null],
+                          ["years_in_business", view.label("years_in_business"), r.years_in_business],
+                          ["estimated_annual_premium", view.label("estimated_annual_premium"), r.estimated_annual_premium],
+                          ["claims_3yrs", view.label("claims_3yrs"), yesNo(r.claims_3yrs)],
+                          ["professionals", view.label("professionals"), r.professionals],
+                          ["covered_employees", view.label("covered_employees"), r.covered_employees],
+                          // The campaign type's own questions (Nov 2026).
+                          ...view.custom.map((f) => [null, f.label, customText(f, custom[f.id])]),
+                        ].filter(([key]) => !key || !view.hidden(key)).map(([, label, value]) => [label, value])}
                       />
                     </div>
                   ),
                 },
-                {
+                ...(view.hidden("tab_coverage") ? [] : [{
                   id: "coverage",
-                  label: "Coverage",
+                  label: view.label("tab_coverage"),
                   count: lines.filter((l) => ins?.[l.date]).length || null,
                   content: (
                     <div>
                       {canRecord ? (
                         <div className="flex justify-end border-b border-[var(--panel-border)] px-4 py-2">
-                          <CoverageForm leadId={lead.id} company={lead.co} coverage={coverage} carriers={carriers} />
+                          <CoverageForm leadId={lead.id} company={lead.co} coverage={coverage} carriers={carriers} campaign={campaign?.type ?? null} />
                         </div>
                       ) : null}
                       <Rows
                         rows={[
-                          ["Ultimate XDate", ins?.ultimate_xdate ? <span className="font-semibold tabular-nums text-primary">{mediumDate(ins.ultimate_xdate)}</span> : null],
-                          ["Agency", (ins?.agency_name ?? r.agency?.name)
+                          ...(view.hidden("ultimate_xdate") ? [] : [[view.label("ultimate_xdate"), ins?.ultimate_xdate ? <span className="font-semibold tabular-nums text-primary">{mediumDate(ins.ultimate_xdate)}</span> : null]]),
+                          ...(view.hidden("agency") ? [] : [[view.label("agency"), (ins?.agency_name ?? r.agency?.name)
                             ? `${ins?.agency_name ?? r.agency?.name}${ins?.agency_years != null ? ` · ${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"} with them` : ""}`
-                            : null],
+                            : null]]),
                           ...(r.original_xdate
                             ? [["Original renewal", <span key="o"><span className="tabular-nums">{mediumDate(r.original_xdate)}</span><span className="text-muted-foreground"> · corrected on a call</span></span>]]
                             : []),
@@ -641,7 +651,7 @@ export default async function LeadSheet({ params, searchParams }) {
                       </table>
                     </div>
                   ),
-                },
+                }]),
                 {
                   // The client's profile sheet (Sean, Oct 2026): the agent and office (its area code is the caller ID
                   // to call from; its address opens directions to this business), producers, what qualifies an

@@ -2,6 +2,7 @@
 
 /** Creating, editing and working leads. */
 
+import { customFromForm } from "@/lib/campaign-types";
 import { revalidatePath } from "next/cache";
 import { check, fail, idFrom, logActivity, n, ok, onlySubmitted, removeRecord, s } from "@/lib/server/action-helpers";
 import { createClient } from "@/lib/supabase/server";
@@ -151,10 +152,21 @@ export async function updateLead(prevState, formData) {
   if (failed) return failed;
 
   const supabase = await createClient();
+  // The answers to its campaign type's own fields (Nov 2026), checked before anything is saved.
+  let customValues = null;
+  if ([...formData.keys()].some((k) => k.startsWith("custom."))) {
+    const { data: row } = await supabase.from("leads")
+      .select("custom, project:projects!leads_project_id_fkey(company:companies(campaign_type:campaign_types(fields)))").eq("id", id).maybeSingle();
+    const one = (v) => (Array.isArray(v) ? v[0] : v) ?? null;
+    const fields = one(one(one(row?.project)?.company)?.campaign_type)?.fields?.custom ?? [];
+    const read = customFromForm(fields, formData);
+    if (read.error) return fail(read.error, { [read.field]: read.error }, Object.fromEntries([...formData.entries()].filter(([k]) => k.startsWith("custom."))));
+    customValues = Object.fromEntries(Object.entries({ ...(row?.custom ?? {}), ...read.values }).filter(([, v]) => v !== null));
+  }
   const { error } = await supabase
     .from("leads")
     // Editing the record is not working the name: only a call (record_call_result) sets date_last_worked.
-    .update(onlySubmitted(formData, leadPayload(formData)))
+    .update({ ...onlySubmitted(formData, leadPayload(formData)), ...(customValues ? { custom: customValues } : {}) })
     .eq("id", id);
   if (error) return fail(error);
   const notesError = await saveInternalNotes(supabase, id, formData);
@@ -211,14 +223,14 @@ export async function saveCoverage(prevState, formData) {
   if (notAllowed) return fail(notAllowed, null, values);
   if (!allowed) return fail("This name is not on your call list, so you can't change its coverage.", null, values);
 
-  const payload = {
-    ultimate_xdate: values.ultimate_xdate || null,
-    agency_name: values.agency_name || null,
-    agency_years: values.agency_years === "" || values.agency_years == null ? null : Number.parseInt(values.agency_years, 10),
-  };
+  // Only what the form sent: a campaign type that turns a line off leaves what it holds as it is (Nov 2026).
+  const payload = {};
+  if (formData.has("ultimate_xdate")) payload.ultimate_xdate = values.ultimate_xdate || null;
+  if (formData.has("agency_name")) payload.agency_name = values.agency_name || null;
+  if (formData.has("agency_years")) payload.agency_years = values.agency_years === "" || values.agency_years == null ? null : Number.parseInt(values.agency_years, 10);
   for (const line of POLICY_LINES) {
-    payload[line.date] = values[line.date] || null;
-    payload[line.carrier] = values[line.carrier] || null;
+    if (formData.has(line.date)) payload[line.date] = values[line.date] || null;
+    if (formData.has(line.carrier)) payload[line.carrier] = values[line.carrier] || null;
   }
   const { data: rows, error } = await supabase.from("insurance_details").update(payload).eq("lead_id", leadId).select("id");
   if (error) return fail(error, null, values);

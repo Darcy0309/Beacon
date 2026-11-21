@@ -21,12 +21,14 @@ import ApptTextSettings from "@/features/settings/components/appt-text-settings"
 import CallRecordingSettings from "@/features/settings/components/call-recording-settings";
 import PhoneLinesSettings from "@/features/settings/components/phone-lines-settings";
 import { apptTextSettings } from "@/lib/appointment-texts";
+import CampaignTypesCard from "@/features/campaign-types/components/campaign-types-card";
+import { getCampaignTypes } from "@/features/campaign-types/queries";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
-  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting, bonusRules, phoneLines, callers] = await Promise.all([
+  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting, bonusRules, phoneLines, callers, campaignTypes] = await Promise.all([
     getSettings(), getPayRules(), getBusinessToday(),
     supabase.from("sic_codes").select("code", { count: "exact", head: true }),
     getDeletedRecords(),
@@ -38,6 +40,7 @@ export default async function SettingsPage() {
     supabase.from("phone_lines").select("id, number, kind, label, ring_user_ids, area_code").order("kind").order("number"),
     supabase.from("users").select("id, first_name, last_name, email, phone_ext").in("role", ["admin", "manager", "agent"]).eq("status", "active")
       .is("deleted_at", null).order("first_name").order("last_name").limit(500),
+    getCampaignTypes(),
   ]);
 
   return (
@@ -59,6 +62,8 @@ export default async function SettingsPage() {
         <PaySchedule periods={payRules.time.schedule} today={today} editable />
         {/* The lead and appointment managers' bonus plans (Sean, Nov 2026). */}
         <BonusPlansSettings rules={bonusRules} />
+        {/* Lead sheets for other industries (Sean, Nov 2026). */}
+        <CampaignTypesCard types={campaignTypes} />
         <SicCodesCard count={sic.count ?? 0} />
         <CargoTypesCard types={cargo} />
         <DeletedRecordsCard records={deleted} />
