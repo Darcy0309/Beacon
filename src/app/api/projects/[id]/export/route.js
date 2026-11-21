@@ -15,10 +15,12 @@ const LEAD_COLUMNS = `id, company_name, contact_name, contact_title, phone, cont
   address, city, state, zip, county, territory,
   sic_code, description, employees, autos, drivers, xmod, sales_volume, location, ein, years_in_business, estimated_annual_premium,
   producer_name, list_source, call_result_dbdv, call_result_appt, client_note,
+  contact_phone, employees_full_time, employees_part_time, subcontractors_pct, annual_payroll, auto_types, travel_radius, dot_number, cargo,
+  location_ownership, building_age, building_stories, building_acres, claims_3yrs, professionals, covered_employees,
   result:call_results(name, project_type),
   insurance:insurance_details(agency_name, agency_years, ultimate_xdate, pkg_xdate, pkg_carrier, wc_xdate, wc_carrier, auto_xdate, auto_carrier,
     health_xdate, health_carrier, dental_xdate, dental_provider, vision_xdate, vision_provider, prof_liab_xdate, prof_liab_carrier,
-    do_xdate, do_carrier, eo_xdate, eo_carrier),
+    do_xdate, do_carrier, eo_xdate, eo_carrier, personal_lines_xdate, personal_lines_carrier),
   note:lead_notes(notes),
   appointments(id, appt_date, appt_time, appt_create_date, invalid_at)`;
 

@@ -6,7 +6,7 @@
  */
 
 import { TEMPLATE_HEADERS } from "./csv.js";
-import { xmodText } from "./business.js";
+import { AUTO_TYPES, xmodText } from "./business.js";
 
 /** A date (YYYY-MM-DD…) as the lists write it: 8/17/2026. Blank for none. */
 const usDate = (d) => {
@@ -35,6 +35,7 @@ const TEMPLATE_VALUES = {
   "Contact": (r) => r.lead.contact_name,
   "Contact Title": (r) => r.lead.contact_title,
   "Phone": (r) => r.lead.phone,
+  "Contact Direct Phone": (r) => r.lead.contact_phone,
   "Mobile Phone": (r) => r.lead.contact_mobile,
   "Email": (r) => r.lead.email,
   "Fax": (r) => r.lead.fax,
@@ -44,6 +45,11 @@ const TEMPLATE_VALUES = {
   "DM Phone": (r) => r.lead.dm_phone,
   "DM Cell": (r) => r.lead.dm_mobile,
   "DM Email": (r) => r.lead.dm_email,
+  "Contact 2": (r) => r.lead.contact2_name,
+  "Contact 2 Title": (r) => r.lead.contact2_title,
+  "Contact 2 Phone": (r) => r.lead.contact2_phone,
+  "Contact 2 Mobile": (r) => r.lead.contact2_mobile,
+  "Contact 2 Email": (r) => r.lead.contact2_email,
   "Address": (r) => r.lead.address,
   "City": (r) => r.lead.city,
   "State": (r) => r.lead.state,
@@ -52,6 +58,23 @@ const TEMPLATE_VALUES = {
   "Territory": (r) => r.lead.territory,
   "SIC Code": (r) => r.lead.sic_code,
   "SIC Description": (r) => r.sicDescription,
+  "Description": (r) => r.lead.description,
+  // The rest of the lead page's business details (Sean, Nov 2026), as the import reads them back.
+  "Full-Time Employees": (r) => r.lead.employees_full_time,
+  "Part-Time Employees": (r) => r.lead.employees_part_time,
+  "Subcontractors %": (r) => r.lead.subcontractors_pct,
+  "Annual Payroll": (r) => r.lead.annual_payroll,
+  "Vehicle Types": (r) => (r.lead.auto_types ?? []).map((k) => AUTO_TYPES.find(([key]) => key === k)?.[1] ?? k).join(", "),
+  "Travel Radius": (r) => r.lead.travel_radius,
+  "DOT Number": (r) => r.lead.dot_number,
+  "Cargo": (r) => r.lead.cargo,
+  "Building Own/Lease": (r) => ({ own: "Own", lease: "Lease" })[r.lead.location_ownership] ?? r.lead.location_ownership,
+  "Building Age": (r) => r.lead.building_age,
+  "Building Stories": (r) => r.lead.building_stories,
+  "Building Acres": (r) => r.lead.building_acres,
+  "Claims Last 3 Yrs": (r) => (r.lead.claims_3yrs === true ? "Yes" : r.lead.claims_3yrs === false ? "No" : ""),
+  "Professionals": (r) => r.lead.professionals,
+  "Covered Employees": (r) => r.lead.covered_employees,
   "Employees": (r) => r.lead.employees,
   "Autos": (r) => r.lead.autos,
   "Drivers": (r) => r.lead.drivers,
@@ -72,6 +95,8 @@ const TEMPLATE_VALUES = {
   "Auto Carrier": (r) => r.insurance?.auto_carrier,
   "Health XDate": (r) => usDate(r.insurance?.health_xdate),
   "Health Carrier": (r) => r.insurance?.health_carrier,
+  "Personal Lines XDate": (r) => usDate(r.insurance?.personal_lines_xdate),
+  "Personal Lines Carrier": (r) => r.insurance?.personal_lines_carrier,
   "Dental XDate": (r) => usDate(r.insurance?.dental_xdate),
   "Dental Provider": (r) => r.insurance?.dental_provider,
   "Vision XDate": (r) => usDate(r.insurance?.vision_xdate),
@@ -95,12 +120,7 @@ const TEMPLATE_VALUES = {
 // What a lead also carries that the template leaves out. The import reads
 // these headings too, so nothing on a lead is lost between the two.
 const EXTRA_VALUES = {
-  "Contact 2": (r) => r.lead.contact2_name,
-  "Contact 2 Title": (r) => r.lead.contact2_title,
-  "Contact 2 Phone": (r) => r.lead.contact2_phone,
-  "Contact 2 Mobile": (r) => r.lead.contact2_mobile,
-  "Contact 2 Email": (r) => r.lead.contact2_email,
-  "Description": (r) => r.lead.description,
+  // Contact 2 and the description went into the template itself (Nov 2026): every field a lead page edits is there.
 };
 
 /** The export's headings: the import template's, in its order, then the extras. */

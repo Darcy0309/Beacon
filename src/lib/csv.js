@@ -120,6 +120,22 @@ export const COLUMN_ALIASES = {
   // The experience MOD on work comp: .85, 1.50.
   xmod: "xmod", emod: "xmod", expmod: "xmod", experiencemod: "xmod", experiencemodifier: "xmod", modrating: "xmod", wcmod: "xmod",
   salesvolume: "sales_volume", revenue: "sales_volume", annualrevenue: "sales_volume",
+  // Everything else the lead page's business details hold (Sean, Nov 2026: "make the import/export template
+  // include every field on the leads pages that we can input data on"), read as that form saves it.
+  annualpayroll: "annual_payroll", payroll: "annual_payroll",
+  buildingownlease: "location_ownership", buildingownership: "location_ownership", ownorlease: "location_ownership", ownlease: "location_ownership",
+  buildingage: "building_age", buildingstories: "building_stories", stories: "building_stories",
+  buildingacres: "building_acres", acres: "building_acres",
+  fulltimeemployees: "employees_full_time", employeesfulltime: "employees_full_time", fulltime: "employees_full_time",
+  parttimeemployees: "employees_part_time", employeesparttime: "employees_part_time", parttime: "employees_part_time",
+  subcontractors: "subcontractors_pct", subcontractorspct: "subcontractors_pct", subcontractorspercent: "subcontractors_pct",
+  vehicletypes: "auto_types", autotypes: "auto_types", kindsofvehicles: "auto_types",
+  travelradius: "travel_radius", radius: "travel_radius",
+  dotnumber: "dot_number", dot: "dot_number", usdot: "dot_number", usdotnumber: "dot_number",
+  cargo: "cargo", cargotype: "cargo",
+  claimslast3yrs: "claims_3yrs", claimslast3years: "claims_3yrs", claims3yrs: "claims_3yrs", claims: "claims_3yrs",
+  // The contact's own line (the lead page's Contact Phone); a plain "Contact Phone" column stays the business's.
+  contactdirectphone: "contact_phone", contactdirectline: "contact_phone", directphone: "contact_phone", directline: "contact_phone",
   yearsinbusiness: "years_in_business", yrsinbusiness: "years_in_business",
   premium: "estimated_annual_premium", estimatedannualpremium: "estimated_annual_premium",
 
@@ -176,13 +192,19 @@ export const NAME_PART_ALIASES = {
  * out are simply blank). Company is the only one required.
  */
 export const TEMPLATE_HEADERS = [
-  "Company", "Contact", "Contact Title", "Phone", "Mobile Phone", "Email", "Fax", "Website",
+  "Company", "Contact", "Contact Title", "Phone", "Contact Direct Phone", "Mobile Phone", "Email", "Fax", "Website",
   "Decision Maker", "DM Title", "DM Phone", "DM Cell", "DM Email",
+  "Contact 2", "Contact 2 Title", "Contact 2 Phone", "Contact 2 Mobile", "Contact 2 Email",
   "Address", "City", "State", "Zip", "County", "Territory",
-  "SIC Code", "SIC Description", "Employees", "Autos", "Drivers", "XMOD", "Sales Volume", "Locations", "EIN", "Years In Business", "Estimated Annual Premium",
+  "SIC Code", "SIC Description", "Description",
+  "Employees", "Full-Time Employees", "Part-Time Employees", "Subcontractors %",
+  "Autos", "Drivers", "XMOD", "Sales Volume", "Annual Payroll",
+  "Vehicle Types", "Travel Radius", "DOT Number", "Cargo",
+  "Locations", "Building Own/Lease", "Building Age", "Building Stories", "Building Acres",
+  "EIN", "Years In Business", "Estimated Annual Premium", "Claims Last 3 Yrs", "Professionals", "Covered Employees",
   "Producer Name", "List Source",
   "Ultimate XDate", "Package XDate", "Package Carrier", "Work Comp XDate", "Work Comp Carrier",
-  "Auto XDate", "Auto Carrier", "Health XDate", "Health Carrier", "Dental XDate", "Dental Provider",
+  "Auto XDate", "Auto Carrier", "Health XDate", "Health Carrier", "Personal Lines XDate", "Personal Lines Carrier", "Dental XDate", "Dental Provider",
   "Vision XDate", "Vision Provider", "Prof Liab XDate", "Prof Liab Carrier", "DO XDate", "DO Carrier",
   "EO XDate", "EO Carrier", "Agency Name", "Years With Agency",
   "Call Result DBDV", "Call Result Appt", "Appointment Date", "Appointment Time",
@@ -222,6 +244,7 @@ export const INSURANCE_ALIASES = {
   eoxdate: "eo_xdate", eocarrier: "eo_carrier",
   homeownerxdate: "homeowner_xdate", homeownercarrier: "homeowner_carrier",
   personalautoxdate: "personal_auto_xdate", personalautocarrier: "personal_auto_carrier",
+  personallinesxdate: "personal_lines_xdate", personallinescarrier: "personal_lines_carrier",
 };
 
 /** Columns that describe a booked appointment rather than the lead. */
@@ -291,7 +314,7 @@ const DATE_COLUMNS = new Set([
   "qa_date_dbdv", "qa_date_appt", "shopping_date", "appt_date",
   "ultimate_xdate", "pkg_xdate", "wc_xdate", "auto_xdate", "health_xdate",
   "dental_xdate", "vision_xdate", "prof_liab_xdate", "do_xdate", "eo_xdate",
-  "homeowner_xdate", "personal_auto_xdate", "developed_at", "set_at", "lead_date",
+  "homeowner_xdate", "personal_auto_xdate", "personal_lines_xdate", "developed_at", "set_at", "lead_date",
 ]);
 
 // What old lists put in a field that has nothing in it: read as blank.
@@ -581,6 +604,46 @@ const CARRIER_XDATE = {
  * recognised, and each row is { lead, insurance, appointment, notes, status,
  * contacts, row }: how many people it names, and its index in csvRows.
  */
+// The kinds of vehicle and travel radii the lead page offers (lib/business.js), as an import reads them.
+const VEHICLE_KINDS = [["cars", /^cars?$/], ["vans", /^vans?$/], ["delivery_trucks", /^delivery( trucks?)?$/],
+  ["big_rigs", /^(big rigs?|semis?|tractor trailers?)$/], ["tow_trucks", /^(tow trucks?|wreckers?|tow trucks? \/ wreckers?)$/]];
+const RADII = ["25", "50", "100", "250", "300", "500+"];
+
+/**
+ * The business details beyond the template's first columns (Nov 2026), as the lead page's form saves them: whole
+ * numbers, acres and a percent, Own or Lease, Yes or No, the kinds of vehicle and a travel radius from its lists.
+ * One that is none of those is left out (the row kept), so a stray value never fails the batch.
+ */
+export function businessDetails(lead) {
+  const whole = (v) => (/^\d{1,6}$/.test(String(v).replace(/[,\s]/g, "")) ? Number(String(v).replace(/[,\s]/g, "")) : null);
+  const decimal = (v, max) => {
+    const n = Number(String(v).replace(/[%,\s]/g, ""));
+    return String(v).trim() && Number.isFinite(n) && n >= 0 && n <= max ? n : null;
+  };
+  const set = (column, value) => { if (value === null || value === undefined) delete lead[column]; else lead[column] = value; };
+  for (const c of ["building_age", "building_stories", "employees_full_time", "employees_part_time"]) if (c in lead) set(c, whole(lead[c]));
+  if ("building_acres" in lead) set("building_acres", decimal(lead.building_acres, 99999999));
+  if ("subcontractors_pct" in lead) set("subcontractors_pct", decimal(lead.subcontractors_pct, 100));
+  if ("location_ownership" in lead) {
+    const v = String(lead.location_ownership).trim().toLowerCase();
+    set("location_ownership", /^own(ed|er|s)?$/.test(v) ? "own" : /^(lease[ds]?|rent(s|ed)?)$/.test(v) ? "lease" : null);
+  }
+  if ("claims_3yrs" in lead) {
+    const v = String(lead.claims_3yrs).trim().toLowerCase();
+    set("claims_3yrs", /^(y|yes|true|1)$/.test(v) ? true : /^(n|no|none|false|0)$/.test(v) ? false : null);
+  }
+  if ("auto_types" in lead) {
+    const kinds = String(lead.auto_types).toLowerCase().split(/\s*[,;|]\s*/).map((t) => t.replace(/_/g, " ").trim()).filter(Boolean)
+      .map((t) => VEHICLE_KINDS.find(([key, re]) => key.replace(/_/g, " ") === t || re.test(t))?.[0]).filter(Boolean);
+    set("auto_types", kinds.length ? [...new Set(kinds)] : null);
+  }
+  if ("travel_radius" in lead) {
+    const v = String(lead.travel_radius).toLowerCase().replace(/miles?|mi\.?/g, "").replace(/\s/g, "");
+    set("travel_radius", RADII.includes(v) ? v : /^500\+?$|^over500$/.test(v) ? "500+" : null);
+  }
+  if ("dot_number" in lead) set("dot_number", String(lead.dot_number).replace(/^(us)?dot#?\s*/i, "").trim().slice(0, 14) || null);
+}
+
 export function rowsToImport(csvRows) {
   if (csvRows.length < 2) return { rows: [], errors: 0, headers: [] };
 
@@ -679,6 +742,7 @@ export function rowsToImport(csvRows) {
       insurance[xdate] ??= day;
       delete insurance[carrier];
     }
+    businessDetails(lead);
     // Numbers in the database: one that is not a count or an XMOD is left out, or the whole batch would fail.
     for (const [column, parse] of [["drivers", parseDrivers], ["xmod", parseXmod]]) {
       if (!(column in lead)) continue;

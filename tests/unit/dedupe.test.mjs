@@ -43,7 +43,7 @@ const SAMPLE = [
 // --- SalesGenie columns ----------------------------------------------------
 const csv = parseCsv(SAMPLE);
 const unread = mapAllHeaders(csv[0]).map((m, i) => (m ? null : csv[0][i])).filter(Boolean);
-eq("every SalesGenie column used is read, but Own or Lease and the genders", unread, ["Own or Lease", "Executive Gender 1"]);
+eq("every SalesGenie column used is read (Own or Lease too, as the building, Nov 2026), but the genders", unread, ["Executive Gender 1"]);
 
 const { rows, errors } = rowsToImport(csv);
 check("every row imports", rows.length === 18 && errors === 0, `${rows.length} / ${errors}`);
