@@ -6,6 +6,8 @@
  * again by hand, and for a link opened without signing in.
  */
 
+import { readLeadCampaign } from "@/features/campaign-types/queries";
+import { campaignView, customText } from "@/lib/campaign-types";
 import "server-only";
 import { POLICY_LINES } from "@/lib/coverage";
 import { isMailbox, mailFailure, isReservedAddress, oneLine } from "@/lib/email";
@@ -75,7 +77,7 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       .order("appt_create_date", { ascending: false }).order("id", { ascending: false }).limit(1).maybeSingle();
 
   const projectId = call?.project_id ?? lead.project_id;
-  const [{ data: project }, { data: appt }, { data: tz }, { data: sic }, { data: docs }] = await Promise.all([
+  const [{ data: project }, { data: appt }, { data: tz }, { data: sic }, { data: docs }, campaign] = await Promise.all([
     projectId
       ? admin.from("projects").select("id, name, email, delivery_link_only, contact_name, appt_project_id, company:companies(name)").eq("id", projectId).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -87,7 +89,13 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
       : Promise.resolve({ data: null }),
     // The policy files kept with the lead: they go with it, each behind the sheet's own signed link.
     admin.from("documents").select("id, name, file_type, size_bytes").eq("lead_id", leadId).is("deleted_at", null).order("created_at"),
+    // Its client's campaign type (Nov 2026): the sheet as its lead page has it.
+    readLeadCampaign(admin, leadId),
   ]);
+  const view = campaignView(campaign?.type);
+  const answers = campaign?.custom ?? {};
+  const shown = ([key]) => !key || !view.hidden(key);
+  const labelled = ([key, label, value]) => [key ? view.label(key) : label, value];
   const fileToken = origin && docs?.length ? sheetToken(leadId) : null;
 
   const ins = one(lead.insurance) ?? {};
@@ -116,20 +124,30 @@ export async function loadLeadSheet(admin, leadId, callRecordId = null, { origin
     map: mapLink(address.join(", ")),
     website: lead.website,
     fax: lead.fax,
-    coverage: {
-      ultimate: longDate(ins.ultimate_xdate),
-      agency: ins.agency_name && ins.agency_years != null ? `${ins.agency_name} (${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"})` : ins.agency_name,
-      lines: POLICY_LINES.map((l) => ({ label: l.label, xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
+    // Its Coverage tab (renamed, or left off, by a campaign type), with what it holds.
+    coverage: view.hidden("tab_coverage") ? null : {
+      title: view.insurance ? null : view.label("tab_coverage"),
+      ultimateLabel: view.insurance ? null : view.label("ultimate_xdate"),
+      agencyLabel: view.insurance ? null : view.label("agency"),
+      ultimate: view.hidden("ultimate_xdate") ? null : longDate(ins.ultimate_xdate),
+      agency: view.hidden("agency") ? null
+        : ins.agency_name && ins.agency_years != null ? `${ins.agency_name} (${ins.agency_years} year${ins.agency_years === 1 ? "" : "s"})` : ins.agency_name,
+      lines: POLICY_LINES.filter((l) => !view.hidden(`line_${l.key}`))
+        .map((l) => ({ label: view.label(`line_${l.key}`), xdate: longDate(ins[l.date]), carrier: ins[l.carrier] })),
     },
+    profileTitle: view.insurance ? null : view.label("tab_business"),
+    filesTitle: view.insurance ? null : "Files",
     profile: [
-      // What the Business tab holds, as it reads there.
-      ["Locations", locationsLine(lead)], ["Employees", employeesLine(lead)], ["Sub-contractors", subcontractorsLine(lead)],
-      ["Autos", autosLine(lead)], ["DOT#", lead.dot_number], ["Cargo", lead.cargo],
-      ["XMOD", xmodText(lead.xmod)], ["Sales volume", lead.sales_volume], ["Annual payroll", lead.annual_payroll],
-      ["EIN", lead.ein], ["Years in business", lead.years_in_business], ["SIC code", sicLabel(lead.sic_code, sic?.description)],
-      ["Est. premium", lead.estimated_annual_premium], ["Claims last 3 yrs", yesNo(lead.claims_3yrs)],
-      ["Professionals", lead.professionals], ["Covered employees", lead.covered_employees],
-    ],
+      // What the Business tab holds, as it reads there (a campaign type's names, without what it turns off).
+      ["locations", "Locations", locationsLine(lead)], ["employees", "Employees", employeesLine(lead)], ["subcontractors", "Sub-contractors", subcontractorsLine(lead)],
+      ["autos", "Autos", autosLine(lead)], ["dot_number", "DOT#", lead.dot_number], ["cargo", "Cargo", lead.cargo],
+      ["xmod", "XMOD", xmodText(lead.xmod)], ["sales_volume", "Sales volume", lead.sales_volume], ["annual_payroll", "Annual payroll", lead.annual_payroll],
+      ["ein", "EIN", lead.ein], ["years_in_business", "Years in business", lead.years_in_business], ["sic", "SIC code", sicLabel(lead.sic_code, sic?.description)],
+      ["estimated_annual_premium", "Est. premium", lead.estimated_annual_premium], ["claims_3yrs", "Claims last 3 yrs", yesNo(lead.claims_3yrs)],
+      ["professionals", "Professionals", lead.professionals], ["covered_employees", "Covered employees", lead.covered_employees],
+      // …and the type's own questions, answered.
+      ...view.custom.map((f) => [null, f.label, customText(f, answers[f.id])]),
+    ].filter(shown).map((row) => (view.insurance && row[0] ? [row[1], row[2]] : labelled(row))),
     // Only what was written for the client: the call notes stay internal.
     notes: [["Client notes", lead.client_note], ["Description", lead.description]],
     files: (docs ?? []).map((d) => ({

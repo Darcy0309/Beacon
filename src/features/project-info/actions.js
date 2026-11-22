@@ -17,7 +17,8 @@ import { mailServer, sendMail } from "@/lib/server/mail";
 import { ADMIN_UNAVAILABLE, createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
-import { carrierNames, copyInfo, infoByLink, infoSources, keptCarriers, loadProjectInfo, readInfoForm, resolveInfoProject, setOwnInfo, writeProjectInfo } from "./server";
+import { campaignInfo, carrierNames, copyInfo, infoByLink, infoSources, keptCarriers, loadProjectInfo, readInfoForm, resolveInfoProject, setOwnInfo, writeProjectInfo } from "./server";
+import { readProjectCampaign } from "@/features/campaign-types/queries";
 
 const NOT_YOURS = "Only an administrator or the client can change Project Info.";
 
@@ -57,7 +58,10 @@ export async function saveProjectInfo(prevState, formData) {
   const admin = createAdminClient();
   if (!admin) return fail(ADMIN_UNAVAILABLE);
   const [carriers, kept] = await Promise.all([carrierNames(admin), keptCarriers(admin, target.id)]);
-  const form = readInfoForm(formData, { carriers, kept });
+  const read = readInfoForm(formData, { carriers, kept });
+  if (read.failed) return read.failed;
+  // Laid against the client's campaign type (Nov 2026): what it turns off kept as it is, its own questions answered.
+  const form = campaignInfo(read, await readProjectCampaign(admin, target.id), formData);
   if (form.failed) return form.failed;
   const problem = await writeProjectInfo(admin, target.id, form, { userId: me.id, via: "app" });
   if (problem) return fail(problem, null, form.values);
@@ -80,7 +84,9 @@ export async function saveProjectInfoByLink(prevState, formData) {
   const { info } = opened;
 
   const [carriers, kept] = await Promise.all([carrierNames(admin), keptCarriers(admin, info.project_id)]);
-  const form = readInfoForm(formData, { carriers, kept });
+  const read = readInfoForm(formData, { carriers, kept });
+  if (read.failed) return read.failed;
+  const form = campaignInfo(read, info.campaign, formData);
   if (form.failed) return form.failed;
   const problem = await writeProjectInfo(admin, info.project_id, form, { via: "link" });
   if (problem) {

@@ -35,7 +35,64 @@ export const BUILTIN_FIELDS = {
     { key: "agency", label: "Agency" },
     ...POLICY_LINES.map((l) => ({ key: `line_${l.key}`, label: l.label })),
   ],
+  // The project profile (Project Info, phase 2): its sections (info_sec_*) and their rows, each renamed or turned off.
+  info: [
+    { key: "info_sec_agent", label: "Agent & office", section: true },
+    { key: "info_agent", label: "Project agent", in: "agent" },
+    { key: "info_office", label: "Address", in: "agent" },
+    { key: "info_phone", label: "Phone", in: "agent" },
+    { key: "info_mobile", label: "Mobile", in: "agent" },
+    { key: "info_email", label: "Email", in: "agent" },
+    { key: "info_states", label: "States licensed", in: "agent" },
+    { key: "info_sec_producers", label: "Producers taking appointments", section: true },
+    { key: "info_sec_carriers", label: "Carriers", section: true },
+    { key: "info_top_carriers", label: "Top carriers", in: "carriers" },
+    { key: "info_avoid_carriers", label: "Can't compete with", in: "carriers" },
+    { key: "info_sec_appointments", label: "Appointments", section: true },
+    { key: "info_avoid_days", label: "Days to avoid", in: "appointments" },
+    { key: "info_min_employees", label: "Minimum employees", in: "appointments" },
+    { key: "info_personal_lines", label: "Personal home/auto", in: "appointments" },
+    { key: "info_wc_mono", label: "Work comp only", in: "appointments" },
+    { key: "info_auto_mono", label: "Commercial auto only", in: "appointments" },
+    { key: "info_health_only", label: "Group health only", in: "appointments" },
+    { key: "info_quote_time", label: "Time to put a quote together", in: "appointments" },
+    { key: "info_quote_min_time", label: "Least time needed to quote", in: "appointments" },
+    { key: "info_sec_about", label: "About the agency", section: true },
+    { key: "info_special_programs", label: "Special programs & services", in: "about" },
+    { key: "info_value_added", label: "Value-added services", in: "about" },
+    { key: "info_exclusive_program", label: "Exclusive programs", in: "about" },
+    { key: "info_industry_notes", label: "In the industry", in: "about" },
+  ],
 };
+
+/**
+ * What each Project Info part keeps: its columns on the project's profile and on the project (its office), so a
+ * part a type turns off is left out of a save and what it holds is kept.
+ */
+export const INFO_COLUMNS = {
+  info_agent: { office: ["contact_name"] },
+  info_office: { office: ["address", "city", "state", "zip"] },
+  info_phone: { office: ["phone"] },
+  info_mobile: { profile: ["agent_mobile"] },
+  info_email: { profile: ["agent_email"] },
+  info_states: { profile: ["states_licensed"] },
+  info_sec_producers: { profile: ["producers"] },
+  info_top_carriers: { profile: ["top_carriers"] },
+  info_avoid_carriers: { profile: ["avoid_carriers"] },
+  info_avoid_days: { profile: ["avoid_days"] },
+  info_min_employees: { profile: ["min_employees"] },
+  info_personal_lines: { profile: ["personal_lines"] },
+  info_wc_mono: { profile: ["wc_mono", "wc_min_employees"] },
+  info_auto_mono: { profile: ["auto_mono", "auto_min_autos"] },
+  info_health_only: { profile: ["health_only", "health_min_lives"] },
+  info_quote_time: { profile: ["quote_time"] },
+  info_quote_min_time: { profile: ["quote_min_time"] },
+  info_special_programs: { profile: ["special_programs"] },
+  info_value_added: { profile: ["value_added"] },
+  info_exclusive_program: { profile: ["exclusive_program"] },
+  info_industry_notes: { profile: ["industry_notes"] },
+};
+const INFO_SECTION_OF = Object.fromEntries(BUILTIN_FIELDS.info.filter((f) => f.in).map((f) => [f.key, `info_sec_${f.in}`]));
 
 /** The kinds of field a type can add. */
 export const CUSTOM_TYPES = [
@@ -56,8 +113,11 @@ export function campaignView(type) {
     name: type?.name ?? "Insurance",
     insurance: !type,
     label: (key) => String(builtin[key]?.label ?? "").trim() || DEFAULT_LABEL[key] || key,
-    hidden: (key) => !FIXED.has(key) && Boolean(builtin[key]?.hidden),
+    // A Project Info row is off with its section, too.
+    hidden: (key) => !FIXED.has(key) && (Boolean(builtin[key]?.hidden) || Boolean(INFO_SECTION_OF[key] && builtin[INFO_SECTION_OF[key]]?.hidden)),
     custom: Array.isArray(type?.fields?.custom) ? type.fields.custom : [],
+    // Its own Project Info questions (phase 2).
+    infoCustom: Array.isArray(type?.fields?.info_custom) ? type.fields.info_custom : [],
   };
 }
 
@@ -75,9 +135,10 @@ export function cleanFields(input) {
     if ((label && label !== DEFAULT_LABEL[key]) || hidden) builtin[key] = { ...(label && label !== DEFAULT_LABEL[key] ? { label } : {}), ...(hidden ? { hidden } : {}) };
   }
   const kinds = new Set(CUSTOM_TYPES.map(([k]) => k));
-  const custom = [];
   const ids = new Set();
-  for (const f of Array.isArray(input?.custom) ? input.custom.slice(0, 60) : []) {
+  const list = (items) => {
+  const custom = [];
+  for (const f of Array.isArray(items) ? items.slice(0, 60) : []) {
     const label = String(f?.label ?? "").trim().slice(0, 40);
     if (!label) continue;
     if (!kinds.has(f?.type)) return { error: `Choose what kind of field "${label}" is.` };
@@ -90,7 +151,13 @@ export function cleanFields(input) {
     if (f.type === "select" && !options.length) return { error: `Give "${label}" the choices to pick from.` };
     custom.push({ id, label, type: f.type, ...(options ? { options } : {}) });
   }
-  return { fields: { builtin, custom } };
+  return { custom };
+  };
+  const business = list(input?.custom);
+  if (business.error) return business;
+  const info = list(input?.info_custom);
+  if (info.error) return info;
+  return { fields: { builtin, custom: business.custom, info_custom: info.custom } };
 }
 
 /**
@@ -98,10 +165,10 @@ export function cleanFields(input) {
  * a number a number, a date YYYY-MM-DD, Yes or No, a list's choice one of its choices, text up to 500 characters.
  * Blank clears it. { values } (only those on the form) or { error, field }.
  */
-export function customFromForm(custom, formData) {
+export function customFromForm(custom, formData, prefix = "custom.") {
   const values = {};
   for (const f of custom ?? []) {
-    const name = `custom.${f.id}`;
+    const name = `${prefix}${f.id}`;
     if (!formData.has(name)) continue;
     const raw = String(formData.get(name) ?? "").trim();
     if (!raw) { values[f.id] = null; continue; }

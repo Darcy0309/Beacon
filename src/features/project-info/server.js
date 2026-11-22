@@ -7,6 +7,8 @@
  * project's it promotes to, as its calendar is.
  */
 
+import { readProjectCampaign } from "@/features/campaign-types/queries";
+import { INFO_COLUMNS, campaignView, customFromForm } from "@/lib/campaign-types";
 import "server-only";
 import { normalizeState } from "@/lib/csv";
 import { fullName } from "@/lib/format";
@@ -56,11 +58,14 @@ export async function resolveInfoProject(db, projectId) {
 export async function loadProjectInfo(db, projectId) {
   const target = await resolveInfoProject(db, projectId);
   if (!target) return null;
-  const [{ data: project, error }, { data: profile, error: profileError }, { data: sharing }] = await Promise.all([
+  const [{ data: project, error }, { data: profile, error: profileError }, { data: sharing }, campaign, { data: answers }] = await Promise.all([
     db.from("projects").select("id, name, contact_name, contact_title, phone, address, city, state, zip, company:companies(id, name, email)")
       .eq("id", target.id).maybeSingle(),
     db.from("project_profiles").select(PROFILE_COLUMNS).eq("project_id", target.id).maybeSingle(),
     db.from("projects").select("id, name, profile:project_profiles(own)").eq("appt_project_id", target.id).is("deleted_at", null).order("name"),
+    // Its client's campaign type, laying the sheet out (Nov 2026), and the answers to the type's own questions.
+    readProjectCampaign(db, target.id),
+    db.from("project_profiles").select("custom").eq("project_id", target.id).maybeSingle().then((r) => (r.error ? { data: null } : r)),
   ]);
   if (error) throw error;
   if (profileError) throw profileError;
@@ -109,7 +114,26 @@ export async function loadProjectInfo(db, projectId) {
     updated_by_client: editor?.role === "client",
     updated_via: p.updated_via ?? null,
     has_link: Boolean(p.link_key),
+    campaign: campaign ?? null,
+    custom: answers?.custom ?? {},
   };
+}
+
+/**
+ * A checked Project Info form (readInfoForm()) laid against the client's campaign type (Nov 2026): what the type
+ * turns off is left out, so what it holds is kept, and the answers to its own questions (`info_custom.<id>`),
+ * checked by kind. The form with `custom`, or { failed }.
+ */
+export function campaignInfo(form, type, formData) {
+  const view = campaignView(type);
+  for (const [key, cols] of Object.entries(INFO_COLUMNS)) {
+    if (!view.hidden(key)) continue;
+    for (const c of cols.profile ?? []) delete form.profile[c];
+    for (const c of cols.office ?? []) delete form.office[c];
+  }
+  const read = customFromForm(view.infoCustom, formData, "info_custom.");
+  if (read.error) return { failed: fail(read.error, { [read.field]: read.error }, form.values) };
+  return { ...form, custom: read.values };
 }
 
 /** The carriers to pick from: the Insurance Companies list's names, A to Z. */
@@ -201,12 +225,19 @@ export async function keptCarriers(admin, projectId) {
  * office, with the server's role: `userId` who did it (none for a link),
  * `via` "app" or "link". Returns what went wrong, or null.
  */
-export async function writeProjectInfo(admin, projectId, { office, profile }, { userId = null, via = "app" } = {}) {
+export async function writeProjectInfo(admin, projectId, { office, profile, custom = null }, { userId = null, via = "app" } = {}) {
+  // A campaign type's own answers, merged into those kept (Nov 2026).
+  let answers = null;
+  if (custom && Object.keys(custom).length) {
+    const { data } = await admin.from("project_profiles").select("custom").eq("project_id", projectId).maybeSingle();
+    answers = Object.fromEntries(Object.entries({ ...(data?.custom ?? {}), ...custom }).filter(([, v]) => v !== null));
+  }
   const { error } = await admin.from("project_profiles").upsert(
-    { project_id: projectId, ...profile, updated_at: new Date().toISOString(), updated_by: userId, updated_via: via },
+    { project_id: projectId, ...profile, ...(answers ? { custom: answers } : {}), updated_at: new Date().toISOString(), updated_by: userId, updated_via: via },
     { onConflict: "project_id" }
   );
   if (error) return error.message;
+  if (!Object.keys(office).length) return null;
   const { error: officeError } = await admin.from("projects").update(office).eq("id", projectId);
   return officeError ? officeError.message : null;
 }

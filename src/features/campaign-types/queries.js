@@ -17,16 +17,31 @@ export async function getCampaignTypes() {
   return (data ?? []).map((t) => ({ id: t.id, name: t.name, fields: t.fields ?? {}, clients: Number(t.companies?.[0]?.count ?? 0) }));
 }
 
+const one = (v) => (Array.isArray(v) ? v[0] : v) ?? null;
+
 /**
- * A lead's campaign type (its client's; null: Insurance) and its answers to the type's own fields:
- * { type: { id, name, fields } | null, custom: {} }. Insurance and no answers when the database has neither yet.
+ * A lead's campaign type (its client's; null: Insurance) and its answers to the type's own fields, read with `db`
+ * (the signed-in person's client, or the server's for a delivery): { type: { id, name, fields } | null, custom: {} }.
+ * Insurance and no answers when the database has neither yet.
  */
-export async function getLeadCampaign(leadId) {
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("leads")
+export async function readLeadCampaign(db, leadId) {
+  if (!db || !leadId) return { type: null, custom: {} };
+  const { data, error } = await db.from("leads")
     .select("custom, project:projects!leads_project_id_fkey(company:companies(campaign_type:campaign_types(id, name, fields)))")
     .eq("id", leadId).maybeSingle();
   if (error) return { type: null, custom: {} };
-  const one = (v) => (Array.isArray(v) ? v[0] : v) ?? null;
   return { type: one(one(one(data?.project)?.company)?.campaign_type), custom: data?.custom ?? {} };
+}
+
+/** The signed-in person's view of a lead's campaign type and answers (readLeadCampaign). */
+export async function getLeadCampaign(leadId) {
+  return readLeadCampaign(await createClient(), leadId);
+}
+
+/** A project's campaign type (its client's; null: Insurance), read with `db`. Null too before the migration has run. */
+export async function readProjectCampaign(db, projectId) {
+  if (!db || !projectId) return null;
+  const { data, error } = await db.from("projects").select("company:companies(campaign_type:campaign_types(id, name, fields))").eq("id", projectId).maybeSingle();
+  if (error) return null;
+  return one(one(data?.company)?.campaign_type);
 }

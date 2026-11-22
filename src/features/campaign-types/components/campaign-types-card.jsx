@@ -16,7 +16,7 @@ import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
-const SECTIONS = [["tabs", "Tabs"], ["business", "Business tab"], ["coverage", "Coverage tab"]];
+const SECTIONS = [["tabs", "Tabs"], ["business", "Business tab"], ["coverage", "Coverage tab"], ["info", "Project Info (the project profile)"]];
 
 /**
  * Settings › Campaign Types (Sean, Nov 2026): the lead sheet layouts for industries other than insurance. Each
@@ -75,6 +75,7 @@ const startFrom = (type) => ({
     label: type?.fields?.builtin?.[f.key]?.label ?? "", hidden: Boolean(type?.fields?.builtin?.[f.key]?.hidden),
   }])),
   custom: (type?.fields?.custom ?? []).map((c) => ({ ...c, options: (c.options ?? []).join(", ") })),
+  info_custom: (type?.fields?.info_custom ?? []).map((c) => ({ ...c, options: (c.options ?? []).join(", ") })),
 });
 
 function TypeDialog({ type = null }) {
@@ -93,12 +94,13 @@ function TypeDialog({ type = null }) {
   }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const setBuiltin = (key, patch) => setF((x) => ({ ...x, builtin: { ...x.builtin, [key]: { ...x.builtin[key], ...patch } } }));
-  const setCustom = (i, patch) => setF((x) => ({ ...x, custom: x.custom.map((c, j) => (j === i ? { ...c, ...patch } : c)) }));
-  const move = (i, by) => setF((x) => {
-    const list = [...x.custom];
+  // Its own fields: the Business tab's (`custom`) and Project Info's (`info_custom`).
+  const setCustom = (list, i, patch) => setF((x) => ({ ...x, [list]: x[list].map((c, j) => (j === i ? { ...c, ...patch } : c)) }));
+  const move = (listKey, i, by) => setF((x) => {
+    const list = [...x[listKey]];
     const [c] = list.splice(i, 1);
     list.splice(Math.max(0, Math.min(list.length, i + by)), 0, c);
-    return { ...x, custom: list };
+    return { ...x, [listKey]: list };
   });
 
   return (
@@ -126,8 +128,10 @@ function TypeDialog({ type = null }) {
                 <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
                   {BUILTIN_FIELDS[section].map((b) => {
                     const v = f.builtin[b.key];
+                    // Project Info: a section heads its rows (turning it off turns them off).
+                    const off = v.hidden || (b.in && f.builtin[`info_sec_${b.in}`]?.hidden);
                     return (
-                      <div key={b.key} className={cn("flex items-center gap-2", v.hidden && "opacity-50")} data-builtin={b.key}>
+                      <div key={b.key} className={cn("flex items-center gap-2", off && "opacity-50", b.section && "font-semibold sm:col-span-2", b.in && "sm:pl-6")} data-builtin={b.key}>
                         <input type="checkbox" checked={!v.hidden} disabled={b.fixed} onChange={(e) => setBuiltin(b.key, { hidden: !e.target.checked })}
                           aria-label={`Show ${b.label}`} className="size-4 shrink-0 accent-[var(--primary)]" data-builtin-show={b.key} />
                         <Input value={v.label} placeholder={b.label} maxLength={40} onChange={(e) => setBuiltin(b.key, { label: e.target.value })}
@@ -144,36 +148,8 @@ function TypeDialog({ type = null }) {
               </fieldset>
             ))}
 
-            <fieldset className="rounded-lg border border-[var(--panel-border)] p-3" data-campaign-section="custom">
-              <legend className="px-1 text-xs font-semibold">Your own fields (on the Business tab)</legend>
-              <div className="space-y-2">
-                {f.custom.map((c, i) => (
-                  <div key={c.id ?? i} className="grid grid-cols-[1fr_9rem_auto] items-start gap-2" data-custom-field={i}>
-                    <div className="space-y-1.5">
-                      <Input value={c.label} placeholder="e.g. Number of desktops" maxLength={40} onChange={(e) => setCustom(i, { label: e.target.value })}
-                        aria-label="Field name" className="h-8" data-custom-label />
-                      {c.type === "select" ? (
-                        <Input value={c.options ?? ""} placeholder="Choices, separated by commas: Azure, AWS, Google Cloud" onChange={(e) => setCustom(i, { options: e.target.value })}
-                          aria-label="Choices" className="h-8" data-custom-options />
-                      ) : null}
-                    </div>
-                    <Select value={c.type} onChange={(e) => setCustom(i, { type: e.target.value })} aria-label="Kind of field" className="h-8" data-custom-type>
-                      {CUSTOM_TYPES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                    </Select>
-                    <span className="flex items-center gap-0.5">
-                      <Button type="button" size="sm" variant="outline" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Up"><ArrowUp /></Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => move(i, 1)} disabled={i === f.custom.length - 1} aria-label="Down"><ArrowDown /></Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => setF((x) => ({ ...x, custom: x.custom.filter((_, j) => j !== i) }))} aria-label="Remove field" data-custom-remove>
-                        <Trash2 />
-                      </Button>
-                    </span>
-                  </div>
-                ))}
-                <Button type="button" size="sm" variant="outline" onClick={() => setF((x) => ({ ...x, custom: [...x.custom, { label: "", type: "text" }] }))} data-custom-add>
-                  <Plus /> Add a field
-                </Button>
-              </div>
-            </fieldset>
+            <OwnFields title="Your own fields (on the Business tab)" listKey="custom" f={f} setF={setF} setCustom={setCustom} move={move} />
+            <OwnFields title="Your own Project Info questions" listKey="info_custom" f={f} setF={setF} setCustom={setCustom} move={move} />
           </div>
           <DialogFooter className="shrink-0">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
@@ -182,5 +158,42 @@ function TypeDialog({ type = null }) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** A type's own fields, to add, name, give a kind (and a list its choices), order and remove. */
+function OwnFields({ title, listKey, f, setF, setCustom, move }) {
+  const list = f[listKey];
+  return (
+    <fieldset className="rounded-lg border border-[var(--panel-border)] p-3" data-campaign-section={listKey}>
+      <legend className="px-1 text-xs font-semibold">{title}</legend>
+      <div className="space-y-2">
+        {list.map((c, i) => (
+          <div key={c.id ?? i} className="grid grid-cols-[1fr_9rem_auto] items-start gap-2" data-custom-field={i}>
+            <div className="space-y-1.5">
+              <Input value={c.label} placeholder="e.g. Number of desktops" maxLength={40} onChange={(e) => setCustom(listKey, i, { label: e.target.value })}
+                aria-label="Field name" className="h-8" data-custom-label />
+              {c.type === "select" ? (
+                <Input value={c.options ?? ""} placeholder="Choices, separated by commas: Azure, AWS, Google Cloud" onChange={(e) => setCustom(listKey, i, { options: e.target.value })}
+                  aria-label="Choices" className="h-8" data-custom-options />
+              ) : null}
+            </div>
+            <Select value={c.type} onChange={(e) => setCustom(listKey, i, { type: e.target.value })} aria-label="Kind of field" className="h-8" data-custom-type>
+              {CUSTOM_TYPES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </Select>
+            <span className="flex items-center gap-0.5">
+              <Button type="button" size="sm" variant="outline" onClick={() => move(listKey, i, -1)} disabled={i === 0} aria-label="Up"><ArrowUp /></Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => move(listKey, i, 1)} disabled={i === list.length - 1} aria-label="Down"><ArrowDown /></Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setF((x) => ({ ...x, [listKey]: x[listKey].filter((_, j) => j !== i) }))} aria-label="Remove field" data-custom-remove>
+                <Trash2 />
+              </Button>
+            </span>
+          </div>
+        ))}
+        <Button type="button" size="sm" variant="outline" onClick={() => setF((x) => ({ ...x, [listKey]: [...x[listKey], { label: "", type: "text" }] }))} data-custom-add>
+          <Plus /> Add a field
+        </Button>
+      </div>
+    </fieldset>
   );
 }

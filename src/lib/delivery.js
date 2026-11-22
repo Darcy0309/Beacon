@@ -117,15 +117,16 @@ function sheetSections(s, { forCalendar = false } = {}) {
   }
   const lines = (s.coverage?.lines ?? []).filter((l) => !blank(l.xdate) || !blank(l.carrier));
   // The prospect's agency after the policies, not beside the renewal date.
-  sections.push(["Policy information", rows([
-    ["Ultimate X-Date", s.coverage?.ultimate],
+  // Named as the client's campaign type names them (Nov 2026); Insurance's as before.
+  if (s.coverage !== null) sections.push([s.coverage?.title || "Policy information", rows([
+    [s.coverage?.ultimateLabel || "Ultimate X-Date", s.coverage?.ultimate],
     ...lines.map((l) => [l.label, [l.xdate, l.carrier].filter(Boolean).join(" · ")]),
-    ["Agency", s.coverage?.agency],
+    [s.coverage?.agencyLabel || "Agency", s.coverage?.agency],
   ])]);
-  sections.push(["Profile", rows(s.profile ?? [])]);
+  sections.push([s.profileTitle || "Profile", rows(s.profile ?? [])]);
   sections.push(["Notes", rows(s.notes ?? [])]);
   // The files the prospect sent, each a link the client can open from the email.
-  sections.push(["Policy files", (s.files ?? []).map((f) => [f.about, f.href ? { text: f.name, href: f.href } : f.name])]);
+  sections.push([s.filesTitle || "Policy files", (s.files ?? []).map((f) => [f.about, f.href ? { text: f.name, href: f.href } : f.name])]);
 
   return sections.filter(([, pairs]) => pairs.length);
 }

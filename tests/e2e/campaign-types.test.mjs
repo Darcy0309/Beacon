@@ -9,6 +9,7 @@
 import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
+import { SERVICE_ROLE_KEY, SUPABASE_URL } from "../support/env.mjs";
 
 const TAG = `CT${Date.now()}`;
 const NAME = `IT ${TAG}`;
@@ -103,6 +104,30 @@ try {
   const seen = await until(() => client.ev(`[...document.querySelectorAll('[role=tabpanel]')].find((p) => p.offsetParent !== null && p.closest('[data-tabs], div'))?.innerText ?? null`), { timeout: 15000 });
   check("the client sees the same layout: its own fields, not XMOD", Boolean(seen?.includes("Desktops") && seen.includes("42") && !seen.includes("XMOD")), seen?.slice(0, 300));
 
+  section("The lead sheet (what the client is emailed)");
+  const sheet = await admin.ev(`fetch('/api/leads/${LEAD}/sheet').then((r) => r.text())`);
+  check("laid out as the campaign type: Systems, Contract renewal, its own answers, no XMOD or DOT#",
+    ["Systems", "Contract renewal", "Desktops", "42", "Cloud / hosting", "AWS"].every((t) => sheet.includes(t)) && !/XMOD|DOT#|Workers comp/.test(sheet), sheet.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 600));
+
+  const asServer = await fetch(`${SUPABASE_URL}/rest/v1/projects?select=company:companies(campaign_type:campaign_types(name))&id=eq.${P}`,
+    { headers: { apikey: SERVICE_ROLE_KEY, authorization: `Bearer ${SERVICE_ROLE_KEY}` } }).then((r) => r.json());
+  check("…and the server reads the type too (the sheet emailed, Project Info saved by link)", asServer?.[0]?.company?.campaign_type?.name === NAME, JSON.stringify(asServer));
+
+  section("Project Info");
+  sql(`update public.campaign_types set fields = jsonb_set(jsonb_set(fields, '{builtin,info_sec_carriers}', '{"hidden": true}'), '{builtin,info_min_employees}', '{"label": "Minimum desktops"}')
+    || '{"info_custom": [{"id": "i1", "label": "Help desk tool", "type": "select", "options": ["ConnectWise", "Autotask"]}]}'::jsonb where id = ${typeId}`);
+  sql(`insert into public.project_profiles (project_id, top_carriers, min_employees) values (${P}, '{Travelers}', '10')`);
+  await admin.go(`/leads/${LEAD}?tab=info`, 6000);
+  const info = await until(() => admin.ev(`(() => { const v = document.querySelector('[data-project-info]'); return v ? { carriers: !!v.querySelector('[data-info-section="carriers"]'), text: v.innerText } : null; })()`));
+  check("no Carriers, Minimum desktops, and its own question", info && !info.carriers && info.text.includes("Minimum desktops") && info.text.includes("Help desk tool"), JSON.stringify(info)?.slice(0, 400));
+  await admin.click("[data-edit-project-info]");
+  await until(() => admin.ev(`!!document.querySelector('[role=dialog] [data-info-custom="i1"]')`));
+  check("its form: no Carriers, its own question", await admin.ev(`!document.querySelector('[role=dialog] [data-info-group="carriers"]')`));
+  await admin.fill('[role=dialog] [data-info-custom="i1"]', "Autotask");
+  await admin.click("[role=dialog] button[type=submit]");
+  const kept = await until(() => { const r = sql(`select custom::text || '|' || array_to_string(top_carriers, ',') from public.project_profiles where project_id = ${P}`); return r.startsWith('{"i1": "Autotask"}') ? r : null; }, { timeout: 15000 });
+  check("saved its answer, the carriers it hides kept", kept === '{"i1": "Autotask"}|Travelers', sql(`select custom::text || '|' || array_to_string(top_carriers, ',') from public.project_profiles where project_id = ${P}`));
+
   section("Insurance unchanged");
   sql(`update public.companies set campaign_type_id = null where id = ${co}`);
   await admin.go(`/leads/${LEAD}`, 6000);
@@ -112,6 +137,7 @@ try {
   browser.close();
   sql(`update public.users set company_id = ${clientCompany} where id = ${CLIENT}`);
   sql(`delete from public.leads where id = ${LEAD}`);
+  sql(`delete from public.project_profiles where project_id = ${P}`);
   sql(`delete from public.projects where id = ${P}`);
   sql(`delete from public.companies where id = ${co}`);
   if (typeId) sql(`delete from public.campaign_types where id = ${typeId}`);

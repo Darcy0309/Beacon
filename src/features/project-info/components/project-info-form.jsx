@@ -13,6 +13,12 @@ import PickList from "@/components/shared/pick-list";
 import { saveProjectInfo, saveProjectInfoByLink } from "@/features/project-info/actions";
 import { MAX_PRODUCERS, MIN_EMPLOYEES_MAX, QUOTE_MIN_TIMES, QUOTE_TIMES, US_STATES, WEEKDAYS } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
+import { campaignView } from "@/lib/campaign-types";
+import DatePicker from "@/components/shared/date-picker";
+import { ListChecks } from "lucide-react";
+
+// Insurance's own names, to tell a campaign type's renamed part from one it leaves as it is.
+const BASE = campaignView(null);
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const YN = (v) => (v === true ? "yes" : v === false ? "no" : "");
@@ -21,7 +27,10 @@ const ROWS = Array.from({ length: MAX_PRODUCERS }, (_, i) => i);
 const padProducers = (list) => ROWS.map((i) => ({ first: "", last: "", email: "", leads: false, mobile: "", texts: false, ...(list?.[i] ?? {}) }));
 
 /** A part of the form, boxed and titled. */
-function Group({ title, icon: Icon, hint, group, children }) {
+function Group({ title, icon: Icon, hint, group, children, view }) {
+  // The client's campaign type turns a part off, or names it (Nov 2026).
+  if (view?.hidden(`info_sec_${group}`)) return null;
+  if (view && group !== "custom" && view.label(`info_sec_${group}`) !== BASE.label(`info_sec_${group}`)) title = view.label(`info_sec_${group}`);
   return (
     <fieldset data-info-group={group} className="grid grid-cols-1 gap-3 rounded-lg border border-[var(--panel-border)] p-3 sm:grid-cols-2">
       <legend className="flex items-center gap-1.5 px-1 text-xs font-semibold"><Icon className="size-3.5 text-primary" aria-hidden /> {title}</legend>
@@ -96,6 +105,11 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
   const errors = state?.fieldErrors ? Object.keys(state.fieldErrors).length : 0;
   const state2 = dv("state", "") ?? "";
   const stateOptions = state2 && !US_STATES.includes(state2) ? [state2, ...US_STATES] : US_STATES;
+  // Laid out by the client's campaign type (Nov 2026): a part it turns off is not on the form (and is kept as it
+  // is when saved); one it renames says its name; the rest keep their questions.
+  const view = campaignView(info?.campaign);
+  const on = (key) => !view.hidden(key);
+  const L = (key, question) => (view.label(key) !== BASE.label(key) ? view.label(key) : question);
   const text = (name, label, { hint, rows = 3 } = {}) => (
     <Field key={name} label={label} hint={hint} error={fe(name)} className="sm:col-span-2">
       <Textarea name={name} rows={rows} maxLength={4000} defaultValue={dv(name) ?? ""} aria-invalid={invalid(name)} />
@@ -110,11 +124,14 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
         </p>
       ) : null}
 
-      <Group title="Agent & office" icon={Building2} group="agent">
-        <Field label="Project agent" error={fe("contact_name")} className="sm:col-span-2">
+      <Group view={view} title="Agent & office" icon={Building2} group="agent">
+        {on("info_agent") ? (
+        <Field label={L("info_agent", "Project agent")} error={fe("contact_name")} className="sm:col-span-2">
           <Input name="contact_name" defaultValue={dv("contact_name") ?? ""} maxLength={80} aria-invalid={invalid("contact_name")} placeholder="The agent taking the appointments" />
         </Field>
-        <Field label="Address" error={fe("address")} className="sm:col-span-2">
+        ) : null}
+        {on("info_office") ? (<>
+        <Field label={L("info_office", "Address")} error={fe("address")} className="sm:col-span-2">
           <Input name="address" defaultValue={dv("address") ?? ""} maxLength={120} aria-invalid={invalid("address")} />
         </Field>
         <div className="grid grid-cols-[minmax(0,1fr)_5.5rem_7rem] gap-3 sm:col-span-2">
@@ -131,23 +148,32 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
             <Input name="zip" inputMode="numeric" defaultValue={dv("zip") ?? ""} maxLength={10} aria-invalid={invalid("zip")} />
           </Field>
         </div>
+        </>) : null}
         <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3">
-          <Field label="Phone" error={fe("phone")} hint="Our calls for you come from its area code">
+          {on("info_phone") ? (
+          <Field label={L("info_phone", "Phone")} error={fe("phone")} hint="Our calls for you come from its area code">
             <Input name="phone" type="tel" inputMode="tel" defaultValue={dv("phone") ?? ""} aria-invalid={invalid("phone")} />
           </Field>
-          <Field label="Mobile" error={fe("agent_mobile")}>
+          ) : null}
+          {on("info_mobile") ? (
+          <Field label={L("info_mobile", "Mobile")} error={fe("agent_mobile")}>
             <Input name="agent_mobile" type="tel" inputMode="tel" defaultValue={dv("agent_mobile") ?? ""} aria-invalid={invalid("agent_mobile")} />
           </Field>
-          <Field label="Agent email" error={fe("agent_email")}>
+          ) : null}
+          {on("info_email") ? (
+          <Field label={L("info_email", "Agent email")} error={fe("agent_email")}>
             <Input name="agent_email" type="email" defaultValue={dv("agent_email") ?? ""} maxLength={254} aria-invalid={invalid("agent_email")} />
           </Field>
+          ) : null}
         </div>
-        <Field label="States licensed" error={fe("states_licensed")} className="sm:col-span-2">
-          <PickList name="states_licensed" label="States licensed" options={US_STATES} value={states} onChange={setStates} sorted columns placeholder="Add a state…" empty="No states chosen yet" />
+        {on("info_states") ? (
+        <Field label={L("info_states", "States licensed")} error={fe("states_licensed")} className="sm:col-span-2">
+          <PickList name="states_licensed" label={L("info_states", "States licensed")} options={US_STATES} value={states} onChange={setStates} sorted columns placeholder="Add a state…" empty="No states chosen yet" />
         </Field>
+        ) : null}
       </Group>
 
-      <Group title="Producers taking appointments" icon={Users} group="producers"
+      <Group view={view} title="Producers taking appointments" icon={Users} group="producers"
         hint="Up to five. Tick Leads by email for each producer who should be sent every lead and appointment, and Texts for a text to their mobile as an appointment is set, confirmed or rescheduled.">
         <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.5fr)_7.5rem] gap-2 text-[0.7rem] font-medium text-muted-foreground sm:col-span-2 sm:grid" aria-hidden>
           <span>First name</span><span>Last name</span><span>Email</span><span>Leads by email</span>
@@ -189,18 +215,23 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
         })}
       </Group>
 
-      <Group title="Carriers" icon={Landmark} group="carriers"
+      <Group view={view} title="Carriers" icon={Landmark} group="carriers"
         hint={carriers.length ? "Pick each one from the drop-down, or open the Check list to tick several at once." : "The carrier list is empty: an administrator loads it under Insurance Cos."}>
-        <Field label="Top carriers you will use" error={fe("top_carriers")} className="sm:col-span-2">
-          <PickList name="top_carriers" label="Top carriers you will use" options={carriers} value={top} onChange={setTop} placeholder="Add a carrier…" invalid={invalid("top_carriers")} />
+        {on("info_top_carriers") ? (
+        <Field label={L("info_top_carriers", "Top carriers you will use")} error={fe("top_carriers")} className="sm:col-span-2">
+          <PickList name="top_carriers" label={L("info_top_carriers", "Top carriers you will use")} options={carriers} value={top} onChange={setTop} placeholder="Add a carrier…" invalid={invalid("top_carriers")} />
         </Field>
-        <Field label="Carriers you can't compete with" error={fe("avoid_carriers")} className="sm:col-span-2">
-          <PickList name="avoid_carriers" label="Carriers you can't compete with" options={carriers} value={avoid} onChange={setAvoid} placeholder="Add a carrier…" invalid={invalid("avoid_carriers")} />
+        ) : null}
+        {on("info_avoid_carriers") ? (
+        <Field label={L("info_avoid_carriers", "Carriers you can't compete with")} error={fe("avoid_carriers")} className="sm:col-span-2">
+          <PickList name="avoid_carriers" label={L("info_avoid_carriers", "Carriers you can't compete with")} options={carriers} value={avoid} onChange={setAvoid} placeholder="Add a carrier…" invalid={invalid("avoid_carriers")} />
         </Field>
+        ) : null}
       </Group>
 
-      <Group title="Appointments" icon={CalendarX2} group="appointments">
-        <Field label="Days to avoid for appointments" className="sm:col-span-2"
+      <Group view={view} title="Appointments" icon={CalendarX2} group="appointments">
+        {on("info_avoid_days") ? (
+        <Field label={L("info_avoid_days", "Days to avoid for appointments")} className="sm:col-span-2"
           hint="Blocked out on the project's calendar every week, so no appointments are set on them.">
           <div role="group" aria-label="Days to avoid for appointments" className="flex flex-wrap gap-1.5" data-avoid-days>
             {WEEKDAYS.map(([d, short, long]) => {
@@ -219,45 +250,79 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
             })}
           </div>
         </Field>
-        <Field label="Will you take appointments for personal home/auto?" error={fe("personal_lines")} className="sm:col-span-2">
+        ) : null}
+        {on("info_personal_lines") ? (
+        <Field label={L("info_personal_lines", "Will you take appointments for personal home/auto?")} error={fe("personal_lines")} className="sm:col-span-2">
           <Select name="personal_lines" defaultValue={dv("personal_lines", "") ?? ""} aria-invalid={invalid("personal_lines")}>
             <option value="">—</option>
             <option value="yes">Yes</option>
             <option value="no">No</option>
           </Select>
         </Field>
-        <Field label="Minimum employee size that will qualify" error={fe("min_employees")} className="sm:col-span-2">
+        ) : null}
+        {on("info_min_employees") ? (
+        <Field label={L("info_min_employees", "Minimum employee size that will qualify")} error={fe("min_employees")} className="sm:col-span-2">
           <Select name="min_employees" defaultValue={String(dv("min_employees", "") ?? "")} aria-invalid={invalid("min_employees")}>
             <option value="">—</option>
             {EMPLOYEE_SIZES.map((v) => <option key={v} value={v}>{v}</option>)}
           </Select>
         </Field>
-        <Field label="Typical time desired to put a quote together" error={fe("quote_time")}>
+        ) : null}
+        {on("info_quote_time") ? (
+        <Field label={L("info_quote_time", "Typical time desired to put a quote together")} error={fe("quote_time")}>
           <Select name="quote_time" defaultValue={dv("quote_time", "") ?? ""} aria-invalid={invalid("quote_time")}>
             <option value="">—</option>
             {QUOTE_TIMES.map((v) => <option key={v} value={v}>{v}</option>)}
           </Select>
         </Field>
-        <Field label="Minimum time needed to quote" error={fe("quote_min_time")}>
+        ) : null}
+        {on("info_quote_min_time") ? (
+        <Field label={L("info_quote_min_time", "Minimum time needed to quote")} error={fe("quote_min_time")}>
           <Select name="quote_min_time" defaultValue={dv("quote_min_time", "") ?? ""} aria-invalid={invalid("quote_min_time")}>
             <option value="">—</option>
             {QUOTE_MIN_TIMES.map((v) => <option key={v} value={v}>{v}</option>)}
           </Select>
         </Field>
-        <YesWith name="wc_mono" label="Will you take a mono-line appointment to only quote Work Comp?" value={wc} onChange={setWc}
-          countName="wc_min_employees" countLabel="Minimum # of employees" countDefault={dv("wc_min_employees") ?? ""} fe={fe} invalid={invalid} />
-        <YesWith name="auto_mono" label="Will you take a mono-line appointment to only quote Commercial Auto?" value={auto} onChange={setAuto}
-          countName="auto_min_autos" countLabel="Minimum # of autos" countDefault={dv("auto_min_autos") ?? ""} fe={fe} invalid={invalid} />
-        <YesWith name="health_only" label="Do you provide Group Health, and take appointments for just health insurance?" value={health} onChange={setHealth}
-          countName="health_min_lives" countLabel="Minimum # of covered lives" countDefault={dv("health_min_lives") ?? ""} fe={fe} invalid={invalid} />
+        ) : null}
+        {on("info_wc_mono") ? <YesWith name="wc_mono" label={L("info_wc_mono", "Will you take a mono-line appointment to only quote Work Comp?")} value={wc} onChange={setWc}
+          countName="wc_min_employees" countLabel="Minimum # of employees" countDefault={dv("wc_min_employees") ?? ""} fe={fe} invalid={invalid} /> : null}
+        {on("info_auto_mono") ? <YesWith name="auto_mono" label={L("info_auto_mono", "Will you take a mono-line appointment to only quote Commercial Auto?")} value={auto} onChange={setAuto}
+          countName="auto_min_autos" countLabel="Minimum # of autos" countDefault={dv("auto_min_autos") ?? ""} fe={fe} invalid={invalid} /> : null}
+        {on("info_health_only") ? <YesWith name="health_only" label={L("info_health_only", "Do you provide Group Health, and take appointments for just health insurance?")} value={health} onChange={setHealth}
+          countName="health_min_lives" countLabel="Minimum # of covered lives" countDefault={dv("health_min_lives") ?? ""} fe={fe} invalid={invalid} /> : null}
       </Group>
 
-      <Group title="About the agency" icon={MessageSquareText} group="about">
-        {text("special_programs", "Special programs or services that you offer", { hint: "A brief overview of your agency: years in business, the types of business you specialize in, references, etc.", rows: 4 })}
-        {text("value_added", "Any value-added services that set you apart from your competitors?")}
-        {text("exclusive_program", "Do you have an exclusive program for the industries we are targeting for you?")}
-        {text("industry_notes", "Going by the SIC codes you targeted, is anything specific going on in the industry?", { hint: "Rate increases, carriers pulling out, downgraded carrier ratings, etc." })}
+      <Group view={view} title="About the agency" icon={MessageSquareText} group="about">
+        {on("info_special_programs") && text("special_programs", L("info_special_programs", "Special programs or services that you offer"), { hint: "A brief overview of your agency: years in business, the types of business you specialize in, references, etc.", rows: 4 })}
+        {on("info_value_added") && text("value_added", L("info_value_added", "Any value-added services that set you apart from your competitors?"))}
+        {on("info_exclusive_program") && text("exclusive_program", L("info_exclusive_program", "Do you have an exclusive program for the industries we are targeting for you?"))}
+        {on("info_industry_notes") && text("industry_notes", L("info_industry_notes", "Going by the SIC codes you targeted, is anything specific going on in the industry?"), { hint: "Rate increases, carriers pulling out, downgraded carrier ratings, etc." })}
       </Group>
+
+      {/* The campaign type's own questions (Nov 2026). */}
+      {view.infoCustom.length ? (
+        <Group view={view} title={view.name} icon={ListChecks} group="custom">
+          {view.infoCustom.map((f) => {
+            const name = `info_custom.${f.id}`;
+            const was = state?.values && name in state.values ? state.values[name] : info?.custom?.[f.id];
+            const v = was === true ? "yes" : was === false ? "no" : was ?? "";
+            return (
+              <Field key={f.id} label={f.label} error={fe(name)} className={f.type === "text" ? "sm:col-span-2" : undefined}>
+                {f.type === "date" ? <DatePicker name={name} defaultValue={String(v)} aria-label={f.label} invalid={invalid(name)} />
+                  : f.type === "yesno" || f.type === "select" ? (
+                    <Select name={name} defaultValue={String(v)} aria-invalid={invalid(name)} data-info-custom={f.id}>
+                      <option value="">—</option>
+                      {(f.type === "yesno" ? [["yes", "Yes"], ["no", "No"]] : (f.options ?? []).map((o) => [o, o])).map(([val, lab]) => <option key={val} value={val}>{lab}</option>)}
+                    </Select>
+                  ) : (
+                    <Input name={name} defaultValue={String(v)} inputMode={f.type === "number" ? "decimal" : undefined} maxLength={f.type === "number" ? 20 : 500}
+                      aria-invalid={invalid(name)} data-info-custom={f.id} />
+                  )}
+              </Field>
+            );
+          })}
+        </Group>
+      ) : null}
     </>
   );
 

@@ -5,11 +5,16 @@ import { formatPhone, mediumDate, telHref } from "@/lib/format";
 import { SECTION_LINE } from "@/features/leads/form-section";
 import { addressLine, areaCode, directionsLink, hasProfile, producerName, weekdayList, yesNoOf, yesWith } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
+import { campaignView, customText } from "@/lib/campaign-types";
+import { ListChecks } from "lucide-react";
 
 const blank = (v) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
 
 /** A part of the Project Info, titled, boxed in the darker line the lead's edit forms have (Sean, Nov 2026). */
-function Section({ title, icon: Icon, name, children }) {
+function Section({ title, icon: Icon, name, children, view }) {
+  // The client's campaign type names it, or turns it off (Nov 2026).
+  if (view?.hidden(`info_sec_${name}`)) return null;
+  if (view && name !== "custom") title = view.label(`info_sec_${name}`);
   return (
     <section data-info-section={name} className={cn("overflow-hidden", SECTION_LINE)}>
       <h3 className="flex items-center gap-1.5 px-4 pb-1.5 pt-3 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-muted-foreground">
@@ -21,10 +26,11 @@ function Section({ title, icon: Icon, name, children }) {
 }
 
 /** Label and value, striped, as the lead sheet's other tabs have them. */
-function Rows({ rows }) {
+function Rows({ rows, view }) {
+  const shown = view ? rows.filter(([key]) => !view.hidden(`info_${key}`)).map(([key, label, value]) => [key, view.label(`info_${key}`) === `info_${key}` ? label : view.label(`info_${key}`), value]) : rows;
   return (
     <div className="divide-y divide-[var(--panel-border)]">
-      {rows.map(([key, label, value]) => (
+      {shown.map(([key, label, value]) => (
         <div key={key} data-info-row={key} className="grid grid-cols-[minmax(8rem,40%)_1fr] gap-3 px-4 py-2 text-sm odd:bg-muted/30">
           <span className="text-muted-foreground">{label}</span>
           <span className="min-w-0 whitespace-pre-line break-words">{blank(value) ? <span className="text-muted-foreground">—</span> : value}</span>
@@ -47,6 +53,8 @@ function Rows({ rows }) {
  * client). `wide`: two columns on a wide screen.
  */
 export default function ProjectInfoView({ info, toLead = null, action = null, wide = false, emptyHint = null }) {
+  // Laid out by the client's campaign type (Nov 2026; Insurance unless it has one).
+  const view = campaignView(info.campaign);
   const office = addressLine(info);
   const code = areaCode(info.phone);
   const directions = toLead && office ? directionsLink(office, toLead) : null;
@@ -62,8 +70,8 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
     : null;
 
   const agent = (
-    <Section title="Agent & office" icon={Building2} name="agent">
-      <Rows rows={[
+    <Section view={view} title="Agent & office" icon={Building2} name="agent">
+      <Rows view={view} rows={[
         ["agent", "Project agent", info.contact_name ? `${info.contact_name}${info.contact_title ? ` · ${info.contact_title}` : ""}` : null],
         ["office", "Address", office ? (
           <span>
@@ -92,8 +100,8 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
   );
 
   const appointments = (
-    <Section title="Appointments" icon={CalendarX2} name="appointments">
-      <Rows rows={[
+    <Section view={view} title="Appointments" icon={CalendarX2} name="appointments">
+      <Rows view={view} rows={[
         ["avoid_days", "Days to avoid", info.avoid_days.length ? (
           <span className="inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-300">
             <Ban className="size-3.5" aria-hidden /> {weekdayList(info.avoid_days, { plural: true })}
@@ -111,7 +119,7 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
   );
 
   const producers = (
-    <Section title="Producers taking appointments" icon={Users} name="producers">
+    <Section view={view} title="Producers taking appointments" icon={Users} name="producers">
       {info.producers.length ? (
         <ul className="divide-y divide-[var(--panel-border)]">
           {info.producers.map((p, i) => (
@@ -134,17 +142,24 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
   );
 
   const carriers = (
-    <Section title="Carriers" icon={Landmark} name="carriers">
-      <Rows rows={[
+    <Section view={view} title="Carriers" icon={Landmark} name="carriers">
+      <Rows view={view} rows={[
         ["top_carriers", "Top carriers", info.top_carriers.join(", ")],
         ["avoid_carriers", "Can't compete with", info.avoid_carriers.join(", ")],
       ]} />
     </Section>
   );
 
+  // The campaign type's own questions, answered (Nov 2026).
+  const own = view.infoCustom.length ? (
+    <Section view={view} title={view.name} icon={ListChecks} name="custom">
+      <Rows rows={view.infoCustom.map((f) => [`custom_${f.id}`, f.label, customText(f, info.custom?.[f.id])])} />
+    </Section>
+  ) : null;
+
   const about = (
-    <Section title="About the agency" icon={MessageSquareText} name="about">
-      <Rows rows={[
+    <Section view={view} title="About the agency" icon={MessageSquareText} name="about">
+      <Rows view={view} rows={[
         ["special_programs", "Special programs & services", info.special_programs],
         ["value_added", "Value-added services", info.value_added],
         ["exclusive_program", "Exclusive programs", info.exclusive_program],
@@ -172,7 +187,7 @@ export default function ProjectInfoView({ info, toLead = null, action = null, wi
       {/* Agent & office, Producers, Carriers, Appointments, About the agency; on a wide screen the first three, then the last two beside them. */}
       <div className={cn("space-y-3 p-3", wide && "lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0")}>
         <div className="space-y-3">{agent}{producers}{carriers}</div>
-        <div className="space-y-3">{appointments}{about}</div>
+        <div className="space-y-3">{appointments}{about}{own}</div>
       </div>
     </div>
   );
