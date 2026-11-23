@@ -8,6 +8,7 @@ import { campaignView, customText } from "@/lib/campaign-types";
 import { getLeadCampaign } from "@/features/campaign-types/queries";
 import Tabs from "@/components/shared/tabs";
 import ReminderButton from "@/features/texts/components/reminder-button";
+import { leadTextNumbers } from "@/lib/texts";
 import ProspectForm from "@/features/leads/components/prospect-form";
 import BusinessForm from "@/features/leads/components/business-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
@@ -841,7 +842,7 @@ export default async function LeadSheet({ params, searchParams }) {
                             {/* Its reminder text, sent now as well as at its time (Sean, Nov 2026). */}
                             {staff ? (
                               <td className={TD}>
-                                <ReminderButton appointmentId={a.id} reminder={a.reminder}
+                                <ReminderButton appointmentId={a.id} reminder={a.reminder} numbers={leadTextNumbers(r)}
                                   upcoming={String(a.apptDate) >= today && !a.invalid && !["Cancelled", "Held", "No Show", "Invalid"].includes(a.status)} />
                               </td>
                             ) : null}

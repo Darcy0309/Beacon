@@ -97,7 +97,9 @@ export async function sendApptReminder(formData) {
   }
   const admin = createAdminClient();
   if (!admin) return fail(ADMIN_UNAVAILABLE);
-  const sent = await sendReminderNow(admin, appointmentId, { origin: publicOrigin(await headers()), userId: me.id });
+  // To the mobile chosen, when the lead has several (Nov 2026).
+  const to = textDigits(String(formData.get("to") ?? "")) || null;
+  const sent = await sendReminderNow(admin, appointmentId, { origin: publicOrigin(await headers()), userId: me.id, to });
   if (sent.error) return fail(sent.error);
   await logActivity(supabase, "appointment.reminder", { entity: "lead", entityId: appt.lead_id, detail: `Reminder text sent to ${sent.to}` });
   revalidatePath(`/leads/${appt.lead_id}`);

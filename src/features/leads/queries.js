@@ -268,7 +268,7 @@ export async function getLeadActivity(leadId) {
     // What was said on each call: administrators and managers only (call_notes() gives anyone else none).
     supabase.rpc("call_notes", { p_lead_id: Number(leadId) }),
     // Each appointment's reminder texts (Nov 2026): the latest, at its time or sent by hand. (Who may read texts sees them.)
-    supabase.from("lead_texts").select("appointment_id, created_at, status, user_id, user:users(first_name, last_name)")
+    supabase.from("lead_texts").select("appointment_id, created_at, status, user_id, to_number, user:users(first_name, last_name)")
       .eq("lead_id", leadId).eq("direction", "out").not("appointment_id", "is", null).order("created_at", { ascending: false }).limit(50),
   ]);
   const lastReminder = new Map();
@@ -289,7 +289,7 @@ export async function getLeadActivity(leadId) {
       setBy: fullName(one(a.setter)) || null,
       apptDate: a.appt_date,
       // Its latest reminder text: when, how it went, and who sent it by hand (none: the scheduled one).
-      reminder: lastReminder.has(a.id) ? (({ created_at, status, user }) => ({ at: created_at, status, by: fullName(one(user)) || null }))(lastReminder.get(a.id)) : null,
+      reminder: lastReminder.has(a.id) ? (({ created_at, status, user, to_number }) => ({ at: created_at, status, by: fullName(one(user)) || null, to: to_number }))(lastReminder.get(a.id)) : null,
     })),
     calls: (calls.data ?? []).map((c) => ({
       id: c.id,

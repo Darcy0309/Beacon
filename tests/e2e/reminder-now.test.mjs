@@ -74,6 +74,20 @@ try {
   await sean.click(`[data-send-reminder="${A}"]`);
   check("Send again: a second text", Boolean(await until(() => texts(L) === 2)) && asked.length === 2);
 
+  section("A lead with two mobiles: which one");
+  const DM = `602558${String(Date.now()).slice(-4)}`;
+  sql(`update public.leads set decision_maker = 'Dana Diaz', dm_mobile = ${lit(DM)} where id = ${L}`);
+  await sean.go(`/leads/${L}`, 6000);
+  await until(() => sean.ev(`!![...document.querySelectorAll('[role=tab]')].find((t) => t.textContent.includes('Appointments'))`), { timeout: 30000 });
+  await sean.click('[role=tab]', "Appointments");
+  await until(() => sean.ev(`!!document.querySelector('[data-send-reminder="${A}"]')`));
+  check("the row says the number it went to", Boolean(await until(() => sean.ev(`document.querySelector('[data-appt-reminder="${A}"] [data-reminder-last]')?.innerText.includes('557') ?? false`))));
+  await sean.pointer(`[data-send-reminder="${A}"]`);
+  const offered = await until(() => sean.ev(`[...document.querySelectorAll('[data-reminder-to]')].map((m) => m.dataset.reminderTo)`).then((x) => (x?.length ? x : null)));
+  check("Send again asks which: the contact's mobile and the decision maker's", JSON.stringify(offered) === JSON.stringify([MOBILE, DM]), JSON.stringify(offered));
+  await sean.menuItem("Dana Diaz");
+  check("…sent to the decision maker's, Hi to her", Boolean(await until(() => (asked.length === 3 ? asked : null))) && asked[2].To === `+1${DM}` && /Hi Dana,/.test(asked[2].Body), JSON.stringify(asked[2]));
+
   section("Its reply");
   const url = `${APP_URL}/api/twilio/sms`;
   const params = { AccountSid: ACCOUNT, From: `+1${MOBILE}`, To: "+15555550100", Body: "Y", NumMedia: "0", MessageSid: `SM${hex(32)}` };

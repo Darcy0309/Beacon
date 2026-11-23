@@ -10,7 +10,7 @@ import { one } from "@/lib/server/query-helpers";
 import { textSender, twilioApi, twilioConfig } from "@/lib/server/twilio";
 import { apptDateText } from "@/lib/email-templates";
 import { apptTextBody, apptTextSettings } from "@/lib/appointment-texts";
-import { e164, leadTextNumbers, textFailure } from "@/lib/texts";
+import { e164, leadTextNumbers, textDigits, textFailure } from "@/lib/texts";
 import { todayIn } from "@/lib/dates";
 
 const NUMBERS = "phone, contact_name, contact_phone, contact_mobile, decision_maker, dm_phone, dm_mobile, contact2_name, contact2_phone, contact2_mobile";
@@ -31,21 +31,29 @@ async function reminderSettings(admin) {
   return { settings, today: todayIn(settings.zone) };
 }
 
+/** The name of the person whose mobile `digits` is on the lead (the contact's when none matches). */
+const nameAt = (lead, digits) =>
+  (textDigits(lead.dm_mobile) === digits && lead.decision_maker) || (textDigits(lead.contact2_mobile) === digits && lead.contact2_name) || lead.contact_name;
+
 /**
  * Text an appointment's reminder (`a`, read with APPT_SELECT) to its lead's mobile, and keep it on the lead's
  * Conversation (`userId`: who sent it by hand; none for the scheduled one). { text_id, error } (error: why not).
  */
-async function textReminder(admin, config, a, { settings, today, origin, userId = null }) {
+async function textReminder(admin, config, a, { settings, today, origin, userId = null, toDigits = null }) {
   const lead = one(a?.lead);
   if (!a || !lead) return { error: "The appointment or its lead is gone." };
   if (String(a.appt_date) < today) return { error: "The appointment had passed before the reminder could go." };
-  const to = leadTextNumbers(lead)[0];
+  // The mobile chosen (Sean, Nov 2026: the decision maker's, when that's who to remind), else the first on the lead.
+  const numbers = leadTextNumbers(lead);
+  const to = toDigits ? numbers.find((n) => n.digits === toDigits) : numbers[0];
+  if (toDigits && !to) return { error: "That number isn't one of this lead's mobiles." };
   if (!to) return { error: "There's no mobile number on the lead to text." };
 
   const sender = textSender(config);
   const project = one(lead.project);
   const body = apptTextBody(settings.body, {
-    first_name: String(lead.contact_name ?? "").trim().split(/\s+/)[0],
+    // Whoever is texted, by name (the decision maker's mobile: the decision maker's).
+    first_name: String(nameAt(lead, to.digits) ?? "").trim().split(/\s+/)[0],
     company: lead.company_name,
     client: one(project?.company)?.name,
     agent_name: a.rep_name || lead.producer_name || project?.contact_name,
@@ -78,7 +86,7 @@ async function textReminder(admin, config, a, { settings, today, origin, userId 
  * with the scheduled time … resend to prospects if they ever say they never received the text"). The scheduled one
  * still goes at its time. { error } or { to } (the number texted).
  */
-export async function sendReminderNow(admin, appointmentId, { origin, userId }) {
+export async function sendReminderNow(admin, appointmentId, { origin, userId, to = null }) {
   const config = twilioConfig();
   if (!admin || !config) return { error: "Texting isn't connected yet: the server needs its Twilio keys." };
   const [{ data: a, error }, { settings, today }] = await Promise.all([
@@ -92,7 +100,7 @@ export async function sendReminderNow(admin, appointmentId, { origin, userId }) 
   }
   const { data: texting } = await admin.from("projects").select("id").in("id", [a.project_id, a.set_project_id].filter(Boolean)).eq("appt_texts", true).limit(1);
   if (!texting?.length) return { error: "Appointment reminder texts are off for this project: turn them on in the project's Edit first." };
-  const sent = await textReminder(admin, config, a, { settings, today, origin, userId });
+  const sent = await textReminder(admin, config, a, { settings, today, origin, userId, toDigits: to });
   return sent.error ? { error: sent.error } : { to: sent.to };
 }
 
