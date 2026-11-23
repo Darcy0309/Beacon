@@ -517,7 +517,7 @@ export default async function Dashboard({ searchParams }) {
 
         {/* The top tiles for one Sales Rep's clients (Sean, Nov 2026), an administrator's choice. */}
         {team?.reps?.length ? (
-          <div className="-mb-1 flex justify-end" data-tile-rep>
+          <div className="relative z-10 flex justify-end" data-tile-rep>
             <ParamSelect name="tr" label="Sales Rep" placeholder="Everyone" value={team.rep ? String(team.rep) : ""}
               options={team.reps.map((r) => ({ value: String(r.id), label: r.name }))} clears={[]} />
           </div>
