@@ -11,6 +11,7 @@ import { CALLS_ROLES, textSender, twilioApi, twilioConfig } from "@/lib/server/t
 import { publicOrigin } from "@/lib/origin";
 import { TEXTS_PER_HOUR, e164, leadTextNumbers, textDigits, textFailure } from "@/lib/texts";
 import { schemas } from "@/lib/validate";
+import { sendReminderNow } from "@/features/texts/appointment-texts";
 
 /**
  * Send a text to one of a lead's numbers, from the phone's Twilio number. Only staff who may work
@@ -74,4 +75,31 @@ export async function sendLeadText(prevState, formData) {
   revalidatePath(`/leads/${leadId}`);
   if (!sent) return fail(refused, null, values);
   return ok({ to: e164(digits) });
+}
+
+/**
+ * An appointment's reminder text sent now (Sean, Nov 2026: managers send it directly, as well as at its scheduled
+ * time, and again when a prospect says it never came). Staff who may work the name, or an administrator; the
+ * project must have reminder texts on. Kept on the lead's Conversation, a reply (Y, N, R) read as the scheduled
+ * one's is.
+ */
+export async function sendApptReminder(formData) {
+  const appointmentId = Number(formData.get("appointment_id"));
+  if (!Number.isInteger(appointmentId) || appointmentId <= 0) return fail("Choose the appointment.");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me || me.status !== "active" || !CALLS_ROLES.includes(me.role)) return fail("Only staff can send an appointment reminder.");
+  const { data: appt } = await supabase.from("appointments").select("id, lead_id").eq("id", appointmentId).maybeSingle();
+  if (!appt) return fail("That appointment is gone.");
+  if (me.role !== "admin") {
+    const { data: allowed } = await supabase.rpc("can_work_lead", { p_lead_id: appt.lead_id });
+    if (!allowed) return fail("This name is not on your call list, so you can't text it.");
+  }
+  const admin = createAdminClient();
+  if (!admin) return fail(ADMIN_UNAVAILABLE);
+  const sent = await sendReminderNow(admin, appointmentId, { origin: publicOrigin(await headers()), userId: me.id });
+  if (sent.error) return fail(sent.error);
+  await logActivity(supabase, "appointment.reminder", { entity: "lead", entityId: appt.lead_id, detail: `Reminder text sent to ${sent.to}` });
+  revalidatePath(`/leads/${appt.lead_id}`);
+  return ok({ to: sent.to });
 }

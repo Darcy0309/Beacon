@@ -234,7 +234,7 @@ export async function getLeadCounts() {
 /** Appointments, call history and the emails sent to its contact, for one lead. */
 export async function getLeadActivity(leadId) {
   const supabase = await createClient();
-  const [appts, calls, emails, reminders, deliveries, callNotes] = await Promise.all([
+  const [appts, calls, emails, reminders, deliveries, callNotes, apptTexts] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, appt_date, appt_time, duration_min, rep_name, qa_status, confirmed_at, invalid_at, status:appointment_statuses(name), setter:users!appointments_user_id_fkey(first_name, last_name)")
@@ -267,7 +267,12 @@ export async function getLeadActivity(leadId) {
       .limit(30),
     // What was said on each call: administrators and managers only (call_notes() gives anyone else none).
     supabase.rpc("call_notes", { p_lead_id: Number(leadId) }),
+    // Each appointment's reminder texts (Nov 2026): the latest, at its time or sent by hand. (Who may read texts sees them.)
+    supabase.from("lead_texts").select("appointment_id, created_at, status, user_id, user:users(first_name, last_name)")
+      .eq("lead_id", leadId).eq("direction", "out").not("appointment_id", "is", null).order("created_at", { ascending: false }).limit(50),
   ]);
+  const lastReminder = new Map();
+  for (const t of apptTexts.data ?? []) if (!lastReminder.has(t.appointment_id)) lastReminder.set(t.appointment_id, t);
   const notesOf = new Map((callNotes.data ?? []).map((n) => [n.id, n.notes]));
 
   return {
@@ -282,6 +287,9 @@ export async function getLeadActivity(leadId) {
       invalid: Boolean(a.invalid_at),
       qa: a.qa_status,
       setBy: fullName(one(a.setter)) || null,
+      apptDate: a.appt_date,
+      // Its latest reminder text: when, how it went, and who sent it by hand (none: the scheduled one).
+      reminder: lastReminder.has(a.id) ? (({ created_at, status, user }) => ({ at: created_at, status, by: fullName(one(user)) || null }))(lastReminder.get(a.id)) : null,
     })),
     calls: (calls.data ?? []).map((c) => ({
       id: c.id,

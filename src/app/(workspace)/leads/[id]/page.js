@@ -7,6 +7,7 @@ import ToneBadge from "@/components/shared/tone-badge";
 import { campaignView, customText } from "@/lib/campaign-types";
 import { getLeadCampaign } from "@/features/campaign-types/queries";
 import Tabs from "@/components/shared/tabs";
+import ReminderButton from "@/features/texts/components/reminder-button";
 import ProspectForm from "@/features/leads/components/prospect-form";
 import BusinessForm from "@/features/leads/components/business-form";
 import CallResultPanel from "@/features/work/components/call-result-panel";
@@ -822,7 +823,7 @@ export default async function LeadSheet({ params, searchParams }) {
                 content: activity.appointments.length ? (
                   <div className="overflow-x-auto">
                     <table className="w-full min-w-[40rem] text-sm">
-                      <thead><tr><th className={TH}>Date</th><th className={TH}>Time</th><th className={TH}>Length</th><th className={TH}>Status</th><th className={TH}>With</th><th className={TH}>Set by</th></tr></thead>
+                      <thead><tr><th className={TH}>Date</th><th className={TH}>Time</th><th className={TH}>Length</th><th className={TH}>Status</th><th className={TH}>With</th><th className={TH}>Set by</th>{staff ? <th className={TH}>Reminder text</th> : null}</tr></thead>
                       <tbody className="divide-y divide-[var(--panel-border)]">
                         {activity.appointments.map((a) => (
                           <tr key={a.id} data-list-row>
@@ -837,6 +838,13 @@ export default async function LeadSheet({ params, searchParams }) {
                             </td>
                             <td className={TD}>{a.rep}</td>
                             <td className={cn(TD, "text-muted-foreground")}>{a.setBy ?? "—"}</td>
+                            {/* Its reminder text, sent now as well as at its time (Sean, Nov 2026). */}
+                            {staff ? (
+                              <td className={TD}>
+                                <ReminderButton appointmentId={a.id} reminder={a.reminder}
+                                  upcoming={String(a.apptDate) >= today && !a.invalid && !["Cancelled", "Held", "No Show", "Invalid"].includes(a.status)} />
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>

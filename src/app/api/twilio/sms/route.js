@@ -128,10 +128,11 @@ async function tellOfApptReply(admin, lead, body) {
   const answer = apptReply(body);
   if (!answer) return false;
   const since = new Date(Date.now() - REPLY_WITHIN_MS).toISOString();
-  const { data: reminder } = await admin.from("appointment_texts")
+  // The latest reminder sent to them, at its time or by hand (Nov 2026): the text kept on the lead, with its appointment.
+  const { data: reminder } = await admin.from("lead_texts")
     .select("appointment_id, appointment:appointments(id, appt_date, appt_time, user_id, follow_up_user_id)")
-    .eq("lead_id", lead.id).not("sent_at", "is", null).gte("sent_at", since)
-    .order("sent_at", { ascending: false }).limit(1).maybeSingle();
+    .eq("lead_id", lead.id).eq("direction", "out").not("appointment_id", "is", null).neq("status", "failed").gte("created_at", since)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
   const appt = Array.isArray(reminder?.appointment) ? reminder.appointment[0] : reminder?.appointment;
   if (!appt) return false;
 
