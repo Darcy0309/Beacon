@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, Combine, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall, PhoneForwarded,
-  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet, Crown,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet, Crown, Flame,
 } from "lucide-react";
 
 export const ROLES = {
@@ -110,6 +110,8 @@ export const navGroups = [
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.
       { href: "/reports/pay", label: "Pay & Hours", icon: Clock, roles: ["admin", "manager", "agent"] },
+      // When calls turn into leads and appointments, by day and hour in the business's local time (Sean and Darcy, Nov 2026).
+      { href: "/reports/best-times", label: "Best Times to Call", icon: Flame, roles: ["admin"] },
       // Every call on the Lighthouse phone, listed, and a number looked up (Sean, Nov 2026); a manager their own.
       { href: "/reports/calls", label: "Call Log", icon: PhoneForwarded, roles: ["admin", "manager"] },
       // One person's day by the hour: calls, leads and appointments; agents see their own.
