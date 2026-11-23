@@ -10,7 +10,7 @@ const BY_TITLE = { sic: "Industry (SIC)", state: "State", type: "Project type", 
 const BY_PHRASE = { sic: "industry (SIC)", state: "state", type: "project type", manager: "manager" };
 
 /**
- * Best Times to Call (Sean and Darcy, Nov 2026): the week by day and hour in the business's local time, each square
+ * The Production Heat Map (Sean and Darcy, Nov 2026; first Best Times to Call): the week by day and hour in the business's local time, each square
  * shaded by how its calls turned into leads, appointments or either (an hour with too few calls greyed out); the
  * best and worst hours; and the breakdown chosen, each with its best two hours on weekdays.
  * `rows`: best_times() for the filters; `byRows` the same broken down by `by`.

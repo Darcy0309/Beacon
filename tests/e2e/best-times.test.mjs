@@ -1,5 +1,5 @@
 /**
- * Best Times to Call (Sean and Darcy, Nov 2026): calls by day and hour in the business's local time, each hour shaded
+ * The Production Heat Map (Sean and Darcy, Nov 2026; first Best Times to Call): calls by day and hour in the business's local time, each hour shaded
  * by how its calls turned into leads and appointments (one with too few calls greyed out); the best and worst hours;
  * filters; and a breakdown, here by state. A Wisconsin business called at 8 AM Central and an Arizona one at 8 AM
  * Arizona time are both 8 AM.
@@ -33,11 +33,18 @@ calls(WI, "America/Chicago", 8, 15, 3, LEAD);
 calls(AZ, "America/Phoenix", 8, 10, 2, APPT);
 calls(WI, "America/Chicago", 12, 25, 0, LEAD);
 calls(WI, "America/Chicago", 15, 5, 5, LEAD);
+// Another project of the client's, that Sean isn't on: 30 calls at 9 AM.
+const P2 = Number(sql(`insert into public.projects (name, company_id, project_type_id, status_id) values (${lit(`${TAG} Other`)}, ${co},
+  (select id from public.project_types where code = 'DBDV'), 1) returning id`));
+const OTHER = Number(sql(`insert into public.leads (company_name, project_id, state, sic_code) values (${lit(`${TAG} Other Co`)}, ${P2}, 'WI', '4213') returning id`));
+sql(`insert into public.call_records (lead_id, project_id, user_id, call_date, call_result, result_id)
+  select ${OTHER}, ${P2}, ${SEAN}, ((${lit(TUE)}::date + time '09:15') at time zone 'America/Chicago') + (i || ' seconds')::interval, 'x', ${NONE} from generate_series(1, 30) i`);
+sql(`insert into public.project_assignments (project_id, ae_user_id) values (${P}, ${SEAN})`);
 
 const browser = await launchBrowser();
 try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
-  await admin.go(`/reports/best-times?client=${co}&by=state`, 8000);
+  await admin.go(`/reports/heat-map?client=${co}&by=state`, 8000);
   const cell = (key) => admin.ev(`(() => { const c = document.querySelector('[data-best-cell="${key}"]'); return c ? { text: c.textContent.trim(), thin: c.hasAttribute('data-thin') } : null; })()`);
 
   section("By day and hour, in the business's local time");
@@ -45,7 +52,7 @@ try {
   check("Tuesday 8 AM: the Wisconsin and Arizona calls together (25), 5 won: 20%", eight?.text === "20.0%" && !eight.thin, JSON.stringify(eight));
   check("Tuesday noon: 25 calls, none won: 0%", (await cell("2-12"))?.text === "0.0%");
   check("Tuesday 3 PM: 5 calls, too few to judge, greyed out", (await cell("2-15"))?.thin === true);
-  check("…the totals", /55 calls · 8 leads · 2 appointments/.test(await admin.ev(`document.querySelector('[data-best-total]')?.textContent ?? ''`)));
+  check("…the totals (the other project's 30 calls too, for an administrator)", /85 calls · 8 leads · 2 appointments/.test(await admin.ev(`document.querySelector('[data-best-total]')?.textContent ?? ''`)));
 
   section("Leads, appointments");
   await admin.click('[data-best-mode="appts"]');
@@ -63,20 +70,32 @@ try {
   check("Wisconsin and Arizona, each its own", groups.includes("WI") && groups.includes("AZ"), JSON.stringify(groups));
 
   section("Filtered");
-  await admin.go(`/reports/best-times?client=${co}&state=AZ`, 6000);
+  await admin.go(`/reports/heat-map?client=${co}&state=AZ`, 6000);
   check("Arizona only: 10 calls at 8 AM, too few to judge", (await until(() => cell("2-8").then((c) => (c ? c : null))))?.thin === true);
-  await admin.go(`/reports/best-times?client=${co}&sic=42`, 6000);
-  check("an industry's first digits (42, trucking): all of them", /55 calls/.test(await until(() => admin.ev(`document.querySelector('[data-best-total]')?.textContent ?? null`))));
+  await admin.go(`/reports/heat-map?client=${co}&sic=42`, 6000);
+  check("an industry's first digits (42, trucking): all of them", /85 calls/.test(await until(() => admin.ev(`document.querySelector('[data-best-total]')?.textContent ?? null`))));
 
-  section("Administrators only");
-  const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1200, height: 900 });
-  await sean.go("/reports/best-times", 5000);
-  check("not for a manager", !(await sean.ev(`!!document.querySelector('[data-best-times]')`)));
+  section("Its name, and its old address");
+  check("called the Production Heat Map", /Production Heat Map/.test(await admin.ev(`document.querySelector('header')?.innerText ?? document.title`)));
+  await admin.go(`/reports/best-times?client=${co}`, 6000);
+  check("the old address goes to it, filters kept", Boolean(await until(async () => (await admin.url()).startsWith(`/reports/heat-map?client=${co}`))), await admin.url());
+  check("…an administrator sees every project of the client's (the other one's 30 calls too)", /85 calls/.test(await until(() => admin.ev(`document.querySelector('[data-best-total]')?.textContent ?? null`))));
+
+  section("A manager: the projects they're assigned to");
+  const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 1000 });
+  await sean.go(`/reports/heat-map?client=${co}`, 8000);
+  const mine = await until(() => sean.ev(`document.querySelector('[data-best-total]')?.textContent ?? null`), { timeout: 20000 });
+  check("Sean sees his project's calls, not the one he isn't on", /55 calls/.test(mine ?? ""), mine);
+  check("…in the menu", Boolean(await until(() => sean.ev(`[...document.querySelectorAll('a, [role=link]')].some((a) => a.textContent.trim() === 'Production Heat Map')`))));
+  const agentPage = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1200, height: 900 });
+  await agentPage.go("/reports/heat-map", 5000);
+  check("not for an agent", !(await agentPage.ev(`!!document.querySelector('[data-best-times]')`)));
 } finally {
   browser.close();
-  sql(`delete from public.call_records where project_id = ${P}`);
-  sql(`delete from public.leads where project_id = ${P}`);
-  sql(`delete from public.projects where id = ${P}`);
+  sql(`delete from public.project_assignments where project_id in (${P}, ${P2})`);
+  sql(`delete from public.call_records where project_id in (${P}, ${P2})`);
+  sql(`delete from public.leads where project_id in (${P}, ${P2})`);
+  sql(`delete from public.projects where id in (${P}, ${P2})`);
   sql(`delete from public.companies where id = ${co}`);
 }
 

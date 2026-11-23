@@ -110,8 +110,9 @@ export const navGroups = [
       { href: "/reports/production", label: "Production & Pay", icon: Banknote, roles: ["admin", "manager", "agent"] },
       // Time worked in the app, hourly vs commission per pay period; everyone but an administrator sees their own.
       { href: "/reports/pay", label: "Pay & Hours", icon: Clock, roles: ["admin", "manager", "agent"] },
-      // When calls turn into leads and appointments, by day and hour in the business's local time (Sean and Darcy, Nov 2026).
-      { href: "/reports/best-times", label: "Best Times to Call", icon: Flame, roles: ["admin"] },
+      // When calls turn into leads and appointments, by day and hour in the business's local time (Sean and Darcy, Nov
+      // 2026): the Production Heat Map; a manager's, the projects they're assigned to.
+      { href: "/reports/heat-map", label: "Production Heat Map", icon: Flame, roles: ["admin", "manager"] },
       // Every call on the Lighthouse phone, listed, and a number looked up (Sean, Nov 2026); a manager their own.
       { href: "/reports/calls", label: "Call Log", icon: PhoneForwarded, roles: ["admin", "manager"] },
       // One person's day by the hour: calls, leads and appointments; agents see their own.

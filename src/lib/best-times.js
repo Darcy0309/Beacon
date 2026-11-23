@@ -1,4 +1,4 @@
-// Best Times to Call (Sean and Darcy, Nov 2026): when calls turn into leads and appointments, by day and hour in the
+// The Production Heat Map (first Best Times to Call; Sean and Darcy, Nov 2026): when calls turn into leads and appointments, by day and hour in the
 // business's local time. Pure, so the report and the tests share it; the counts come from best_times().
 
 /** An hour with fewer calls than this is greyed out and left out of best and worst: one lucky hour shouldn't count. */
