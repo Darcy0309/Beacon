@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ChevronDown, ListChecks, Search, X } from "lucide-react";
+import { ChevronDown, ListChecks, Loader2, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/field";
@@ -20,10 +20,15 @@ import { cn } from "@/lib/utils";
  * whole list opens to tick and untick, with Select all and Clear (for what
  * is shown: find first to pick only those), and a box to find one in a long
  * list. `columns`: several across, for short choices like the states.
+ *
+ * `onAddNew(text)` (Sean, Nov 2026: a carrier not on the list yet): the find box always shows, and a name it finds
+ * nothing for can be added (`addLabel`, e.g. "carrier"); `onAddNew` resolves to the name added (its options then
+ * include it), which is chosen, or to null.
  */
-export default function PickList({ name, options, value, onChange, placeholder = "Add…", empty = "None chosen yet", sorted = false, invalid, id, label, columns = false, "aria-describedby": describedBy }) {
+export default function PickList({ name, options, value, onChange, placeholder = "Add…", empty = "None chosen yet", sorted = false, invalid, id, label, columns = false, "aria-describedby": describedBy, onAddNew = null, addLabel = "choice" }) {
   const [open, setOpen] = useState(false);
   const [find, setFind] = useState("");
+  const [adding, setAdding] = useState(false);
   const panelId = useId();
   const order = (list) => (sorted ? options.filter((o) => list.includes(o)).concat(list.filter((v) => !options.includes(v))) : list);
   const add = (v) => v && !value.includes(v) && onChange(order([...value, v]));
@@ -34,6 +39,21 @@ export default function PickList({ name, options, value, onChange, placeholder =
   const toggle = (v, on) => (on ? add(v) : remove(v));
   const selectAll = () => onChange(order([...value, ...shown.filter((o) => !value.includes(o))]));
   const clear = () => onChange(value.filter((v) => !shown.includes(v)));
+  // A name found nowhere on the list, to add to it.
+  const typed = find.replace(/\s+/g, " ").trim();
+  const canAdd = Boolean(onAddNew && typed && !options.some((o) => o.toLowerCase() === typed.toLowerCase()));
+  const addNew = async () => {
+    setAdding(true);
+    try {
+      const added = await onAddNew(typed);
+      if (added) {
+        if (!value.includes(added)) onChange(order([...value, added]));
+        setFind("");
+      }
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
     <div data-pick-list={name} className={cn("rounded-md border bg-background/60 p-1.5", invalid ? "border-destructive" : "border-input")}>
@@ -58,7 +78,7 @@ export default function PickList({ name, options, value, onChange, placeholder =
           <option value="">{left.length ? placeholder : "All chosen"}</option>
           {left.map((o) => <option key={o} value={o}>{o}</option>)}
         </Select>
-        <Button type="button" variant="outline" size="sm" onClick={() => setOpen((o) => !o)} disabled={!options.length}
+        <Button type="button" variant="outline" size="sm" onClick={() => setOpen((o) => !o)} disabled={!options.length && !onAddNew}
           aria-expanded={open} aria-controls={panelId} data-pick-open className="h-8 shrink-0 text-xs">
           <ListChecks /> Check list <ChevronDown className={cn("transition-transform", open && "rotate-180")} />
         </Button>
@@ -66,11 +86,11 @@ export default function PickList({ name, options, value, onChange, placeholder =
       {open ? (
         <div id={panelId} data-pick-panel className="mt-1.5 rounded-md border border-[var(--panel-border)] bg-muted/20">
           <div className="flex flex-wrap items-center gap-1.5 border-b border-[var(--panel-border)] p-1.5">
-            {options.length > 12 ? (
+            {options.length > 12 || onAddNew ? (
               <div className="relative min-w-0 flex-1 basis-40">
                 <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" aria-hidden />
                 <Input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find…"
-                  onKeyDown={(e) => e.key === "Enter" && e.preventDefault()} aria-label={label ? `${label}: find` : "Find"}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (canAdd && !shown.length && !adding) addNew(); } }} aria-label={label ? `${label}: find` : "Find"}
                   className="h-8 pl-7 text-xs" data-pick-find />
               </div>
             ) : null}
@@ -99,8 +119,15 @@ export default function PickList({ name, options, value, onChange, placeholder =
               })}
             </ul>
           ) : (
-            <p className="p-2 text-xs text-muted-foreground">Nothing matches.</p>
+            <p className="p-2 text-xs text-muted-foreground">Nothing matches{onAddNew && typed ? `: "${typed}" isn't on the list yet.` : "."}</p>
           )}
+          {canAdd ? (
+            <div className="border-t border-[var(--panel-border)] p-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={addNew} disabled={adding} className="h-8 text-xs" data-pick-add-new>
+                {adding ? <Loader2 className="animate-spin" /> : <Plus />} Add &ldquo;{typed}&rdquo; as a {addLabel}
+              </Button>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between border-t border-[var(--panel-border)] px-2 py-1">
             <span className="text-[0.7rem] text-muted-foreground" data-pick-count>{value.length} of {options.length} chosen</span>
             <Button type="button" variant="ghost" size="sm" onClick={() => { setOpen(false); setFind(""); }} className="h-7 text-xs">Done</Button>

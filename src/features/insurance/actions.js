@@ -85,3 +85,26 @@ export async function saveCarrier(prevState, formData) {
   revalidatePath("/insurance-companies");
   return ok({ id: data[0].id });
 }
+
+/**
+ * A carrier added to the Insurance Cos. list from where it was wanted (Sean, Nov 2026: Project Info's carriers,
+ * "If it doesn't recognize the carrier I'm trying to find, it will have a button to 'Add Carrier' and it will update
+ * the master list"). One already on file, however it is capitalised or punctuated, is that one (`existing`).
+ * Administrators only. { name, existing }.
+ */
+export async function addCarrierByName(name) {
+  const clean = String(name ?? "").replace(/\s+/g, " ").trim().slice(0, 120);
+  if (!carrierKey(clean)) return fail("Type the carrier's name.");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (me?.role !== "admin") return fail("Only an administrator can add carriers to the list.");
+  const { data: same, error: readError } = await supabase.from("agencies").select("id, name").ilike("name", `%${clean.slice(0, 3)}%`).limit(1000);
+  if (readError) return fail(readError);
+  const clash = (same ?? []).find((a) => carrierKey(a.name) === carrierKey(clean));
+  if (clash) return ok({ name: clash.name, existing: true });
+  const { error } = await supabase.from("agencies").insert({ name: clean });
+  if (error) return fail(error);
+  await logActivity(supabase, "carrier.create", { detail: `${clean} (from Project Info)`, userId: me.id });
+  revalidatePath("/insurance-companies");
+  return ok({ name: clean, existing: false });
+}

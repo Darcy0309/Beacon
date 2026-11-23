@@ -664,7 +664,7 @@ export default async function LeadSheet({ params, searchParams }) {
                       info={info}
                       toLead={leadPlace(r)}
                       // Administrators and the client's own people change it (Sean, Oct 2026); managers and agents read it.
-                      action={admin || client ? <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" variant="outline" data-edit-project-info><Pencil /> Edit</Button>} /> : null}
+                      action={admin || client ? <ProjectInfoDialog info={info} carriers={carriers} addCarriers={admin} trigger={<Button size="sm" variant="outline" data-edit-project-info><Pencil /> Edit</Button>} /> : null}
                       emptyHint={admin ? "Fill it in here, or send the client their link from the project's page." : client ? "Fill it in with Edit." : "An administrator or the client fills it in."}
                     />
                   ) : (

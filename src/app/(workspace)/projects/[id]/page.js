@@ -379,7 +379,7 @@ export default async function ProjectDetail({ params, searchParams }) {
                     trigger={<Button size="sm" variant="outline" data-copy-project-info><Copy /> Copy from…</Button>} />
                   <InfoLinkDialog projectId={info.project_id} defaultTo={info.agent_email ?? info.client_email ?? ""} defaultName={info.contact_name ?? ""}
                     trigger={<Button size="sm" variant="outline" data-send-project-info><Send /> Send to client</Button>} />
-                  <ProjectInfoDialog info={info} carriers={carriers} trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />
+                  <ProjectInfoDialog info={info} carriers={carriers} addCarriers trigger={<Button size="sm" data-edit-project-info><Pencil /> Edit</Button>} />
                 </div>
               ) : null} />
             <ProjectInfoView info={info} wide emptyHint="Send the client their link to fill it in, or fill it in here." />

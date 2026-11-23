@@ -11,6 +11,8 @@ import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import PickList from "@/components/shared/pick-list";
 import { saveProjectInfo, saveProjectInfoByLink } from "@/features/project-info/actions";
+import { addCarrierByName } from "@/features/insurance/actions";
+import { reach } from "@/lib/reach";
 import { MAX_PRODUCERS, MIN_EMPLOYEES_MAX, QUOTE_MIN_TIMES, QUOTE_TIMES, US_STATES, WEEKDAYS } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
 import { campaignView } from "@/lib/campaign-types";
@@ -70,7 +72,21 @@ function YesWith({ name, label, value, onChange, countName, countLabel, countDef
  * the title and the buttons; on a page of its own the buttons stay in view,
  * with `status` beside them.
  */
-export default function ProjectInfoForm({ info, carriers = [], action, token = null, onSaved, onCancel, submitLabel = "Save", dialog = false, status = null }) {
+export default function ProjectInfoForm({ info, carriers: carrierNames = [], action, token = null, onSaved, onCancel, submitLabel = "Save", dialog = false, status = null, addCarriers = false }) {
+  // The carriers to pick from, and one added here (Sean, Nov 2026: an administrator adds a carrier not on the
+  // Insurance Cos. list without leaving the sheet; it goes on the list, and is picked).
+  const [carriers, setCarriers] = useState(carrierNames);
+  const addCarrier = addCarriers ? async (typed) => {
+    const result = await reach(() => addCarrierByName(typed));
+    if (!result.ok) {
+      toast.error(result.error);
+      return null;
+    }
+    const added = result.data.name;
+    setCarriers((list) => (list.includes(added) ? list : [...list, added].sort((a, b) => a.localeCompare(b))));
+    toast.success(result.data.existing ? `${added} was already on the Insurance Cos. list` : `${added} added to the Insurance Cos. list`);
+    return added;
+  } : null;
   const [state, formAction, pending] = useActionState(action, EMPTY);
   // The form's values as text: yes and no as the selects have them, numbers as typed.
   const record = info ? {
@@ -216,15 +232,18 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
       </Group>
 
       <Group view={view} title="Carriers" icon={Landmark} group="carriers"
-        hint={carriers.length ? "Pick each one from the drop-down, or open the Check list to tick several at once." : "The carrier list is empty: an administrator loads it under Insurance Cos."}>
+        hint={addCarriers ? "Pick each one from the drop-down, or open the Check list to tick several at once. One not on the list: find it there and Add it."
+          : carriers.length ? "Pick each one from the drop-down, or open the Check list to tick several at once." : "The carrier list is empty: an administrator loads it under Insurance Cos."}>
         {on("info_top_carriers") ? (
         <Field label={L("info_top_carriers", "Top carriers you will use")} error={fe("top_carriers")} className="sm:col-span-2">
-          <PickList name="top_carriers" label={L("info_top_carriers", "Top carriers you will use")} options={carriers} value={top} onChange={setTop} placeholder="Add a carrier…" invalid={invalid("top_carriers")} />
+          <PickList name="top_carriers" label={L("info_top_carriers", "Top carriers you will use")} options={carriers} value={top} onChange={setTop} placeholder="Add a carrier…" invalid={invalid("top_carriers")}
+            onAddNew={addCarrier} addLabel="carrier" />
         </Field>
         ) : null}
         {on("info_avoid_carriers") ? (
         <Field label={L("info_avoid_carriers", "Carriers you can't compete with")} error={fe("avoid_carriers")} className="sm:col-span-2">
-          <PickList name="avoid_carriers" label={L("info_avoid_carriers", "Carriers you can't compete with")} options={carriers} value={avoid} onChange={setAvoid} placeholder="Add a carrier…" invalid={invalid("avoid_carriers")} />
+          <PickList name="avoid_carriers" label={L("info_avoid_carriers", "Carriers you can't compete with")} options={carriers} value={avoid} onChange={setAvoid} placeholder="Add a carrier…" invalid={invalid("avoid_carriers")}
+            onAddNew={addCarrier} addLabel="carrier" />
         </Field>
         ) : null}
       </Group>
@@ -360,7 +379,7 @@ export default function ProjectInfoForm({ info, carriers = [], action, token = n
  * a lead sheet, a client's from their own Project Info page. `trigger`: the
  * button that opens it.
  */
-export function ProjectInfoDialog({ info, carriers, trigger }) {
+export function ProjectInfoDialog({ info, carriers, trigger, addCarriers = false }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const saved = useCallback(() => {
@@ -380,7 +399,7 @@ export function ProjectInfoDialog({ info, carriers, trigger }) {
             {about}{info.shared_with?.length ? ` · also used by ${info.shared_with.join(", ")}` : ""}
           </DialogDescription>
         </DialogHeader>
-        <ProjectInfoForm info={info} carriers={carriers} action={saveProjectInfo} onSaved={saved} onCancel={() => setOpen(false)} dialog />
+        <ProjectInfoForm info={info} carriers={carriers} action={saveProjectInfo} onSaved={saved} onCancel={() => setOpen(false)} dialog addCarriers={addCarriers} />
       </DialogContent>
     </Dialog>
   );
