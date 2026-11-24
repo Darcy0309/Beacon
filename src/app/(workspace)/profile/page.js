@@ -1,25 +1,23 @@
 import Link from "@/components/shared/intent-link";
-import { Camera, ChevronRight, KeyRound, ShieldCheck, SlidersHorizontal, UserRound, Voicemail } from "lucide-react";
+import { ChevronRight, KeyRound, ShieldCheck, SlidersHorizontal, UserRound, Voicemail } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import ToneBadge from "@/components/shared/tone-badge";
-import PictureUpload from "@/components/shared/picture-upload";
 import { Card } from "@/components/ui/card";
 import ProfileForm from "@/features/auth/components/profile-form";
 import VoicemailGreeting from "@/features/phone/components/voicemail-greeting";
 import ProfilePreferences from "@/features/profile/components/profile-preferences";
-import { setMyPhoto } from "@/features/auth/actions";
+import ProfileAvatar from "@/features/profile/components/profile-avatar";
 import { getMyTwoFactor } from "@/features/auth/queries";
 import { ROLES } from "@/lib/nav";
-import { imageUrl } from "@/lib/images";
 import { mediumDate, timeAgo } from "@/lib/format";
 import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
 /**
- * My Profile (Nov 2026), from the sidebar's picture and name: who you are in Lighthouse at a glance; your details,
- * photo and voicemail greeting (here from My Security); this computer's preferences (the look, desktop notifications,
+ * My Profile (Nov 2026), from the sidebar's picture and name: who you are in Lighthouse at a glance (staff click their
+ * avatar for their photo); your details and voicemail greeting (here from My Security); this computer's preferences (the look, desktop notifications,
  * your time zone); and where your sign-in stands, with My Security a click away for the password and two-factor.
  */
 export default async function ProfilePage() {
@@ -45,12 +43,8 @@ export default async function ProfilePage() {
           {/* Who you are here, at a glance. */}
           <Card className="overflow-hidden" data-profile-header>
             <div className="flex flex-wrap items-center gap-5 p-5">
-              <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-blue)] text-2xl font-bold text-[var(--background)]">
-                {me.photo_path ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imageUrl(me.photo_path)} alt="" className="size-full object-cover" />
-                ) : me.initials}
-              </div>
+              {/* Staff click it to add or change their photo (Nov 2026: in place of a My Photo box). */}
+              <ProfileAvatar userId={me.id} path={me.photo_path} initials={me.initials} editable={active && staff} />
               <div className="min-w-0 flex-1">
                 <h2 className="truncate text-xl font-semibold" data-profile-name>{name}</h2>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -77,17 +71,6 @@ export default async function ProfilePage() {
             <Card>
               <SectionHeader label="My Details" icon={UserRound} />
               <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email, bio: me.bio ?? "", birthday: me.birthday ?? null }} staff={staff} />
-            </Card>
-          ) : null}
-
-          {/* Staff: their photo, on Meet the Team for the clients to put a face to the name. */}
-          {active && staff ? (
-            <Card data-my-photo>
-              <SectionHeader label="My Photo" icon={Camera} />
-              <div className="p-5">
-                <PictureUpload folder={`user/${me.id}`} path={me.photo_path} name={name} save={setMyPhoto}
-                  label="Clients see it on Meet the Team. A clear head-and-shoulders picture works best." />
-              </div>
             </Card>
           ) : null}
 

@@ -11,22 +11,15 @@ import { cn } from "@/lib/utils";
 import { REACH_ERROR, isNetworkError, reach } from "@/lib/reach";
 
 /**
- * A picture to add, change or take away: a person's photo (round, cropped
- * square) or a client's logo (whole). Put in the public-images bucket under
- * `folder` (user/<id> or company/<id>), then `save(path | null)` (a server
- * action) keeps it; the one it replaces is taken out of the bucket.
- *
- *   path   the picture now, or null
- *   name   whose it is: their initials stand in for a photo
- *   kind   "photo" | "logo"
+ * A picture's upload and removal, shared by PictureUpload and the profile's own avatar (Nov 2026): { input (the file
+ * input's ref), busy (what it is doing, or null), url (the picture now), choose(file), remove() }.
  */
-export default function PictureUpload({ folder, path, name, kind = "photo", save, label }) {
+export function usePicture({ folder, path, kind = "photo", save }) {
   const router = useRouter();
   const input = useRef(null);
   const [busy, setBusy] = useState(null);
   const photo = kind === "photo";
   const url = imageUrl(path);
-
   const keep = async (next) => {
     const result = await reach(() => save(next));
     if (!result?.ok) throw new Error(result?.error ?? "That could not be saved.");
@@ -65,6 +58,23 @@ export default function PictureUpload({ folder, path, name, kind = "photo", save
       setBusy(null);
     }
   };
+
+  return { input, busy, url, choose, remove };
+}
+
+/**
+ * A picture to add, change or take away: a person's photo (round, cropped
+ * square) or a client's logo (whole). Put in the public-images bucket under
+ * `folder` (user/<id> or company/<id>), then `save(path | null)` (a server
+ * action) keeps it; the one it replaces is taken out of the bucket.
+ *
+ *   path   the picture now, or null
+ *   name   whose it is: their initials stand in for a photo
+ *   kind   "photo" | "logo"
+ */
+export default function PictureUpload({ folder, path, name, kind = "photo", save, label }) {
+  const { input, busy, url, choose, remove } = usePicture({ folder, path, kind, save });
+  const photo = kind === "photo";
 
   return (
     <div className="flex items-center gap-4" data-picture-upload={kind}>

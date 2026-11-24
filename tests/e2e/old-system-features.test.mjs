@@ -53,12 +53,12 @@ try {
 
   section("A photo and a line about themselves");
   await agent.go("/profile", 4000);
-  check("My Profile has My Photo for staff", Boolean(await until(() => agent.ev("!!document.querySelector('[data-my-photo] [data-picture-upload=photo]')"), { timeout: 20000 })));
-  await upload(agent, "[data-my-photo] [data-picture-file]");
+  check("My Profile: staff click their avatar to add a photo", Boolean(await until(() => agent.ev("document.querySelector('[data-profile-avatar] [data-choose-picture]')?.getAttribute('aria-label') === 'Add a photo'"), { timeout: 20000 })));
+  await upload(agent, "[data-profile-avatar] [data-picture-file]");
   const photo = await until(() => sql(`select coalesce(photo_path, '') from public.users where id=${AGENT}`) || null, { timeout: 10000 });
   check("uploaded: kept as their own picture", new RegExp(`^user/${AGENT}/[a-z0-9]+\\.(webp|jpg)$`).test(photo ?? ""), photo);
   check("…and shown in the sidebar beside their name", Boolean(await until(() => agent.ev("!!document.querySelector('[data-my-avatar]')"), { timeout: 8000 })));
-  check("…to anyone at its public address", (await agent.ev(`fetch(document.querySelector('[data-my-photo] [data-picture]')?.src).then((r) => r.ok)`)) === true);
+  check("…to anyone at its public address", (await agent.ev(`fetch(document.querySelector('[data-profile-avatar] [data-picture]')?.src).then((r) => r.ok)`)) === true);
   await agent.fill("[data-profile-form] [data-bio]", `${TAG} Ten years on the phones`);
   await agent.click("[data-profile-form] button[type=submit]", "Save");
   check("their line saves with their details", Boolean(await until(() => sql(`select bio from public.users where id=${AGENT}`) === `${TAG} Ten years on the phones` || null)));

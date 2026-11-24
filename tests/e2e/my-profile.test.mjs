@@ -25,7 +25,7 @@ try {
   section("What it has");
   const header = await sean.ev(`document.querySelector('[data-profile-header]')?.innerText ?? ''`);
   check("who you are: your name, role and email", header.includes(SEAN) && /Account Manager/.test(header) && header.includes("sean@beacon.test"), header.slice(0, 200));
-  check("your details, photo and voicemail greeting", await sean.ev(`!!document.querySelector('[data-profile-form]') && !!document.querySelector('[data-my-photo]') && !!document.querySelector('[data-my-voicemail]')`));
+  check("your details and voicemail greeting; your photo from your avatar, no My Photo box", await sean.ev(`!!document.querySelector('[data-profile-form]') && !!document.querySelector('[data-profile-avatar] [data-choose-picture]') && !document.querySelector('[data-my-photo]') && !!document.querySelector('[data-my-voicemail]')`));
   check("this computer's preferences: appearance, desktop notifications, time zone", await sean.ev(`!!document.querySelector('[data-profile-preferences] [data-open-appearance]') && !!document.querySelector('[data-profile-desktop]') && !!document.querySelector('[data-profile-tz]')`));
   await sean.click("[data-profile-preferences] [data-open-appearance]");
   check("…Appearance opens", Boolean(await until(() => sean.ev(`!!document.querySelector('[role=dialog]')`))));
@@ -45,7 +45,7 @@ try {
   section("A client");
   const client = await (await browser.newContext({ as: "client@beacon.test" })).newPage({ width: 1440, height: 1000 });
   await client.go("/profile", 8000);
-  check("their profile, without a staff photo or voicemail", Boolean(await until(() => client.ev(`!!document.querySelector('[data-profile-form]') && !document.querySelector('[data-my-photo]') && !document.querySelector('[data-my-voicemail]')`), { timeout: 20000 })));
+  check("their profile, without a staff photo or voicemail", Boolean(await until(() => client.ev(`!!document.querySelector('[data-profile-form]') && !document.querySelector('[data-profile-avatar]') && !document.querySelector('[data-my-voicemail]')`), { timeout: 20000 })));
 } finally {
   browser.close();
   sql(`update public.users set mobile = ${mobileBefore ? `'${mobileBefore.replace(/'/g, "''")}'` : "null"} where email = 'sean@beacon.test'`);
