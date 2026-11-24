@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for Campaign Types (Nov 2026): a type's fields made safe, a lead sheet's labels, and answers read. */
-import { campaignView, cleanFields, customFromForm, customText } from "../../src/lib/campaign-types.js";
+import { MAX_CHOICES, campaignView, choicesFrom, cleanFields, customFromForm, customText } from "../../src/lib/campaign-types.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -35,6 +35,24 @@ check("…a choice not on its list, or a number that isn't one, refused",
 check("…blank clears it; a field not on the form left alone", customFromForm([desk, cloud], form({ [`custom.${desk.id}`]: "" })).values[desk.id] === null
   && !(cloud.id in customFromForm([desk, cloud], form({ [`custom.${desk.id}`]: "" })).values));
 check("an answer as the sheet says it", customText(yes, true) === "Yes" && customText(desk, 1250) === "1,250" && customText(desk, null) === null);
+
+// Field formats (Sean, Nov 2026): a percent, several from a list, choices from a file.
+check("choices typed: one a line (a comma kept), or on one line by commas", JSON.stringify(choicesFrom("Acme, Inc.\nZeta")) === '["Acme, Inc.","Zeta"]'
+  && JSON.stringify(choicesFrom("Azure, AWS ,azure")) === '["Azure","AWS"]');
+check("choices from a file: a CSV's first column, its heading left off, quoted commas kept", JSON.stringify(choicesFrom('Category,x\r\n"Roofing, Commercial",1\nHVAC\n\nhvac', { file: true })) === '["Roofing, Commercial","HVAC"]');
+check("…up to MAX_CHOICES", choicesFrom(Array.from({ length: 900 }, (_, i) => `c${i}`).join("\n")).length === MAX_CHOICES);
+const kept = cleanFields({ custom: [{ label: "Share", type: "percent" }, { label: "Tools", type: "multi", options: "A\nB" }, { label: "None", type: "multi", options: "" }] });
+check("a Pick several needs its choices", /choices to pick from/.test(kept.error ?? ""), JSON.stringify(kept));
+const share = { id: "s", label: "Share", type: "percent" };
+const tools = { id: "t", label: "Tools", type: "multi", options: ["A", "B"] };
+const fd = new FormData();
+fd.append("custom.s", "12.5 %"); fd.append("custom.t", ""); fd.append("custom.t", "B"); fd.append("custom.t", "A");
+check("a percent read as its number; several as their list", JSON.stringify(customFromForm([share, tools], fd).values) === '{"s":12.5,"t":["B","A"]}');
+const none = new FormData(); none.append("custom.t", "");
+check("…none chosen clears it", customFromForm([tools], none).values.t === null);
+const bad = new FormData(); bad.append("custom.t", "Z");
+check("…one not on the list refused", /isn't one of its choices/.test(customFromForm([tools], bad).error ?? ""));
+check("shown: 12.5%, and the list", customText(share, 12.5) === "12.5%" && customText(tools, ["B", "A"]) === "B, A" && customText(tools, []) === null);
 
 if (failures) { console.error(`\n${failures} failed`); process.exit(1); }
 console.log("\ncampaign types: all passed");

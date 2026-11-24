@@ -96,8 +96,35 @@ const INFO_SECTION_OF = Object.fromEntries(BUILTIN_FIELDS.info.filter((f) => f.i
 
 /** The kinds of field a type can add. */
 export const CUSTOM_TYPES = [
-  ["text", "Text"], ["number", "Number"], ["date", "Date"], ["yesno", "Yes / No"], ["select", "Pick from a list"],
+  ["text", "Text"], ["number", "Number"], ["percent", "Percent"], ["date", "Date"], ["yesno", "Yes / No"],
+  ["select", "List: pick one"], ["multi", "List: pick several"],
 ];
+
+/** The kinds with a list of choices (Sean, Nov 2026: "drop down with answers like the carrier field"). */
+export const LIST_TYPES = new Set(["select", "multi"]);
+
+/** The most choices a list holds: enough for a whole list loaded from a file. */
+export const MAX_CHOICES = 500;
+
+/**
+ * Choices as typed or loaded: one a line (a choice may have a comma in it), or on one line separated by commas;
+ * from a file, a CSV's first column (a heading row of "Name", "Choice" or the like left off). Trimmed, once each.
+ */
+export function choicesFrom(input, { file = false } = {}) {
+  const text = Array.isArray(input) ? input.join("\n") : String(input ?? "");
+  const lines = file || /\n/.test(text.trim())
+    ? text.split(/\r?\n/).map((line) => (file ? (/^\s*"((?:[^"]|"")*)"|^([^,]*)/.exec(line) ?? []).slice(1).find((x) => x != null)?.replace(/""/g, '"') ?? "" : line))
+    : text.split(",");
+  const seen = new Set();
+  const out = [];
+  lines.forEach((raw, i) => {
+    const v = String(raw).replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!v || (file && i === 0 && /^(name|names|choice|choices|option|options|category|categories|value|values)$/i.test(v))) return;
+    const k = v.toLowerCase();
+    if (!seen.has(k)) { seen.add(k); out.push(v); }
+  });
+  return out.slice(0, MAX_CHOICES);
+}
 
 const ALL_KEYS = new Set(Object.values(BUILTIN_FIELDS).flat().map((f) => f.key));
 const DEFAULT_LABEL = Object.fromEntries(Object.values(BUILTIN_FIELDS).flat().map((f) => [f.key, f.label]));
@@ -123,7 +150,7 @@ export function campaignView(type) {
 
 /**
  * A type's fields as the builder sends them, made safe to keep: known keys only, labels of up to 40 characters,
- * at most 60 fields of its own, each with a kind from CUSTOM_TYPES and, for a list, up to 50 choices.
+ * at most 60 fields of its own, each with a kind from CUSTOM_TYPES and, for a list, up to MAX_CHOICES choices.
  * { fields } or { error }.
  */
 export function cleanFields(input) {
@@ -145,10 +172,8 @@ export function cleanFields(input) {
     let id = String(f?.id ?? "").replace(/[^a-z0-9_]/gi, "").slice(0, 24);
     if (!id || ids.has(id)) id = `f${Math.random().toString(36).slice(2, 10)}`;
     ids.add(id);
-    const options = f.type === "select"
-      ? [...new Set((Array.isArray(f.options) ? f.options : String(f.options ?? "").split(/[,\n]/)).map((o) => String(o).trim().slice(0, 60)).filter(Boolean))].slice(0, 50)
-      : undefined;
-    if (f.type === "select" && !options.length) return { error: `Give "${label}" the choices to pick from.` };
+    const options = LIST_TYPES.has(f.type) ? choicesFrom(f.options) : undefined;
+    if (options && !options.length) return { error: `Give "${label}" the choices to pick from.` };
     custom.push({ id, label, type: f.type, ...(options ? { options } : {}) });
   }
   return { custom };
@@ -162,18 +187,26 @@ export function cleanFields(input) {
 
 /**
  * A lead's answers to its type's own fields, from a form (each `custom.<id>`), checked against the field's kind:
- * a number a number, a date YYYY-MM-DD, Yes or No, a list's choice one of its choices, text up to 500 characters.
- * Blank clears it. { values } (only those on the form) or { error, field }.
+ * a number a number (a percent too, its % left off), a date YYYY-MM-DD, Yes or No, a list's choice one of its
+ * choices (several: each, kept as a list), text up to 500 characters. Blank clears it. { values } (only those on the form) or { error, field }.
  */
 export function customFromForm(custom, formData, prefix = "custom.") {
   const values = {};
   for (const f of custom ?? []) {
     const name = `${prefix}${f.id}`;
     if (!formData.has(name)) continue;
+    if (f.type === "multi") {
+      // Each choice its own input, with a blank one so none chosen still clears it.
+      const picked = [...new Set(formData.getAll(name).map((v) => String(v ?? "").trim()).filter(Boolean))];
+      const bad = picked.find((v) => !(f.options ?? []).includes(v));
+      if (bad) return { error: `${f.label}: "${bad}" isn't one of its choices`, field: name };
+      values[f.id] = picked.length ? picked : null;
+      continue;
+    }
     const raw = String(formData.get(name) ?? "").trim();
     if (!raw) { values[f.id] = null; continue; }
-    if (f.type === "number") {
-      const n = Number(raw.replace(/[,$\s]/g, ""));
+    if (f.type === "number" || f.type === "percent") {
+      const n = Number(raw.replace(/[,$%\s]/g, ""));
       if (!Number.isFinite(n)) return { error: `${f.label}: enter a number`, field: name };
       values[f.id] = n;
     } else if (f.type === "date") {
@@ -196,5 +229,7 @@ export function customText(field, value) {
   if (value === null || value === undefined || value === "") return null;
   if (field.type === "yesno") return value === true ? "Yes" : value === false ? "No" : null;
   if (field.type === "number") return Number(value).toLocaleString("en-US");
+  if (field.type === "percent") return `${Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+  if (Array.isArray(value)) return value.length ? value.join(", ") : null;
   return String(value);
 }

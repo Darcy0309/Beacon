@@ -10,13 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import PickList from "@/components/shared/pick-list";
+import CustomFieldInput from "@/features/campaign-types/components/custom-field-input";
 import { saveProjectInfo, saveProjectInfoByLink } from "@/features/project-info/actions";
 import { addCarrierByName } from "@/features/insurance/actions";
 import { reach } from "@/lib/reach";
 import { MAX_PRODUCERS, MIN_EMPLOYEES_MAX, QUOTE_MIN_TIMES, QUOTE_TIMES, US_STATES, WEEKDAYS } from "@/lib/project-info";
 import { cn } from "@/lib/utils";
 import { campaignView } from "@/lib/campaign-types";
-import DatePicker from "@/components/shared/date-picker";
 import { ListChecks } from "lucide-react";
 
 // Insurance's own names, to tell a campaign type's renamed part from one it leaves as it is.
@@ -324,19 +324,9 @@ export default function ProjectInfoForm({ info, carriers: carrierNames = [], act
           {view.infoCustom.map((f) => {
             const name = `info_custom.${f.id}`;
             const was = state?.values && name in state.values ? state.values[name] : info?.custom?.[f.id];
-            const v = was === true ? "yes" : was === false ? "no" : was ?? "";
             return (
-              <Field key={f.id} label={f.label} error={fe(name)} className={f.type === "text" ? "sm:col-span-2" : undefined}>
-                {f.type === "date" ? <DatePicker name={name} defaultValue={String(v)} aria-label={f.label} invalid={invalid(name)} />
-                  : f.type === "yesno" || f.type === "select" ? (
-                    <Select name={name} defaultValue={String(v)} aria-invalid={invalid(name)} data-info-custom={f.id}>
-                      <option value="">—</option>
-                      {(f.type === "yesno" ? [["yes", "Yes"], ["no", "No"]] : (f.options ?? []).map((o) => [o, o])).map(([val, lab]) => <option key={val} value={val}>{lab}</option>)}
-                    </Select>
-                  ) : (
-                    <Input name={name} defaultValue={String(v)} inputMode={f.type === "number" ? "decimal" : undefined} maxLength={f.type === "number" ? 20 : 500}
-                      aria-invalid={invalid(name)} data-info-custom={f.id} />
-                  )}
+              <Field key={f.id} label={f.label} error={fe(name)} className={f.type === "text" || f.type === "multi" ? "sm:col-span-2" : undefined}>
+                <CustomFieldInput field={f} name={name} value={was} invalid={invalid(name)} data={{ "data-info-custom": f.id }} />
               </Field>
             );
           })}

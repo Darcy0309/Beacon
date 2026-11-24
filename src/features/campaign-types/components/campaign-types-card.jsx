@@ -1,17 +1,18 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, LayoutTemplate, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, FileUp, LayoutTemplate, Pencil, Plus, Trash2 } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { deleteCampaignType, saveCampaignType } from "@/features/campaign-types/actions";
-import { BUILTIN_FIELDS, CUSTOM_TYPES } from "@/lib/campaign-types";
+import { BUILTIN_FIELDS, CUSTOM_TYPES, LIST_TYPES, MAX_CHOICES, choicesFrom } from "@/lib/campaign-types";
 import { reach } from "@/lib/reach";
 import { cn } from "@/lib/utils";
 
@@ -74,8 +75,8 @@ const startFrom = (type) => ({
   builtin: Object.fromEntries(Object.values(BUILTIN_FIELDS).flat().map((f) => [f.key, {
     label: type?.fields?.builtin?.[f.key]?.label ?? "", hidden: Boolean(type?.fields?.builtin?.[f.key]?.hidden),
   }])),
-  custom: (type?.fields?.custom ?? []).map((c) => ({ ...c, options: (c.options ?? []).join(", ") })),
-  info_custom: (type?.fields?.info_custom ?? []).map((c) => ({ ...c, options: (c.options ?? []).join(", ") })),
+  custom: (type?.fields?.custom ?? []).map((c) => ({ ...c, options: (c.options ?? []).join("\n") })),
+  info_custom: (type?.fields?.info_custom ?? []).map((c) => ({ ...c, options: (c.options ?? []).join("\n") })),
 });
 
 function TypeDialog({ type = null }) {
@@ -169,14 +170,11 @@ function OwnFields({ title, listKey, f, setF, setCustom, move }) {
       <legend className="px-1 text-xs font-semibold">{title}</legend>
       <div className="space-y-2">
         {list.map((c, i) => (
-          <div key={c.id ?? i} className="grid grid-cols-[1fr_9rem_auto] items-start gap-2" data-custom-field={i}>
+          <div key={c.id ?? i} className="grid grid-cols-[1fr_12rem_auto] items-start gap-2" data-custom-field={i}>
             <div className="space-y-1.5">
               <Input value={c.label} placeholder="e.g. Number of desktops" maxLength={40} onChange={(e) => setCustom(listKey, i, { label: e.target.value })}
                 aria-label="Field name" className="h-8" data-custom-label />
-              {c.type === "select" ? (
-                <Input value={c.options ?? ""} placeholder="Choices, separated by commas: Azure, AWS, Google Cloud" onChange={(e) => setCustom(listKey, i, { options: e.target.value })}
-                  aria-label="Choices" className="h-8" data-custom-options />
-              ) : null}
+              {LIST_TYPES.has(c.type) ? <Choices value={c.options ?? ""} onChange={(options) => setCustom(listKey, i, { options })} /> : null}
             </div>
             <Select value={c.type} onChange={(e) => setCustom(listKey, i, { type: e.target.value })} aria-label="Kind of field" className="h-8" data-custom-type>
               {CUSTOM_TYPES.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
@@ -195,5 +193,43 @@ function OwnFields({ title, listKey, f, setF, setCustom, move }) {
         </Button>
       </div>
     </fieldset>
+  );
+}
+
+/**
+ * A list's choices: one a line, typed or loaded from a file (Sean, Nov 2026: "where I can import a list of
+ * categories"), a text file or a CSV's first column, added to those there (once each).
+ */
+function Choices({ value, onChange }) {
+  const fileRef = useRef(null);
+  const count = choicesFrom(value).length;
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      return void toast.error("That file couldn't be read. Save it again as a CSV or text file and try again.");
+    }
+    const loaded = choicesFrom(text, { file: true });
+    if (!loaded.length) return void toast.error("No choices found in that file: put one on each line, or in a spreadsheet's first column.");
+    const next = choicesFrom([...choicesFrom(value), ...loaded]);
+    onChange(next.join("\n"));
+    toast.success(`${(next.length - count).toLocaleString()} choice${next.length - count === 1 ? "" : "s"} added from the file`);
+  };
+  return (
+    <div className="space-y-1">
+      <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={Math.min(6, Math.max(2, count + 1))}
+        placeholder={"Choices, one on each line:\nAzure\nAWS\nGoogle Cloud"} aria-label="Choices" className="min-h-0 text-sm" data-custom-options />
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain" className="hidden" onChange={onFile} data-custom-options-file />
+        <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => fileRef.current?.click()} data-custom-options-load>
+          <FileUp /> Load from a file
+        </Button>
+        <span data-custom-options-count>{count.toLocaleString()} choice{count === 1 ? "" : "s"} · a text file or a spreadsheet&apos;s first column · up to {MAX_CHOICES}</span>
+      </div>
+    </div>
   );
 }

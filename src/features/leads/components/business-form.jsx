@@ -13,7 +13,7 @@ import PhoneInput from "@/components/shared/phone-input";
 import { SECTION_BOX, SECTION_LEGEND } from "@/features/leads/form-section";
 import { AUTO_TYPES, TRAVEL_RADII, xmodText } from "@/lib/business";
 import { sicLookup } from "@/lib/sic";
-import DatePicker from "@/components/shared/date-picker";
+import CustomFieldInput from "@/features/campaign-types/components/custom-field-input";
 import { campaignView } from "@/lib/campaign-types";
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
@@ -233,23 +233,9 @@ export default function BusinessForm({ lead, cargoTypes = [], trigger, campaign 
                 {view.custom.map((f) => {
                   const name = `custom.${f.id}`;
                   const was = state?.values && name in state.values ? state.values[name] : custom?.[f.id];
-                  const text = was === true ? "yes" : was === false ? "no" : was ?? "";
                   return (
-                    <Field key={f.id} label={f.label} error={fe(name)}>
-                      {f.type === "date" ? <DatePicker name={name} defaultValue={String(text)} aria-label={f.label} invalid={invalid(name)} />
-                        : f.type === "yesno" ? (
-                          <Select name={name} defaultValue={String(text)} aria-invalid={invalid(name)} data-custom-input={f.id}>
-                            <option value="">—</option><option value="yes">Yes</option><option value="no">No</option>
-                          </Select>
-                        ) : f.type === "select" ? (
-                          <Select name={name} defaultValue={String(text)} aria-invalid={invalid(name)} data-custom-input={f.id}>
-                            <option value="">—</option>
-                            {(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
-                          </Select>
-                        ) : (
-                          <Input name={name} defaultValue={String(text)} inputMode={f.type === "number" ? "decimal" : undefined} maxLength={f.type === "number" ? 20 : 500}
-                            aria-invalid={invalid(name)} data-custom-input={f.id} />
-                        )}
+                    <Field key={f.id} label={f.label} error={fe(name)} className={f.type === "multi" ? "sm:col-span-2" : undefined}>
+                      <CustomFieldInput field={f} name={name} value={was} invalid={invalid(name)} data={{ "data-custom-input": f.id }} />
                     </Field>
                   );
                 })}
