@@ -13,6 +13,9 @@ import CallListFilters from "@/features/work/components/call-list-filters";
 import { criteriaCount } from "@/lib/call-list-filter";
 import { getCurrentUser } from "@/lib/server/session";
 import { readListParams, pageInfo } from "@/lib/paging";
+import { getBusinessToday } from "@/lib/server/business-day";
+import ProjectBestTimes from "@/features/best-times/components/project-best-times";
+import { getProjectBestTimes } from "@/features/best-times/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +43,7 @@ export default async function CallListPage({ params, searchParams }) {
   const perPage = sp?.per ? list.perPage : 50;
 
   const criteriaP = getCallListFilter(projectId);
-  const [{ rows, total }, followUps, criteria, options, everyoneOrNull, reps] = await Promise.all([
+  const [{ rows, total }, followUps, criteria, options, everyoneOrNull, reps, bestTimes] = await Promise.all([
     getCallList(projectId, { page: list.page, perPage, q: list.q, rep: repId }),
     mine ? getFollowUps({ projectId }) : [],
     criteriaP,
@@ -51,6 +54,8 @@ export default async function CallListPage({ params, searchParams }) {
     criteriaP.then((c) => (criteriaCount(c) > 0 || list.q ? getCallList(projectId, { page: 1, perPage: 1, rep: repId, filtered: false }) : null)),
     // The reps on it, for a manager or administrator to look at another's list.
     canLookAtOthers ? getProjectReps(projectId) : [],
+    // Best Times to Call (Darcy, Nov 2026): a manager's (and an administrator's) on the projects they work; null before its migration.
+    canLookAtOthers ? getBusinessToday().then((today) => getProjectBestTimes(project.id, today)).catch(() => null) : null,
   ]);
   const everyone = everyoneOrNull ?? { total };
   const filtered = criteriaCount(criteria) > 0;
@@ -134,6 +139,8 @@ export default async function CallListPage({ params, searchParams }) {
             </ul>
           </Card>
         ) : null}
+
+        {bestTimes ? <ProjectBestTimes projectId={project.id} data={bestTimes} /> : null}
 
         <CallListFilters key={repId ?? "mine"} projectId={project.id} rep={repId} criteria={criteria} options={options} matching={total} all={everyone.total} />
 

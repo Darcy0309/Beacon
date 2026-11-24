@@ -2,6 +2,8 @@
 
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { weekOf, windows } from "@/lib/best-times";
+import { addDays } from "@/lib/dates";
 
 /**
  * best_times() for the filters given: every call's day and hour in the business's local time, with how many became
@@ -29,4 +31,34 @@ export async function getEarlyStarts({ from, to, client = null, project = null, 
   const { data, error } = await supabase.rpc("early_starts", { p_from: from, p_to: to, p_company: client, p_project: project, p_user: manager, p_sic: sic, p_state: state });
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * A project's Best Times to Call (Darcy, Nov 2026: "a 'Best times to call' card on each project page… built from that
+ * project's history, or its industry while it's new"): its calls over the last year by day and hour; with too few to
+ * judge an hour, those to businesses in its leads' main industry (their SIC's first two digits) instead. An
+ * administrator or manager (a manager: the projects they're assigned to); null for anyone else, or before the
+ * Production Heat Map's migration. { rows, basis: "project" | "industry", sic, from, to }.
+ */
+export async function getProjectBestTimes(projectId, today) {
+  const supabase = await createClient();
+  const from = addDays(today, -364);
+  const run = (args) => supabase.rpc("best_times", { p_from: from, p_to: today, ...args });
+  const shape = (r) => ({ dow: r.dow, hour: r.hour, calls: Number(r.calls), leads: Number(r.leads), appts: Number(r.appts) });
+  const own = await run({ p_project: projectId });
+  if (own.error) return null;
+  const rows = (own.data ?? []).map(shape);
+  if (windows(weekOf(rows)).best.length) return { rows, basis: "project", sic: null, from, to: today };
+  // New: its leads' main industry, across the projects this person sees.
+  const { data: leads } = await supabase.from("leads").select("sic_code").eq("project_id", projectId).not("sic_code", "is", null).limit(2000);
+  const count = new Map();
+  for (const l of leads ?? []) {
+    const two = String(l.sic_code).replace(/\D/g, "").slice(0, 2);
+    if (two.length === 2) count.set(two, (count.get(two) ?? 0) + 1);
+  }
+  const sic = [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  if (!sic) return { rows, basis: "project", sic: null, from, to: today };
+  const industry = await run({ p_sic: sic });
+  if (industry.error) return { rows, basis: "project", sic: null, from, to: today };
+  return { rows: (industry.data ?? []).map(shape), basis: "industry", sic, from, to: today };
 }

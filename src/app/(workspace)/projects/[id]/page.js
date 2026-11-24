@@ -49,6 +49,8 @@ import ResultBreakdown from "@/features/stats/components/result-breakdown";
 import { addMonths, monthEnd, monthStart } from "@/lib/dates";
 import { pctLabel } from "@/lib/lead-stats";
 import { getCurrentUser } from "@/lib/server/session";
+import ProjectBestTimes from "@/features/best-times/components/project-best-times";
+import { getProjectBestTimes } from "@/features/best-times/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +89,7 @@ export default async function ProjectDetail({ params, searchParams }) {
     getBlockedDays({ projectIds: scope?.ids ?? [pid], from: span(today).first, to: span(today).last }),
   ]));
 
-  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked], monthCounts, funding] = await Promise.all([
+  const [me, p, overview, team, leads, options, staff, xdates, today, payRules, callResults, info, carriers, { total: s }, results, scope, [days, blocked], monthCounts, funding, bestTimes] = await Promise.all([
     meP,
     getProject(id),
     getProjectOverview(id),
@@ -109,6 +111,8 @@ export default async function ProjectDetail({ params, searchParams }) {
     meP.then((me) => (role(me).canManage ? getProjectMonthCounts([pid]) : {})),
     // Program Funding (client, Nov 2026): the administrators'.
     meP.then((me) => (role(me).admin ? getProjectFunding(pid) : null)),
+    // Best Times to Call (Darcy, Nov 2026): administrators and managers; null before its migration.
+    Promise.all([meP, todayP]).then(([me, today]) => (role(me).canManage ? getProjectBestTimes(pid, today).catch(() => null) : null)),
   ]);
   if (!p) notFound();
   // A client's people (Sean, Oct 2026): their own project (Row Level Security), without its description (our billing
@@ -255,6 +259,8 @@ export default async function ProjectDetail({ params, searchParams }) {
             note={scope?.shared ? `Shared with ${scope.label}, where this project's appointments go.` : "Only this project's appointments."}
             className="animate-pop-in" style={{ animationDelay: `${tiles.length * 60}ms` }} />
         </div>
+
+        {bestTimes ? <ProjectBestTimes projectId={p.id} data={bestTimes} /> : null}
 
         {client ? null : <ProjectTeam
           projectId={p.id}
