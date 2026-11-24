@@ -257,9 +257,14 @@
 [data-settings-area] [data-area-arrow] { transition: transform 200ms ease, color 200ms ease; }
 [data-settings-area]:hover [data-area-title] { color: var(--primary); }
 
-/* …and more of what it holds slides in from its right edge (client, Nov 2026): a slanted panel on a deep
-   teal-to-magenta ground with a little sparkle, its words in white, over the tile's right half. */
+/* …and more of what it holds slides in from its right edge (client, Nov 2026): a slanted panel on a deep ground in
+   the site's own accent and background (its theme or colour: a dark shade sweeping into a lighter one, a few degrees
+   either side of its hue, so it stays in the site's family), a little sparkle, its words in white, over the tile's
+   right half. The lightness is set, not the accent's, so the words read
+   on every theme; a browser without relative colours gets the accent darkened. */
 .settings-reveal {
+  /* The accent with a fifth of the page's own background in it: the panel takes the site's tint as well as its colour. */
+  --reveal-base: color-mix(in oklab, var(--primary) 80%, var(--background));
   position: absolute;
   inset: 0 0 0 auto;
   width: 68%;
@@ -270,8 +275,18 @@
     radial-gradient(1.5px 1.5px at 82% 64%, rgb(255 255 255 / 0.85), transparent 60%),
     radial-gradient(1px 1px at 45% 78%, rgb(255 255 255 / 0.7), transparent 60%),
     radial-gradient(1px 1px at 58% 46%, rgb(255 255 255 / 0.6), transparent 60%),
-    radial-gradient(120% 90% at 100% 0%, rgb(168 85 247 / 0.55), transparent 60%),
-    linear-gradient(125deg, #0f766e 0%, #1e3a8a 45%, #6d28d9 75%, #a21caf 100%);
+    linear-gradient(125deg, color-mix(in oklab, var(--primary) 45%, black), color-mix(in oklab, var(--primary) 80%, black));
+  background:
+    radial-gradient(1.5px 1.5px at 22% 30%, rgb(255 255 255 / 0.9), transparent 60%),
+    radial-gradient(1px 1px at 68% 18%, rgb(255 255 255 / 0.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 64%, rgb(255 255 255 / 0.85), transparent 60%),
+    radial-gradient(1px 1px at 45% 78%, rgb(255 255 255 / 0.7), transparent 60%),
+    radial-gradient(1px 1px at 58% 46%, rgb(255 255 255 / 0.6), transparent 60%),
+    radial-gradient(120% 90% at 100% 0%, oklch(from var(--reveal-base) 0.62 min(c, 0.14) calc(h + 12) / 0.45), transparent 60%),
+    linear-gradient(125deg,
+      oklch(from var(--reveal-base) 0.36 min(c, 0.12) calc(h - 12)) 0%,
+      oklch(from var(--reveal-base) 0.42 min(c, 0.15) h) 50%,
+      oklch(from var(--reveal-base) 0.48 min(c, 0.16) calc(h + 12)) 100%);
   color: #fff;
   transform: translateX(101%);
   transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
