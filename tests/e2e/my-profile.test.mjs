@@ -1,5 +1,5 @@
 /**
- * My Profile (Nov 2026): the sidebar's picture and name open it; who you are at a glance; your details, photo and
+ * My Profile (Nov 2026): the sidebar's picture and name open it (no menu item); who you are at a glance; your details, photo and
  * voicemail greeting (from My Security); this computer's preferences; and the sign-in a click from My Security, which
  * keeps the password and two-factor. A client sees theirs without the staff parts.
  *
@@ -20,7 +20,7 @@ try {
   check("the sidebar's picture and name open My Profile", await until(() => sean.ev(`!!document.querySelector('[data-my-profile-link]')`)) && (await sean.ev(`document.querySelector('[data-my-profile-link]').getAttribute('href')`)) === "/profile");
   await sean.click("[data-my-profile-link]");
   check("…which opens", Boolean(await until(async () => (await sean.path()) === "/profile" && sean.ev(`!!document.querySelector('[data-my-profile]')`), { timeout: 20000 })));
-  check("…also in the menu, beside My Security", await sean.ev(`[...document.querySelectorAll('nav a')].some((a) => a.getAttribute('href') === '/profile')`));
+  check("…from the avatar only, not a menu item", !(await sean.ev(`[...document.querySelectorAll('nav a')].some((a) => a.getAttribute('href') === '/profile')`)));
 
   section("What it has");
   const header = await sean.ev(`document.querySelector('[data-profile-header]')?.innerText ?? ''`);
