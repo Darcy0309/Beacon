@@ -140,7 +140,8 @@ try {
   const row = await cells(admin, `tr[data-rep="${SEAN}"]`);
   check("today, on that project: Sean, 2 calls, 1 appointment, no Special Pay, $30.00", row[0] === "Sean Fitzgerald" && row[1] === "2" && row[3] === "1" && row[6] === "—" && row[7] === "$30.00", JSON.stringify(row));
   check("the Pay tile agrees", await until(async () => (await tile(admin, "Pay")) === "$30.00"), await tile(admin, "Pay"));
-  const callBars = await admin.ev(`[...document.querySelectorAll('[data-panel]')].find((p) => /^calls$/i.test(p.querySelector('.stat-label')?.textContent.trim()))?.querySelectorAll(':scope > svg rect').length ?? 0`);
+  // The tiles' charts are bars, one column a day (client, Nov 2026: bars on every tile).
+  const callBars = await admin.ev(`[...document.querySelectorAll('[data-panel]')].find((p) => /^calls$/i.test(p.querySelector('.stat-label')?.textContent.trim()))?.querySelectorAll('[data-report-chart] [data-tip]').length ?? 0`);
   check("even for one day, the tiles plot the last 14", callBars === 14, `${callBars} bars`);
   const csv = await admin.ev(`fetch('/api/reports/production?period=today&project=${PROJECT}').then((r) => r.text())`);
   // Day, account manager, client, project, five counts, then lead, appointment and confirmation pay, Special Pay, chargebacks and the total.
@@ -152,8 +153,10 @@ try {
   const mt = await manager.text();
   check("an account manager sees only their own production", !(await manager.ev(`!!document.querySelector('tr[data-rep="${SEAN}"]')`)) && /My pay/i.test(mt), mt.slice(0, 120));
   check("…and no rates to set", !/Pay rates by project/i.test(mt));
-  const empty = await manager.ev(`[...document.querySelectorAll('[data-panel]')].filter((p) => p.querySelector(':scope > div > .stat-value'))
-    .map((p) => p.querySelector(':scope > svg')?.dataset.sparkline ?? 'none')`);
+  // Each tile's chart with every bar at nothing: the same flat baseline on all of them.
+  const empty = await manager.ev(`[...document.querySelectorAll('[data-panel]')].filter((p) => p.querySelector('[data-tile-value]'))
+    .map((p) => { const c = p.querySelector('[data-report-chart]'); if (!c) return 'none';
+      return [...c.querySelectorAll('[data-seg]')].every((b) => parseFloat(b.style.height) === 0) ? 'empty' : 'drawn'; })`);
   check("with nothing to plot, every tile shows the same baseline", empty.length === 6 && empty.every((s) => s === "empty"), JSON.stringify(empty));
   const agent = await (await browser.newContext({ as: "agent@beacon.test" })).newPage();
   const agentCsv = await (async () => { await agent.go("/reports/production", 3500); return agent.ev(`fetch('/api/reports/production?period=today&rep=${SEAN}').then((r) => r.text())`); })();
@@ -162,9 +165,9 @@ try {
   // chart still sits on its tile's foot, so the baselines line up.
   const wide = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1600, height: 900 });
   await wide.go("/reports/production", 4000);
-  const feet = await wide.ev(`[...document.querySelectorAll('[data-panel]')].filter((p) => p.querySelector(':scope > div > .stat-value')).map((p) => {
-    const tile = p.getBoundingClientRect(); const chart = p.querySelector(':scope > svg').getBoundingClientRect();
-    return { top: Math.round(tile.top), gap: Math.round(tile.bottom - chart.bottom), noteLines: Math.round(p.querySelector('.stat-value + div').getBoundingClientRect().height / 16) };
+  const feet = await wide.ev(`[...document.querySelectorAll('[data-panel]')].filter((p) => p.querySelector('[data-tile-value]')).map((p) => {
+    const tile = p.getBoundingClientRect(); const chart = p.querySelector('[data-report-chart]').getBoundingClientRect();
+    return { top: Math.round(tile.top), bottom: Math.round(chart.bottom), gap: Math.round(tile.bottom - chart.bottom), noteLines: Math.round(p.querySelector('[data-tile-value] + div').getBoundingClientRect().height / 16) };
   })`);
   check("six tiles in one row, some notes on two lines", feet.length === 6 && new Set(feet.map((f) => f.top)).size === 1 && feet.some((f) => f.noteLines > 1), JSON.stringify(feet));
   check("…and every chart sits on its tile's foot, in line with the others", feet.every((f) => f.gap === feet[0].gap && f.gap <= 2), JSON.stringify(feet.map((f) => f.gap)));

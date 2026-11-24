@@ -83,9 +83,10 @@ try {
   const signed = samples.map((s) => Number(s.replace(/[^\d.-]/g, "")));
   check("…only ever upwards, from zero", signed.every((n, i) => n >= 0 && (i === 0 || n >= signed[i - 1])), samples.join(" → "));
   check("…keeping their format (thousands commas)", final < 1000 || /,/.test(samples.at(-1)), samples.at(-1));
-  const anims = await admin.ev(`({ rise: [...document.querySelectorAll('.animate-rise')].map((e) => getComputedStyle(e).animationName)[0],
+  // The tiles' charts are bars (client, Nov 2026): they grow up, as the rep bars grow across.
+  const anims = await admin.ev(`({ tiles: [...document.querySelectorAll('[data-panel] [data-report-chart] .animate-grow-height')].map((e) => getComputedStyle(e).animationName)[0],
     grow: [...document.querySelectorAll('.animate-grow-width')].map((e) => getComputedStyle(e).animationName)[0] })`);
-  check("sparklines rise and bars grow", anims.rise === "rise" && anims.grow === "grow-width", JSON.stringify(anims));
+  check("tile bars grow up and rep bars grow across", anims.tiles === "grow-height" && anims.grow === "grow-width", JSON.stringify(anims));
   check("every counted figure ends visible", await admin.ev(`[...document.querySelectorAll('[data-count-up]')].every((e) => e.hasAttribute('data-counted') && getComputedStyle(e).visibility === 'visible')`));
 
   section("Sidebar");
