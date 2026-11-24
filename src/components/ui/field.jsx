@@ -54,6 +54,16 @@ export function Select({ className, ref, searchable, ...props }) {
     for (const o of el.options) o.defaultSelected = o.value === want;
     el.value = want;
   }, [value, defaultValue]);
+  // A controlled one: its choice is also what a form reset goes back to. React resets the form after a refused save,
+  // and with the state unchanged it doesn't set the select again, so it would sit blank and the next save send
+  // nothing for it (Nov 2026: a DB Dev project's type, refused as "Only a database-development project promotes…").
+  // Marked after every render (its options may have changed), and only marked: what it shows is React's.
+  useLayoutEffect(() => {
+    const el = own.current;
+    if (!el || value === undefined) return;
+    const want = String(value ?? "");
+    for (const o of el.options) if (o.defaultSelected !== (o.value === want)) o.defaultSelected = o.value === want;
+  });
 
   // A dialog stops the page behind it scrolling by catching the wheel on the
   // document, and it cannot see that an open list (the browser's own picker)
