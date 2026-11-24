@@ -145,7 +145,7 @@ try {
   await client.go("/");
   // Row two (Sean, Oct 2026): the Sale Pipeline in place of the six-month bars, beside their calendar.
   check("client has the Sale Pipeline and their calendar, in place of the six-month delivery bars",
-    Boolean(await until(() => client.ev("!!document.querySelector('[data-client-row-two] [data-sale-pipeline]') && !!document.querySelector('[data-client-row-two] [data-my-schedule]') && !document.querySelector('[data-months-chart]')"))));
+    Boolean(await until(() => client.ev("!!document.querySelector('[data-dash-row] [data-dash-section=pipeline] [data-sale-pipeline]') && !!document.querySelector('[data-dash-row] [data-dash-section=schedule] [data-my-schedule]') && !document.querySelector('[data-months-chart]')"))));
   const phone = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 390, height: 844 });
   await phone.go("/", 4500);
   const overflow = await phone.ev("document.documentElement.scrollWidth - document.documentElement.clientWidth");

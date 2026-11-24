@@ -653,3 +653,28 @@ export async function getClientCampaigns({ companyId = null } = {}) {
   if (error) throw error;
   return campaignsOf((data ?? []).map((p) => ({ id: p.id, name: p.name, apptProjectId: p.appt_project_id })));
 }
+
+/**
+ * A dashboard's layout (Sean, Nov 2026: a customizable dashboard): the administrators' default for its kind, and the
+ * person's own (`userId`; null for neither). { role, mine }, each a stored layout or null; both null before the
+ * migration (the first layout, then).
+ */
+export async function getDashboardLayouts(kind, userId) {
+  const supabase = await createClient();
+  let q = supabase.from("dashboard_layouts").select("user_id, layout").eq("kind", kind);
+  q = userId ? q.or(`user_id.is.null,user_id.eq.${Number(userId)}`) : q.is("user_id", null);
+  const { data, error } = await q;
+  if (error) return { role: null, mine: null };
+  return {
+    role: data.find((r) => r.user_id == null)?.layout ?? null,
+    mine: userId ? data.find((r) => Number(r.user_id) === Number(userId))?.layout ?? null : null,
+  };
+}
+
+/** Every kind's default, for an administrator choosing whose to set: { kind: layout | null }. */
+export async function getDefaultLayouts() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("dashboard_layouts").select("kind, layout").is("user_id", null);
+  if (error) return {};
+  return Object.fromEntries((data ?? []).map((r) => [r.kind, r.layout]));
+}

@@ -115,18 +115,18 @@ try {
   check("the client sets their goal for the year", Boolean(await until(async () => /\$120,000/.test((await stat("goal")) ?? ""), { timeout: 10000 }))
     && /25% of it written/.test((await stat("goal")) ?? "") && Boolean(await client.ev("!!document.querySelector('[data-goal-pace]')")), await stat("goal"));
   if (process.env.SHOTS) {
-    await client.ev("document.querySelector('[data-client-row-two]').scrollIntoView({ block: 'start' })");
+    await client.ev("document.querySelector('[data-dash-section=pipeline]').closest('[data-dash-row]').scrollIntoView({ block: 'start' })");
     await client.screenshot(`${process.env.SHOTS}/client-row-two.png`);
   }
 
   section("Row two: their calendar, as a manager's");
-  const days = await client.ev("document.querySelectorAll('[data-client-row-two] [data-my-schedule] [data-day]').length");
+  const days = await client.ev("document.querySelectorAll('[data-dash-section=schedule] [data-my-schedule] [data-day]').length");
   check("the full month beside the day", days >= 28, String(days));
   const apptDay = sql("select (current_date + 3)::text");
-  await client.ev(`document.querySelector('[data-client-row-two] [data-day="${apptDay}"]')?.click()`);
-  const listed = await until(() => client.ev(`[...document.querySelectorAll('[data-client-row-two] [data-schedule-item]')].map((i) => i.innerText.replace(/\\s+/g, ' ')).join(' | ') || null`));
-  check("…with their appointments, to open", /CD-TEST .* Co /.test(listed ?? "") && Boolean(await client.ev("!!document.querySelector('[data-client-row-two] [data-schedule-item] a[href], [data-client-row-two] a[data-schedule-item]')")), listed);
-  check("…nothing to drag about: theirs to open, not to move", !(await client.ev("!!document.querySelector('[data-client-row-two] [draggable=true]')")));
+  await client.ev(`document.querySelector('[data-dash-section=schedule] [data-day="${apptDay}"]')?.click()`);
+  const listed = await until(() => client.ev(`[...document.querySelectorAll('[data-dash-section=schedule] [data-schedule-item]')].map((i) => i.innerText.replace(/\\s+/g, ' ')).join(' | ') || null`));
+  check("…with their appointments, to open", /CD-TEST .* Co /.test(listed ?? "") && Boolean(await client.ev("!!document.querySelector('[data-dash-section=schedule] [data-schedule-item] a[href], [data-dash-section=schedule] a[data-schedule-item]')")), listed);
+  check("…nothing to drag about: theirs to open, not to move", !(await client.ev("!!document.querySelector('[data-dash-section=schedule] [draggable=true]')")));
 
   section("Row three: Recent Activity, the last week to begin with");
   await client.go("/", 4000);

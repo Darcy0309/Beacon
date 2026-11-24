@@ -7,6 +7,7 @@ import { check, currentAppUser, fail, idFrom, logActivity, ok } from "@/lib/serv
 import { getBusinessToday } from "@/lib/server/business-day";
 import { createClient } from "@/lib/supabase/server";
 import { schemas } from "@/lib/validate";
+import { SECTIONS, cleanLayout, kindOf } from "@/lib/dashboard-layout";
 
 const count = (v) => (v === "" || v == null ? null : Number.parseInt(String(v), 10));
 
@@ -122,4 +123,29 @@ export async function messageManager(formData) {
   if (error) return fail(error.message);
   if (!data) return fail("It could not be delivered: that manager may no longer be active.");
   return ok({ sent: data });
+}
+
+/**
+ * Keep a dashboard's layout (Sean, Nov 2026: a customizable dashboard): `scope` "mine", the person's own for their
+ * kind of dashboard; "default", an administrator's for a kind, which everyone's starts from. `layout` null puts it
+ * back (the default, or the first layout).
+ */
+export async function saveDashboardLayout({ kind, scope = "mine", layout = null } = {}) {
+  if (!SECTIONS[kind]) return fail("Choose a dashboard.");
+  const supabase = await createClient();
+  const me = await currentAppUser(supabase);
+  if (!me) return fail("Sign in again.");
+  const mine = scope !== "default";
+  if (mine && kindOf(me.role) !== kind) return fail("That isn't your dashboard.");
+  if (!mine && me.role !== "admin") return fail("Only administrators set the default layout.");
+  const userId = mine ? me.id : null;
+  const scoped = (q) => (userId ? q.eq("user_id", userId) : q.is("user_id", null));
+  const { error: gone } = await scoped(supabase.from("dashboard_layouts").delete().eq("kind", kind));
+  if (gone) return fail(/dashboard_layouts/.test(gone.message ?? "") ? "Customizing the dashboard needs an update first: ask your administrator." : gone);
+  if (layout) {
+    const { error } = await supabase.from("dashboard_layouts").insert({ user_id: userId, kind, layout: cleanLayout(kind, layout) });
+    if (error) return fail(error);
+  }
+  revalidatePath("/");
+  return ok({ kind, scope: mine ? "mine" : "default" });
 }

@@ -50,6 +50,10 @@ import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day
 import CallActivityCard from "@/features/dashboard/components/call-activity";
 import { getCallActivity } from "@/features/phone/queries";
 import { twilioConfig } from "@/lib/server/twilio";
+import { getDashboardLayouts, getDefaultLayouts } from "@/features/dashboard/queries";
+import DashboardSections from "@/features/dashboard/components/dashboard-sections";
+import CustomizeDashboard from "@/features/dashboard/components/customize-dashboard";
+import { resolveLayout } from "@/lib/dashboard-layout";
 
 export const dynamic = "force-dynamic";
 
@@ -221,7 +225,12 @@ export default async function Dashboard({ searchParams }) {
     return getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, client: true }).then((schedule) => ({ cm, schedule }));
   }) : null;
 
-  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company, clientDash, clientPipeline, clientSales, clientSchedule, clientActivity] = await Promise.all([
+  // A customizable dashboard (Sean, Nov 2026): this kind's layout, the administrators' default and the person's own
+  // (an administrator viewing a manager's dashboard sees that manager's), and every kind's default for an administrator.
+  const kind = isManager ? "manager" : view.audience === "company" ? "admin" : client ? "client" : "agent";
+  const layoutsP = Promise.all([getDashboardLayouts(kind, subject ? subject.id : me?.id), role === "admin" ? getDefaultLayouts() : null]);
+
+  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company, clientDash, clientPipeline, clientSales, clientSchedule, clientActivity, [layouts, defaults]] = await Promise.all([
     // An administrator has Recent Leads & Appointments instead (below).
     isManager || view.audience === "company" ? [] : getRecentLeads(6),
     isManager ? { today: [], tomorrow: [] } : getAppointments(),
@@ -241,6 +250,7 @@ export default async function Dashboard({ searchParams }) {
     clientSalesP,
     clientScheduleP,
     clientActivityP,
+    layoutsP,
   ]);
   const calls = await callsP;
   const callCard = calls ? (
@@ -349,23 +359,7 @@ export default async function Dashboard({ searchParams }) {
     ];
   }
 
-  // The cards under the tiles, laid out by role below.
-  // The team's day: every manager's production, then everyone's calls on the Lighthouse phone (an administrator's).
-  const teamDay = (
-    <>
-      {production ? (
-        <DailyProductionCard rows={production.rows} view={production.view} timeZone={tz}
-          picker={
-            // Any manager's dashboard, as they see it.
-            <ParamSelect name="view" label="Open a manager's dashboard" placeholder="Choose a manager" value=""
-              options={production.rows.filter((r) => r.role === "manager").map((r) => ({ value: r.userId, label: r.name }))} />
-          }
-          {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
-      ) : null}
-      {!manager ? callCard : null}
-    </>
-  );
-
+  // The cards under the tiles: each a section of the dashboard, laid out as the person has it (below).
   const scheduleCard = (
           <Card>
             <SectionHeader label="Today's Schedule" icon={CalendarClock} href="/appointments" action="All" />
@@ -492,6 +486,127 @@ export default async function Dashboard({ searchParams }) {
     </>
   );
 
+  // Each section of the dashboard, by its name in SECTIONS (lib/dashboard-layout); null when this one has nothing to show.
+  const tilesNode = (
+    <>
+      {/* The top tiles for one Sales Rep's clients (Sean, Nov 2026), an administrator's choice. */}
+      {team?.reps?.length ? (
+        <div className="relative z-10 flex justify-end" data-tile-rep>
+          <ParamSelect name="tr" label="Sales Rep" placeholder="Everyone" value={team.rep ? String(team.rep) : ""}
+            options={team.reps.map((r) => ({ value: String(r.id), label: r.name }))} clears={[]} />
+        </div>
+      ) : null}
+      <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
+        {tiles.map((t, i) => (
+          <StatTile key={t.label} {...t} trace className="animate-pop-in"
+            style={{ animationDelay: `${i * 60}ms` }} />
+        ))}
+      </div>
+    </>
+  );
+  const volumeCard = () => (
+    <Card className={view.trend === "weeks" ? undefined : "flex flex-col"}>
+      {view.trend === "weeks" ? (
+        <LeadVolumeChart days={volume} fallback={s.weeks} today={businessToday} />
+      ) : (
+        <>
+          {/* Monthly totals: quiet weeks in a campaign do not read as a dip. */}
+          <SectionHeader label="Delivered — Last 6 Months" icon={Activity} />
+          <div className="flex flex-1 flex-col p-5">
+            <div className="mb-4 flex items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: "var(--neon-cyan)" }} /> Leads
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
+              </span>
+            </div>
+            {/* Hovering a month shows what was delivered, above its taller bar. */}
+            <TipLayer tips={monthBarTips(months, { leads: "Leads delivered", appts: "Appointments" })} className="flex min-h-52 flex-1 items-stretch gap-3" data-months-chart>
+              {months.map((m, i) => (
+                <div key={m.key} data-tip={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
+                  className="flex min-h-0 flex-1 flex-col items-center gap-2">
+                  <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
+                    <div data-tip-row="leads" data-tip-anchor={m.leads >= m.appts ? "" : undefined}
+                      className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
+                      style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)", animationDelay: `${i * 70}ms` }} />
+                    <div data-tip-row="appts" data-tip-anchor={m.leads < m.appts ? "" : undefined}
+                      className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
+                      style={{ height: `${(m.appts / maxMonth) * 100}%`, background: "var(--neon-emerald)", boxShadow: "0 0 12px -3px var(--neon-emerald)", animationDelay: `${i * 70 + 35}ms` }} />
+                  </div>
+                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{m.label}</span>
+                </div>
+              ))}
+              {months.length === 0 && (
+                <p className="m-auto text-sm text-muted-foreground">Nothing delivered yet.</p>
+              )}
+            </TipLayer>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+  const nodes = manager ? {
+    tiles: tilesNode,
+    production: (
+      <ProductionCard person={manager.person} view={manager.prod} timeZone={tz} readOnly={!subject.own}
+        today={manager.today ?? { leads: 0, appts: 0, leadsGoal: null, apptsGoal: null }}
+        {...viewControls(sp, manager.prod, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
+    ),
+    schedule: <MySchedule items={manager.schedule.items} awaiting={manager.schedule.awaiting} month={manager.cm} today={businessToday} params={otherParams(sp, "cm")} />,
+    developed: (
+      <DevelopedCard rows={manager.developed} view={manager.recent} projectLinks={role === "admin"}
+        {...viewControls(sp, manager.recent, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
+    ),
+    team: <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long").replace(/, \d{4}$/, "")} />,
+    calls: callCard,
+  } : chart ? {
+    tiles: tilesNode,
+    chart: <ProductionChart data={chart.data} range={chart.range} goals={chart.goals} options={chart.options} selected={chart.selected} params={otherParams(sp)} today={businessToday} />,
+    recent: (
+      <RecentDevelopedCard rows={recentAll.rows} view={recentAll.view} kind={recentAll.kind} params={otherParams(sp)}
+        kindSwitch={<PeriodSwitch param="rk" current={recentAll.kind} params={otherParams(sp, "rk")} options={RECENT_KINDS} />}
+        {...viewControls(sp, recentAll.view, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
+    ),
+    // The calendar in place of Today's Schedule (every manager's appointments, the administrator's own reminders).
+    schedule: team ? (
+      <MySchedule items={team.schedule.items} awaiting={team.schedule.awaiting} month={team.cm} today={businessToday}
+        params={otherParams(sp, "cm")} allHref="/appointments" stacked />
+    ) : scheduleCard,
+    reps: sideCards,
+    // The team's day: every manager's production, then everyone's calls on the Lighthouse phone.
+    production: production ? (
+      <DailyProductionCard rows={production.rows} view={production.view} timeZone={tz}
+        picker={
+          // Any manager's dashboard, as they see it.
+          <ParamSelect name="view" label="Open a manager's dashboard" placeholder="Choose a manager" value=""
+            options={production.rows.filter((r) => r.role === "manager").map((r) => ({ value: r.userId, label: r.name }))} />
+        }
+        {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
+    ) : null,
+    calls: callCard,
+  } : client ? {
+    tiles: tilesNode,
+    // A client's row two: the Sale Pipeline, and their calendar with the month beside the day (Sean, Oct 2026).
+    pipeline: <SalePipeline sales={clientSales} thisMonth={Number(businessToday.slice(5, 7))} />,
+    schedule: (
+      <MySchedule items={clientSchedule.schedule.items} awaiting={clientSchedule.schedule.awaiting} month={clientSchedule.cm}
+        today={businessToday} params={otherParams(sp, "cm")} allHref="/appointments" />
+    ),
+    // What was developed for them lately.
+    activity: (
+      <ClientActivity rows={clientActivity.rows} range={clientActivity.range} projects={clientActivity.campaigns}
+        chosen={activityChosen} params={otherParams(sp)} timeZone={tz} />
+    ),
+  } : {
+    tiles: tilesNode,
+    volume: volumeCard(),
+    schedule: scheduleCard,
+    recent: recentCard(),
+    reps: sideCards,
+  };
+  const sections = resolveLayout(kind, layouts.role, layouts.mine);
+
   // Their Signature Select's end (Sean, Nov 2026), not the client's old End date.
   const selectEnds = me?.signatureSelect?.endsOn ?? null;
   const notice = client ? subscriptionNotice(selectEnds, businessToday) : null;
@@ -531,153 +646,12 @@ export default async function Dashboard({ searchParams }) {
           </div>
         ) : null}
 
-        {/* The top tiles for one Sales Rep's clients (Sean, Nov 2026), an administrator's choice. */}
-        {team?.reps?.length ? (
-          <div className="relative z-10 flex justify-end" data-tile-rep>
-            <ParamSelect name="tr" label="Sales Rep" placeholder="Everyone" value={team.rep ? String(team.rep) : ""}
-              options={team.reps.map((r) => ({ value: String(r.id), label: r.name }))} clears={[]} />
-          </div>
-        ) : null}
-        {/* metric tiles */}
-        <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
-          {tiles.map((t, i) => (
-            <StatTile key={t.label} {...t} trace className="animate-pop-in"
-              style={{ animationDelay: `${i * 60}ms` }} />
-          ))}
+        {/* Customize (Sean, Nov 2026): each person's own layout; an administrator also sets each kind's default. */}
+        <div className="flex justify-end" data-customize-row>
+          <CustomizeDashboard kind={kind} mine={!subject || subject.own ? sections : null} defaults={defaults} />
         </div>
 
-        {/* Daily Production and Call Activity: an administrator's come after the chart and the calendar (Sean,
-            Nov 2026: with every manager loaded they were taking over the top of the dashboard). */}
-        {chart && !manager ? null : teamDay}
-
-        {manager ? (
-          <>
-            {/* Row two: their production, and their own calendar. */}
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
-              <div className="flex flex-col xl:col-span-2 [&>*]:flex-1">
-                <ProductionCard person={manager.person} view={manager.prod} timeZone={tz} readOnly={!subject.own}
-                  today={manager.today ?? { leads: 0, appts: 0, leadsGoal: null, apptsGoal: null }}
-                  {...viewControls(sp, manager.prod, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
-              </div>
-              <div className="flex flex-col xl:col-span-3 [&>*]:flex-1">
-                <MySchedule items={manager.schedule.items} awaiting={manager.schedule.awaiting} month={manager.cm}
-                  today={businessToday} params={otherParams(sp, "cm")} />
-              </div>
-            </div>
-
-            {/* Row three: what they developed, and the team's day. */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <DevelopedCard rows={manager.developed} view={manager.recent} projectLinks={role === "admin"}
-                  {...viewControls(sp, manager.recent, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
-              </div>
-              <TeamProductionCard rows={manager.team} meId={subject.id} meLabel={subject.own ? "you" : null} dayLabel={formatIso(businessToday, "long").replace(/, \d{4}$/, "")} />
-            </div>
-
-            {/* Row four: everyone's calls on the Lighthouse phone. */}
-            {callCard}
-          </>
-        ) : (
-        <>
-        {chart ? (
-          // An administrator: the chart and the leads down the left, the day's schedule and the reps down
-          // the right, each column its own length, so no card is stretched to match a taller neighbour.
-          <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <ProductionChart data={chart.data} range={chart.range} goals={chart.goals} options={chart.options}
-                selected={chart.selected} params={otherParams(sp)} today={businessToday} />
-              <RecentDevelopedCard rows={recentAll.rows} view={recentAll.view} kind={recentAll.kind} params={otherParams(sp)}
-                kindSwitch={<PeriodSwitch param="rk" current={recentAll.kind} params={otherParams(sp, "rk")} options={RECENT_KINDS} />}
-                {...viewControls(sp, recentAll.view, { keyParam: "rl", dateParam: "rd", options: RECENT_PERIODS })} />
-            </div>
-            <div className="space-y-4">
-              {team ? (
-                <MySchedule items={team.schedule.items} awaiting={team.schedule.awaiting} month={team.cm} today={businessToday}
-                  params={otherParams(sp, "cm")} allHref="/appointments" stacked />
-              ) : scheduleCard}
-              {sideCards}
-            </div>
-          </div>
-        ) : null}
-        {chart && !manager ? teamDay : null}
-        {chart ? null : (
-        <>
-        {client ? (
-          // A client's row two: the Sale Pipeline, and their calendar with the month beside the day (Sean, Oct 2026).
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2" data-client-row-two>
-            <div className="flex flex-col [&>*]:flex-1">
-              <SalePipeline sales={clientSales} thisMonth={Number(businessToday.slice(5, 7))} />
-            </div>
-            <div className="flex flex-col [&>*]:flex-1">
-              <MySchedule items={clientSchedule.schedule.items} awaiting={clientSchedule.schedule.awaiting} month={clientSchedule.cm}
-                today={businessToday} params={otherParams(sp, "cm")} allHref="/appointments" />
-            </div>
-          </div>
-        ) : (
-        /* volume over time + today */
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {/* The monthly chart fills its card, which grows beside a long schedule. */}
-          <Card className={view.trend === "weeks" ? "lg:col-span-2" : "flex flex-col lg:col-span-2"}>
-            {view.trend === "weeks" ? (
-              <LeadVolumeChart days={volume} fallback={s.weeks} today={businessToday} />
-            ) : (
-              <>
-                {/* Monthly totals: quiet weeks in a campaign do not read as a dip. */}
-                <SectionHeader label="Delivered — Last 6 Months" icon={Activity} />
-                <div className="flex flex-1 flex-col p-5">
-                  <div className="mb-4 flex items-center gap-4 text-[0.66rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-full" style={{ background: "var(--neon-cyan)" }} /> Leads
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <span className="size-2 rounded-full" style={{ background: "var(--neon-emerald)" }} /> Appointments
-                    </span>
-                  </div>
-                  {/* Hovering a month shows what was delivered, above its taller bar. */}
-                  <TipLayer tips={monthBarTips(months, { leads: "Leads delivered", appts: "Appointments" })} className="flex min-h-52 flex-1 items-stretch gap-3" data-months-chart>
-                    {months.map((m, i) => (
-                      <div key={m.key} data-tip={m.key} role="img" aria-label={`${m.label}: ${m.leads} leads, ${m.appts} appointments`}
-                        className="flex min-h-0 flex-1 flex-col items-center gap-2">
-                        <div className="flex min-h-0 w-full flex-1 items-end justify-center gap-1.5">
-                          <div data-tip-row="leads" data-tip-anchor={m.leads >= m.appts ? "" : undefined}
-                            className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
-                            style={{ height: `${(m.leads / maxMonth) * 100}%`, background: "var(--neon-cyan)", boxShadow: "0 0 12px -3px var(--neon-cyan)", animationDelay: `${i * 70}ms` }} />
-                          <div data-tip-row="appts" data-tip-anchor={m.leads < m.appts ? "" : undefined}
-                            className="animate-grow-height w-1/3 rounded-t transition-[height] duration-500"
-                            style={{ height: `${(m.appts / maxMonth) * 100}%`, background: "var(--neon-emerald)", boxShadow: "0 0 12px -3px var(--neon-emerald)", animationDelay: `${i * 70 + 35}ms` }} />
-                        </div>
-                        <span className="text-[0.66rem] font-semibold uppercase tracking-[0.1em] text-muted-foreground">{m.label}</span>
-                      </div>
-                    ))}
-                    {months.length === 0 && (
-                      <p className="m-auto text-sm text-muted-foreground">Nothing delivered yet.</p>
-                    )}
-                  </TipLayer>
-                </div>
-              </>
-            )}
-          </Card>
-
-          {scheduleCard}
-        </div>
-        )}
-
-        {client ? (
-          // A client's only row under the second (Sean, Oct 2026): what was developed for them lately.
-          <ClientActivity rows={clientActivity.rows} range={clientActivity.range} projects={clientActivity.campaigns}
-            chosen={activityChosen} params={otherParams(sp)} timeZone={tz} />
-        ) : (
-        /* recent leads + the side panel this role gets */
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          {recentCard("lg:col-span-2")}
-
-          <div className="space-y-4">{sideCards}</div>
-        </div>
-        )}
-        </>
-        )}
-        </>
-        )}
+        <DashboardSections kind={kind} sections={sections} nodes={nodes} editable={!subject || subject.own} />
       </div>
     </>
   );
