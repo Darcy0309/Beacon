@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowRight, CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 import Link from "@/components/shared/intent-link";
 import { addMonths, formatIso, monthGrid, monthStart, sameMonth } from "@/lib/dates";
+import { HOLIDAY_COLOR, holidayLabel, holidayOn } from "@/lib/holidays";
 import { cn } from "@/lib/utils";
 
 const DOW = ["S", "M", "T", "W", "T", "F", "S"];
@@ -61,9 +62,12 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
           {grid.map((day) => {
             const count = days[day] ?? 0;
             const dim = !sameMonth(day, month);
+            // A US holiday (Sean, Nov 2026): a small diamond in the corner, named when pointed at.
+            const holiday = holidayOn(day);
             return (
               <Link key={day} href={`/calendar?${query}&view=day&d=${day}`} prefetch={false} data-tile-day={day} data-count={count || undefined} data-blocked={blocked[day] || undefined}
-                title={`${formatIso(day, "long")}: ${count ? `${count} appointment${count === 1 ? "" : "s"}` : "no appointments"}${blocked[day] ? (blocked[day] === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
+                data-holiday={holiday ? day : undefined}
+                title={`${formatIso(day, "long")}${holiday ? ` · ${holidayLabel(holiday)}` : ""}: ${count ? `${count} appointment${count === 1 ? "" : "s"}` : "no appointments"}${blocked[day] ? (blocked[day] === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
                 // Blocked out: shaded for the whole day, underlined for part of it.
                 style={blocked[day] && !dim ? (blocked[day] === "day"
                   ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 35%, transparent) 0 2px, transparent 2px 5px)" }
@@ -77,6 +81,7 @@ export default function CalendarTile({ label, note, days, blocked = {}, today, f
                 {Number(day.slice(8))}
                 {/* The day's count, big enough to read at a glance (Oct 2026). */}
                 {count > 1 && !dim ? <sup className="absolute right-1 top-0.5 text-[0.62rem] font-extrabold leading-none" data-tile-count>{count}</sup> : null}
+                {holiday && !dim ? <span className="absolute bottom-0.5 left-1/2 size-1 -translate-x-1/2 rotate-45 rounded-[1px]" style={{ background: HOLIDAY_COLOR }} data-holiday-mark /> : null}
               </Link>
             );
           })}

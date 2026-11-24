@@ -6,6 +6,7 @@ import {
   MONTHS, WEEKDAYS, addDays, addMonths, addYears, clampIso, formatIso, monthEnd, monthGrid, monthStart,
   sameMonth, todayIso, weekdayOf,
 } from "@/lib/dates";
+import { HOLIDAY_COLOR, holidayLabel, holidayOn } from "@/lib/holidays";
 import { cn } from "@/lib/utils";
 
 const navButton =
@@ -198,7 +199,9 @@ export default function Calendar({
                   const inRange = Boolean(rangeFrom && rangeTo && iso > rangeFrom && iso < rangeTo);
                   const selected = range ? isStart || isEnd : value === iso;
                   const block = blocked?.[iso] ?? null;
-                  const label = [formatIso(iso, "full"), isToday ? "today" : null, count ? markLabel(count) : null,
+                  // A US holiday (Sean, Nov 2026): a small diamond in its corner, named when pointed at.
+                  const holiday = holidayOn(iso);
+                  const label = [formatIso(iso, "full"), holiday ? holidayLabel(holiday) : null, isToday ? "today" : null, count ? markLabel(count) : null,
                     block === "day" ? "blocked out" : block === "part" ? "partly blocked out" : null, disabled ? "not available" : null]
                     .filter(Boolean).join(", ");
                   return (
@@ -215,6 +218,8 @@ export default function Calendar({
                         aria-label={label}
                         aria-current={isToday ? "date" : undefined}
                         data-blocked={block || undefined}
+                        data-holiday={holiday ? iso : undefined}
+                        title={holiday ? holidayLabel(holiday) : undefined}
                         style={block === "day" && !selected
                           ? { backgroundImage: "repeating-linear-gradient(135deg, color-mix(in srgb, var(--neon-amber) 28%, transparent) 0 3px, transparent 3px 7px)" }
                           : undefined}
@@ -236,6 +241,7 @@ export default function Calendar({
                       >
                         <span className="leading-none">{Number(iso.slice(8))}</span>
                         {block === "part" ? <span aria-hidden className="absolute inset-x-2 top-[3px] h-[2px] rounded-full" style={{ background: "var(--neon-amber)" }} /> : null}
+                        {holiday && !outside ? <span aria-hidden className="absolute right-[3px] top-[3px] size-1.5 rotate-45 rounded-[1px]" style={{ background: selected ? "var(--primary-foreground)" : HOLIDAY_COLOR }} data-holiday-mark /> : null}
                         {count ? (
                           <span aria-hidden className="absolute bottom-[3px] flex gap-0.5" title={markLabel(count)}>
                             {Array.from({ length: Math.min(count, 3) }, (_, i) => (

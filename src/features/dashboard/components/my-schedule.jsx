@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { addMonths, formatIso, monthGrid, sameMonth } from "@/lib/dates";
 import { APPOINTMENT_TIMES, REMINDER_TIMES } from "@/lib/validate";
 import { cn } from "@/lib/utils";
+import { HOLIDAY_COLOR, holidayLabel, holidayOn } from "@/lib/holidays";
 import { moveScheduleItem } from "@/features/dashboard/actions";
 import { reach } from "@/lib/reach";
 import { dashboardHref } from "@/features/dashboard/components/period-switch";
@@ -239,6 +240,8 @@ export default function MySchedule({ items, awaiting, month, today, params, allH
               const here = byDay.get(day) ?? [];
               const inMonth = sameMonth(day, month);
               const canDrop = Boolean(dragging) && day >= today && day !== dragged?.day;
+              // A US holiday (Sean, Nov 2026): a small diamond in its colour, named when pointed at.
+              const holiday = holidayOn(day);
               return (
                 <button
                   key={day}
@@ -249,7 +252,9 @@ export default function MySchedule({ items, awaiting, month, today, params, allH
                   onDragLeave={() => setOver((o) => (o === day ? null : o))}
                   onDrop={(e) => { e.preventDefault(); if (canDrop) drop(day); }}
                   aria-pressed={day === selected}
-                  aria-label={`${formatIso(day, "long")}: ${here.length ? `${here.length} item${here.length === 1 ? "" : "s"}` : "nothing"}`}
+                  aria-label={`${formatIso(day, "long")}${holiday ? `, ${holidayLabel(holiday)}` : ""}: ${here.length ? `${here.length} item${here.length === 1 ? "" : "s"}` : "nothing"}`}
+                  title={holiday ? holidayLabel(holiday) : undefined}
+                  data-holiday={holiday ? day : undefined}
                   className={cn(
                     "flex h-11 flex-col items-center justify-start rounded-md border pt-1 text-xs tabular-nums transition-[colors,transform,box-shadow] duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -266,10 +271,11 @@ export default function MySchedule({ items, awaiting, month, today, params, allH
                   {Number(day.slice(8))}
                   {over === day ? (
                     <span className="pointer-events-none mt-0.5 text-[0.5rem] font-bold uppercase tracking-[0.1em] text-primary">Drop</span>
-                  ) : here.length ? (
-                    <span className="pointer-events-none mt-1 flex gap-0.5">
-                      {here.slice(0, 3).map((it) => <span key={it.key} className="size-1.5 rounded-full" style={{ background: KINDS[kindOf(it)].color }} />)}
-                      {here.length > 3 ? <span className="text-[0.5rem] leading-[0.375rem]">+</span> : null}
+                  ) : here.length || holiday ? (
+                    <span className="pointer-events-none mt-1 flex items-center gap-0.5">
+                      {holiday ? <span className="size-1.5 rotate-45 rounded-[1px]" style={{ background: HOLIDAY_COLOR }} data-holiday-mark /> : null}
+                      {here.slice(0, holiday ? 2 : 3).map((it) => <span key={it.key} className="size-1.5 rounded-full" style={{ background: KINDS[kindOf(it)].color }} />)}
+                      {here.length > (holiday ? 2 : 3) ? <span className="text-[0.5rem] leading-[0.375rem]">+</span> : null}
                     </span>
                   ) : null}
                 </button>
@@ -280,13 +286,17 @@ export default function MySchedule({ items, awaiting, month, today, params, allH
             {["appointment", "waiting", "reminder", "message"].map((k) => (
               <span key={k} className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: KINDS[k].color }} />{KINDS[k].label}</span>
             ))}
+            <span className="flex items-center gap-1"><span className="size-1.5 rotate-45 rounded-[1px]" style={{ background: HOLIDAY_COLOR }} />Holiday</span>
           </div>
         </div>
 
         {/* The chosen day */}
         <div className="flex min-w-0 flex-col p-4" data-schedule-day={selected}>
           <div className="mb-2 flex items-baseline justify-between gap-2">
-            <span className="text-sm font-semibold">{dayName}</span>
+            <span className="min-w-0 text-sm font-semibold">
+              {dayName}
+              {holidayOn(selected) ? <span className="ml-2 text-xs font-semibold" style={{ color: HOLIDAY_COLOR }} data-holiday-day>{holidayLabel(holidayOn(selected))}</span> : null}
+            </span>
             <span className="text-[0.66rem] text-muted-foreground">{list.length} item{list.length === 1 ? "" : "s"}</span>
           </div>
           <ul className="max-h-80 space-y-1 overflow-y-auto">

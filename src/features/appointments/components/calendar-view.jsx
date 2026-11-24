@@ -9,7 +9,7 @@ import { reach } from "@/lib/reach";
 import Link from "@/components/shared/intent-link";
 import {
   CalendarRange, CalendarClock, ChevronLeft, ChevronRight, ArrowRight, Ban,
-  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText, StickyNote, X } from "lucide-react";
+  Phone, ArrowUpRight, User, MapPin, Mail, FolderKanban, Clock, MessageSquareText, PartyPopper, StickyNote, X } from "lucide-react";
 import SectionHeader from "@/components/shared/section-header";
 import ToneBadge from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { blockDays, blockHours, blockOn, clockOf, noteTime } from "@/lib/project
 import { NoteDialog } from "@/features/calendar/components/project-calendar";
 import RemoveBlock from "@/features/calendar/components/remove-block";
 import { cn } from "@/lib/utils";
+import { HOLIDAY_COLOR, holidayLabel, holidayOn } from "@/lib/holidays";
 
 /** Lets any appointment in any of the three views open the shared dialog. */
 const OpenAppointment = createContext(() => {});
@@ -386,7 +387,7 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusIds =
                   href={d.href}
                   scroll={false}
                   className={cn(
-                    "flex items-baseline justify-center gap-1.5 border-l border-[var(--panel-border)] py-2 transition-colors hover:bg-primary/5",
+                    "flex flex-wrap items-baseline justify-center gap-x-1.5 border-l border-[var(--panel-border)] py-2 transition-colors hover:bg-primary/5",
                     d.isToday && "bg-primary/10"
                   )}
                 >
@@ -394,6 +395,12 @@ function TimeGrid({ view, title, days, byDate, rows, today, timeZone, focusIds =
                   <span className={cn("text-sm font-bold tabular-nums", d.isToday ? "text-primary" : "text-foreground/80")}>
                     {d.dayNum}
                   </span>
+                  {/* A US holiday (Sean, Nov 2026). */}
+                  {holidayOn(d.date) ? (
+                    <span className="basis-full truncate text-center text-[0.6rem] font-semibold" style={{ color: HOLIDAY_COLOR }} data-holiday={d.date}>
+                      {holidayLabel(holidayOn(d.date))}
+                    </span>
+                  ) : null}
                 </Link>
               ))}
             </div>
@@ -677,15 +684,18 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
               const heat = n ? 0.25 + (n / busiest) * 0.55 : 0;
               // Time blocked out on the project's calendar: the whole day ("day") or part of it.
               const blocked = blockedDays?.[isoOf(d)] ?? null;
+              // A US holiday (Sean, Nov 2026): named in the day, in its own colour.
+              const holiday = holidayOn(isoOf(d));
               return (
                 <button
                   key={i}
                   type="button"
                   onClick={() => toggle(d)}
                   aria-pressed={isSelected}
-                  aria-label={`${label(d)}, ${n} appointment${n === 1 ? "" : "s"}${blocked ? (blocked === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
-                  title={[n ? `${n} appointment${n === 1 ? "" : "s"}` : null, blocked ? (blocked === "day" ? "Blocked out" : "Partly blocked out") : null].filter(Boolean).join(" · ") || undefined}
+                  aria-label={`${label(d)}${holiday ? `, ${holidayLabel(holiday)}` : ""}, ${n} appointment${n === 1 ? "" : "s"}${blocked ? (blocked === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
+                  title={[holiday ? holidayLabel(holiday) : null, n ? `${n} appointment${n === 1 ? "" : "s"}` : null, blocked ? (blocked === "day" ? "Blocked out" : "Partly blocked out") : null].filter(Boolean).join(" · ") || undefined}
                   data-blocked={blocked || undefined}
+                  data-holiday={holiday ? isoOf(d) : undefined}
                   className={cn(
                     "group relative flex min-h-[4.25rem] flex-col rounded-lg border p-1.5 text-left transition-all duration-150",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
@@ -704,6 +714,9 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
                       {blocked ? <span className="text-[0.52rem] font-bold uppercase tracking-[0.08em]" style={{ color: "var(--neon-amber)" }}>{blocked === "day" ? "Blocked" : "Part"}</span> : null}
                     </span>
                   </span>
+                  {holiday ? (
+                    <span className="mt-0.5 line-clamp-2 text-[0.58rem] font-semibold leading-tight" style={{ color: HOLIDAY_COLOR }}>{holidayLabel(holiday)}</span>
+                  ) : null}
                   {n ? (
                     <span className="mt-auto flex items-center justify-between">
                       <span className="flex gap-0.5" data-day-dots>
@@ -724,6 +737,7 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[0.7rem] text-muted-foreground" data-dot-legend>
             <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full" style={{ background: "var(--event-appt)" }} /> Appointment</span>
             <span className="flex items-center gap-1.5"><span className="size-1.5 rounded-full" style={{ background: "var(--event-waiting)" }} /> Awaiting confirmation</span>
+            <span className="flex items-center gap-1.5"><span className="text-[0.62rem] font-semibold" style={{ color: HOLIDAY_COLOR }}>Aa</span> US holiday</span>
           </div>
         </div>
       </Card>
@@ -741,6 +755,12 @@ function MonthView({ year, month, rows, byDay, count, todayDay, title, dayHrefBa
         <TipLayer tips={tips} delay={250} className="max-h-[34rem] space-y-1 overflow-y-auto p-4">
           {selected ? (
             <>
+              {holidayOn(isoOf(selected)) ? (
+                <div className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-semibold" data-holiday-row
+                  style={{ color: HOLIDAY_COLOR, borderColor: `color-mix(in srgb, ${HOLIDAY_COLOR} 40%, transparent)`, background: `color-mix(in srgb, ${HOLIDAY_COLOR} 8%, transparent)` }}>
+                  <PartyPopper className="size-3.5 shrink-0" /> {holidayLabel(holidayOn(isoOf(selected)))}
+                </div>
+              ) : null}
               {dayBlocks.map((b) => <BlockedRow key={b.id} b={b} />)}
               {dayNotes.map((n) => <NoteRow key={`n${n.id}`} n={n} />)}
               {dayRows.map((a) => <ApptRow key={a.id} a={a} />)}

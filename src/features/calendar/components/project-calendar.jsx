@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { addMonths, formatIso, monthGrid, monthStart, sameMonth, weekdayOf } from "@/lib/dates";
+import { HOLIDAY_COLOR, holidayLabel, holidayOn } from "@/lib/holidays";
 import { WEEKDAYS } from "@/lib/project-info";
 import { BLOCK_TIMES, blockDays, blockHours, dayMarks, eventsOn, noteTime } from "@/lib/project-calendar";
 import { cn } from "@/lib/utils";
@@ -283,11 +284,14 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
             {grid.map((day) => {
               const m = marks[day];
               const dim = !sameMonth(day, month);
+              // A US holiday (Sean, Nov 2026).
+              const holiday = holidayOn(day);
               return (
                 <button key={day} type="button" onClick={() => setSelected(day)} data-day={day}
                   data-appointments={m?.appointments || undefined} data-blocked={m?.blocked || undefined}
                   aria-pressed={day === selected}
-                  aria-label={`${formatIso(day, "long")}: ${m?.appointments ? `${m.appointments} appointment${m.appointments === 1 ? "" : "s"}` : "no appointments"}${m?.blocked ? (m.blocked === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
+                  data-holiday={holiday ? day : undefined} title={holiday ? holidayLabel(holiday) : undefined}
+                  aria-label={`${formatIso(day, "long")}${holiday ? `, ${holidayLabel(holiday)}` : ""}: ${m?.appointments ? `${m.appointments} appointment${m.appointments === 1 ? "" : "s"}` : "no appointments"}${m?.blocked ? (m.blocked === "day" ? ", blocked out" : ", partly blocked out") : ""}`}
                   className={cn(
                     "relative flex h-8 flex-col items-center justify-start rounded border pt-0.5 text-[0.68rem] tabular-nums transition-colors",
                     day === selected ? "border-primary bg-primary/15 font-semibold text-primary" : day === today ? "border-primary/50" : "border-transparent hover:bg-muted",
@@ -302,6 +306,7 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
                       style={{ background: m.waiting ? "var(--event-waiting)" : "var(--event-appt)" }}>{m.appointments}</span> : null}
                     {m?.blocked === "part" ? <span className="h-1 w-2 rounded-full" style={{ background: BLOCKED }} /> : null}
                     {m?.notes ? <span className="size-1 rounded-full" style={{ background: NOTED }} data-day-notes={m.notes} /> : null}
+                    {holiday ? <span className="size-1 rotate-45 rounded-[1px]" style={{ background: HOLIDAY_COLOR }} data-holiday-mark /> : null}
                   </span>
                 </button>
               );
@@ -312,13 +317,17 @@ export default function ProjectCalendar({ projectId, initial, today, leadLinks =
             <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: "var(--event-waiting)" }} /> Awaiting confirmation</span>
             <span className="flex items-center gap-1"><span className="h-1 w-2 rounded-full" style={{ background: BLOCKED }} /> Blocked out</span>
             <span className="flex items-center gap-1"><span className="size-1.5 rounded-full" style={{ background: NOTED }} /> Notes</span>
+            <span className="flex items-center gap-1"><span className="size-1.5 rotate-45 rounded-[1px]" style={{ background: HOLIDAY_COLOR }} /> Holiday</span>
           </div>
         </div>
 
         {/* The chosen day */}
         <div className="flex min-w-0 flex-col" data-calendar-day={selected}>
           <div className="mb-1 flex items-baseline justify-between gap-2">
-            <span className="text-xs font-semibold">{selected === today ? "Today" : formatIso(selected, "long")}</span>
+            <span className="min-w-0 text-xs font-semibold">
+              {selected === today ? "Today" : formatIso(selected, "long")}
+              {holidayOn(selected) ? <span className="ml-1.5" style={{ color: HOLIDAY_COLOR }} data-holiday-day>{holidayLabel(holidayOn(selected))}</span> : null}
+            </span>
             <span className="shrink-0 text-[0.62rem] text-muted-foreground">{events.filter((e) => e.kind === "appointment").length} appt{events.filter((e) => e.kind === "appointment").length === 1 ? "" : "s"}</span>
           </div>
           <ul className={cn("max-h-52 flex-1 space-y-1 overflow-y-auto", removing && "opacity-60")}>
