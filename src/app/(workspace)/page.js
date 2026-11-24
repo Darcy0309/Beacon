@@ -350,6 +350,22 @@ export default async function Dashboard({ searchParams }) {
   }
 
   // The cards under the tiles, laid out by role below.
+  // The team's day: every manager's production, then everyone's calls on the Lighthouse phone (an administrator's).
+  const teamDay = (
+    <>
+      {production ? (
+        <DailyProductionCard rows={production.rows} view={production.view} timeZone={tz}
+          picker={
+            // Any manager's dashboard, as they see it.
+            <ParamSelect name="view" label="Open a manager's dashboard" placeholder="Choose a manager" value=""
+              options={production.rows.filter((r) => r.role === "manager").map((r) => ({ value: r.userId, label: r.name }))} />
+          }
+          {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
+      ) : null}
+      {!manager ? callCard : null}
+    </>
+  );
+
   const scheduleCard = (
           <Card>
             <SectionHeader label="Today's Schedule" icon={CalendarClock} href="/appointments" action="All" />
@@ -530,17 +546,9 @@ export default async function Dashboard({ searchParams }) {
           ))}
         </div>
 
-        {production ? (
-          <DailyProductionCard rows={production.rows} view={production.view} timeZone={tz}
-            picker={
-              // Any manager's dashboard, as they see it.
-              <ParamSelect name="view" label="Open a manager's dashboard" placeholder="Choose a manager" value=""
-                options={production.rows.filter((r) => r.role === "manager").map((r) => ({ value: r.userId, label: r.name }))} />
-            }
-            {...viewControls(sp, production.view, { keyParam: "dp", dateParam: "dd", options: VIEW_PERIODS })} />
-        ) : null}
-        {/* An administrator's: below Daily Production. */}
-        {!manager ? callCard : null}
+        {/* Daily Production and Call Activity: an administrator's come after the chart and the calendar (Sean,
+            Nov 2026: with every manager loaded they were taking over the top of the dashboard). */}
+        {chart && !manager ? null : teamDay}
 
         {manager ? (
           <>
@@ -590,7 +598,9 @@ export default async function Dashboard({ searchParams }) {
               {sideCards}
             </div>
           </div>
-        ) : (
+        ) : null}
+        {chart && !manager ? teamDay : null}
+        {chart ? null : (
         <>
         {client ? (
           // A client's row two: the Sale Pipeline, and their calendar with the month beside the day (Sean, Oct 2026).
