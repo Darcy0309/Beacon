@@ -146,7 +146,7 @@ export default function AppearanceDialog({ open, onOpenChange }) {
         <section className="space-y-2" data-tones>
           <h3 className="eyebrow flex items-center gap-1.5 text-muted-foreground"><Palette className="size-3.5 text-primary" /> Colours</h3>
           <div role="radiogroup" aria-label="Colours" className="grid grid-cols-4 gap-3 sm:grid-cols-7">
-            <ToneSwatch label="Default" on={!a.tone} onPick={() => change({ tone: null })} colors={STYLE_DEFAULT_COLORS[a.style] ?? STYLE_DEFAULT_COLORS.executive} k="default" />
+            <ToneSwatch label="Default" on={!a.tone} onPick={() => change({ tone: null })} colors={STYLE_DEFAULT_COLORS[a.style] ?? STYLE_DEFAULT_COLORS.classic} k="default" />
             {TONES.map(([k, label, page, menu, accent]) => (
               <ToneSwatch key={k} k={k} label={label} on={a.tone === k} onPick={() => change({ tone: k, wallpaper: "classic" })} colors={{ page, menu, accent }} />
             ))}

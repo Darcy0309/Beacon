@@ -158,24 +158,25 @@ try {
     && (await page.ev("getComputedStyle(document.querySelector('.brightness-veil')).display")) === "none");
   await page.click('[data-theme-pick="dark"]');
 
-  section("Executive, the default style, and the colours (Sean, Oct 2026)");
+  section("Classic and Light, the defaults (Sean, Nov 2026), and the colours (Sean, Oct 2026)");
   {
     const fresh = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 950 });
     await fresh.go("/", 4000);
-    await fresh.ev("localStorage.removeItem('lighthouse.appearance'); true");
+    await fresh.ev("localStorage.removeItem('lighthouse.appearance'); localStorage.removeItem('theme'); true");
     await fresh.go("/projects", 5000);
     const look = () => fresh.ev(`(() => { const d = document.documentElement, cs = getComputedStyle(d);
       return { style: d.dataset.style, executive: 'executive' in d.dataset, tone: d.dataset.tone ?? null, bg: cs.getPropertyValue('--background').trim(),
         title: getComputedStyle(document.querySelector('[data-topbar-title]')).fontFamily }; })()`);
     const first = await look();
-    check("nothing chosen: Executive, with its serif titles", first.executive && first.style === "modern" && /Fraunces|display/i.test(first.title), JSON.stringify(first));
+    check("nothing chosen: Classic, in the light theme", !first.executive && first.style === "classic"
+      && !(await fresh.ev("document.documentElement.classList.contains('dark')")), JSON.stringify(first));
     // Someone who had saved Modern back when it was the default moves to Executive, once.
     await fresh.ev(`localStorage.setItem('lighthouse.appearance', JSON.stringify({ style: 'modern', wallpaper: 'classic' })); true`);
     await fresh.go("/projects", 4000);
     check("Modern saved before it stopped being the default: Executive now", (await look()).executive);
 
     await openAppearance(fresh);
-    check("the styles: Executive, Modern and Classic", (await fresh.ev("[...document.querySelectorAll('[data-style-pick]')].map((b) => b.dataset.stylePick).join()")) === "executive,modern,classic"
+    check("the styles: Executive, Modern and Classic, Executive kept for the one moved to it", (await fresh.ev("[...document.querySelectorAll('[data-style-pick]')].map((b) => b.dataset.stylePick).join()")) === "executive,modern,classic"
       && (await fresh.ev("document.querySelector('[data-style-pick=executive]').getAttribute('aria-checked')")) === "true");
     check("twelve colours, a Default and a Custom", (await fresh.ev("document.querySelectorAll('[data-tone-pick]').length")) === 14);
     await fresh.click("[data-tone-pick=sage]");

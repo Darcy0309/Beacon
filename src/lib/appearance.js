@@ -4,8 +4,9 @@
  * before the page draws (APPEARANCE_SCRIPT, in the root layout), so there is
  * no flash of the default look; changed from the theme button's Appearance.
  *
- *   style      "modern" (the default: calmer colours, soft cards, ordinary-case
- *              labels) or "classic" (the look as it was)
+ *   style      "classic" (the default since Nov 2026: neon edges, capital labels),
+ *              "modern" (calmer colours, soft cards, ordinary-case labels) or
+ *              "executive" (Modern, warmer, with serif titles)
  *   wallpaper  "classic" (the workspace as it was), one of the phone's, a live
  *              one drawn on a canvas (LIVE_WALLPAPERS), or "custom": a picture
  *              they uploaded, kept apart under APPEARANCE_IMAGE_KEY
@@ -42,7 +43,8 @@ const CHART_KEYS = new Set(CHART_STYLES.map(([k]) => k));
 const chartOf = (v) => (CHART_KEYS.has(v) ? v : "default");
 export const STYLES = [["executive", "Executive"], ["modern", "Modern"], ["classic", "Classic"]];
 const STYLE_KEYS = new Set(STYLES.map(([k]) => k));
-export const DEFAULT_APPEARANCE = { style: "executive", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null, cursor: "standard", cursorSize: "normal", chartType: "default" };
+// Light and Classic to begin with (Sean, Nov 2026: "make default theme into this"); anyone who chose another keeps it.
+export const DEFAULT_APPEARANCE = { style: "classic", wallpaper: "classic", light: 0, dark: 0, blur: 0, tone: null, toneColor: null, cursor: "standard", cursorSize: "normal", chartType: "default" };
 // Saved before Executive was the default (Sean, Oct 2026): a saved "modern" was then simply the default, so it moves to Executive once.
 const APPEARANCE_VERSION = 2;
 
@@ -103,7 +105,7 @@ const clamp = (v) => Math.min(MAX_SHIFT, Math.max(0, Number(v) || 0));
 export function readAppearance() {
   try {
     const a = JSON.parse(localStorage.getItem(APPEARANCE_KEY) ?? "{}") ?? {};
-    const style = a.v !== APPEARANCE_VERSION && a.style === "modern" ? "executive" : STYLE_KEYS.has(a.style) ? a.style : "executive";
+    const style = a.v !== APPEARANCE_VERSION && a.style === "modern" ? "executive" : STYLE_KEYS.has(a.style) ? a.style : DEFAULT_APPEARANCE.style;
     return {
       style,
       wallpaper: KNOWN.has(a.wallpaper) && (a.wallpaper !== "custom" || readImage()) ? a.wallpaper : "classic",
@@ -250,8 +252,8 @@ export function pictureTint(src) {
 export function applyAppearance(a, { keep = true } = {}) {
   const d = document.documentElement;
   // Executive builds on Modern: Modern's rules, then its own (html[data-executive]).
-  d.dataset.style = a.style === "classic" ? "classic" : "modern";
-  if (a.style === "executive" || !STYLE_KEYS.has(a.style)) d.dataset.executive = "";
+  d.dataset.style = a.style === "modern" || a.style === "executive" ? "modern" : "classic";
+  if (a.style === "executive") d.dataset.executive = "";
   else delete d.dataset.executive;
   // The colours: the page, the menu and the accent (TONES), as variables globals.css reads.
   const tone = toneColors(a);
@@ -290,7 +292,7 @@ export function applyAppearance(a, { keep = true } = {}) {
   else delete d.dataset.chartType;
   if (!keep) return true;
   try {
-    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : "executive", wallpaper: a.wallpaper,
+    localStorage.setItem(APPEARANCE_KEY, JSON.stringify({ v: APPEARANCE_VERSION, style: STYLE_KEYS.has(a.style) ? a.style : DEFAULT_APPEARANCE.style, wallpaper: a.wallpaper,
       blur: clampBlur(a.blur), light: clamp(a.light), dark: clamp(a.dark), tone: tone ? a.tone : null, toneColor: HEX6.test(a.toneColor ?? "") ? a.toneColor : null,
       cursor: cursorOf(a.cursor),
       cursorSize: SIZE_KEYS.has(a.cursorSize) ? a.cursorSize : "normal",
@@ -307,8 +309,9 @@ export function applyAppearance(a, { keep = true } = {}) {
 /** The same, as a script run before the page draws: no flash of the default look. */
 // Executive unless Modern (saved since it stopped being the default) or Classic was chosen; then the colours (TONES, or their own).
 const TONE_SCRIPT_TABLE = JSON.stringify(Object.fromEntries(TONES.map(([k, , ...colors]) => [k, colors])));
-export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="modern";d.dataset.executive="";d.dataset.cursor="standard";d.dataset.cursorSize="normal";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
-  + `if(a.style==="classic"){d.dataset.style="classic";delete d.dataset.executive;}else if(a.style==="modern"&&a.v===${APPEARANCE_VERSION})delete d.dataset.executive;`
+export const APPEARANCE_SCRIPT = `var d=document.documentElement;d.dataset.style="classic";d.dataset.cursor="standard";d.dataset.cursorSize="normal";try{var a=JSON.parse(localStorage.getItem(${JSON.stringify(APPEARANCE_KEY)})||"{}")||{},c=function(v){v=Number(v)||0;return Math.min(${MAX_SHIFT},Math.max(0,v))};`
+  // Classic unless they chose Modern or Executive (a Modern kept before version ${APPEARANCE_VERSION} is Executive now).
+  + `if(a.style==="modern"||a.style==="executive"){d.dataset.style="modern";if(a.style==="executive"||a.v!==${APPEARANCE_VERSION})d.dataset.executive="";}`
   + `if(${JSON.stringify(CURSOR_STYLES.map(([k]) => k))}.indexOf(a.cursor)>=0)d.dataset.cursor=a.cursor;if(a.cursorSize==="small"||a.cursorSize==="large")d.dataset.cursorSize=a.cursorSize;if(a.chartType==="bar"||a.chartType==="line"||a.chartType==="area")d.dataset.chartType=a.chartType;`
   + `var T=${TONE_SCRIPT_TABLE},k=a.tone,tc=null;if(k==="custom"&&a.toneVars&&/^#[0-9a-f]{6}$/i.test(a.toneVars[0]))tc=a.toneVars;else if(typeof k==="string"&&T[k])tc=T[k];`
   + `if(tc){d.dataset.tone=k;["--tone-page","--tone-menu","--tone-accent","--tone-accent-dark","--tone-contrast","--tone-contrast-dark"].forEach(function(p,j){if(/^#[0-9a-f]{6}$/i.test(tc[j]))d.style.setProperty(p,tc[j]);});}`

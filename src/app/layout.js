@@ -51,7 +51,8 @@ export default async function RootLayout({ children }) {
         <script dangerouslySetInnerHTML={{ __html: APPEARANCE_SCRIPT }} />
         <div aria-hidden className="brightness-veil" />
         <Backdrop />
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        {/* Light to begin with (Sean, Nov 2026); anyone who chose Dark or System keeps it. */}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           <RoleProvider user={user} timeZone={timeZone}>
             {children}
             <Toaster />
