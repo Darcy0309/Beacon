@@ -3,6 +3,7 @@ import { ChevronRight } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
 import { Card } from "@/components/ui/card";
 import SettingsIcon from "@/features/settings/components/settings-icon";
+import SettingsArt from "@/features/settings/components/settings-art";
 import { SETTINGS_AREAS } from "@/features/settings/areas";
 
 export const dynamic = "force-dynamic";
@@ -21,19 +22,23 @@ export default function SettingsPage() {
             <Link key={a.key} href={`/settings/${a.key}`} data-settings-area={a.key}
               className="rounded-xl outline-none">
               <Card className="flex h-full flex-col gap-4 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary" data-area-icon>
-                    <SettingsIcon name={a.icon} className="size-5" />
-                  </span>
-                  <ChevronRight className="size-4 text-muted-foreground" aria-hidden data-area-arrow />
+                <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary" data-area-icon>
+                  <SettingsIcon name={a.icon} className="size-5" />
+                </span>
+                <div className="space-y-1" data-area-title>
+                  <h2 className="text-base font-semibold tracking-tight transition-colors">{a.title}</h2>
+                  <p className="text-sm text-muted-foreground">{a.summary}</p>
                 </div>
-                <h2 className="text-base font-semibold tracking-tight transition-colors" data-area-title>{a.title}</h2>
-                <ul className="mt-auto flex flex-wrap gap-1.5">
+                <ul className="mt-auto flex flex-wrap gap-1.5" data-area-items>
                   {a.items.map((i) => (
                     <li key={i} className="rounded-full border border-[var(--panel-border)] px-2 py-0.5 text-[0.7rem] text-muted-foreground">{i}</li>
                   ))}
                 </ul>
-                {/* Pointed at (client, Nov 2026): more of what it holds, sliding in from the right edge on a contrasting ground. */}
+                {/* Pointed at (client, Nov 2026): a picture of what the area is about takes the left… */}
+                <div className="settings-art" data-area-art>
+                  <SettingsArt name={a.icon} className="size-full" />
+                </div>
+                {/* …and more of what it holds slides in from the right edge on a contrasting ground. */}
                 <div className="settings-reveal" data-area-reveal aria-hidden>
                   <div className="settings-reveal-body">
                     <p className="text-[0.66rem] font-bold uppercase tracking-[0.14em] opacity-80">{a.title}</p>

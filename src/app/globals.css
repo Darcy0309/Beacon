@@ -254,8 +254,7 @@
   background-color: color-mix(in srgb, var(--primary) 5%, var(--card)) !important;
   box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--primary) 45%, transparent), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent) !important;
 }
-[data-settings-area] [data-area-arrow] { transition: transform 200ms ease, color 200ms ease; }
-[data-settings-area]:hover [data-area-title] { color: var(--primary); }
+[data-settings-area]:hover [data-area-title] h2 { color: var(--primary); }
 
 /* …and more of what it holds slides in from its right edge (client, Nov 2026): a slanted panel on a deep ground in
    the site's own accent and background (its theme or colour: a dark shade sweeping into a lighter one, a few degrees
@@ -302,10 +301,50 @@
 }
 [data-settings-area]:hover .settings-reveal,
 [data-settings-area]:focus-visible .settings-reveal { transform: translateX(0); }
+/* …the chips, the small icon, the title and its summary (the panel names it) make way, and a picture of what the area is about
+   rises in on the left, beside the panel (client, Nov 2026). Drawn in the accent, so it follows the theme too; a part
+   or two moves gently. */
+[data-settings-area] [data-area-items],
+[data-settings-area] [data-area-title],
+[data-settings-area] [data-area-icon] { transition: opacity 180ms ease, transform 180ms ease, color 200ms ease; }
+[data-settings-area]:hover [data-area-items],
+[data-settings-area]:focus-visible [data-area-items],
+[data-settings-area]:hover [data-area-title],
+[data-settings-area]:focus-visible [data-area-title],
+[data-settings-area]:hover [data-area-icon],
+[data-settings-area]:focus-visible [data-area-icon] { opacity: 0; transform: translateY(4px); }
+.settings-art {
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  width: min(29%, 8rem);
+  max-height: calc(100% - 1.5rem);
+  aspect-ratio: 1;
+  opacity: 0;
+  transform: translateY(calc(-50% + 10px)) scale(0.92);
+  transition: opacity 260ms ease 60ms, transform 360ms cubic-bezier(0.22, 1, 0.36, 1) 60ms;
+  pointer-events: none;
+}
+[data-settings-area]:hover .settings-art,
+[data-settings-area]:focus-visible .settings-art { opacity: 1; transform: translateY(-50%); }
+@keyframes art-float { 50% { transform: translateY(-3px); } }
+@keyframes art-pulse { 50% { opacity: 0.35; } }
+@keyframes art-bar { from { transform: scaleY(0.2); } }
+@keyframes art-dot { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-3px); } }
+@keyframes art-hand { to { transform: rotate(360deg); } }
+@keyframes art-drop { 0% { transform: translateY(-6px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(18px); opacity: 0; } }
+[data-settings-area]:hover .settings-art .art-float { animation: art-float 2.4s ease-in-out infinite; }
+[data-settings-area]:hover .settings-art .art-pulse { animation: art-pulse 1.4s ease-in-out infinite; }
+[data-settings-area]:hover .settings-art .art-blink { animation: art-pulse 1s steps(2, jump-none) infinite; }
+[data-settings-area]:hover .settings-art .art-bar { transform-box: fill-box; transform-origin: bottom; animation: art-bar 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+[data-settings-area]:hover .settings-art .art-dot { transform-box: fill-box; animation: art-dot 1.2s ease-in-out infinite; }
+[data-settings-area]:hover .settings-art .art-hand { transform-box: view-box; transform-origin: 98px 30px; animation: art-hand 6s linear infinite; }
+[data-settings-area]:hover .settings-art .art-drop { animation: art-drop 1.8s ease-in infinite; }
 @media (prefers-reduced-motion: reduce) {
-  [data-settings-area]:hover [data-panel], [data-settings-area]:focus-visible [data-panel],
-  [data-settings-area]:hover [data-area-arrow] { transform: none; }
+  [data-settings-area]:hover [data-panel], [data-settings-area]:focus-visible [data-panel] { transform: none; }
   .settings-reveal { transition: opacity 150ms ease; opacity: 0; transform: none; }
+  .settings-art * { animation: none !important; }
+  .settings-art, [data-settings-area]:hover .settings-art { transform: translateY(-50%); }
   [data-settings-area]:hover .settings-reveal, [data-settings-area]:focus-visible .settings-reveal { opacity: 1; }
 }
 /* A control that sits on the page itself rather than in a panel (the calendar's view switch and
