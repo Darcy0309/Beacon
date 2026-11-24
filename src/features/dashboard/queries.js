@@ -9,6 +9,7 @@ import { dayAxis, hourAxis } from "@/lib/tile-axis";
 import { appointmentKind, cityState, shortDate, splitTime, timeRank } from "@/lib/format";
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
+import { campaignCompanies, withCampaign } from "@/features/campaign-types/filter";
 
 export async function getDashboardStats() {
   const supabase = await createClient();
@@ -149,23 +150,28 @@ function tallyOf(rows, key, range, today, hours = null) {
  * as the production report counts them: not names or leads imported. Each
  * { total, series }.
  */
-export async function getTeamTiles({ today, ranges, rep = null }) {
+export async function getTeamTiles({ today, ranges, rep = null, campaign = null }) {
   const supabase = await createClient();
   const report = (r) => supabase.rpc("production_report", { p_from: r.from, p_to: r.to, p_project_id: null, p_user_id: null });
-  // A day by the hour (client, Nov 2026); a Sales Rep's clients' only when one is chosen.
-  const hourly = (r) => (r.from === r.to ? supabase.rpc("production_hours", { p_day: r.from, ...(rep ? { p_rep: rep } : {}) }) : Promise.resolve({ data: null }));
-  const [leads, appts, leadHours, apptHours, clients, repStats, repRows] = await Promise.all([report(ranges.leads), report(ranges.appts), hourly(ranges.leads), hourly(ranges.appts),
+  // A day by the hour (client, Nov 2026); a Sales Rep's clients' only when one is chosen; the campaign type's (phase 4).
+  const hourly = (r) => (r.from === r.to ? withCampaign(supabase.rpc("production_hours", { p_day: r.from, ...(rep ? { p_rep: rep } : {}) }), campaign) : Promise.resolve({ data: null }));
+  // Active Clients: a Sales Rep's, or a campaign type's (every Sales Rep's), counted apart.
+  const filtered = Boolean(rep || (campaign && campaign.value !== "all"));
+  const [leads, appts, leadHours, apptHours, clients, repStats, repRows, ofCampaign] = await Promise.all([report(ranges.leads), report(ranges.appts), hourly(ranges.leads), hourly(ranges.appts),
     rep ? supabase.from("companies").select("id").eq("sales_rep_id", rep) : Promise.resolve({ data: null }),
-    rep ? supabase.rpc("rep_client_stats", { p_rep: rep }) : Promise.resolve({ data: null }),
+    filtered ? withCampaign(supabase.rpc("rep_client_stats", { p_rep: rep }), campaign) : Promise.resolve({ data: null }),
     // The Sales Reps to choose from: those who have clients.
-    supabase.from("companies").select("sales_rep:users!companies_sales_rep_id_fkey(id, first_name, last_name)").not("sales_rep_id", "is", null).is("deleted_at", null)]);
+    supabase.from("companies").select("sales_rep:users!companies_sales_rep_id_fkey(id, first_name, last_name)").not("sales_rep_id", "is", null).is("deleted_at", null),
+    campaignCompanies(campaign?.value)]);
   for (const r of [leads, appts, leadHours, apptHours, clients, repStats, repRows]) if (r.error) throw r.error;
   const reps = [...new Map((repRows.data ?? []).map((c) => one(c.sales_rep)).filter(Boolean)
     .map((u) => [u.id, { id: u.id, name: [u.first_name, u.last_name].filter(Boolean).join(" ") || `User ${u.id}` }])).values()]
     .sort((a, b) => a.name.localeCompare(b.name));
   // A Sales Rep chosen (Sean, Nov 2026): what was developed on their clients' projects.
   const theirs = clients.data ? new Set(clients.data.map((c) => c.id)) : null;
-  const keep = (rows) => (theirs ? (rows ?? []).filter((r) => theirs.has(r.client_id)) : rows);
+  // …and the campaign type chosen (Insurance: a project without a client too).
+  const inCampaign = (r) => !ofCampaign || (r.client_id == null ? campaign.value === "insurance" : ofCampaign.has(r.client_id));
+  const keep = (rows) => (rows ?? []).filter((r) => (!theirs || theirs.has(r.client_id)) && inCampaign(r));
   return {
     leads: tallyOf(keep(leads.data), "leads", ranges.leads, today, leadHours.data),
     appts: tallyOf(keep(appts.data), "appointments", ranges.appts, today, apptHours.data),
@@ -181,9 +187,9 @@ export async function getTeamTiles({ today, ranges, rep = null }) {
  * year before, the leads in the pipeline for it and those with an appointment set in its calling window
  * (renewal_conversion()). { month, year, now: { leads, appts, rate }, before: { … }, series (each month of `year`) }.
  */
-export async function getRenewalConversion({ year, month, rep = null }) {
+export async function getRenewalConversion({ year, month, rep = null, campaign = null }) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("renewal_conversion", { p_year: year, ...(rep ? { p_rep: rep } : {}) });
+  const { data, error } = await withCampaign(supabase.rpc("renewal_conversion", { p_year: year, ...(rep ? { p_rep: rep } : {}) }), campaign);
   if (error) throw error;
   const rate = (r) => (r && Number(r.leads) ? Math.round((Number(r.appointments) / Number(r.leads)) * 1000) / 10 : null);
   const at = (y, m) => (data ?? []).find((r) => r.year === y && r.month === m);
@@ -315,7 +321,7 @@ function developedType(kind, result) {
  * "appointment" or both. Each also carries the manager, the name's call
  * result now, and its ultimate X-date.
  */
-export async function getDeveloped({ userId = null, from, to, timeZone, kinds = ["lead", "appointment"] }) {
+export async function getDeveloped({ userId = null, from, to, timeZone, kinds = ["lead", "appointment"], campaign = null }) {
   const supabase = await createClient();
   const [lo, hi] = around({ from, to });
   // A pay period across the team can pass the API's 1,000-row cap: read in pages.
@@ -337,7 +343,10 @@ export async function getDeveloped({ userId = null, from, to, timeZone, kinds = 
     if (userId) q = q.eq("user_id", userId);
     return q;
   }, { max: userId ? 1000 : 10000 });
+  // The campaign type chosen (phase 4): its clients' only.
+  const companies = await campaignCompanies(campaign?.value);
   return data
+    .filter((e) => { if (!companies) return true; const c = one(one(e.project)?.company)?.id; return c == null ? campaign.value === "insurance" : companies.has(c); })
     .map((e) => {
       const project = one(e.project);
       const lead = one(e.lead);
@@ -521,9 +530,9 @@ export async function getManagerUser(id) {
  * day) the leads and appointments developed and the minutes worked on lead
  * and on appointment projects; everyone's, one person's or one project's.
  */
-export async function getProductionChart({ from, to, user = null, project = null }) {
+export async function getProductionChart({ from, to, user = null, project = null, campaign = null }) {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("production_chart", { p_from: from, p_to: to, p_user: user, p_project: project });
+  const { data, error } = await withCampaign(supabase.rpc("production_chart", { p_from: from, p_to: to, p_user: user, p_project: project }), campaign);
   if (error) throw error;
   return { days: data?.days ?? [], hours: data?.hours ?? [] };
 }

@@ -11,6 +11,8 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import PeriodSwitch from "@/features/dashboard/components/period-switch";
 import { getBillingReport, getReportCounts, getReportNames } from "@/features/reports/admin-queries";
+import { campaignCompanies, readCampaign } from "@/features/campaign-types/filter";
+import CampaignPicker from "@/features/campaign-types/components/campaign-picker";
 import { PERIODS, billingCsv, groupBy, inMonths, lastMonths, monthSeries, outcomes, periodOf, topClients, totals, withBilling } from "@/lib/admin-reports";
 import { monthBarTips } from "@/lib/chart-tips";
 import { formatRange, isIsoDate, monthStart } from "@/lib/dates";
@@ -48,12 +50,18 @@ export default async function AdminReports({ sp, today }) {
   const bTo = isIsoDate(sp?.bt) && sp.bt >= bFrom ? sp.bt : today;
   const bRep = /^\d+$/.test(sp?.brep ?? "") ? Number(sp.brep) : null;
 
-  const [rows, names, billing] = await Promise.all([
+  const [allRows, names, allBilling, campaign] = await Promise.all([
     getReportCounts(months[0].from, today),
     getReportNames(),
     getBillingReport(bFrom, bTo, bRep),
+    readCampaign(sp?.ct),
   ]);
   const project = (id) => names.projects[id] ?? { name: "—", client: "—", companyId: null, salesRepId: null, salesRep: null };
+  // The campaign type counted (Campaign Types phase 4, ?ct=): Insurance to begin with, its clients' figures only.
+  const companies = await campaignCompanies(campaign?.value);
+  const inCampaign = (companyId) => !companies || (companyId == null ? campaign.value === "insurance" : companies.has(companyId));
+  const rows = allRows.filter((r) => inCampaign(project(r.project_id).companyId));
+  const billing = allBilling.filter((r) => inCampaign(r.company_id));
   const person = (id) => (id == null ? "Unassigned" : names.people[id] ?? "—");
   const period = (param) => periodOf(sp?.[param]);
   const of = (param) => inMonths(rows, keys(period(param)));
@@ -89,6 +97,7 @@ export default async function AdminReports({ sp, today }) {
 
   return (
     <div className="space-y-4" data-admin-reports>
+      {campaign ? <div className="flex justify-end"><CampaignPicker campaign={campaign} clears={[]} /></div> : null}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatTile label="Leads Delivered" value={lt.leads.toLocaleString()} icon={Target} accent="var(--neon-cyan)" series={series.map((m) => m.leads)} seriesLabels={series.map((m) => m.label)}
           note={`${plural(ltProjects, "project")}${lt.invalid_leads ? ` · ${lt.invalid_leads} invalid` : ""}`} action={<Period param="lt" current={period("lt")} params={params} />} />

@@ -13,6 +13,8 @@ import PipelineReport from "@/features/reports/components/pipeline-report";
 import XdateFilterBar from "@/features/reports/components/xdate-filter-bar";
 import { getSalesReps } from "@/features/users/queries";
 import { filterParams, pipelineMonths, readXdateFilters } from "@/lib/pipeline";
+import { campaignProjects, readCampaign } from "@/features/campaign-types/filter";
+import CampaignPicker from "@/features/campaign-types/components/campaign-picker";
 import { getLookups } from "@/lib/server/lookups";
 import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
 import { pageInfo, readListParams } from "@/lib/paging";
@@ -38,7 +40,14 @@ export default async function XdatesReport({ searchParams }) {
   // the Pipeline Report under them still has both kinds, with their pay.
   const read = { ...readXdateFilters(sp), type: null };
   const filters = isClient ? { ...read, companyId: null, repId: null, userIds: [] } : read;
-  const appt = { ...filters, type: "APPT" };
+  // The campaign type counted (Campaign Types phase 4, ?ct=; ours, not a client's): Insurance to begin with. Its
+  // clients' projects, within those chosen; the filters as chosen stay for the links and the title.
+  const campaign = isClient ? null : await readCampaign(sp?.ct);
+  const inCampaign = await campaignProjects(campaign?.value);
+  const counted = inCampaign ? { ...filters, projectIds: filters.projectIds.length ? filters.projectIds.filter((id) => inCampaign.includes(id)) : inCampaign } : filters;
+  // None left: no project at all, not every one.
+  if (inCampaign && !counted.projectIds.length) counted.projectIds = [0];
+  const appt = { ...counted, type: "APPT" };
   const month = /^(0|[1-9]|1[0-2])$/.test(sp?.month ?? "") ? Number(sp.month) : null;
   const bucket = XDATE_BUCKETS[sp?.bucket] ? sp.bucket : null;
   const list = readListParams(sp);
@@ -55,7 +64,7 @@ export default async function XdatesReport({ searchParams }) {
     // The Pipeline Report (Sean, Oct 2026): the filtered names by project and manager, for the months picked (the next three to begin with).
     isClient ? null : Promise.all([todayP, getBusinessTimeZone()]).then(([t, zone]) => {
       const months = pipelineMonths(filters.months, t);
-      return getPipelineReport({ filters, months, timeZone: zone }).then((rows) => ({ rows, months }));
+      return getPipelineReport({ filters: counted, months, timeZone: zone }).then((rows) => ({ rows, months }));
     }),
   ]);
 
@@ -68,7 +77,11 @@ export default async function XdatesReport({ searchParams }) {
     ?? (isClient ? me?.company?.name ?? "Your projects" : "The whole book");
 
   // Links keep the filters, and open one month's names.
-  const scoped = () => filterParams(filters);
+  const scoped = () => {
+    const p = filterParams(filters);
+    if (campaign?.param) p.set("ct", campaign.param);
+    return p;
+  };
   const href = (m, b) => {
     const p = scoped();
     p.set("month", String(m));
@@ -91,9 +104,9 @@ export default async function XdatesReport({ searchParams }) {
           </Link>
         ) : null}
         <Card>
-          <SectionHeader label="Renewals by Month" icon={CalendarSearch} />
+          <SectionHeader label="Renewals by Month" icon={CalendarSearch} action={<CampaignPicker campaign={campaign} clears={["month", "bucket", "page"]} />} />
           {/* A client's people: their projects and the renewal months (Sean, Nov 2026). */}
-          <XdateFilterBar filters={appt} showClient={!isClient} showManagers={!isClient} showType={false}
+          <XdateFilterBar filters={{ ...appt, projectIds: filters.projectIds }} showClient={!isClient} showManagers={!isClient} showType={false}
             options={{ companies: options.companies, projects: options.projects, reps, managers }} />
           <div className="p-5">
             <XdateMonths data={data} href={href} today={today} selected={month === null ? null : { month, bucket }} only={filters.months} />

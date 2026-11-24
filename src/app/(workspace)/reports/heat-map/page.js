@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import BestTimesBoard from "@/features/best-times/components/best-times-board";
+import { readCampaign } from "@/features/campaign-types/filter";
+import CampaignPicker from "@/features/campaign-types/components/campaign-picker";
 import { getBestTimes, getEarlyStarts } from "@/features/best-times/queries";
 import EarlyStarts from "@/features/best-times/components/early-starts";
 import { getAssignableStaff } from "@/features/users/queries";
@@ -42,12 +44,14 @@ export default async function BestTimesPage({ searchParams }) {
     state: typeof sp?.state === "string" && US_STATES.includes(sp.state.toUpperCase()) ? sp.state.toUpperCase() : null,
   };
   const by = BY.some(([k]) => k === sp?.by) ? sp.by : "sic";
+  // The campaign type counted (Campaign Types phase 4, ?ct=): Insurance to begin with.
+  const campaign = await readCampaign(sp?.ct);
 
   const supabase = await createClient();
   const [{ all, byRows }, early, staff, { data: clients }, { data: projects }, { data: assigned }] = await Promise.all([
-    getBestTimes({ from, to, ...filters, by }),
+    getBestTimes({ from, to, ...filters, by, campaign }),
     // Early Starts, by manager (Sean and Darcy, Nov 2026): a manager's own.
-    getEarlyStarts({ from, to, ...filters }),
+    getEarlyStarts({ from, to, ...filters, campaign }),
     getAssignableStaff(),
     supabase.from("companies").select("id, name").is("deleted_at", null).order("name"),
     supabase.from("projects").select("id, name, company_id").is("deleted_at", null).order("name"),
@@ -58,7 +62,7 @@ export default async function BestTimesPage({ searchParams }) {
   const ownProjects = (projects ?? []).filter((p) => !mine || mine.has(p.id));
   const ownClients = (clients ?? []).filter((c) => !mine || ownProjects.some((p) => p.company_id === c.id));
   const projectList = ownProjects.filter((p) => !filters.client || p.company_id === filters.client);
-  const kept = Object.entries({ ...filters, by, from: chosen ? from : null, to: chosen ? to : null }).filter(([, v]) => v != null && v !== "");
+  const kept = Object.entries({ ...filters, by, ct: campaign?.param || null, from: chosen ? from : null, to: chosen ? to : null }).filter(([, v]) => v != null && v !== "");
 
   return (
     <>
@@ -70,6 +74,7 @@ export default async function BestTimesPage({ searchParams }) {
               {kept.filter(([k]) => !["from", "to"].includes(k)).map(([k, v]) => <input key={k} type="hidden" name={k} value={String(v)} />)}
               <DateRangePicker key={`${from}:${to}`} defaultFrom={from} defaultTo={to} max="today" maxDays={730} active={chosen} />
             </form>
+            <CampaignPicker campaign={campaign} clears={["client", "project"]} />
             <ParamSelect name="client" label="Client" placeholder="All clients" value={filters.client ? String(filters.client) : ""} clears={["project"]}
               options={ownClients.map((c) => ({ value: String(c.id), label: c.name }))} />
             <ParamSelect name="project" label="Project" placeholder="All projects" value={filters.project ? String(filters.project) : ""} clears={[]}

@@ -54,6 +54,8 @@ import { getDashboardLayouts, getDefaultLayouts } from "@/features/dashboard/que
 import DashboardSections from "@/features/dashboard/components/dashboard-sections";
 import CustomizeDashboard from "@/features/dashboard/components/customize-dashboard";
 import { resolveLayout } from "@/lib/dashboard-layout";
+import { readCampaign } from "@/features/campaign-types/filter";
+import CampaignPicker from "@/features/campaign-types/components/campaign-picker";
 
 export const dynamic = "force-dynamic";
 
@@ -130,7 +132,9 @@ export default async function Dashboard({ searchParams }) {
     };
   });
 
-  const companyP = view.audience !== "company" ? Promise.resolve(null) : basics.then(async ([businessToday, rules, tz]) => {
+  // The campaign type the administrator's figures count (Campaign Types phase 4, ?ct=): Insurance to begin with.
+  const campaignP = view.audience === "company" && !isManager ? readCampaign(sp?.ct) : Promise.resolve(null);
+  const companyP = view.audience !== "company" ? Promise.resolve(null) : Promise.all([basics, campaignP]).then(async ([[businessToday, rules, tz], campaign]) => {
     // An administrator's view of the team: a day (today to begin with) or a pay period, week or month.
     const v = readView(sp, { keyParam: "dp", dateParam: "dd", keys: VIEW_KEYS, today: businessToday, time: rules.time });
     // And the top tiles: what the managers developed over a day, the pay period (to begin with), a week or a month.
@@ -163,20 +167,20 @@ export default async function Dashboard({ searchParams }) {
     const [rows, tiles, schedule, data, goals, options, developed] = await Promise.all([
       getProduction(v.range),
       Promise.all([
-        getTeamTiles({ today: businessToday, rep: tileRep, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
-        getRenewalConversion({ year: ry, month: rm, rep: tileRep }),
+        getTeamTiles({ today: businessToday, rep: tileRep, campaign, ranges: { leads: viewRange(tp.tl, businessToday, rules.time), appts: viewRange(tp.ta, businessToday, rules.time) } }),
+        getRenewalConversion({ year: ry, month: rm, rep: tileRep, campaign }),
       ]).then(([t, conversion]) => ({ ...t, conversion, rep: tileRep, thisYear })),
       // An administrator who is a client's Sales Rep: their own clients' (Sean, Nov 2026).
       getMySchedule({ userId: me.id, from: grid[0], to: grid[41], today: businessToday, timeZone: tz, owner: true, everyone: true, salesRep: Boolean(me.salesRep) }),
-      getProductionChart({ from: range.from, to: range.to, ...selected }),
+      getProductionChart({ from: range.from, to: range.to, ...selected, campaign }),
       // The months shown, and a year either way for setting goals ahead.
       getProductionGoals(addDays(range.from < businessToday ? range.from : businessToday, -366), addDays(businessToday, 366)),
       getProductionChartOptions(),
-      getDeveloped({ from: rv.range.from, to: rv.range.to, timeZone: tz, kinds: kind === "both" ? ["lead", "appointment"] : [kind] }),
+      getDeveloped({ from: rv.range.from, to: rv.range.to, timeZone: tz, kinds: kind === "both" ? ["lead", "appointment"] : [kind], campaign }),
     ]);
     return {
       production: { view: v, rows },
-      team: { ...tiles, periods: tp, cm, schedule },
+      team: { ...tiles, periods: tp, cm, schedule, campaign },
       chart: { data, range, goals, options, selected },
       recentAll: { view: rv, kind, rows: developed },
     };
@@ -489,11 +493,17 @@ export default async function Dashboard({ searchParams }) {
   // Each section of the dashboard, by its name in SECTIONS (lib/dashboard-layout); null when this one has nothing to show.
   const tilesNode = (
     <>
-      {/* The top tiles for one Sales Rep's clients (Sean, Nov 2026), an administrator's choice. */}
-      {team?.reps?.length ? (
-        <div className="relative z-10 flex justify-end" data-tile-rep>
-          <ParamSelect name="tr" label="Sales Rep" placeholder="Everyone" value={team.rep ? String(team.rep) : ""}
-            options={team.reps.map((r) => ({ value: String(r.id), label: r.name }))} clears={[]} />
+      {/* The top tiles for one Sales Rep's clients (Sean, Nov 2026), an administrator's choice; and the campaign type
+          the dashboard counts (Campaign Types phase 4: Insurance to begin with). */}
+      {team?.reps?.length || team?.campaign ? (
+        <div className="relative z-10 flex flex-wrap justify-end gap-2">
+          <CampaignPicker campaign={team.campaign} clears={[]} />
+          {team.reps?.length ? (
+            <span data-tile-rep>
+              <ParamSelect name="tr" label="Sales Rep" placeholder="Everyone" value={team.rep ? String(team.rep) : ""}
+                options={team.reps.map((r) => ({ value: String(r.id), label: r.name }))} clears={[]} />
+            </span>
+          ) : null}
         </div>
       ) : null}
       <div className="expand-row grid grid-cols-1 gap-4 sm:grid-cols-2 xl:flex" data-from="xl">
