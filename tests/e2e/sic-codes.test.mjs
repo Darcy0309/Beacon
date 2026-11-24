@@ -36,7 +36,7 @@ try {
     await admin.send("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [p] });
   };
   const toastSays = (re) => until(() => admin.ev(`[...document.querySelectorAll('[data-sonner-toast]')].some((t) => ${re}.test(t.textContent))`), { timeout: 20000 });
-  await admin.go("/settings", 8000);
+  await admin.go("/settings/leads", 8000);
   await until(() => admin.ev("!!document.querySelector('[data-sic-import]')"), { timeout: 30000 });
   await upload(file("list.csv", `SIC Code,SIC Description\n111,${TAG} Wheat\n11101,${TAG} Durum\n`));
   check("loaded from a sheet: 111 is 0111, 11101 is 011101", Boolean(await until(() => sql(`select string_agg(code, ',' order by code) from public.sic_codes where description like ${lit(`${TAG}%`)}`) === "0111,011101" || null, { timeout: 20000 })));
@@ -50,7 +50,7 @@ try {
   const electric = old("Electric", null, "ELECTRICAL WORK");
   const story = old("Story", null, "Family-owned HVAC company since 1990");
   const coded = old("Coded", "1521", "Electrical Work");
-  await admin.go("/settings", 5000);
+  await admin.go("/settings/leads", 5000);
   await admin.click("[data-sic-fill-leads]");
   check("Settings gives the leads with a description and no code theirs, and says how many", Boolean(await toastSays("/given theirs from the description/")));
   check("…a description on the list: its code", sql(`select coalesce(sic_code, '') from public.leads where id = ${electric}`) === "1731", sql(`select sic_code from public.leads where id = ${electric}`));
@@ -65,7 +65,7 @@ try {
   await admin.key("Escape");
   sql(`delete from public.leads where project_id = ${project}`);
   sql(`delete from public.projects where id = ${project}`);
-  await admin.go("/settings", 5000);
+  await admin.go("/settings/leads", 5000);
 
   section("Replace the whole list");
   await admin.ev("document.querySelector('[data-sic-replace]').click()");

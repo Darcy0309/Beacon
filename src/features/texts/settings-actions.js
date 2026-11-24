@@ -27,6 +27,6 @@ export async function saveApptTextSettings(prevState, formData) {
   const { error } = await supabase.from("app_settings").upsert({ key: "appt_texts", value: saved, updated_at: new Date().toISOString() });
   if (error) return fail(error, null, values);
   await logActivity(supabase, "settings.appt_texts", { detail: `${hour}:00 ${zone}`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok(saved);
 }

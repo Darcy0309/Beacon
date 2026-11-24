@@ -60,7 +60,7 @@ export async function importSicCodes(pairs, { replace = false } = {}) {
     kept = used.size;
   }
   await logActivity(supabase, "sic.import", { detail: `${added} added, ${changes.length - added} updated${replace ? `, ${removed} removed` : ""}`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok({ added, updated: changes.length - added, removed, kept, total: existing.size + added - removed });
 }
 

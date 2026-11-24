@@ -90,7 +90,7 @@ export default function ProjectRatesForm({ project, ranges, trigger }) {
             </fieldset>
           ) : null}
           <p className="text-xs text-muted-foreground">
-            The choices come from <Link href="/settings" className="text-primary hover:underline">Settings › Pay &amp; time</Link>.
+            The choices come from <Link href="/settings/pay" className="text-primary hover:underline">Settings › Pay &amp; Time</Link>.
           </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

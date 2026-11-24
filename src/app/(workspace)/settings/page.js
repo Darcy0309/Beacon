@@ -1,72 +1,45 @@
+import Link from "@/components/shared/intent-link";
+import { ChevronRight } from "lucide-react";
 import Topbar from "@/components/layout/topbar";
-import SettingsForm from "@/features/settings/components/settings-form";
-import { getSettings } from "@/features/settings/queries";
-import PayRulesForm from "@/features/pay/components/pay-rules-form";
-import PaySchedule from "@/features/pay/components/pay-schedule";
-import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day";
-import { getBonusRules, getPayRules } from "@/features/pay/queries";
-import BonusPlansSettings from "@/features/pay/components/bonus-plans-settings";
-import { mailServerInfo } from "@/lib/server/mail";
-import SicCodesCard from "@/features/sic/components/sic-codes-card";
-import CargoTypesCard from "@/features/cargo/components/cargo-types-card";
-import IdleSettings from "@/features/settings/components/idle-settings";
-import DeliverySettings from "@/features/settings/components/delivery-settings";
-import { getCargoTypes } from "@/features/cargo/queries";
-import DeletedRecordsCard from "@/features/trash/components/deleted-records-card";
-import EmailTemplatesCard from "@/features/email/components/email-templates-card";
-import { getAllEmailTemplates } from "@/features/email/templates";
-import { getDeletedRecords } from "@/features/trash/queries";
-import { createClient } from "@/lib/supabase/server";
-import ApptTextSettings from "@/features/settings/components/appt-text-settings";
-import CallRecordingSettings from "@/features/settings/components/call-recording-settings";
-import PhoneLinesSettings from "@/features/settings/components/phone-lines-settings";
-import { apptTextSettings } from "@/lib/appointment-texts";
-import CampaignTypesCard from "@/features/campaign-types/components/campaign-types-card";
-import { getCampaignTypes } from "@/features/campaign-types/queries";
+import { Card } from "@/components/ui/card";
+import SettingsIcon from "@/features/settings/components/settings-icon";
+import { SETTINGS_AREAS } from "@/features/settings/areas";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
-  const supabase = await createClient();
-  const [{ settings }, payRules, today, sic, deleted, cargo, templates, tz, texting, bonusRules, phoneLines, callers, campaignTypes] = await Promise.all([
-    getSettings(), getPayRules(), getBusinessToday(),
-    supabase.from("sic_codes").select("code", { count: "exact", head: true }),
-    getDeletedRecords(),
-    getCargoTypes(),
-    getAllEmailTemplates(),
-    getBusinessTimeZone(),
-    supabase.from("projects").select("id", { count: "exact", head: true }).eq("appt_texts", true).is("deleted_at", null),
-    getBonusRules(),
-    supabase.from("phone_lines").select("id, number, kind, label, ring_user_ids, area_code").order("kind").order("number"),
-    supabase.from("users").select("id, first_name, last_name, email, phone_ext").in("role", ["admin", "manager", "agent"]).eq("status", "active")
-      .is("deleted_at", null).order("first_name").order("last_name").limit(500),
-    getCampaignTypes(),
-  ]);
-
+/**
+ * Settings, by area (client, Nov 2026: "categorize them by area … view these categories and click on them to access
+ * more detailed settings"): a tile for each, naming what it holds; each opens its own page (/settings/<area>).
+ */
+export default function SettingsPage() {
   return (
     <>
-      <Topbar title="Settings" sub="Branding, security, email, pay and time" />
-      <div className="flex-1 space-y-4 p-4 sm:p-6">
-        <SettingsForm settings={settings} mailServer={mailServerInfo()} />
-        {/* What managers pick from in a lead's Email box (client, Nov 2026). */}
-        <EmailTemplatesCard templates={templates} />
-        {/* The text a prospect gets the day before their appointment, on the projects that have it on (client, Nov 2026). */}
-        <ApptTextSettings value={apptTextSettings(settings.appt_texts, tz)} projects={texting.count ?? 0} />
-        {/* Every call on the Lighthouse phone recorded, without pressing Record (Sean, Nov 2026). */}
-        <CallRecordingSettings value={settings.phone} />
-        {/* The lines, extensions and voicemail (Sean, Nov 2026: the toll-free lines moved from PanTerra). */}
-        <PhoneLinesSettings lines={phoneLines.data ?? []} staff={callers.data ?? []} value={settings.phone ?? {}} />
-        <DeliverySettings value={settings.delivery} />
-        <IdleSettings minutes={settings.security?.idle_minutes} />
-        <PayRulesForm rules={payRules} />
-        <PaySchedule periods={payRules.time.schedule} today={today} editable />
-        {/* The lead and appointment managers' bonus plans (Sean, Nov 2026). */}
-        <BonusPlansSettings rules={bonusRules} />
-        {/* Lead sheets for other industries (Sean, Nov 2026). */}
-        <CampaignTypesCard types={campaignTypes} />
-        <SicCodesCard count={sic.count ?? 0} />
-        <CargoTypesCard types={cargo} />
-        <DeletedRecordsCard records={deleted} />
+      <Topbar title="Settings" sub="Choose an area to change its settings" />
+      <div className="flex-1 p-4 sm:p-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-settings-areas>
+          {SETTINGS_AREAS.map((a) => (
+            <Link key={a.key} href={`/settings/${a.key}`} data-settings-area={a.key}
+              className="group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <Card className="flex h-full flex-col gap-4 p-5 transition-colors group-hover:border-primary/50 group-hover:bg-primary/[0.04]">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                    <SettingsIcon name={a.icon} className="size-5" />
+                  </span>
+                  <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
+                </div>
+                <div className="space-y-1">
+                  <h2 className="text-base font-semibold tracking-tight">{a.title}</h2>
+                  <p className="text-sm text-muted-foreground">{a.summary}</p>
+                </div>
+                <ul className="mt-auto flex flex-wrap gap-1.5">
+                  {a.items.map((i) => (
+                    <li key={i} className="rounded-full border border-[var(--panel-border)] px-2 py-0.5 text-[0.7rem] text-muted-foreground">{i}</li>
+                  ))}
+                </ul>
+              </Card>
+            </Link>
+          ))}
+        </div>
       </div>
     </>
   );

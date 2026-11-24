@@ -31,7 +31,7 @@ try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
 
   section("Built: a Percent field, and Pick several with its choices from a file");
-  await admin.go("/settings", 6000);
+  await admin.go("/settings/leads", 6000);
   await admin.ev(`document.querySelector('[data-campaign-types]')?.scrollIntoView()`);
   await until(() => admin.ev(`!!document.querySelector('[data-new-campaign-type]')`), { timeout: 20000 });
   await admin.click("[data-new-campaign-type]");

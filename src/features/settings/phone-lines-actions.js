@@ -31,7 +31,7 @@ export async function addPhoneLine(prevState, formData) {
   const { error } = await supabase.from("phone_lines").insert({ number, kind, label: label(formData), ring_user_ids: kind === "main" ? ids(formData, "ring") : [], created_by: me.id });
   if (error) return fail(error.code === "23505" ? `${lineNumberLabel(number)} is already one of the lines.` : error);
   await logActivity(supabase, "settings.phone_line", { detail: `added ${lineNumberLabel(number)} (${KIND_LABEL[kind]})`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok({ number });
 }
 
@@ -48,7 +48,7 @@ export async function updatePhoneLine(prevState, formData) {
   if (error) return fail(error);
   if (!data) return fail("That line is no longer there.");
   await logActivity(supabase, "settings.phone_line", { detail: `${lineNumberLabel(data.number)}: ${KIND_LABEL[kind]}`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok({ id });
 }
 
@@ -59,7 +59,7 @@ export async function removePhoneLine(id) {
   const { data, error } = await supabase.from("phone_lines").delete().eq("id", Number(id)).select("number").maybeSingle();
   if (error) return fail(error);
   if (data) await logActivity(supabase, "settings.phone_line", { detail: `removed ${lineNumberLabel(data.number)}`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok({ id });
 }
 
@@ -75,6 +75,6 @@ export async function savePhoneLineSettings(prevState, formData) {
   const { error } = await supabase.from("app_settings").upsert({ key: "phone", value, updated_at: new Date().toISOString() });
   if (error) return fail(error);
   await logActivity(supabase, "settings.phone", { detail: `managers' line greeting ${greeting ? "set" : "the usual one"}; general voicemail to ${people.length || "the administrators"}`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok(value);
 }

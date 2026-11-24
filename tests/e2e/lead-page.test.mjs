@@ -67,7 +67,7 @@ try {
 
   section("The cargo list, in Settings");
   const adminPage = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1400, height: 1000 });
-  await adminPage.go("/settings", 5000);
+  await adminPage.go("/settings/leads", 5000);
   await until(() => adminPage.ev(`!!document.querySelector('[data-cargo-import]')`));
   const doc = await adminPage.send("DOM.getDocument");
   const input = await adminPage.send("DOM.querySelector", { nodeId: doc.root.nodeId, selector: "[data-cargo-import]" });

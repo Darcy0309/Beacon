@@ -42,7 +42,7 @@ export async function saveSettings(prevState, formData) {
     if (error) return fail(error);
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok();
 }
 
@@ -63,7 +63,7 @@ export async function saveSetting(prevState, formData) {
     .upsert({ key, value, updated_at: new Date().toISOString() });
   if (error) return fail(error);
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok();
 }
 
@@ -88,7 +88,7 @@ export async function saveIdleSettings(prevState, formData) {
     .upsert({ key: "security", value: { ...(current?.value ?? {}), idle_minutes: minutes }, updated_at: new Date().toISOString() });
   if (error) return fail(error);
   await logActivity(supabase, "settings.idle", { detail: IDLE_ROLES.map(([r]) => `${r} ${minutes[r] || "never"}`).join(", "), userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok(minutes);
 }
 
@@ -112,6 +112,6 @@ export async function savePhoneSettings(prevState, formData) {
     detail: recordAll ? `every call recorded${notice ? ", with the notice" : ", no notice"}` : "calls recorded only with Record",
     userId: me.id,
   });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok(value);
 }

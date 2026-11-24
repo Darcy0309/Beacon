@@ -319,7 +319,7 @@ try {
     Boolean(await until(async () => /2 carrier entries weren't a match[\s\S]*unsure[\s\S]*will provide|2 carrier entries weren't a match[\s\S]*will provide[\s\S]*unsure/i.test((await admin.toasts()) ?? ""), { timeout: 8000 })), await admin.toasts());
 
   section("The SIC list in Settings");
-  await admin.go("/settings", 4000);
+  await admin.go("/settings/leads", 4000);
   const before = Number((await admin.ev(`document.querySelector('[data-sic-count]')?.textContent ?? '0'`)).replace(/\D/g, ""));
   const listFile = path.join(path.dirname(file), "sic.csv");
   writeFileSync(listFile, ["SICCode,SICDesc", `${NEW_SIC},${TAG} widgets and gadgets`, `8${String(Date.now()).slice(-3)}-11,${TAG} new trade`].join("\n"));

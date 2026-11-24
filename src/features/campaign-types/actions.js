@@ -31,7 +31,7 @@ export async function saveCampaignType(prevState, formData) {
   if (error) return fail(/duplicate|unique/i.test(error.message) ? "There's already a campaign type with that name." : error.message, /duplicate|unique/i.test(error.message) ? { name: "Taken" } : null);
   if (!data?.length) return fail("That campaign type no longer exists.");
   await logActivity(supabase, id ? "campaign_type.update" : "campaign_type.create", { entity: "campaign_type", entityId: data[0].id, detail: name });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/leads", "layout");
   return ok({ id: data[0].id, name });
 }
@@ -47,7 +47,7 @@ export async function deleteCampaignType(formData) {
   if (error) return fail(error.message);
   if (!data?.length) return fail("That campaign type no longer exists.");
   await logActivity(supabase, "campaign_type.delete", { entity: "campaign_type", entityId: id, detail: data[0].name });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/clients", "layout");
   return ok({ id });
 }

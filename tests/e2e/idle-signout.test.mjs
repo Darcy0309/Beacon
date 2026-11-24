@@ -60,7 +60,7 @@ try {
   check("no limit: nothing counts down, and they stay signed in", (await admin.path()) === "/" && !(await admin.ev(`!!document.querySelector('[data-idle-warning]')`)) && !(await idleCookie(admin)));
 
   section("Each role's time, set in Settings");
-  await admin.go("/settings", 5000);
+  await admin.go("/settings/general", 5000);
   await until(() => admin.ev(`!!document.querySelector('[data-idle-settings] select[name="manager"]')`));
   await admin.fill('[data-idle-settings] select[name="manager"]', "60");
   await admin.fill('[data-idle-settings] select[name="agent"]', "0");

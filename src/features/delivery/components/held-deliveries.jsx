@@ -91,7 +91,7 @@ export default function HeldDeliveries({ rows, summary }) {
   return (
     <div data-held-deliveries>
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--panel-border)] px-5 py-2.5">
-        <p className="text-xs text-muted-foreground" data-delivery-summary>{summary} <Link href="/settings#delivery" className="font-semibold text-primary hover:underline">Change</Link></p>
+        <p className="text-xs text-muted-foreground" data-delivery-summary>{summary} <Link href="/settings/messages#delivery" className="font-semibold text-primary hover:underline">Change</Link></p>
         {rows.length ? (
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" disabled={sending || picked.size === 0} onClick={() => send([...picked])} data-send-picked>

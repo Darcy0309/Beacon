@@ -30,7 +30,7 @@ try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
 
   section("Built in Settings");
-  await admin.go("/settings", 6000);
+  await admin.go("/settings/leads", 6000);
   await admin.ev(`document.querySelector('[data-campaign-types]')?.scrollIntoView()`);
   check("Settings has Campaign Types, Insurance built in", Boolean(await until(() => admin.ev(`!!document.querySelector('[data-campaign-type="insurance"]')`))));
   await admin.click("[data-new-campaign-type]");

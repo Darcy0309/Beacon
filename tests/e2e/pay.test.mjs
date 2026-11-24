@@ -26,7 +26,7 @@ const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newP
 try {
   section("Settings › Pay & time: ranges an administrator can widen");
   {
-    await admin.go("/settings", 4000);
+    await admin.go("/settings/pay", 4000);
     const value = (name) => admin.ev(`document.querySelector('[data-pay-rules] input[name="${name}"]')?.value ?? null`);
     check("lead pay $8–$12 in 50¢ steps to start with", (await value("lead_min")) === "8.00" && (await value("lead_max")) === "12.00" && (await value("lead_step")) === "0.50",
       `${await value("lead_min")}–${await value("lead_max")} / ${await value("lead_step")}`);

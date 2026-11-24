@@ -17,7 +17,7 @@ async function asAdmin() {
 }
 
 const refresh = () => {
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/leads", "layout");
 };
 

@@ -50,7 +50,7 @@ export async function savePayRules(prevState, formData) {
     entity: "settings",
     detail: `lead $${rates.lead.min}–$${rates.lead.max} · appointment $${rates.appointment.min}–$${rates.appointment.max} · special $${rates.special.min}–$${rates.special.max} · hourly $${rates.hourly.min}–$${rates.hourly.max}`,
   });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/reports/pay");
   revalidatePath("/reports/production");
   return ok({ rates, time });
@@ -93,7 +93,7 @@ export async function savePayPeriod(prevState, formData) {
   if (!data?.length) return fail("That pay period is no longer on the schedule.");
 
   await logActivity(supabase, id ? "pay.period.update" : "pay.period.create", { entity: "pay_period", entityId: data[0].id, detail: `${from} – ${to}` });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/reports/pay");
   return ok({ id: data[0].id });
 }
@@ -109,7 +109,7 @@ export async function deletePayPeriod(formData) {
   if (error) return fail(error);
   if (!data?.length) return fail("That pay period is no longer on the schedule.");
   await logActivity(supabase, "pay.period.delete", { entity: "pay_period", entityId: id, detail: `${data[0].starts_on} – ${data[0].ends_on}` });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/reports/pay");
   return ok({ id });
 }

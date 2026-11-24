@@ -49,7 +49,7 @@ const template = () => JSON.parse(sql(`select coalesce(row_to_json(t)::text, 'nu
 try {
   section("An administrator adds a template in Settings");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
-  await admin.go("/settings", 7000);
+  await admin.go("/settings/messages", 7000);
   await when(admin, "!!document.querySelector('[data-new-template]')");
   await admin.ev("document.querySelector('[data-new-template]').click(), true");
   await when(admin, "!!document.querySelector('[data-template-dialog] [data-template-name]')");

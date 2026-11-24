@@ -17,7 +17,7 @@ const browser = await launchBrowser();
 try {
   sql("delete from public.app_settings where key = 'phone'");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1280, height: 900 });
-  await admin.go("/settings", 5000);
+  await admin.go("/settings/phone", 5000);
   const card = "[data-call-recording-settings]";
   await until(() => admin.ev(`!!document.querySelector('${card}')`));
 
@@ -37,7 +37,7 @@ try {
   await admin.click(`${card} button[type=submit]`, "Save");
   check("the notice on: every call, with the notice", Boolean(await until(() => saved()?.record_all === true && saved()?.record_notice === true)), JSON.stringify(saved()));
 
-  await admin.go("/settings", 5000);
+  await admin.go("/settings/phone", 5000);
   await until(() => admin.ev(`!!document.querySelector('${card}')`));
   check("as saved when the page is opened again", await admin.ev(`document.querySelector('${card} [data-record-all]').checked && document.querySelector('${card} [data-record-notice]').checked`));
   await admin.ev(`document.querySelector('${card} [data-record-all]').click()`);

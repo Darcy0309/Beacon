@@ -51,7 +51,7 @@ try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1500, height: 1100 });
 
   section("Settings › Delivery");
-  await admin.go("/settings", 5000);
+  await admin.go("/settings/messages", 5000);
   check("how leads and appointments go to clients, and when held ones go", await admin.ev(`!!document.querySelector('[data-delivery-settings] select[name="leads"]') && document.querySelector('[data-delivery-settings] select[name="appointments"]').value === 'hold'`));
 
   section("A Lead, held");

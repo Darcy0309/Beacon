@@ -54,7 +54,7 @@ try {
   check("in the activity log, by name", sql(`select count(*) from public.activity_log where action = 'company.delete' and entity_id = ${company} and detail = ${lit(NAME)}`) === "1");
 
   section("Restored");
-  await admin.go("/settings", 6000);
+  await admin.go("/settings/trash", 6000);
   await until(() => admin.ev(`!!document.querySelector('[data-deleted="companies:${company}"]')`));
   await admin.ev(`document.querySelector('[data-deleted="companies:${company}"]').scrollIntoView({ block: 'center' })`);
   await admin.click(`[data-deleted="companies:${company}"] [data-restore]`);

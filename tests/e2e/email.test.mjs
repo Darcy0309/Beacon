@@ -218,7 +218,7 @@ try {
   check("an administrator: the button, on any name", await admin.ev(`!!document.querySelector('[data-email-lead]')`));
 
   section("Settings");
-  await admin.go("/settings", 4000);
+  await admin.go("/settings/general", 4000);
   const server = await admin.ev(`document.querySelector('[data-mail-server]')?.innerText ?? ''`);
   check("Settings shows the mail server the app sends through and its login", server.includes(`127.0.0.1:${PORT}`) && server.includes(`signed in as ${mail.logins[0] ?? ""}`), server);
   check("…never the password, and no server fields to type into", await admin.ev(`!document.querySelector('input[name="mail_host"], input[name="mail_provider"]')`) && /never here/.test(server));

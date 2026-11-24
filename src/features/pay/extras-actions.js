@@ -145,7 +145,7 @@ export async function saveBonusPlans(prevState, formData) {
   const { error } = await supabase.from("app_settings").upsert({ key: "bonus_plans", value, updated_at: new Date().toISOString() });
   if (error) return fail(error);
   await logActivity(supabase, "settings.bonus_plans", { detail: JSON.stringify(value).slice(0, 400), userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   revalidatePath("/reports/pay");
   return ok(value);
 }

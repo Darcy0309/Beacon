@@ -94,7 +94,7 @@ export async function saveDeliverySettings(prevState, formData) {
   const { error } = await supabase.from("app_settings").upsert({ key: "delivery", value: saved, updated_at: new Date().toISOString() });
   if (error) return fail(error);
   await logActivity(supabase, "settings.delivery", { detail: `leads ${saved.leads}, appointments ${saved.appointments}, every ${saved.every}h ${saved.from}-${saved.to}`, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   refresh();
   return ok(saved);
 }

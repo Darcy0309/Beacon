@@ -95,7 +95,7 @@ const browser = await launchBrowser({ mouse: true });
 try {
   section("Settings: the reminder and when it goes");
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 1000 });
-  await admin.go("/settings", 7000);
+  await admin.go("/settings/messages", 7000);
   await until(() => admin.ev("!!document.querySelector('[data-appt-text-settings]')"), { timeout: 15000 });
   check("on Settings, with the projects that have it on counted", /projects? ha(s|ve) it on/.test(await admin.ev("document.querySelector('[data-appt-text-settings]').innerText")));
   const body = "Hi {first_name}, {client} here: reminder of your appointment with {agent_name} {appt_date} at {appt_time}. Reply Y to confirm, N to cancel, or R to reschedule.";

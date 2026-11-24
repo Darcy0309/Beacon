@@ -94,7 +94,7 @@ try {
   check("…Sean kept as its developer", Number(sql(`select dbdv_user_id from public.leads where id = ${leadB}`)) === SEAN);
 
   section("Settings › Bonus Plans, and the Pay report");
-  await admin.go("/settings", 6000);
+  await admin.go("/settings/pay", 6000);
   check("the bonus plans, with their tiers", Boolean(await until(() => admin.ev(`(() => { const c = document.querySelector('[data-bonus-plans]'); return !!c && c.querySelector('[name="lead_weekly_at_0"]')?.value === '50' && c.querySelector('[name="appt_monthly_amount_1"]')?.value === '500'; })()`))));
   check("…and the appointment managers' weekly scale: from 21 on $5 each, from 31 on $10 each", await admin.ev(`(() => { const c = document.querySelector('[data-bonus-plans]');
     return ['appt_weekly_scale_from_0', 'appt_weekly_scale_each_0', 'appt_weekly_scale_from_1', 'appt_weekly_scale_each_1'].map((n) => c.querySelector('[name="' + n + '"]')?.value).join() === '21,5,31,10'; })()`));

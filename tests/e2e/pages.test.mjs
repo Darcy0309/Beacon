@@ -76,7 +76,10 @@ const PAGES = [
   ["/reports/pay", "Pay & Hours", ["Pay for the Period", "Hours Paid", "Commission", "Sean Fitzgerald"]],
   ["/alerts", "Alerts", ["Alert rules"]],
   ["/users", "Users", ["Users", "beacon.test"]],
-  ["/settings", "Settings", ["Branding", "Email (SMTP)", "Sign-in Security", "Pay Rates", "Time Worked"]],
+  // By area (client, Nov 2026): the areas, then each one's own page.
+  ["/settings", "Settings", ["Dashboard", "Phone", "Deleted Records", "Campaign types", "Bonus plans", "Call recording"]],
+  ["/settings/general", "Settings", ["Branding", "Email (SMTP)", "Sign-in Security"]],
+  ["/settings/pay", "Settings", ["Pay Rates", "Time Worked"]],
 ];
 
 section("Signed out: protected routes must redirect");

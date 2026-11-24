@@ -32,7 +32,7 @@ export async function addCargoTypes(names) {
     if (insertError) return fail(insertError);
     await logActivity(supabase, "cargo.add", { detail: fresh.length === 1 ? fresh[0] : `${fresh.length} added`, userId: me.id });
   }
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok({ added: fresh.length, already: list.length - fresh.length });
 }
 
@@ -45,6 +45,6 @@ export async function removeCargoType(id) {
   if (error) return fail(error);
   if (!data?.length) return fail("That cargo type was not found.");
   await logActivity(supabase, "cargo.remove", { detail: data[0].name, userId: me.id });
-  revalidatePath("/settings");
+  revalidatePath("/settings/[area]", "page");
   return ok();
 }

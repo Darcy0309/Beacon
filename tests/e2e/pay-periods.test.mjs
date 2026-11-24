@@ -47,7 +47,7 @@ try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 950 });
 
   section("Settings: a custom schedule");
-  await admin.go("/settings", 4000);
+  await admin.go("/settings/pay", 4000);
   await admin.fill('select[name="pay_period"]', "custom");
   await admin.click("button[type=submit]", "Save pay rules");
   check("“Custom schedule” is a pay period to choose", Boolean(await until(() => sql("select value->>'pay_period' from public.app_settings where key = 'time_tracking'") === "custom")));

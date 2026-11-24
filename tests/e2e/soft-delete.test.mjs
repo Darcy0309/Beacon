@@ -66,7 +66,7 @@ try {
   check("the delete is in the activity log, with its name", sql(`select count(*) from public.activity_log where action = 'project.delete' and entity_id = ${project} and detail = ${lit(NAME)}`) === "1");
 
   section("Settings › Deleted Records");
-  await admin.go("/settings", 6000);
+  await admin.go("/settings/trash", 6000);
   const listed = await until(() => admin.ev(`document.querySelector('[data-deleted="projects:${project}"]')?.innerText.replace(/\\s+/g, ' ') ?? null`));
   check("the project is listed: its client, what went with it, when and by whom", new RegExp(`${NAME} ${TAG} Insurance · 3 records went with it Project`).test(listed ?? "") && /Restore/i.test(listed ?? ""), listed);
   check("its names are not listed one by one", (await admin.ev(`document.querySelectorAll('[data-deleted^="leads:"]').length`)) === Number(sql("select count(*) from public.leads where deleted_at is not null and deleted_via is null")));
@@ -84,7 +84,7 @@ try {
 
   section("A manager");
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 1000 });
-  await sean.go("/settings", 4000);
+  await sean.go("/settings/trash", 4000);
   check("has no Deleted Records to open", !(await sean.ev(`!!document.querySelector('[data-deleted-records]')`)));
   sean.close();
 
