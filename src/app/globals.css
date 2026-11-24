@@ -241,6 +241,58 @@
   background-color: color-mix(in srgb, var(--card) 80%, transparent);
   border-radius: var(--radius-xl);
 }
+/* Settings' area tiles (Nov 2026): pointed at, a tile lifts and its edge and shadow take the accent; the same when
+   tabbed to. Above the panels' own rules, which the utility classes can't beat. */
+[data-settings-area] [data-panel] {
+  transition: transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease, background-color 200ms ease;
+}
+[data-settings-area]:hover [data-panel],
+[data-settings-area]:focus-visible [data-panel] {
+  transform: translateY(-3px);
+  /* !important: every look's own panel border and shadow (Executive, Modern…) is more specific than this. */
+  border-color: color-mix(in srgb, var(--primary) 55%, var(--panel-border)) !important;
+  background-color: color-mix(in srgb, var(--primary) 5%, var(--card)) !important;
+  box-shadow: 0 14px 30px -14px color-mix(in srgb, var(--primary) 45%, transparent), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent) !important;
+}
+[data-settings-area] [data-area-arrow] { transition: transform 200ms ease, color 200ms ease; }
+[data-settings-area]:hover [data-area-title] { color: var(--primary); }
+
+/* …and more of what it holds slides in from its right edge (client, Nov 2026): a slanted panel on a deep
+   teal-to-magenta ground with a little sparkle, its words in white, over the tile's right half. */
+.settings-reveal {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 68%;
+  clip-path: polygon(24% 0, 100% 0, 100% 100%, 0 100%);
+  background:
+    radial-gradient(1.5px 1.5px at 22% 30%, rgb(255 255 255 / 0.9), transparent 60%),
+    radial-gradient(1px 1px at 68% 18%, rgb(255 255 255 / 0.8), transparent 60%),
+    radial-gradient(1.5px 1.5px at 82% 64%, rgb(255 255 255 / 0.85), transparent 60%),
+    radial-gradient(1px 1px at 45% 78%, rgb(255 255 255 / 0.7), transparent 60%),
+    radial-gradient(1px 1px at 58% 46%, rgb(255 255 255 / 0.6), transparent 60%),
+    radial-gradient(120% 90% at 100% 0%, rgb(168 85 247 / 0.55), transparent 60%),
+    linear-gradient(125deg, #0f766e 0%, #1e3a8a 45%, #6d28d9 75%, #a21caf 100%);
+  color: #fff;
+  transform: translateX(101%);
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.settings-reveal-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1.25rem 1.25rem 27%;
+}
+[data-settings-area]:hover .settings-reveal,
+[data-settings-area]:focus-visible .settings-reveal { transform: translateX(0); }
+@media (prefers-reduced-motion: reduce) {
+  [data-settings-area]:hover [data-panel], [data-settings-area]:focus-visible [data-panel],
+  [data-settings-area]:hover [data-area-arrow] { transform: none; }
+  .settings-reveal { transition: opacity 150ms ease; opacity: 0; transform: none; }
+  [data-settings-area]:hover .settings-reveal, [data-settings-area]:focus-visible .settings-reveal { opacity: 1; }
+}
 /* A control that sits on the page itself rather than in a panel (the calendar's view switch and
    arrows, a page's back link): the panels' own backing, so it reads over a wallpaper or photo. */
 .surface-chip {

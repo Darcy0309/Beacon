@@ -19,16 +19,16 @@ export default function SettingsPage() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-settings-areas>
           {SETTINGS_AREAS.map((a) => (
             <Link key={a.key} href={`/settings/${a.key}`} data-settings-area={a.key}
-              className="group rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              <Card className="flex h-full flex-col gap-4 p-5 transition-colors group-hover:border-primary/50 group-hover:bg-primary/[0.04]">
+              className="rounded-xl outline-none">
+              <Card className="flex h-full flex-col gap-4 p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary/12 text-primary" data-area-icon>
                     <SettingsIcon name={a.icon} className="size-5" />
                   </span>
-                  <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" aria-hidden />
+                  <ChevronRight className="size-4 text-muted-foreground" aria-hidden data-area-arrow />
                 </div>
                 <div className="space-y-1">
-                  <h2 className="text-base font-semibold tracking-tight">{a.title}</h2>
+                  <h2 className="text-base font-semibold tracking-tight transition-colors" data-area-title>{a.title}</h2>
                   <p className="text-sm text-muted-foreground">{a.summary}</p>
                 </div>
                 <ul className="mt-auto flex flex-wrap gap-1.5">
@@ -36,6 +36,14 @@ export default function SettingsPage() {
                     <li key={i} className="rounded-full border border-[var(--panel-border)] px-2 py-0.5 text-[0.7rem] text-muted-foreground">{i}</li>
                   ))}
                 </ul>
+                {/* Pointed at (client, Nov 2026): more of what it holds, sliding in from the right edge on a contrasting ground. */}
+                <div className="settings-reveal" data-area-reveal aria-hidden>
+                  <div className="settings-reveal-body">
+                    <p className="text-[0.66rem] font-bold uppercase tracking-[0.14em] opacity-80">{a.title}</p>
+                    <p className="text-sm leading-snug">{a.details}</p>
+                    <p className="flex items-center gap-1 text-xs font-semibold">Open <ChevronRight className="size-3.5" aria-hidden /></p>
+                  </div>
+                </div>
               </Card>
             </Link>
           ))}
