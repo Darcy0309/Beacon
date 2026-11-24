@@ -81,11 +81,21 @@ try {
   check("the old address goes to it, filters kept", Boolean(await until(async () => (await admin.url()).startsWith(`/reports/heat-map?client=${co}`))), await admin.url());
   check("…an administrator sees every project of the client's (the other one's 30 calls too)", /85 calls/.test(await until(() => admin.ev(`document.querySelector('[data-best-total]')?.textContent ?? null`))));
 
+  section("Early Starts");
+  const early = () => admin.ev(`(() => { const r = document.querySelector('[data-early-row="${SEAN}"]'); return r ? { first: r.querySelector('[data-first-call]').textContent, early: r.querySelector('[data-early-rate]').textContent, later: r.querySelector('[data-later-rate]').textContent, lead: r.querySelector('[data-to-lead]').innerText.replace(/\\s+/g, ' '), slow: !!r.querySelector('[data-slow-start]'), text: r.innerText.replace(/\\s+/g, ' ') } : null; })()`);
+  const es = await until(early, { timeout: 15000 });
+  check("Sean's first call, on average: 8:15 AM in the business's local time", es?.first === "8:15 AM", JSON.stringify(es));
+  check("…25 calls before 9 (Wisconsin's and Arizona's), 3 leads and 2 appointments: 20%", /\b25\b/.test(es?.text ?? "") && /3 · 2/.test(es.text) && es.early === "20.0%", JSON.stringify(es));
+  check("…after 9: 60 calls, 5 leads: 8.3%; not a slow start", es?.later === "8.3%" && !es.slow, JSON.stringify(es));
+  check("…his first lead with his first call", /^0m on 1 day with a lead/.test(es?.lead ?? ""), es?.lead);
+
   section("A manager: the projects they're assigned to");
   const sean = await (await browser.newContext({ as: "sean@beacon.test" })).newPage({ width: 1440, height: 1000 });
   await sean.go(`/reports/heat-map?client=${co}`, 8000);
   const mine = await until(() => sean.ev(`document.querySelector('[data-best-total]')?.textContent ?? null`), { timeout: 20000 });
   check("Sean sees his project's calls, not the one he isn't on", /55 calls/.test(mine ?? ""), mine);
+  const own = await until(() => sean.ev(`[...document.querySelectorAll('[data-early-row]')].map((r) => [r.dataset.earlyRow, r.querySelector('[data-later-rate]').textContent])`).then((x) => (x?.length ? x : null)));
+  check("…Early Starts: only his own row, on his own project (after 9: 30 calls, 5 leads)", JSON.stringify(own) === JSON.stringify([[String(SEAN), "16.7%"]]), JSON.stringify(own));
   check("…in the menu", Boolean(await until(() => sean.ev(`[...document.querySelectorAll('a, [role=link]')].some((a) => a.textContent.trim() === 'Production Heat Map')`))));
   const agentPage = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1200, height: 900 });
   await agentPage.go("/reports/heat-map", 5000);

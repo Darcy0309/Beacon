@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import BestTimesBoard from "@/features/best-times/components/best-times-board";
-import { getBestTimes } from "@/features/best-times/queries";
+import { getBestTimes, getEarlyStarts } from "@/features/best-times/queries";
+import EarlyStarts from "@/features/best-times/components/early-starts";
 import { getAssignableStaff } from "@/features/users/queries";
 import { addDays, formatRange, isIsoDate } from "@/lib/dates";
 import { US_STATES } from "@/lib/project-info";
@@ -43,8 +44,10 @@ export default async function BestTimesPage({ searchParams }) {
   const by = BY.some(([k]) => k === sp?.by) ? sp.by : "sic";
 
   const supabase = await createClient();
-  const [{ all, byRows }, staff, { data: clients }, { data: projects }, { data: assigned }] = await Promise.all([
+  const [{ all, byRows }, early, staff, { data: clients }, { data: projects }, { data: assigned }] = await Promise.all([
     getBestTimes({ from, to, ...filters, by }),
+    // Early Starts, by manager (Sean and Darcy, Nov 2026): a manager's own.
+    getEarlyStarts({ from, to, ...filters }),
     getAssignableStaff(),
     supabase.from("companies").select("id, name").is("deleted_at", null).order("name"),
     supabase.from("projects").select("id, name, company_id").is("deleted_at", null).order("name"),
@@ -91,6 +94,7 @@ export default async function BestTimesPage({ searchParams }) {
           </div>
         </Card>
         <BestTimesBoard rows={all} byRows={byRows} by={by} />
+        <EarlyStarts rows={early} />
       </div>
     </>
   );

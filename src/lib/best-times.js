@@ -82,3 +82,29 @@ export function bestSpan(week, mode = "both") {
 
 /** A rate as "9.7%"; "—" for none. */
 export const pct = (r) => (r == null ? "—" : `${(r * 100).toFixed(1)}%`);
+
+/** Minutes after midnight as a time of day: 492.5 → "8:12 AM". */
+export function clockOf(minutes) {
+  if (minutes == null || !Number.isFinite(Number(minutes))) return "—";
+  const m = Math.round(Number(minutes));
+  const h = Math.floor(m / 60) % 24;
+  return `${((h + 11) % 12) + 1}:${String(m % 60).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+/** Minutes as a length of time: 85 → "1h 25m", 40 → "40m". */
+export function lengthOf(minutes) {
+  if (minutes == null || !Number.isFinite(Number(minutes))) return "—";
+  const m = Math.round(Number(minutes));
+  return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m` : `${m}m`;
+}
+
+/**
+ * An early start that isn't paying off (Darcy, Nov 2026: "paying an hour for no results"): enough calls before 9 AM
+ * to judge, converting at under half the rate of the manager's calls after 9.
+ */
+export function slowStart(r, mode = "both") {
+  if (Number(r.early_calls) < MIN_CALLS || Number(r.later_calls) < MIN_CALLS) return false;
+  const early = rateOf({ calls: Number(r.early_calls), leads: Number(r.early_leads), appts: Number(r.early_appts) }, mode);
+  const later = rateOf({ calls: Number(r.later_calls), leads: Number(r.later_leads), appts: Number(r.later_appts) }, mode);
+  return later > 0 && early < later / 2;
+}

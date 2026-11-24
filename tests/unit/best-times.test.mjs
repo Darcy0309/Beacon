@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /** Unit tests for Best Times to Call (Nov 2026): a week of counts, rates, best and worst hours, a best span. */
-import { MIN_CALLS, bestSpan, hourSpan, pct, rateOf, weekOf, windows } from "../../src/lib/best-times.js";
+import { MIN_CALLS, bestSpan, clockOf, hourSpan, lengthOf, pct, rateOf, slowStart, weekOf, windows } from "../../src/lib/best-times.js";
 
 let failures = 0;
 const check = (label, cond, detail = "") => {
@@ -29,6 +29,11 @@ check("two hours to judge: one best, one worst, never both", two.best.length ===
 check("a best two hours on weekdays", span.hour === 8 && span.calls === 240, JSON.stringify(span));
 check("hour spans read as people say them", hourSpan(9) === "9–10 AM" && hourSpan(11) === "11 AM–12 PM" && hourSpan(12) === "12–1 PM" && hourSpan(8, 2) === "8–10 AM");
 check("a rate", pct(0.0971) === "9.7%" && pct(null) === "—");
+check("Early Starts: a first call's time, a time to a lead", clockOf(492.5) === "8:13 AM" && clockOf(780) === "1:00 PM" && clockOf(null) === "—" && lengthOf(85) === "1h 25m" && lengthOf(40) === "40m");
+check("…a slow start: early calls converting at under half the later rate",
+  slowStart({ early_calls: 40, early_leads: 1, early_appts: 0, later_calls: 100, later_leads: 10, later_appts: 0 })
+  && !slowStart({ early_calls: 40, early_leads: 4, early_appts: 0, later_calls: 100, later_leads: 10, later_appts: 0 })
+  && !slowStart({ early_calls: 5, early_leads: 0, early_appts: 0, later_calls: 100, later_leads: 10, later_appts: 0 }));
 
 if (failures) { console.error(`\n${failures} failed`); process.exit(1); }
 console.log("\nbest times: all passed");

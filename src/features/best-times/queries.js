@@ -19,3 +19,14 @@ export async function getBestTimes({ from, to, client = null, project = null, ma
   const shape = (r) => ({ dim: r.dim, label: r.dim_label, dow: r.dow, hour: r.hour, calls: Number(r.calls), leads: Number(r.leads), appts: Number(r.appts) });
   return { all: (all.data ?? []).map(shape), byRows: (split.data ?? []).map(shape) };
 }
+
+/**
+ * Early Starts (Sean and Darcy, Nov 2026) for the same filters: each manager's first-call time, calls before and after
+ * 9 AM local with what they made, and time from first call to first lead (early_starts()). A manager: their own.
+ */
+export async function getEarlyStarts({ from, to, client = null, project = null, manager = null, sic = null, state = null }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("early_starts", { p_from: from, p_to: to, p_company: client, p_project: project, p_user: manager, p_sic: sic, p_state: state });
+  if (error) throw error;
+  return data ?? [];
+}
