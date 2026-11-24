@@ -45,3 +45,17 @@ export async function readProjectCampaign(db, projectId) {
   if (error) return null;
   return one(one(data?.company)?.campaign_type);
 }
+
+/**
+ * Every project whose client has a campaign type, with it (Nov 2026, phase 3: the importer reads and lays out a file
+ * as the type does): { projectId: { id, name, fields } }. Empty before the migration has run.
+ */
+export async function getProjectCampaigns() {
+  const supabase = await createClient();
+  const { data: companies, error } = await supabase.from("companies").select("id, campaign_type:campaign_types(id, name, fields)").not("campaign_type_id", "is", null);
+  if (error || !companies?.length) return {};
+  const typeOf = new Map(companies.map((c) => [c.id, one(c.campaign_type)]).filter(([, t]) => t));
+  if (!typeOf.size) return {};
+  const { data: projects } = await supabase.from("projects").select("id, company_id").in("company_id", [...typeOf.keys()]).is("deleted_at", null);
+  return Object.fromEntries((projects ?? []).map((p) => [p.id, typeOf.get(p.company_id)]));
+}

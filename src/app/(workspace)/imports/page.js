@@ -3,6 +3,7 @@ import Topbar from "@/components/layout/topbar";
 import Link from "@/components/shared/intent-link";
 import ToneBadge from "@/components/shared/tone-badge";
 import CsvImport from "@/features/imports/components/csv-import";
+import { getProjectCampaigns } from "@/features/campaign-types/queries";
 import StatTile from "@/components/shared/stat-tile";
 import SectionHeader from "@/components/shared/section-header";
 import { Card } from "@/components/ui/card";
@@ -18,7 +19,7 @@ const statusTone = { Complete: "emerald", Processing: "cyan", Failed: "rose" };
 
 export default async function ImportsPage({ searchParams }) {
   const params = readListParams(await searchParams, ["status", "project"]);
-  const [{ rows: pageRows, total, stats: recentImports, projects }, lookups, checkProjects] = await Promise.all([listImports(params), getLookups(), getCheckProjects()]);
+  const [{ rows: pageRows, total, stats: recentImports, projects }, lookups, checkProjects, campaigns] = await Promise.all([listImports(params), getLookups(), getCheckProjects(), getProjectCampaigns()]);
 
   // Tiles total every batch; the table shows one page of them.
   const rows = recentImports.reduce((s, r) => s + r.rows, 0);
@@ -47,7 +48,7 @@ export default async function ImportsPage({ searchParams }) {
           ))}
         </div>
 
-        <CsvImport projects={lookups.projects} checkProjects={checkProjects} />
+        <CsvImport projects={lookups.projects} checkProjects={checkProjects} campaigns={campaigns} />
 
         <Card>
           <SectionHeader label="Recent Imports" icon={Upload} />

@@ -57,11 +57,11 @@ export function csvText(rows) {
  * The columns of a file the importer reads, and its rows without the rest:
  * a raw SalesGenie export carries some 200 columns and goes to the server
  * as the twenty-odd it uses. `skip` is the rows (indexes into csvRows) to
- * leave out. The heading row stays first.
+ * leave out. The heading row stays first. `aliases`: a campaign type's headings too (campaign-csv.js).
  */
-export function keepColumns(csvRows, skip = new Set()) {
+export function keepColumns(csvRows, skip = new Set(), aliases = {}) {
   if (!csvRows.length) return [];
-  const used = mapAllHeaders(csvRows[0]).flatMap((m, i) => (m ? [i] : []));
+  const used = mapAllHeaders(csvRows[0], aliases).flatMap((m, i) => (m ? [i] : []));
   return csvRows.filter((_, r) => !skip.has(r)).map((row) => used.map((i) => row[i] ?? ""));
 }
 
@@ -430,9 +430,11 @@ export function mapHeaders(headerRow) {
 // The lead's internal notes live apart from it (lead_notes, staff only).
 const NOTE_COLUMNS = new Set(["internal_notes"]);
 
-export function mapAllHeaders(headerRow) {
+export function mapAllHeaders(headerRow, aliases = {}) {
   return headerRow.map((h) => {
     const key = norm(h);
+    // A campaign type's own headings first (campaign-csv.js): its fields, and the parts it renamed.
+    if (aliases[key]) return aliases[key];
     if (NOTE_COLUMNS.has(COLUMN_ALIASES[key])) return { table: "notes", column: COLUMN_ALIASES[key] };
     if (COLUMN_ALIASES[key]) return { table: "lead", column: COLUMN_ALIASES[key] };
     if (INSURANCE_ALIASES[key]) return { table: "insurance", column: INSURANCE_ALIASES[key] };
@@ -644,10 +646,10 @@ export function businessDetails(lead) {
   if ("dot_number" in lead) set("dot_number", String(lead.dot_number).replace(/^(us)?dot#?\s*/i, "").trim().slice(0, 14) || null);
 }
 
-export function rowsToImport(csvRows) {
+export function rowsToImport(csvRows, aliases = {}) {
   if (csvRows.length < 2) return { rows: [], errors: 0, headers: [] };
 
-  const resolved = mapAllHeaders(csvRows[0]);
+  const resolved = mapAllHeaders(csvRows[0], aliases);
   const rows = [];
   let errors = 0;
 
@@ -659,6 +661,7 @@ export function rowsToImport(csvRows) {
     const notes = {};
     const parts = {};
     const history = {};
+    const custom = {};
 
     resolved.forEach((target, i) => {
       if (!target) return;
@@ -666,6 +669,12 @@ export function rowsToImport(csvRows) {
       // …and an "&" an old export wrote as its code ("Dr Spray Paint U0026 Body", Nov 2026) is an "&" again.
       const value = (raw[i] ?? "").trim().replace(/^'(?=[=+\-@])/, "").replace(/\\?u0026/gi, "&");
       if (!value) return;
+      // A campaign type's own field (Nov 2026): read by its kind.
+      if (target.table === "custom") {
+        const v = target.parse(value);
+        if (v !== null) custom[target.column] = v;
+        return;
+      }
       if (target.table === "name") {
         const v = cleanValue(target.column, value);
         if (v !== null) parts[target.column] = v;
@@ -755,6 +764,8 @@ export function rowsToImport(csvRows) {
       lead,
       insurance: Object.keys(insurance).length ? insurance : null,
       notes: Object.keys(notes).length ? notes : null,
+      // The answers to its campaign type's own fields (only when there are: an Insurance row is as it was).
+      ...(Object.keys(custom).length ? { custom } : {}),
       // When the old system says it was developed and set, and by whom.
       history: Object.keys(history).length ? history : null,
       // A time with no date is not a booking.

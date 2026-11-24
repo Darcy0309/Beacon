@@ -4,6 +4,8 @@
 
 import { revalidatePath } from "next/cache";
 import { MAX_IMPORT_MB, dayAt, parseCsv, resultSpelling, rowsToImport, staffMatcher } from "@/lib/csv";
+import { campaignCsv } from "@/lib/campaign-csv";
+import { readProjectCampaign } from "@/features/campaign-types/queries";
 import { appointmentSpan } from "@/lib/appointment-links";
 import { removalMatcher } from "@/lib/dedupe";
 import { check, currentAppUser, fail, logActivity, n, ok, s } from "@/lib/server/action-helpers";
@@ -170,15 +172,16 @@ export async function importLeadsCsv(prevState, formData) {
   const rows = parseCsv(text);
   if (rows.length < 2) return fail("That file has no data rows.");
 
-  const { rows: parsed, errors: skipped, headers } = rowsToImport(rows);
+  // The project's client's campaign type (Nov 2026, phase 3): its renamed columns and its own fields read too.
+  const supabase = await createClient();
+  const campaign = await readProjectCampaign(supabase, projectId);
+  const { rows: parsed, errors: skipped, headers } = rowsToImport(rows, campaignCsv(campaign).aliases);
   if (!headers.includes("company_name")) {
     return fail("No recognisable company column — expected a 'Company' heading.");
   }
 
   // A place half given (a ZIP and no county, a city and no ZIP…; Sean, Oct 2026): filled in where the rest says for certain.
   const places = await fillPlaces(parsed.map((r) => r.lead));
-
-  const supabase = await createClient();
 
   // Everything the import looks up, asked for at once rather than one after another.
   // The sheet's call-result columns place each name in the lifecycle. Old
@@ -425,6 +428,8 @@ export async function importLeadsCsv(prevState, formData) {
       return {
         ...lead,
         ...resultText,
+        // The answers to its campaign type's own fields.
+        ...(parsedRow.custom ? { custom: parsedRow.custom } : {}),
         producer_name: producer,
         project_id: target,
         ...(source ? { source_project_id: source, promoted_at: dayAt(history?.developed_at) ?? now } : {}),

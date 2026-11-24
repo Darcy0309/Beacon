@@ -1,4 +1,6 @@
-import { EXPORT_HEADERS, csvLine, currentAppointment, exportCells, exportFileName } from "@/lib/lead-export";
+import { csvLine, currentAppointment, exportFileName } from "@/lib/lead-export";
+import { campaignCells, campaignCsv } from "@/lib/campaign-csv";
+import { readProjectCampaign } from "@/features/campaign-types/queries";
 import { logActivity } from "@/lib/server/action-helpers";
 import { one } from "@/lib/server/query-helpers";
 import { getCurrentUser } from "@/lib/server/session";
@@ -28,7 +30,8 @@ const LEAD_COLUMNS = `id, company_name, contact_name, contact_title, phone, cont
  * A project's leads as a CSV in the import template's columns, with what
  * each lead holds now: its contacts, coverage, call result, appointment and
  * notes (the internal ones too). Administrators only. Every lead on the
- * project, in the order they are called, streamed a batch at a time.
+ * project, in the order they are called, streamed a batch at a time. A client with a campaign type (Nov 2026): laid
+ * out as its lead sheet is, the columns it turns off left out, those it renames renamed, and its own fields added.
  */
 export async function GET(request, { params }) {
   const me = await getCurrentUser();
@@ -47,7 +50,13 @@ export async function GET(request, { params }) {
       const { data: feeders } = await supabase.from("projects").select("id").eq("appt_project_id", project.id).is("deleted_at", null);
       ids = [...new Set([project.id, project.appt_project_id, ...(feeders ?? []).map((f) => f.id)].filter(Boolean))];
     }
-    const { count } = await supabase.from("leads").select("id", { count: "exact", head: true }).in("project_id", ids);
+    const [{ count }, campaign] = await Promise.all([
+      supabase.from("leads").select("id", { count: "exact", head: true }).in("project_id", ids),
+      readProjectCampaign(supabase, project.id),
+    ]);
+    const layout = campaignCsv(campaign);
+    // Its own answers only with a type (the column comes with the type's migration).
+    const columns = campaign ? `${LEAD_COLUMNS}, custom` : LEAD_COLUMNS;
 
     // What each SIC code means, for the template's description column.
     const sic = new Map();
@@ -59,11 +68,11 @@ export async function GET(request, { params }) {
     }
 
     const batch = async (after) => {
-      const { data, error } = await supabase.from("leads").select(LEAD_COLUMNS).in("project_id", ids).gt("id", after).order("id").limit(BATCH);
+      const { data, error } = await supabase.from("leads").select(columns).in("project_id", ids).gt("id", after).order("id").limit(BATCH);
       if (error) throw error;
       return data ?? [];
     };
-    const line = (lead) => csvLine(exportCells({
+    const line = (lead) => csvLine(campaignCells(layout, {
       lead,
       result: one(lead.result),
       insurance: one(lead.insurance),
@@ -81,7 +90,7 @@ export async function GET(request, { params }) {
       async start(controller) {
         try {
           // The byte-order mark has a spreadsheet read the file as UTF-8.
-          controller.enqueue(encoder.encode(`﻿${csvLine(EXPORT_HEADERS)}\r\n`));
+          controller.enqueue(encoder.encode(`﻿${csvLine(layout.columns.map((c) => c.heading))}\r\n`));
           for (let rows = first; rows.length; rows = await batch(rows[rows.length - 1].id)) {
             controller.enqueue(encoder.encode(`${rows.map(line).join("\r\n")}\r\n`));
           }

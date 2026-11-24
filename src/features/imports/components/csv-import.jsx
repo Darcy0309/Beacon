@@ -14,9 +14,11 @@ import { cn } from "@/lib/utils";
 import { reach } from "@/lib/reach";
 import { MAX_IMPORT_MB, MAX_SOURCE_MB, TEMPLATE_HEADERS, csvText, keepColumns, parseCsv, rowsToImport } from "@/lib/csv";
 import { findDuplicates, removalMatcher, reasonLabel, stageOf } from "@/lib/dedupe";
+import { campaignCsv, campaignHeadings } from "@/lib/campaign-csv";
 
-// The template: every column the import reads, as a CSV of headings only.
-const TEMPLATE_HREF = `data:text/csv;charset=utf-8,${encodeURIComponent(`${TEMPLATE_HEADERS.join(",")}\r\n`)}`;
+// The template: every column the import reads, as a CSV of headings only; a campaign type's, laid out as it is (Nov 2026).
+const templateHref = (headings) => `data:text/csv;charset=utf-8,${encodeURIComponent(`${headings.map((h) => (/[",]/.test(h) ? `"${h.replace(/"/g, '""')}"` : h)).join(",")}\r\n`)}`;
+const TEMPLATE_HREF = templateHref(TEMPLATE_HEADERS);
 
 const EMPTY = { ok: false, data: null, error: null, fieldErrors: null, values: null };
 const MAX_BYTES = MAX_SOURCE_MB * 1024 * 1024;
@@ -48,9 +50,9 @@ async function runImport(prevState, formData) {
  * its rows, the groups of records of one business (the one to keep marked),
  * and the names the client has taken off before.
  */
-async function checkFile(file, projectId, checkIds = []) {
+async function checkFile(file, projectId, checkIds = [], aliases = {}) {
   const csvRows = parseCsv(await file.text());
-  const { rows } = rowsToImport(csvRows);
+  const { rows } = rowsToImport(csvRows, aliases);
   const checks = projectId ? await reach(() => importChecks(projectId, checkIds)) : { ok: true, data: { removals: [], existing: [], others: [] } };
   if (!checks.ok) throw new Error(checks.error);
   const removed = removalMatcher(checks.data.removals);
@@ -95,7 +97,7 @@ const droppedOf = (plan, keep) => plan.groups.flatMap((g) => g.rows.filter((i) =
  * are left out. Import goes ahead on that, or Review duplicates shows each
  * group to choose what to keep.
  */
-export default function CsvImport({ projects = [], checkProjects = [] }) {
+export default function CsvImport({ projects = [], checkProjects = [], campaigns = {} }) {
   const [state, formAction, pending] = useActionState(runImport, EMPTY);
   const [fileName, setFileName] = useState("");
   const [projectId, setProjectId] = useState(state?.values?.project_id ?? "");
@@ -127,7 +129,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
       checking.current = null;
       return;
     }
-    const run = checkFile(file, project, [...ids]).then(
+    const run = checkFile(file, project, [...ids], campaignCsv(campaigns[project] ?? null).aliases).then(
       (p) => {
         if (checking.current !== run) return null;
         setPlan(p);
@@ -234,7 +236,7 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
       return;
     }
     const dropped = droppedOf(p, keep);
-    const text = csvText(keepColumns(p.csvRows, new Set(dropped.map((i) => p.rows[i].row))));
+    const text = csvText(keepColumns(p.csvRows, new Set(dropped.map((i) => p.rows[i].row)), campaignCsv(campaigns[projectId] ?? null).aliases));
     const upload = new File([text], file.name, { type: "text/csv" });
     if (upload.size > MAX_UPLOAD) {
       toast.error(`The columns this list imports come to more than ${MAX_IMPORT_MB} MB: split it into smaller lists.`);
@@ -304,10 +306,18 @@ export default function CsvImport({ projects = [], checkProjects = [] }) {
             Columns are read by their headings, in any order (“Company”, “Company Name” and “COMPANY” all work), and a SalesGenie export as it comes.
             Only Company is required; columns not used are left blank.
           </span>
-          <a href={TEMPLATE_HREF} download="lighthouse-import-template.csv" data-import-template
-            className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary hover:underline">
-            <Download className="size-3.5" /> Download template
-          </a>
+          {/* The chosen project's client's campaign type (Nov 2026): its template, laid out as its lead sheet is. */}
+          {campaigns[projectId] ? (
+            <a href={templateHref(campaignHeadings(campaigns[projectId]))} download={`lighthouse-import-template-${campaigns[projectId].name.replace(/[^\w-]+/g, "-")}.csv`}
+              data-import-template={campaigns[projectId].name} className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary hover:underline">
+              <Download className="size-3.5" /> Download {campaigns[projectId].name} template
+            </a>
+          ) : (
+            <a href={TEMPLATE_HREF} download="lighthouse-import-template.csv" data-import-template
+              className="inline-flex shrink-0 items-center gap-1 font-semibold text-primary hover:underline">
+              <Download className="size-3.5" /> Download template
+            </a>
+          )}
         </div>
         <form ref={formRef} onSubmit={onSubmit} noValidate className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
