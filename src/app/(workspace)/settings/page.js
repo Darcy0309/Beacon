@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Settings, by area (client, Nov 2026: "categorize them by area … view these categories and click on them to access
- * more detailed settings"): a tile for each, naming what it holds; each opens its own page (/settings/<area>).
+ * more detailed settings"): a tile for each, naming what it holds (more of it when pointed at); each opens its own page (/settings/<area>).
  */
 export default function SettingsPage() {
   return (
@@ -27,10 +27,7 @@ export default function SettingsPage() {
                   </span>
                   <ChevronRight className="size-4 text-muted-foreground" aria-hidden data-area-arrow />
                 </div>
-                <div className="space-y-1">
-                  <h2 className="text-base font-semibold tracking-tight transition-colors" data-area-title>{a.title}</h2>
-                  <p className="text-sm text-muted-foreground">{a.summary}</p>
-                </div>
+                <h2 className="text-base font-semibold tracking-tight transition-colors" data-area-title>{a.title}</h2>
                 <ul className="mt-auto flex flex-wrap gap-1.5">
                   {a.items.map((i) => (
                     <li key={i} className="rounded-full border border-[var(--panel-border)] px-2 py-0.5 text-[0.7rem] text-muted-foreground">{i}</li>
