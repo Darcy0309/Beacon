@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import AppearanceDialog from "@/components/layout/appearance-dialog";
 import DesktopSwitch from "@/features/notifications/components/desktop-switch";
 import { useOwnTimeZone } from "@/components/shared/own-time-zone";
+import CustomizeDashboard from "@/features/dashboard/components/customize-dashboard";
 
 /**
  * My Profile's preferences (Nov 2026): the look of Lighthouse (theme, wallpaper, brightness), desktop notifications,
- * and the time zone times are shown in. All of this computer's own: each person sets them where they work.
+ * and the time zone times are shown in (this computer's own); and their dashboard's layout (kept to their login).
  */
-export default function ProfilePreferences() {
+export default function ProfilePreferences({ dashboard = null }) {
   const [appearance, setAppearance] = useState(false);
   const { tz, short } = useOwnTimeZone();
   const row = "flex flex-wrap items-center justify-between gap-3 px-5 py-3.5";
@@ -24,6 +25,16 @@ export default function ProfilePreferences() {
         </div>
         <Button type="button" size="sm" variant="outline" onClick={() => setAppearance(true)} data-open-appearance><Palette /> Change</Button>
       </div>
+      {/* The dashboard's sections (Sean, Nov 2026: Customize moved off the dashboard; administrators also have it in Settings). */}
+      {dashboard?.mine ? (
+        <div className={row} data-profile-dashboard>
+          <div className="min-w-0">
+            <p className="text-sm font-medium">Dashboard layout</p>
+            <p className="text-xs text-muted-foreground">Show, hide, collapse and move the sections of your dashboard.</p>
+          </div>
+          <CustomizeDashboard kind={dashboard.kind} mine={dashboard.mine} defaults={null} />
+        </div>
+      ) : null}
       <div className="space-y-2.5 px-5 py-3.5" data-profile-desktop>
         <div>
           <p className="text-sm font-medium">Desktop notifications</p>

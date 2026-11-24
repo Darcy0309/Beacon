@@ -10,6 +10,7 @@ import { appointmentKind, cityState, shortDate, splitTime, timeRank } from "@/li
 import { one, readAll } from "@/lib/server/query-helpers";
 import { createClient } from "@/lib/supabase/server";
 import { campaignCompanies, withCampaign } from "@/features/campaign-types/filter";
+import { kindOf, resolveLayout } from "@/lib/dashboard-layout";
 
 export async function getDashboardStats() {
   const supabase = await createClient();
@@ -686,4 +687,14 @@ export async function getDefaultLayouts() {
   const { data, error } = await supabase.from("dashboard_layouts").select("kind, layout").is("user_id", null);
   if (error) return {};
   return Object.fromEntries((data ?? []).map((r) => [r.kind, r.layout]));
+}
+
+/**
+ * The signed-in person's dashboard layout, to customize from Settings or My Profile (Nov 2026): { kind, mine (its
+ * sections as they have them), defaults (every kind's, for an administrator; else null) }.
+ */
+export async function getMyDashboardLayout(me) {
+  const kind = kindOf(me?.role);
+  const [layouts, defaults] = await Promise.all([getDashboardLayouts(kind, me?.id ?? null), me?.role === "admin" ? getDefaultLayouts() : null]);
+  return { kind, mine: resolveLayout(kind, layouts.role, layouts.mine), defaults };
 }

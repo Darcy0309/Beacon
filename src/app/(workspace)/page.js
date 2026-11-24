@@ -50,9 +50,8 @@ import { getBusinessTimeZone, getBusinessToday } from "@/lib/server/business-day
 import CallActivityCard from "@/features/dashboard/components/call-activity";
 import { getCallActivity } from "@/features/phone/queries";
 import { twilioConfig } from "@/lib/server/twilio";
-import { getDashboardLayouts, getDefaultLayouts } from "@/features/dashboard/queries";
+import { getDashboardLayouts } from "@/features/dashboard/queries";
 import DashboardSections from "@/features/dashboard/components/dashboard-sections";
-import CustomizeDashboard from "@/features/dashboard/components/customize-dashboard";
 import { resolveLayout } from "@/lib/dashboard-layout";
 import { readCampaign } from "@/features/campaign-types/filter";
 import CampaignPicker from "@/features/campaign-types/components/campaign-picker";
@@ -230,11 +229,11 @@ export default async function Dashboard({ searchParams }) {
   }) : null;
 
   // A customizable dashboard (Sean, Nov 2026): this kind's layout, the administrators' default and the person's own
-  // (an administrator viewing a manager's dashboard sees that manager's), and every kind's default for an administrator.
+  // (an administrator viewing a manager's dashboard sees that manager's). Customized from Settings or My Profile.
   const kind = isManager ? "manager" : view.audience === "company" ? "admin" : client ? "client" : "agent";
-  const layoutsP = Promise.all([getDashboardLayouts(kind, subject ? subject.id : me?.id), role === "admin" ? getDefaultLayouts() : null]);
+  const layoutsP = getDashboardLayouts(kind, subject ? subject.id : me?.id);
 
-  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company, clientDash, clientPipeline, clientSales, clientSchedule, clientActivity, [layouts, defaults]] = await Promise.all([
+  const [recentLeads, appointments, s, report, projects, mine, volume, tz, businessToday, manager, company, clientDash, clientPipeline, clientSales, clientSchedule, clientActivity, layouts] = await Promise.all([
     // An administrator has Recent Leads & Appointments instead (below).
     isManager || view.audience === "company" ? [] : getRecentLeads(6),
     isManager ? { today: [], tomorrow: [] } : getAppointments(),
@@ -655,11 +654,6 @@ export default async function Dashboard({ searchParams }) {
             <span>Your Signature Select subscription <strong>{notice.text}</strong>{selectEnds ? ` (${mediumDate(selectEnds)})` : ""}. Contact your Sales Rep to renew.</span>
           </div>
         ) : null}
-
-        {/* Customize (Sean, Nov 2026): each person's own layout; an administrator also sets each kind's default. */}
-        <div className="flex justify-end" data-customize-row>
-          <CustomizeDashboard kind={kind} mine={!subject || subject.own ? sections : null} defaults={defaults} />
-        </div>
 
         <DashboardSections kind={kind} sections={sections} nodes={nodes} editable={!subject || subject.own} />
       </div>

@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import ProfileForm from "@/features/auth/components/profile-form";
 import VoicemailGreeting from "@/features/phone/components/voicemail-greeting";
 import ProfilePreferences from "@/features/profile/components/profile-preferences";
+import { getMyDashboardLayout } from "@/features/dashboard/queries";
 import ProfileAvatar from "@/features/profile/components/profile-avatar";
 import { getMyTwoFactor } from "@/features/auth/queries";
 import { ROLES } from "@/lib/nav";
@@ -22,6 +23,8 @@ export const dynamic = "force-dynamic";
  */
 export default async function ProfilePage() {
   const [me, twoFactor] = await Promise.all([getCurrentUser(), getMyTwoFactor()]);
+  // Their dashboard's layout, to customize under Preferences (Nov 2026: Customize moved off the dashboard).
+  const dashboard = me ? await getMyDashboardLayout(me) : null;
   if (!me) return null;
   const staff = me.role !== "client";
   const active = me.status === "active";
@@ -87,7 +90,7 @@ export default async function ProfilePage() {
         <div className="space-y-4">
           <Card>
             <SectionHeader label="Preferences" icon={SlidersHorizontal} />
-            <ProfilePreferences />
+            <ProfilePreferences dashboard={dashboard} />
           </Card>
 
           {/* The sign-in itself stays on My Security: password and two-factor. */}
