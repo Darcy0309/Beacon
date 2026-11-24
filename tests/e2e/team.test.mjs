@@ -121,9 +121,9 @@ try {
   await admin.click("[data-spotlight-switch=show]");
   check("…and back", Boolean(await until(() => sql("select coalesce(value->>'spotlight', '') from public.app_settings where key = 'team'") === "true" || null, { timeout: 10000 })));
 
-  section("Their birthday, on My Security");
+  section("Their birthday, on My Profile");
   const agent = await (await browser.newContext({ as: "agent@beacon.test" })).newPage({ width: 1440, height: 950 });
-  await agent.go("/security", 6000);
+  await agent.go("/profile", 6000);
   await when(agent, "!!document.querySelector('[data-birthday] select[name=birthday_month]')");
   await agent.fill("select[name=birthday_month]", "3");
   await agent.fill("select[name=birthday_day]", "14");

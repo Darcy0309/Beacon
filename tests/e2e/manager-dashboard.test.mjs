@@ -131,7 +131,7 @@ try {
   check("…then the flag is gone", Boolean(await until(() => sql(`select must_change_password from public.users where email = ${lit(NEW_EMAIL)}`) === "f")));
 
   section("My Profile");
-  await again.go("/security", 3000);
+  await again.go("/profile", 3000);
   await until(() => again.ev(`!!document.querySelector('[data-profile-form]')`));
   await again.fill('[data-profile-form] input[name="phone"]', "(602) 555-0142");
   await again.fill('[data-profile-form] input[name="first_name"]', "Tempo");

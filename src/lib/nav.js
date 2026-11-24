@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Target, CalendarDays, CalendarRange, Users, FolderKanban,
   UserCog, Building2, Combine, MessageSquareText, ClipboardCheck, Megaphone, FileText,
   Upload, BarChart3, BellRing, ShieldCheck, Settings, History, KeyRound, Database, Bell, PhoneCall, PhoneForwarded,
-  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet, Crown, Flame,
+  CalendarSearch, Banknote, Clock, ClipboardList, UsersRound, Palette, Timer, Goal, ClipboardPen, Gauge, ListFilter, Wallet, Crown, Flame, UserRound,
 } from "lucide-react";
 
 export const ROLES = {
@@ -146,6 +146,8 @@ export const navGroups = [
     items: [
       { href: "/users", label: "Users & Access", icon: ShieldCheck, roles: ["admin"] },
       { href: "/activity", label: "Activity Log", icon: History, roles: ["admin"] },
+      // Your details, photo, voicemail greeting and this computer's preferences (Nov 2026).
+      { href: "/profile", label: "My Profile", icon: UserRound, roles: ALL },
       { href: "/security", label: "My Security", icon: KeyRound, roles: ALL },
       { href: "/settings", label: "Settings", icon: Settings, roles: ["admin"] },
     ],

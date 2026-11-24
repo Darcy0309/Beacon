@@ -52,8 +52,8 @@ try {
   const admin = await (await browser.newContext({ as: "admin@beacon.test" })).newPage({ width: 1440, height: 950 });
 
   section("A photo and a line about themselves");
-  await agent.go("/security", 4000);
-  check("My Security has My Photo for staff", Boolean(await until(() => agent.ev("!!document.querySelector('[data-my-photo] [data-picture-upload=photo]')"), { timeout: 20000 })));
+  await agent.go("/profile", 4000);
+  check("My Profile has My Photo for staff", Boolean(await until(() => agent.ev("!!document.querySelector('[data-my-photo] [data-picture-upload=photo]')"), { timeout: 20000 })));
   await upload(agent, "[data-my-photo] [data-picture-file]");
   const photo = await until(() => sql(`select coalesce(photo_path, '') from public.users where id=${AGENT}`) || null, { timeout: 10000 });
   check("uploaded: kept as their own picture", new RegExp(`^user/${AGENT}/[a-z0-9]+\\.(webp|jpg)$`).test(photo ?? ""), photo);

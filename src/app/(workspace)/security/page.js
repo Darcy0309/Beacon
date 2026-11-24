@@ -1,12 +1,9 @@
-import { ShieldCheck, History, KeyRound, UserRound, Camera, Voicemail } from "lucide-react";
-import VoicemailGreeting from "@/features/phone/components/voicemail-greeting";
+import { ShieldCheck, History, KeyRound, UserRound, ChevronRight } from "lucide-react";
+import Link from "@/components/shared/intent-link";
 import Topbar from "@/components/layout/topbar";
 import SectionHeader from "@/components/shared/section-header";
 import TwoFactorSetup from "@/features/auth/components/two-factor-setup";
 import PasswordForm from "@/features/auth/components/password-form";
-import ProfileForm from "@/features/auth/components/profile-form";
-import PictureUpload from "@/components/shared/picture-upload";
-import { setMyPhoto } from "@/features/auth/actions";
 import { Card } from "@/components/ui/card";
 import { listActivity } from "@/features/activity/queries";
 import { getMyTwoFactor } from "@/features/auth/queries";
@@ -14,7 +11,7 @@ import { getCurrentUser } from "@/lib/server/session";
 
 export const dynamic = "force-dynamic";
 
-/** Everyone's own security settings: password, two-factor, and their recent activity. */
+/** Everyone's own sign-in settings: password, two-factor, and their recent activity (their profile: My Profile). */
 export default async function SecurityPage({ searchParams }) {
   const params = await searchParams;
   const [me, twoFactor, { rows }] = await Promise.all([
@@ -48,31 +45,15 @@ export default async function SecurityPage({ searchParams }) {
           <PasswordForm welcome={welcome} reset={reset} temporary={temporary || (me?.status === "invited" && Boolean(me?.must_change_password))} isClient={me?.role === "client"} />
         </Card>
 
-        {/* Their own contact details; the sign-in email and role stay an administrator's. */}
+        {/* Their details, photo and voicemail greeting are on My Profile now (Nov 2026); this page is the sign-in. */}
         {me?.status === "active" ? (
-          <Card>
-            <SectionHeader label="My Profile" icon={UserRound} />
-            <ProfileForm me={{ first_name: me.first_name, last_name: me.last_name, phone: me.phone, mobile: me.mobile, email: me.email, bio: me.bio ?? "", birthday: me.birthday ?? null }} staff={me.role !== "client"} />
-          </Card>
-        ) : null}
-
-        {/* Staff who take calls: what their extension's voicemail says (Sean, Nov 2026: an AI voice, or their own). */}
-        {me?.status === "active" && ["admin", "manager", "agent"].includes(me.role) ? (
-          <Card data-my-voicemail>
-            <SectionHeader label="My Voicemail Greeting" icon={Voicemail} />
-            <VoicemailGreeting me={{ first_name: me.first_name, phone_ext: me.phone_ext, voicemail_greeting: me.voicemail_greeting,
-              voicemail_use_recording: me.voicemail_use_recording, voicemail_audio_path: me.voicemail_audio_path }} />
-          </Card>
-        ) : null}
-
-        {/* Staff: their photo, on Meet the Team for the clients to put a face to the name. */}
-        {me?.status === "active" && me.role !== "client" ? (
-          <Card data-my-photo>
-            <SectionHeader label="My Photo" icon={Camera} />
-            <div className="p-5">
-              <PictureUpload folder={`user/${me.id}`} path={me.photo_path} name={[me.first_name, me.last_name].filter(Boolean).join(" ")} save={setMyPhoto}
-                label="Clients see it on Meet the Team. A clear head-and-shoulders picture works best." />
-            </div>
+          <Card data-security-to-profile>
+            <Link href="/profile" className="flex items-center justify-between gap-3 px-5 py-4 text-sm hover:bg-muted/40">
+              <span className="flex items-center gap-2.5"><UserRound className="size-4 text-primary" aria-hidden />
+                <span><span className="font-medium">Your details, photo and voicemail greeting</span><span className="block text-xs text-muted-foreground">are on My Profile</span></span>
+              </span>
+              <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+            </Link>
           </Card>
         ) : null}
 

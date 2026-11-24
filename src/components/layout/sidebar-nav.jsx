@@ -212,6 +212,9 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
 
       <div className={cn("border-t border-sidebar-border", collapsed ? "flex flex-col items-center gap-2 p-2" : "p-3")}>
         <div className={cn("flex items-center gap-3", collapsed && "flex-col gap-2")}>
+          {/* Your picture and name: My Profile (Nov 2026). */}
+          <Link href="/profile" className={cn("group flex min-w-0 flex-1 items-center gap-3 rounded-md -m-1 p-1 transition-colors hover:bg-sidebar-accent", collapsed && "flex-none")}
+            title={collapsed ? "My Profile" : undefined} aria-label="My Profile" data-my-profile-link>
           <div className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-[var(--neon-cyan)] to-[var(--neon-blue)] text-xs font-bold text-[var(--background)]">
             {user?.photo_path ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -224,6 +227,7 @@ export default function SidebarNav({ onNavigate, forceExpanded = false }) {
               <div className="truncate text-xs text-sidebar-foreground/60">{ROLES[role]?.label}</div>
             </div>
           )}
+          </Link>
           {/* Signing out asks first: the button is small and sits by the navigation. */}
           <button
             type="button"
