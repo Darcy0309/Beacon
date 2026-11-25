@@ -44,6 +44,11 @@ async function atFullAssurance(supabase) {
  * already ended (it expired, or ended in another tab). Next's own header for
  * an action's redirect opens the page instead.
  */
+// What Supabase says of a session that is gone for good (ended by a sign-out, a password change, its login removed or
+// made again), as against a moment it couldn't be reached.
+const DEAD_SESSION_CODES = new Set(["refresh_token_not_found", "refresh_token_already_used", "session_not_found", "session_expired", "user_not_found", "bad_jwt"]);
+const isDeadSession = (error) => Boolean(error) && (DEAD_SESSION_CODES.has(error.code) || error.status === 403);
+
 function goTo(request, url) {
   if (!request.headers.has("next-action")) return NextResponse.redirect(url);
   return new NextResponse(null, {
@@ -87,17 +92,38 @@ export async function proxy(request) {
   // login page will surface the real error on submit.
   let user = null;
   let unreachable = false;
+  let dead = false;
   try {
     const { data, error } = await supabase.auth.getUser();
     user = data?.user ?? null;
     // auth-js reports a failed network call as an error rather than throwing.
     unreachable = error?.name === "AuthRetryableFetchError";
+    dead = !user && !unreachable && isDeadSession(error);
   } catch (err) {
     unreachable = true;
     console.error("[proxy] Supabase unreachable:", err?.message ?? err);
   }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  // A session Supabase has ended (Nov 2026: Sean's, after a sign-out elsewhere, a password reset and his login made
+  // again: "Invalid Refresh Token: Refresh Token Not Found" on every request, the sign-in page too): its cookies
+  // taken off now, so it is never tried again, and the sign-in page from a page that needs one.
+  if (dead) {
+    const stale = request.cookies.getAll().map((c) => c.name).filter((n) => n.includes("auth-token") || n === IDLE_COOKIE);
+    stale.forEach((n) => request.cookies.delete(n));
+    let response;
+    if (isPublic) response = NextResponse.next({ request });
+    else {
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = "";
+      if (!pathname.startsWith("/api/") && pathname !== "/") url.searchParams.set("next", pathname);
+      response = goTo(request, url);
+    }
+    stale.forEach((n) => response.cookies.delete(n));
+    return response;
+  }
 
   // A visitor with a session cookie whose check could not reach Supabase is
   // not signed out — let the request through so the page reports the outage
