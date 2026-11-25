@@ -40,6 +40,10 @@ export default function WorkspaceShell({ children }) {
     else if (temporary && path !== "/security") router.replace("/security?temporary=1");
   }, [invited, temporary, path, router]);
 
+  // Signed in, but no account to go with it (Sean, Nov 2026: signed in as a test client that was deleted later): the
+  // database hides a deleted account's row, so every page would fail. This says so, with a way out, instead of an
+  // error page he couldn't leave; and Try again, for a moment the account couldn't be read.
+  if (!user) return <AccountMissing />;
   // The database already refuses a disabled account everything. This just
   // says so, with a way out, instead of a workspace full of empty tables.
   if (user?.status === "disabled") return <AccountDisabled email={user.email} />;
@@ -122,6 +126,37 @@ function AccountDisabled({ email }) {
             <LogOut className="size-3.5" /> Sign out
           </button>
         </form>
+      </Card>
+    </div>
+  );
+}
+
+/** Signed in, no account to load: one deleted since (its login still good), or a moment the database didn't answer. */
+function AccountMissing() {
+  return (
+    <div className="flex min-h-svh flex-1 items-center justify-center p-6" data-account-missing>
+      <Card className="max-w-md p-8 text-center">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-xl border border-[var(--panel-border)] text-muted-foreground">
+          <UserX className="size-5" />
+        </span>
+        <h2 className="mt-4 text-base font-semibold">We couldn&apos;t load your account</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          The account you&apos;re signed in with may have been removed. Sign out and sign in with your own account; if it keeps happening, contact an
+          administrator.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          {/* A plain form post (/auth/sign-out): it works with no account behind the sign-in. */}
+          <form action="/auth/sign-out" method="post" onSubmit={forgetPushThenSubmit}>
+            <button type="submit" data-account-missing-sign-out
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary-foreground transition-opacity hover:opacity-90">
+              <LogOut className="size-3.5" /> Sign out
+            </button>
+          </form>
+          <button type="button" onClick={() => window.location.reload()}
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--panel-border)] px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-[0.14em] text-primary transition-colors hover:border-primary/40">
+            Try again
+          </button>
+        </div>
       </Card>
     </div>
   );
