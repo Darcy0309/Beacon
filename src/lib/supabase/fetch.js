@@ -84,7 +84,28 @@ export async function supabaseFetch(url, init = {}) {
   }
 }
 
+// "JWT issued at future" (PGRST303, Nov 2026: Sean signed in and got "We couldn't load your account"): the database
+// service's clock a little behind the sign-in service's, so a token minted that moment is refused as not yet valid,
+// and every read right after signing in failed, his own account first. Refused before anything ran, so any request,
+// a write too, is safe to send again once the clocks agree: up to three more times, a moment apart.
+const CLOCK_WAITS_MS = [1_000, 2_000, 3_000];
+
+async function withClockRetry(send) {
+  for (let i = 0; ; i++) {
+    const res = await send();
+    if (res.status !== 401 || i >= CLOCK_WAITS_MS.length) return res;
+    const body = await res.clone().text().catch(() => "");
+    if (!body.includes("PGRST303")) return res;
+    await res.body?.cancel().catch(() => {});
+    await new Promise((resolve) => setTimeout(resolve, CLOCK_WAITS_MS[i]));
+  }
+}
+
 async function supabaseFetchUnlogged(url, init = {}) {
+  return withClockRetry(() => sendOnce(url, init));
+}
+
+async function sendOnce(url, init = {}) {
   const method = String(init.method ?? "GET").toUpperCase();
   if (method !== "GET" && method !== "HEAD") {
     return undiciFetch(url, { ...init, dispatcher: agent() });
