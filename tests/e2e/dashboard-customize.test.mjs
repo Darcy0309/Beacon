@@ -50,6 +50,9 @@ try {
   await admin.click(`${row("chart")} [data-collapse]`);
   for (let i = 0; i < 5; i++) await admin.click(`${row("production")} [data-move-up]`);
   await pick(admin, `${row("schedule")} [data-place]`, "left");
+  // A rough sketch of the dashboard beside the list, redrawn as it changes (Sean, Nov 2026).
+  const sketch = await admin.ev(`[...document.querySelectorAll('[data-layout-preview] [data-preview-section]')].map((b) => b.dataset.previewSection + ('previewCollapsed' in b.dataset ? ':c' : ''))`);
+  check("the preview follows: Daily Production first, the chart a bar, Appointments by Rep gone", sketch[0] === "production" && sketch.includes("chart:c") && !sketch.includes("reps"), JSON.stringify(sketch));
   check("…saved", /Your dashboard is saved/.test((await saved(admin, /saved/)) ?? ""));
   await admin.go("/", 9000);
   const after = await until(() => order(admin).then((o) => (o?.[0] === "production" ? o : null)), { timeout: 15000 });

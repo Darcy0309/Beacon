@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { saveDashboardLayout } from "@/features/dashboard/actions";
 import { KINDS, PLACES, layoutOf, resolveLayout } from "@/lib/dashboard-layout";
 import { reach } from "@/lib/reach";
+import LayoutPreview from "@/features/dashboard/components/layout-preview";
 
 /**
  * The dashboard's layout (Sean, Nov 2026: "Is it possible to make the dashboard customizable … so each person can set
@@ -69,30 +70,37 @@ export function LayoutEditor({ kind, mine, defaults, onDone = null }) {
           What everyone with this dashboard starts from. Anyone who has customized their own keeps theirs until they choose Back to default.
         </p>
       ) : null}
-      <ol className="divide-y divide-[var(--panel-border)] rounded-lg border border-[var(--panel-border)]">
-        {sections.map((s, i) => (
-          <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 text-sm" data-customize-section={s.id}>
-            <span className="flex gap-0.5">
-              <Button type="button" size="icon" variant="ghost" className="size-7" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${s.label} up`} data-move-up>
-                <ArrowUp />
-              </Button>
-              <Button type="button" size="icon" variant="ghost" className="size-7" disabled={i === sections.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${s.label} down`} data-move-down>
-                <ArrowDown />
-              </Button>
-            </span>
-            <span className={`min-w-40 flex-1 font-medium ${s.hidden ? "text-muted-foreground line-through" : ""}`}>{s.label}</span>
-            <label className="flex items-center gap-1.5">
-              <input type="checkbox" checked={!s.hidden} onChange={(e) => change(s.id, { hidden: !e.target.checked })} data-show /> Show
-            </label>
-            <label className={`flex items-center gap-1.5 ${s.hidden ? "opacity-50" : ""}`}>
-              <input type="checkbox" checked={s.collapsed} disabled={s.hidden} onChange={(e) => change(s.id, { collapsed: e.target.checked })} data-collapse /> Collapsed
-            </label>
-            <Select value={s.place} disabled={s.hidden || s.id === "tiles"} onChange={(e) => change(s.id, { place: e.target.value })} className="h-8 w-32" aria-label={`Where ${s.label} sits`} data-place>
-              {PLACES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
-            </Select>
-          </li>
-        ))}
-      </ol>
+      {/* The sections, and beside them (below, where it's narrow) a rough sketch of the dashboard they make, redrawn as
+          they change (Sean, Nov 2026). */}
+      <div className="@container">
+        <div className="grid items-start gap-3 @3xl:grid-cols-[minmax(0,1fr)_minmax(15rem,22rem)]">
+          <ol className="divide-y divide-[var(--panel-border)] rounded-lg border border-[var(--panel-border)]">
+            {sections.map((s, i) => (
+              <li key={s.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3 py-2.5 text-sm" data-customize-section={s.id}>
+                <span className="flex gap-0.5">
+                  <Button type="button" size="icon" variant="ghost" className="size-7" disabled={i === 0} onClick={() => move(i, -1)} aria-label={`Move ${s.label} up`} data-move-up>
+                    <ArrowUp />
+                  </Button>
+                  <Button type="button" size="icon" variant="ghost" className="size-7" disabled={i === sections.length - 1} onClick={() => move(i, 1)} aria-label={`Move ${s.label} down`} data-move-down>
+                    <ArrowDown />
+                  </Button>
+                </span>
+                <span className={`min-w-40 flex-1 font-medium ${s.hidden ? "text-muted-foreground line-through" : ""}`}>{s.label}</span>
+                <label className="flex items-center gap-1.5">
+                  <input type="checkbox" checked={!s.hidden} onChange={(e) => change(s.id, { hidden: !e.target.checked })} data-show /> Show
+                </label>
+                <label className={`flex items-center gap-1.5 ${s.hidden ? "opacity-50" : ""}`}>
+                  <input type="checkbox" checked={s.collapsed} disabled={s.hidden} onChange={(e) => change(s.id, { collapsed: e.target.checked })} data-collapse /> Collapsed
+                </label>
+                <Select value={s.place} disabled={s.hidden || s.id === "tiles"} onChange={(e) => change(s.id, { place: e.target.value })} className="h-8 w-32" aria-label={`Where ${s.label} sits`} data-place>
+                  {PLACES.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                </Select>
+              </li>
+            ))}
+          </ol>
+          <LayoutPreview sections={sections} className="@3xl:sticky @3xl:top-4" />
+        </div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button type="button" variant="ghost" onClick={() => save(null)} disabled={pending} data-customize-reset>
           <RotateCcw /> {target === "mine" ? "Back to default" : "Back to the original"}
@@ -117,7 +125,7 @@ export default function CustomizeDashboard({ kind, mine, defaults, label = "Cust
       <DialogTrigger asChild>
         <Button type="button" size="sm" variant="outline" data-customize-dashboard><SlidersHorizontal /> {label}</Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Customize the dashboard</DialogTitle>
           <DialogDescription>
