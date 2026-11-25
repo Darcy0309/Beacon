@@ -172,8 +172,8 @@ function OwnFields({ title, listKey, f, setF, setCustom, move }) {
         {list.map((c, i) => (
           <div key={c.id ?? i} className="grid grid-cols-[1fr_12rem_auto] items-start gap-2" data-custom-field={i}>
             <div className="space-y-1.5">
-              <Input value={c.label} placeholder="e.g. Number of desktops" maxLength={40} onChange={(e) => setCustom(listKey, i, { label: e.target.value })}
-                aria-label="Field name" className="h-8" data-custom-label />
+              <Input value={c.label} maxLength={40} onChange={(e) => setCustom(listKey, i, { label: e.target.value })}
+                placeholder="Field name" aria-label="Field name" className="h-8" data-custom-label />
               {LIST_TYPES.has(c.type) ? <Choices value={c.options ?? ""} onChange={(options) => setCustom(listKey, i, { options })} /> : null}
             </div>
             <Select value={c.type} onChange={(e) => setCustom(listKey, i, { type: e.target.value })} aria-label="Kind of field" className="h-8" data-custom-type>
@@ -222,7 +222,7 @@ function Choices({ value, onChange }) {
   return (
     <div className="space-y-1">
       <Textarea value={value} onChange={(e) => onChange(e.target.value)} rows={Math.min(6, Math.max(2, count + 1))}
-        placeholder={"Choices, one on each line:\nAzure\nAWS\nGoogle Cloud"} aria-label="Choices" className="min-h-0 text-sm" data-custom-options />
+        placeholder="One choice on each line" aria-label="Choices" className="min-h-0 text-sm" data-custom-options />
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
         <input ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain" className="hidden" onChange={onFile} data-custom-options-file />
         <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => fileRef.current?.click()} data-custom-options-load>
