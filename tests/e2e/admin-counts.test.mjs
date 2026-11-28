@@ -18,7 +18,7 @@
  *
  *   node tests/run.mjs tests/e2e/admin-counts.test.mjs
  */
-import { check, finish, section, until } from "../support/assert.mjs";
+import { check, finish, section, sleep, until } from "../support/assert.mjs";
 import { sql, lit } from "../support/db.mjs";
 import { launchBrowser } from "../support/browser.mjs";
 
@@ -99,7 +99,11 @@ try {
   await admin.fill('[role=dialog] input[name="mobile"]', "(480) 555-0199");
   await admin.fill('[role=dialog] input[name="state"]', "arizona");
   await admin.fill('[role=dialog] select[name="timezone_id"]', "3");
-  await admin.fill('[role=dialog] input[name="start_date"]', "2021-03-15");
+  // The app's date picker (not the browser's): typed into, as a person would.
+  await admin.ev(`document.querySelector('[role=dialog] input[aria-label="Start date"]').focus()`);
+  await admin.fill('[role=dialog] input[aria-label="Start date"]', "3/15/2021");
+  await admin.key("Tab");
+  await sleep(200);
   await admin.click("[role=dialog] button[type=submit]");
   check("…saved, the state written as its code", Boolean(await until(() => sql(`select concat_ws('|', mobile, state, timezone_id, start_date) from public.users where id = ${MIKE}`) === "(480) 555-0199|AZ|3|2021-03-15")),
     sql(`select concat_ws('|', mobile, state, timezone_id, start_date) from public.users where id = ${MIKE}`));

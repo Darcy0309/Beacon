@@ -18,7 +18,8 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { addDays, addMonths, formatRange } from "@/lib/dates";
+import { addDays, addMonths, formatRange, todayIso } from "@/lib/dates";
+import MonthJump from "@/components/shared/month-jump";
 import { CHART_RANGES, DAY_AXIS, axisMax, chartPoints, chartStats, goalFrom, workdaysBetween } from "@/lib/production-chart";
 import { cn } from "@/lib/utils";
 import { saveProductionGoal } from "@/features/dashboard/actions";
@@ -69,7 +70,10 @@ function GoalsDialog({ goals, month: start }) {
         <form action={action} className="flex flex-col gap-4" data-goals-form>
           <input type="hidden" name="month" value={`${month}-01`} />
           <Field label="Month">
-            <Input type="month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} aria-label="Month" />
+            {/* The app's own month picker, not the browser's (Nov 2026). */}
+            <div className="flex h-9 items-center rounded-md border border-input bg-background/60 px-1" data-goals-month>
+              <MonthJump month={`${month}-01`} today={todayIso()} onPick={(iso) => setMonth(iso.slice(0, 7))} className="w-full justify-between text-sm" />
+            </div>
           </Field>
           {[
             ["leads", "Leads", "Lead managers", "leadPeople", "leadHours", leadsCalc],

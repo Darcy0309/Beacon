@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { UserPlus, Pencil, Wand2, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+// The app's own calendar, not the browser's (Nov 2026: the date of birth and start date opened the system one).
+import DatePicker from "@/components/shared/date-picker";
 import { Field, Select, formHelpers } from "@/components/ui/field";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -221,10 +223,10 @@ export default function UserForm({ user, options, pay, hourly, trigger }) {
               </Select>
             </Field>
             <Field label="Date of birth" error={fe("birth_date")} hint="A birthday note goes to the team that day">
-              <Input name="birth_date" type="date" defaultValue={dv("birth_date")} aria-invalid={invalid("birth_date")} />
+              <DatePicker name="birth_date" defaultValue={dv("birth_date") ?? ""} max="today" invalid={invalid("birth_date")} aria-label="Date of birth" display="numeric" />
             </Field>
             <Field label="Started" error={fe("start_date")} hint="Their hire date: a work anniversary note goes to the team each year">
-              <Input name="start_date" type="date" defaultValue={dv("start_date")} aria-invalid={invalid("start_date")} />
+              <DatePicker name="start_date" defaultValue={dv("start_date") ?? ""} invalid={invalid("start_date")} aria-label="Start date" display="numeric" />
             </Field>
 
             <Field
